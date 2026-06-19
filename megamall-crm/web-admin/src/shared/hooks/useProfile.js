@@ -1,0 +1,29 @@
+import { useMemo } from 'react'
+import useCurrentUser from './useCurrentUser'
+import useEmployee from '../../features/people/hooks/useEmployee'
+import useAuthStore from '../store/authStore'
+
+export default function useProfile() {
+  const { userId } = useCurrentUser()
+  const { phone, role } = useAuthStore()
+  const { data: employee } = useEmployee(userId)
+
+  const fullName = employee?.full_name ?? employee?.FullName ?? null
+
+  const initials = useMemo(() => {
+    if (fullName) {
+      const words = fullName.trim().split(/\s+/).filter(Boolean)
+      return words.map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    }
+    // Role-based fallback — never show phone digits
+    if (role) {
+      const parts = role.split('_').filter(Boolean)
+      return parts.length >= 2
+        ? (parts[0][0] + parts[1][0]).toUpperCase()
+        : role.slice(0, 2).toUpperCase()
+    }
+    return 'U'
+  }, [fullName, role])
+
+  return { fullName, initials, phone, role, userId, employee }
+}

@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+
+# Env files
+.env
+.env.*
+!.env.example
+!.env.staging.example
+
+# Go build artifacts
+megamall-crm/server
+megamall-crm/tmp/
+megamall-crm/venv/
+
+# Frontend build & deps
+megamall-crm/web-admin/node_modules/
+megamall-crm/web-admin/dist/
+mobile/courier-app/node_modules/
+package-lock.json
+
+# Uploads (runtime data)
+megamall-crm/uploads/
+
+# IDE / Claude internals
+.claude/
+megamall-crm/.claude/
+megamall-crm/web-admin/.claude/
+.codex-screens/

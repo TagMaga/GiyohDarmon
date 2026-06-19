@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base resets ─────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply text-slate-900 font-sans;
+    background: #F2F4F7;
+    margin: 0;
+  }
+
+  /* Custom slim scrollbar */
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-slate-400; }
+}
+
+/* ─── Reusable component classes ──────────────────────────────────────────── */
+@layer components {
+
+  /* ── Sidebar navigation item ── */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 text-[13.5px] font-medium
+           text-slate-400 hover:text-white
+           transition-all duration-150 cursor-pointer select-none no-underline;
+    border-radius: 12px;
+    min-height: 44px;
+  }
+  .nav-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+  .nav-item.active {
+    @apply bg-indigo-600 text-white;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+  }
+  .nav-item.active:hover {
+    @apply bg-indigo-500;
+  }
+
+  /* ── Cards ── */
+  .card {
+    @apply bg-white;
+    border-radius: 20px;
+    border: 1px solid rgba(226, 232, 240, 0.7);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.06);
+  }
+  .card-hover {
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .card-hover:hover {
+    box-shadow: 0 2px 4px rgba(16, 24, 40, 0.04), 0 12px 32px rgba(16, 24, 40, 0.08);
+    transform: translateY(-1px);
+  }
+
+  /* ── KPI card ── */
+  .kpi-card {
+    padding: 24px;
+    border-radius: 24px;
+    background: white;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.06);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .kpi-card:hover {
+    box-shadow: 0 2px 4px rgba(16, 24, 40, 0.04), 0 12px 32px rgba(16, 24, 40, 0.08);
+    transform: translateY(-2px);
+  }
+
+  /* ── Buttons — pill shape ── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-semibold
+           transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+    border-radius: 999px;
+  }
+  .btn-sm  { @apply btn text-xs px-4 py-2; }
+  .btn-md  { @apply btn text-sm px-5 py-3; }
+  .btn-lg  { @apply btn text-[15px] px-6; padding-top: 14px; padding-bottom: 14px; }
+
+  .btn-primary {
+    @apply bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98]
+           text-white focus-visible:ring-indigo-500;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+  }
+  .btn-secondary {
+    @apply bg-slate-100 hover:bg-slate-200 active:bg-slate-200
+           text-slate-700 focus-visible:ring-slate-400;
+  }
+  .btn-danger {
+    @apply bg-red-500 hover:bg-red-600 text-white focus-visible:ring-red-400;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+  }
+
+  /* ── Form inputs ── */
+  .input {
+    @apply w-full px-4 py-3 bg-white border border-slate-200
+           text-sm text-slate-900 placeholder-slate-400
+           focus:outline-none focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-400
+           transition-all duration-150;
+    border-radius: 14px;
+  }
+  .input-label {
+    @apply block text-[13px] font-semibold text-slate-700 mb-1.5;
+  }
+
+  /* ── Page titles ── */
+  .page-title    {
+    @apply font-bold text-slate-900 tracking-tight leading-tight;
+    font-size: 28px;
+  }
+  .page-subtitle {
+    @apply text-[14px] text-slate-500 font-medium;
+    margin-top: 4px;
+  }
+
+  /* ── Status dots ── */
+  .dot-online  { @apply w-2 h-2 rounded-full bg-emerald-500; }
+  .dot-offline { @apply w-2 h-2 rounded-full bg-red-500; }
+  .dot-pending { @apply w-2 h-2 rounded-full bg-amber-400 animate-pulse-slow; }
+
+  /* ── Table placeholder ── */
+  .table-placeholder {
+    @apply card overflow-hidden;
+  }
+  .table-placeholder-header {
+    @apply px-6 py-4 border-b border-slate-100 flex items-center justify-between;
+  }
+  .table-placeholder-body {
+    @apply flex flex-col items-center justify-center py-16 text-center;
+  }
+
+  /* ── Loading skeleton ── */
+  .skeleton {
+    @apply bg-slate-100 rounded-xl animate-pulse;
+  }
+
+  /* ── Scrollbar hide (StatusTabs horizontal scroll) ── */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ── Account menu dropdown animation ─────────────────────────────────────── */
+@keyframes accountMenuIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* Spinner for password save button */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
