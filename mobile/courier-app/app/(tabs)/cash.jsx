@@ -103,7 +103,7 @@ export default function CashScreen() {
   const removeAttachment = (uri) => setAttachments(prev => prev.filter(a => a.uri !== uri))
 
   const handleHandover = async () => {
-    const expected = summary?.cash_to_handover || 0
+    const expected = toReturn
     const amt = parseFloat(actualAmount)
     if (!amt || amt <= 0) { Alert.alert('Укажите сумму', 'Введите сумму перевода'); return }
     if (attachments.length === 0) { Alert.alert('Нет подтверждения', 'Прикрепите скриншот перевода'); return }
@@ -135,9 +135,10 @@ export default function CashScreen() {
     ])
   }
 
-  const toReturn  = summary?.cash_to_handover || 0
+  const collected = summary?.cash_to_handover || 0
   const salary    = summary?.total_delivery_fees || 0
-  const collected = Number(toReturn) + Number(salary)
+  const alreadyHanded = summary?.already_handed || 0
+  const toReturn  = Math.max(0, Number(collected) - Number(salary) - Number(alreadyHanded))
   const cashOrders = summary?.orders_collected || 0
   const pendingHandover = history.filter(h => h.status === 'pending').reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0)
   const amtNum = parseFloat(actualAmount) || 0

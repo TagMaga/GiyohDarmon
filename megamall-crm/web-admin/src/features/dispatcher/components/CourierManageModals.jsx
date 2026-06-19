@@ -125,6 +125,7 @@ function PrimaryBtn({ onClick, disabled, loading, children, color = T.violet }) 
         cursor: disabled || loading ? 'not-allowed' : 'pointer',
         opacity: disabled || loading ? 0.7 : 1,
         minWidth: 100,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
       }}
     >
       {loading ? '...' : children}
@@ -381,7 +382,7 @@ export function TariffsModal({ courier, onClose }) {
           <ErrorMsg msg={error} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
             <PrimaryBtn onClick={handleAdd} loading={saving}>
-              <Plus size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+              <Plus size={14} />
               Добавить
             </PrimaryBtn>
           </div>

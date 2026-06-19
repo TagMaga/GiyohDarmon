@@ -137,9 +137,9 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 				         SELECT cho.order_id
 				         FROM   cash_handover_orders cho
 				         JOIN   cash_handovers ch ON ch.id = cho.handover_id
-				         WHERE  ch.status IN ('pending', 'confirmed')
+				         WHERE  ch.status = 'confirmed'
 				     )
-				     THEN o.total_amount - COALESCE(o.prepayment_amount, 0)
+				     THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount, 0) - COALESCE(o.courier_payout, 0))
 				     ELSE 0 END
 			), 0)                                                            AS cash_owed
 		FROM users u
@@ -339,7 +339,7 @@ func (r *Repository) GetCashSettlement(ctx context.Context, filter CashSettlemen
 			Failed:             row.Failed,
 			SuccessRate:        cashSettlementSuccessRate(row.Delivered, row.Failed),
 			AvgDeliverySeconds: avgSeconds,
-			CashDebt:           cashSettlementDebt(row.CollectedCash, row.HandedOverCash),
+			CashDebt:           cashSettlementDebt(row.CollectedCash, row.Earnings, row.HandedOverCash),
 			Earnings:           row.Earnings,
 		})
 	}
@@ -355,11 +355,10 @@ func cashSettlementSuccessRate(delivered, failed int) *float64 {
 	return &rate
 }
 
-// cashSettlementDebt is the cash the courier still owes: full collected client
-// cash minus what they have handed over. Courier payout is NOT subtracted — it is
-// a company expense paid to the courier separately, not cash the courier keeps.
-func cashSettlementDebt(collectedCash, handedOverCash float64) float64 {
-	debt := collectedCash - handedOverCash
+// cashSettlementDebt is the cash the courier still owes: collected from clients
+// minus their own payout (which they keep) minus what they have already handed over.
+func cashSettlementDebt(collectedCash, earnings, handedOverCash float64) float64 {
+	debt := collectedCash - earnings - handedOverCash
 	if debt < 0 {
 		return 0
 	}

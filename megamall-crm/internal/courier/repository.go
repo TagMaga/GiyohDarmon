@@ -334,7 +334,7 @@ func (r *Repository) ListAvailableOrders(ctx context.Context, courierID uuid.UUI
 	}
 
 	var rows []row
-	if err := base.Order("o.created_at ASC").
+	if err := base.Order("CASE WHEN o.delivery_method IN ('fast','express') THEN 0 ELSE 1 END ASC, o.created_at ASC").
 		Limit(p.Limit).Offset(p.Offset()).
 		Scan(&rows).Error; err != nil {
 		return nil, 0, fmt.Errorf("list available orders: %w", err)
