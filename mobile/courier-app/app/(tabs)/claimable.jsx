@@ -6,6 +6,13 @@ import useAuthStore from '../../src/store/authStore'
 import { resolveCreator } from '../../src/lib/creator'
 import { C } from '../../src/components/OrderDetailSheet'
 
+// Canonical DB value is "fast"; "express" kept as legacy fallback.
+// Defensive check across all possible field-name shapes from the API.
+const isUrgent = (o) => {
+  const m = String(o?.delivery_method ?? o?.DeliveryMethod ?? o?.deliveryMethod ?? '').toLowerCase()
+  return m === 'fast' || m === 'express'
+}
+
 export default function ClaimableScreen() {
   const [orders, setOrders]     = useState([])
   const [loading, setLoading]   = useState(true)
@@ -16,7 +23,9 @@ export default function ClaimableScreen() {
   const fetchOrders = async () => {
     try {
       const { data } = await getClaimableOrders()
-      setOrders(data.data || [])
+      const list = data.data || []
+      // Urgent orders first; backend also sorts this way, but guard on client too
+      setOrders([...list].sort((a, b) => (isUrgent(b) ? 1 : 0) - (isUrgent(a) ? 1 : 0)))
     } catch (e) {
       Alert.alert('Ошибка загрузки', e?.response?.data?.error?.message || 'Не удалось загрузить заказы')
     } finally { setLoading(false); setRefreshing(false) }
@@ -24,20 +33,15 @@ export default function ClaimableScreen() {
 
   useEffect(() => { fetchOrders() }, [])
 
-  const handleClaim = (order) => {
-    Alert.alert('Взять заказ?', `${order.order_number} — ${order.customer?.full_name}`, [
-      { text: 'Отмена', style: 'cancel' },
-      { text: '🎯 Взять', onPress: async () => {
-        setClaiming(order.id)
-        try {
-          await claimOrder(order.id)
-          fetchOrders()
-          Alert.alert('Заказ взят!', 'Перейдите во вкладку «Доставки»')
-        } catch (e) {
-          Alert.alert('Ошибка', e.response?.data?.error?.message || 'Не удалось взять заказ')
-        } finally { setClaiming(null) }
-      }},
-    ])
+  // Direct claim — no confirmation popup, no success popup
+  const handleClaim = async (order) => {
+    setClaiming(order.id)
+    try {
+      await claimOrder(order.id)
+      fetchOrders()
+    } catch (e) {
+      Alert.alert('Ошибка', e.response?.data?.error?.message || 'Не удалось взять заказ')
+    } finally { setClaiming(null) }
   }
 
   const fmt = (n) => Number(n || 0).toLocaleString()
@@ -66,12 +70,18 @@ export default function ClaimableScreen() {
             : orders.map((order) => {
               const cr         = resolveCreator(order, currentUserName)
               const collectAmt = Number(order.courier_collect_amount ?? order.amount_to_collect ?? 0)
+              const urgent     = isUrgent(order)
               return (
-                <View key={order.id} style={s.card}>
-                  {/* Top: order number + amount */}
+                <View key={order.id} style={[s.card, urgent && s.cardUrgent]}>
+                  {/* Top: order number + badges */}
                   <View style={s.cardTop}>
                     <Text style={s.orderNum}>{order.order_number}</Text>
-                    <View style={s.newBadge}><Text style={s.newBadgeText}>свободный</Text></View>
+                    <View style={s.topBadges}>
+                      {urgent && (
+                        <View style={s.expressBadge}><Text style={s.expressText}>⚡ Экспресс</Text></View>
+                      )}
+                      <View style={s.newBadge}><Text style={s.newBadgeText}>свободный</Text></View>
+                    </View>
                   </View>
 
                   {/* Address / customer */}
@@ -147,26 +157,34 @@ const s = StyleSheet.create({
     shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06, shadowRadius: 14, elevation: 3,
   },
-  cardTop:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  orderNum:   { fontSize: 15, fontWeight: '900', color: C.ink, letterSpacing: -0.2 },
-  newBadge:   { backgroundColor: '#e8f8f0', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999 },
+  cardUrgent: {
+    borderColor: C.orange, borderWidth: 2,
+    shadowColor: C.orange, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
+  },
+  cardTop:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  topBadges:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  expressBadge: { backgroundColor: '#fff7e6', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#ffe0a0' },
+  expressText:  { fontSize: 11, fontWeight: '900', color: C.orange },
+  orderNum:     { fontSize: 15, fontWeight: '900', color: C.ink, letterSpacing: -0.2 },
+  newBadge:     { backgroundColor: '#e8f8f0', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999 },
   newBadgeText: { color: '#098a50', fontWeight: '900', fontSize: 11 },
-  infoBlock:  { gap: 4 },
-  clientName: { fontSize: 17, fontWeight: '900', color: C.ink, letterSpacing: -0.3 },
-  address:    { fontSize: 13, color: C.muted, fontWeight: '600', lineHeight: 18 },
-  amountRow:  { gap: 2 },
-  amountLabel: { fontSize: 10, fontWeight: '800', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
-  amountVal:  { fontSize: 18, fontWeight: '900', color: C.violet, letterSpacing: -0.5 },
+  infoBlock:    { gap: 4 },
+  clientName:   { fontSize: 17, fontWeight: '900', color: C.ink, letterSpacing: -0.3 },
+  address:      { fontSize: 13, color: C.muted, fontWeight: '600', lineHeight: 18 },
+  amountRow:    { gap: 2 },
+  amountLabel:  { fontSize: 10, fontWeight: '800', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  amountVal:    { fontSize: 18, fontWeight: '900', color: C.violet, letterSpacing: -0.5 },
   creatorStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line },
-  creatorIcon: { fontSize: 14 },
-  creatorName: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '800', color: C.ink },
-  rolePill:   { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0 },
+  creatorIcon:  { fontSize: 14 },
+  creatorName:  { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '800', color: C.ink },
+  rolePill:     { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0 },
   rolePillText: { fontSize: 11, fontWeight: '900' },
-  claimBtn:   {
+  claimBtn:     {
     borderRadius: 18, paddingVertical: 16, alignItems: 'center',
     backgroundColor: C.violet,
     shadowColor: C.violet, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 3,
   },
   claimBtnDisabled: { opacity: 0.45 },
-  claimBtnText: { color: '#fff', fontWeight: '900', fontSize: 16 },
+  claimBtnText:     { color: '#fff', fontWeight: '900', fontSize: 16 },
 })

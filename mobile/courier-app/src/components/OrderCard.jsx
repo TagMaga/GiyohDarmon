@@ -6,6 +6,11 @@
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native'
 import { C, STATUS_LABEL, STATUS_COLOR } from './OrderDetailSheet'
 
+const isUrgent = (o) => {
+  const m = String(o?.delivery_method ?? o?.DeliveryMethod ?? o?.deliveryMethod ?? '').toLowerCase()
+  return m === 'fast' || m === 'express'
+}
+
 export function OrderCard({ order, onOpen, onStart, actionLoading }) {
   const color      = STATUS_COLOR[order.status] || C.muted
   const collectAmt = Number(order.amount_to_collect ?? order.courier_collect_amount ?? 0)
@@ -22,7 +27,7 @@ export function OrderCard({ order, onOpen, onStart, actionLoading }) {
   const isDone       = ['delivered', 'returned', 'issue', 'confirmed', 'cancelled'].includes(order.status)
 
   return (
-    <TouchableOpacity style={oc.card} onPress={onOpen} activeOpacity={0.78}>
+    <TouchableOpacity style={[oc.card, isUrgent(order) && oc.cardUrgent]} onPress={onOpen} activeOpacity={0.78}>
       {/* Top: order number + status badge */}
       <View style={oc.topRow}>
         <Text style={oc.orderNum}>{order.order_number}</Text>
@@ -90,6 +95,11 @@ const oc = StyleSheet.create({
     padding: 16, gap: 12,
     shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06, shadowRadius: 14, elevation: 3,
+  },
+  cardUrgent: {
+    borderColor: C.orange, borderWidth: 2,
+    shadowColor: C.orange, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
   },
   topRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   orderNum:  { fontSize: 15, fontWeight: '900', color: C.ink, letterSpacing: -0.2 },

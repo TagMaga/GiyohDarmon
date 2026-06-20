@@ -33,7 +33,14 @@ export default function DeliveriesScreen() {
 
   useEffect(() => { fetchOrders() }, [])
 
-  const filtered    = activeFilter === 'all' ? orders : orders.filter(o => o.status === activeFilter)
+  const isUrgent = (o) => {
+    const m = String(o?.delivery_method ?? o?.DeliveryMethod ?? o?.deliveryMethod ?? '').toLowerCase()
+    return m === 'fast' || m === 'express'
+  }
+  const filtered = (() => {
+    const base = activeFilter === 'all' ? orders : orders.filter(o => o.status === activeFilter)
+    return [...base].sort((a, b) => (isUrgent(b) ? 1 : 0) - (isUrgent(a) ? 1 : 0))
+  })()
   const openDetail  = (order) => { setSelectedOrder(order); setOpenStep('detail'); setActionLoading(false) }
   const closeDetail = () => setSelectedOrder(null)
 
@@ -51,7 +58,6 @@ export default function DeliveriesScreen() {
     setActionLoading(true)
     try {
       await updateOrderStatus(order.id, 'delivered', data)
-      Alert.alert('Готово!', 'Заказ помечен как доставленный')
       closeDetail(); fetchOrders()
     } catch (e) {
       Alert.alert('Ошибка', e?.response?.data?.error?.message || 'Не удалось обновить статус')
