@@ -137,8 +137,7 @@ export default function CashScreen() {
 
   const collected = summary?.cash_to_handover || 0
   const salary    = summary?.total_delivery_fees || 0
-  const alreadyHanded = summary?.already_handed || 0
-  const toReturn  = Math.max(0, Number(collected) - Number(salary) - Number(alreadyHanded))
+  const toReturn  = Math.max(0, Number(collected) - Number(salary))
   const cashOrders = summary?.orders_collected || 0
   const pendingHandover = history.filter(h => h.status === 'pending').reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0)
   const amtNum = parseFloat(actualAmount) || 0
@@ -192,8 +191,14 @@ export default function CashScreen() {
                   <Text style={s.pendingVal}>{fmt(pendingHandover)} TJS</Text>
                 </View>
               )}
-              <TouchableOpacity style={s.submitBtn} onPress={() => setShowHandover(true)}>
-                <Text style={s.submitBtnText}>Сдать наличные</Text>
+              <TouchableOpacity
+                style={[s.submitBtn, toReturn === 0 && s.submitBtnDisabled]}
+                onPress={() => toReturn > 0 && setShowHandover(true)}
+                activeOpacity={toReturn > 0 ? 0.8 : 1}
+              >
+                <Text style={s.submitBtnText}>
+                  {toReturn === 0 ? 'Касса сдана' : 'Сдать наличные'}
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -397,6 +402,7 @@ const s = StyleSheet.create({
   pendingText: { color: '#b87500', fontWeight: '900', fontSize: 13 },
   pendingVal: { color: '#b87500', fontWeight: '900', fontSize: 14 },
   submitBtn: { width: '100%', marginTop: 16, borderRadius: 22, paddingVertical: 18, backgroundColor: C.violet, alignItems: 'center', shadowColor: C.violet, shadowOffset: { width: 0, height: 13 }, shadowOpacity: 0.22, shadowRadius: 26, elevation: 4 },
+  submitBtnDisabled: { backgroundColor: '#c4c9d4', shadowOpacity: 0 },
   submitBtnText: { color: '#fff', fontWeight: '900', fontSize: 17 },
   // Segmented
   segmented: { marginHorizontal: 18, backgroundColor: '#eaf0f7', borderRadius: 24, padding: 5, flexDirection: 'row', marginBottom: 16 },
