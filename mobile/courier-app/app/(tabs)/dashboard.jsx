@@ -51,7 +51,6 @@ export default function DashboardScreen() {
     setActionLoading(true)
     try {
       await updateOrderStatus(order.id, 'delivered', data)
-      Alert.alert('Готово!', 'Заказ помечен как доставленный')
       setDetailOrder(null); fetchAll()
     } catch (e) {
       Alert.alert('Ошибка', e?.response?.data?.error?.message || 'Не удалось обновить статус')
