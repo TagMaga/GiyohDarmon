@@ -65,8 +65,8 @@ export default function CashScreen() {
   const fetchData = async () => {
     try {
       const [s, h, d] = await Promise.all([
-        getCashSummary(),
-        getHandoverHistory(),
+        getCashSummary().catch((e) => { Alert.alert('Ошибка', 'Не удалось загрузить сводку наличных'); throw e }),
+        getHandoverHistory().catch((e) => { Alert.alert('Ошибка', 'Не удалось загрузить историю сдач'); throw e }),
         getMyOrders({ status: 'delivered' }).catch(() => ({ data: { data: [] } })),
       ])
       setSummary(s.data.data)

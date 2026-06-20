@@ -17,8 +17,9 @@ export default function ClaimableScreen() {
     try {
       const { data } = await getClaimableOrders()
       setOrders(data.data || [])
-    } catch {}
-    finally { setLoading(false); setRefreshing(false) }
+    } catch (e) {
+      Alert.alert('Ошибка загрузки', e?.response?.data?.error?.message || 'Не удалось загрузить заказы')
+    } finally { setLoading(false); setRefreshing(false) }
   }
 
   useEffect(() => { fetchOrders() }, [])

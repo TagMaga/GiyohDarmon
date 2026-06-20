@@ -26,8 +26,9 @@ export default function DeliveriesScreen() {
     try {
       const { data } = await getMyOrders()
       setOrders(data.data || [])
-    } catch {}
-    finally { setLoading(false); setRefreshing(false) }
+    } catch (e) {
+      Alert.alert('Ошибка загрузки', e?.response?.data?.error?.message || 'Не удалось загрузить заказы')
+    } finally { setLoading(false); setRefreshing(false) }
   }
 
   useEffect(() => { fetchOrders() }, [])
@@ -46,10 +47,10 @@ export default function DeliveriesScreen() {
     } finally { setActionLoading(false) }
   }
 
-  const handleDelivered = async (order) => {
+  const handleDelivered = async (order, data = {}) => {
     setActionLoading(true)
     try {
-      await updateOrderStatus(order.id, 'delivered')
+      await updateOrderStatus(order.id, 'delivered', data)
       Alert.alert('Готово!', 'Заказ помечен как доставленный')
       closeDetail(); fetchOrders()
     } catch (e) {

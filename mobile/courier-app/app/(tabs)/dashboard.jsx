@@ -47,10 +47,10 @@ export default function DashboardScreen() {
     } finally { setActionLoading(false) }
   }
 
-  const handleDelivered = async (order) => {
+  const handleDelivered = async (order, data = {}) => {
     setActionLoading(true)
     try {
-      await updateOrderStatus(order.id, 'delivered')
+      await updateOrderStatus(order.id, 'delivered', data)
       Alert.alert('Готово!', 'Заказ помечен как доставленный')
       setDetailOrder(null); fetchAll()
     } catch (e) {

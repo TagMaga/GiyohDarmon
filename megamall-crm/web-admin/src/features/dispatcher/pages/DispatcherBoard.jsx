@@ -312,7 +312,7 @@ export default function DispatcherBoard() {
   }, [grouped, filters.mobileStatus, filters.mobileTouched])
 
   const currentMobileOrders = grouped[effectiveMobileStatus] ?? []
-  const isLoading = board.isPending && news.isPending
+  const isLoading = board.isPending || news.isPending
 
   function logout() {
     clearAuth()

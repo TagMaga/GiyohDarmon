@@ -95,13 +95,15 @@ export async function fetchCashSettlement(params = {}) {
 /** GET /dispatch/cash/transactions — full courier cash transaction history */
 export async function fetchCashTransactions(params = {}) {
   const res = await client.get('/dispatch/cash/transactions', { params })
-  return res.data
+  // Return { data, meta } explicitly so arr() and meta() helpers work without
+  // relying on the raw envelope shape (unlike unwrap() which drops meta).
+  return { data: res.data.data, meta: res.data.meta }
 }
 
 /** GET /dispatch/history/orders — aggregated dispatcher order history */
 export async function fetchDispatchOrderHistory(params = {}) {
   const res = await client.get('/dispatch/history/orders', { params })
-  return res.data
+  return { data: res.data.data, meta: res.data.meta }
 }
 
 // ── Cash handovers ───────────────────────────────────────────────────────────
