@@ -1206,6 +1206,8 @@ function OrderHistoryView({ rows, pageMeta, couriers, range, filters, loading, e
       <DataPanel
         title="Заказы"
         count={pageMeta.total ?? rows.length}
+        deliveredCount={pageMeta.delivered_count}
+        totalIncome={pageMeta.total_income}
         rowCount={rows.length}
         loading={loading}
         error={error}
@@ -1281,12 +1283,20 @@ function OrderHistoryCard({ row }) {
   )
 }
 
-function DataPanel({ title, count, rowCount, loading, error, emptyTitle, onRetry, children }) {
+function DataPanel({ title, count, deliveredCount, totalIncome, rowCount, loading, error, emptyTitle, onRetry, children }) {
   return (
     <div className="dv2-cash-table-wrap">
       <div className="dv2-cash-head">
         <div className="dv2-cash-title small">{title}</div>
-        <div className="dv2-cash-status pending">Найдено: {fmt(count ?? 0)}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="dv2-cash-status pending">Найдено: {fmt(count ?? 0)}</div>
+          {deliveredCount != null && (
+            <div className="dv2-cash-status settled">Доставлено: {fmt(deliveredCount)}</div>
+          )}
+          {totalIncome != null && totalIncome > 0 && (
+            <div className="dv2-cash-status settled">Сумма: {formatMoney(totalIncome)}</div>
+          )}
+        </div>
       </div>
       {error ? (
         <div className="dv2-cash-state dv2-cash-error">

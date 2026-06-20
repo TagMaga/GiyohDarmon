@@ -542,6 +542,25 @@ func (r *Repository) ListOrderHistory(ctx context.Context, filter OrderHistoryFi
 	return out, int(total), nil
 }
 
+// AggregateOrderHistory returns total_income (sum of total_amount for delivered orders)
+// and delivered_count for the given filter, across all pages.
+func (r *Repository) AggregateOrderHistory(ctx context.Context, filter OrderHistoryFilter) (totalIncome float64, deliveredCount int, err error) {
+	type aggResult struct {
+		TotalIncome    float64 `gorm:"column:total_income"`
+		DeliveredCount int     `gorm:"column:delivered_count"`
+	}
+	base := r.orderHistoryBase(ctx, filter)
+	sub := base.Select("o.id, o.status, o.total_amount").Group("o.id, o.status, o.total_amount")
+	var result aggResult
+	if err2 := r.db.WithContext(ctx).Table("(?) AS agg_sub", sub).Select(
+		`COALESCE(SUM(CASE WHEN status = 'delivered' THEN total_amount ELSE 0 END), 0) AS total_income,
+		 COUNT(CASE WHEN status = 'delivered' THEN 1 END) AS delivered_count`,
+	).Scan(&result).Error; err2 != nil {
+		return 0, 0, fmt.Errorf("aggregate order history: %w", err2)
+	}
+	return result.TotalIncome, result.DeliveredCount, nil
+}
+
 func (r *Repository) orderHistoryBase(ctx context.Context, filter OrderHistoryFilter) *gorm.DB {
 	q := r.db.WithContext(ctx).Table("orders o").
 		Joins("JOIN customers c ON c.id = o.customer_id").

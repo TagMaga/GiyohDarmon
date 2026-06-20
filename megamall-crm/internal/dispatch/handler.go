@@ -112,7 +112,28 @@ func (h *Handler) listOrderHistory(c *gin.Context) {
 		response.HandleError(c, svcErr)
 		return
 	}
-	response.OKWithMeta(c, rows, pagination.BuildMeta(p, total))
+	totalIncome, deliveredCount, svcErr := h.svc.AggregateOrderHistory(c.Request.Context(), filter)
+	if svcErr != nil {
+		response.HandleError(c, svcErr)
+		return
+	}
+	base := pagination.BuildMeta(p, total)
+	type historyMeta struct {
+		Page           int     `json:"page"`
+		Limit          int     `json:"limit"`
+		Total          int     `json:"total"`
+		TotalPages     int     `json:"total_pages"`
+		TotalIncome    float64 `json:"total_income"`
+		DeliveredCount int     `json:"delivered_count"`
+	}
+	response.OKWithMeta(c, rows, historyMeta{
+		Page:           base.Page,
+		Limit:          base.Limit,
+		Total:          base.Total,
+		TotalPages:     base.TotalPages,
+		TotalIncome:    totalIncome,
+		DeliveredCount: deliveredCount,
+	})
 }
 
 // ─── Order actions ────────────────────────────────────────────────────────────

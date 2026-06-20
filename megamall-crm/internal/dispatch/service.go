@@ -69,6 +69,10 @@ func (s *Service) ListOrderHistory(ctx context.Context, filter OrderHistoryFilte
 	return s.repo.ListOrderHistory(ctx, filter, p)
 }
 
+func (s *Service) AggregateOrderHistory(ctx context.Context, filter OrderHistoryFilter) (totalIncome float64, deliveredCount int, err error) {
+	return s.repo.AggregateOrderHistory(ctx, filter)
+}
+
 func (s *Service) UpdateCourierOrderIntake(ctx context.Context, actorID, courierID uuid.UUID, req UpdateCourierOrderIntakeRequest) (*CourierOverview, error) {
 	if req.Enabled == nil {
 		return nil, apperrors.BadRequest("enabled is required")
