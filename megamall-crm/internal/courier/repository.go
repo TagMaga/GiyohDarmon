@@ -412,6 +412,13 @@ func (r *Repository) AddressChanged(ctx context.Context, courierID, orderID uuid
 			return fmt.Errorf("deactivate assignment: %w", err)
 		}
 
+		var customerID uuid.UUID
+		if err := tx.WithContext(ctx).Table("orders").
+			Select("customer_id").Where("id = ?", orderID).
+			Scan(&customerID).Error; err != nil {
+			return fmt.Errorf("read order customer: %w", err)
+		}
+
 		if err := tx.WithContext(ctx).Table("orders").
 			Where("id = ?", orderID).
 			Updates(map[string]interface{}{
@@ -419,6 +426,14 @@ func (r *Repository) AddressChanged(ctx context.Context, courierID, orderID uuid
 				"status":     string(orders.StatusConfirmed),
 			}).Error; err != nil {
 			return fmt.Errorf("reset order: %w", err)
+		}
+
+		if newAddress != "" {
+			if err := tx.WithContext(ctx).Table("customers").
+				Where("id = ?", customerID).
+				Update("address", newAddress).Error; err != nil {
+				return fmt.Errorf("update customer address: %w", err)
+			}
 		}
 
 		comment := "Смена адреса"
