@@ -111,6 +111,7 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID) ([]M
 		DeliveryMethod       string             `gorm:"column:delivery_method"`
 		ProductTotal         float64            `gorm:"column:product_total"`
 		DeliveryFee          float64            `gorm:"column:delivery_fee"`
+		CourierPayout        float64            `gorm:"column:courier_payout"`
 		PrepaymentAmount     float64            `gorm:"column:prepayment_amount"`
 		CourierCollectAmount float64            `gorm:"column:courier_collect_amount"`
 		ScheduledAt          *time.Time         `gorm:"column:scheduled_at"`
@@ -135,6 +136,7 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID) ([]M
 			COALESCE(o.delivery_method, 'normal') AS delivery_method,
 			o.total_amount AS product_total,
 			o.delivery_fee,
+			o.courier_payout,
 			o.prepayment_amount,
 			GREATEST(0, o.total_amount + o.delivery_fee - o.prepayment_amount) AS courier_collect_amount,
 			o.scheduled_at,
@@ -186,6 +188,7 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID) ([]M
 			DeliveryMethod:       rw.DeliveryMethod,
 			ProductTotal:         rw.ProductTotal,
 			DeliveryFee:          rw.DeliveryFee,
+			CourierPayout:        rw.CourierPayout,
 			PrepaymentAmount:     rw.PrepaymentAmount,
 			TotalOrderAmount:     totalOrderAmount,
 			AmountToCollect:      amountToCollect,

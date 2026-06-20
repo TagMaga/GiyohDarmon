@@ -151,7 +151,7 @@ export default function CashScreen() {
   const earnings = delivered.map(o => ({
     id: o.order_id ?? o.id,
     number: o.order_number ?? o.OrderNumber ?? '—',
-    fee: Number(o.delivery_fee ?? o.DeliveryFee ?? 0),
+    fee: Number(o.courier_payout ?? o.delivery_fee ?? o.DeliveryFee ?? 0),
     date: o.delivered_at ?? o.assigned_at ?? o.created_at,
     address: o.customer_address ?? o.customer?.address,
   }))

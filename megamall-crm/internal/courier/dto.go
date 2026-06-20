@@ -87,6 +87,7 @@ type MyOrderResponse struct {
 	DeliveryMethod       string              `json:"delivery_method"`
 	ProductTotal         float64             `json:"product_total"`
 	DeliveryFee          float64             `json:"delivery_fee"`
+	CourierPayout        float64             `json:"courier_payout"`
 	PrepaymentAmount     float64             `json:"prepayment_amount"`
 	TotalOrderAmount     float64             `json:"total_order_amount"`
 	AmountToCollect      float64             `json:"amount_to_collect"`
