@@ -784,7 +784,7 @@ function DetailPanel({ order, customerMap, courierMap, onClose, onAction }) {
                   <Info label="Телефон" value={customer.phone || '—'} />
                   <Info label="Сумма" value={`${fmt(order.total_amount)} сом`} />
                   <Info label="Возраст" value={orderAge(order) || '—'} />
-                  <Info full label="Адрес" value={resolveAddress(order) || resolveCity(order) || '—'} />
+                  <Info full label="Адрес" value={resolveAddress(order) || customer?.address || resolveCity(order) || customer?.city || '—'} />
                 </div>
               </section>
               <section className="dv2-dp-section">
