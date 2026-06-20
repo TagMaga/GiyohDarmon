@@ -11,8 +11,11 @@ const STATUS_ENDPOINT = {
   issue:           'issue',
   address_changed: 'address-changed',
 }
-export const updateOrderStatus = (id, status, data = {}) =>
-  client.post(`/courier/orders/${id}/${STATUS_ENDPOINT[status] || status}`, data)
+export const updateOrderStatus = (id, status, data = {}) => {
+  const endpoint = STATUS_ENDPOINT[status]
+  if (!endpoint) return Promise.reject(new Error(`unknown order status: ${status}`))
+  return client.post(`/courier/orders/${id}/${endpoint}`, data)
+}
 
 export const reportAddressChanged = (id, newAddress) =>
   client.post(`/courier/orders/${id}/address-changed`, { new_address: newAddress || '' })

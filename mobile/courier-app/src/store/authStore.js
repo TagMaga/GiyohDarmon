@@ -32,7 +32,9 @@ const useAuthStore = create((set) => ({
           set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false })
         }
       }
-    } catch {}
+    } catch (e) {
+      console.warn('[authStore] rehydrate failed:', e)
+    }
   },
 
   logout: async () => {

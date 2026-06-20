@@ -29,6 +29,7 @@ export default function LoginScreen() {
     try {
       const { data } = await login({ phone: loginVal, password })
       const tokens = data.data
+      if (!tokens?.access_token) throw new Error('Неожиданный ответ сервера')
       await setAuth(tokens.access_token, tokens.refresh_token)
       const { data: meRes } = await getMe()
       const profile = meRes.data

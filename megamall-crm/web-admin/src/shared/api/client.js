@@ -16,6 +16,8 @@ const client = axios.create({
 })
 
 // ── Request interceptor — attach Bearer token ────────────────────────────────
+// TODO: token in localStorage is vulnerable to XSS. Migrate to httpOnly-cookie
+//       session when this admin panel needs to be hardened for public deployment.
 client.interceptors.request.use(
   (config) => {
     // Import lazily to avoid circular-module issues at load time
