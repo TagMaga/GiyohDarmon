@@ -421,13 +421,6 @@ func (r *Repository) AddressChanged(ctx context.Context, courierID, orderID uuid
 			return fmt.Errorf("deactivate assignment: %w", err)
 		}
 
-		var customerID uuid.UUID
-		if err := tx.WithContext(ctx).Table("orders").
-			Select("customer_id").Where("id = ?", orderID).
-			Scan(&customerID).Error; err != nil {
-			return fmt.Errorf("read order customer: %w", err)
-		}
-
 		if err := tx.WithContext(ctx).Table("orders").
 			Where("id = ?", orderID).
 			Updates(map[string]interface{}{
@@ -438,10 +431,21 @@ func (r *Repository) AddressChanged(ctx context.Context, courierID, orderID uuid
 		}
 
 		if newAddress != "" {
-			if err := tx.WithContext(ctx).Table("customers").
-				Where("id = ?", customerID).
-				Update("address", newAddress).Error; err != nil {
-				return fmt.Errorf("update customer address: %w", err)
+			type custRow struct {
+				CustomerID uuid.UUID `gorm:"column:customer_id"`
+			}
+			var cr custRow
+			if err := tx.WithContext(ctx).Table("orders").
+				Select("customer_id").Where("id = ?", orderID).
+				Scan(&cr).Error; err != nil {
+				return fmt.Errorf("read order customer: %w", err)
+			}
+			if cr.CustomerID != uuid.Nil {
+				if err := tx.WithContext(ctx).Table("customers").
+					Where("id = ?", cr.CustomerID).
+					Update("address", newAddress).Error; err != nil {
+					return fmt.Errorf("update customer address: %w", err)
+				}
 			}
 		}
 
