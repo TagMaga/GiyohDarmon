@@ -17,18 +17,28 @@ func TestCashSettlementSuccessRate_IgnoresIssueOrders(t *testing.T) {
 	}
 }
 
-// Courier owes the FULL cash collected from clients; courier payout is a separate
-// company expense and is NOT deducted from the cash debt.
+// Cash debt = collected − courier_earnings − already_handed_over.
+// Courier owes the net amount after subtracting their payout and prior handovers.
 func TestCashSettlementDebt_RemainingCashHeld(t *testing.T) {
-	got := cashSettlementDebt(1000, 700)
+	// collected=1000, earnings=200, handed=500 → debt=300
+	got := cashSettlementDebt(1000, 200, 500)
 	if got != 300 {
 		t.Fatalf("debt: got %.2f, want 300.00", got)
 	}
 }
 
 func TestCashSettlementDebt_ZeroWhenFullySettled(t *testing.T) {
-	got := cashSettlementDebt(1000, 1000)
+	// collected=1000, earnings=200, handed=800 → debt=0
+	got := cashSettlementDebt(1000, 200, 800)
 	if got != 0 {
 		t.Fatalf("debt: got %.2f, want 0.00", got)
+	}
+}
+
+func TestCashSettlementDebt_EarningsReduceDebt(t *testing.T) {
+	// Higher earnings → lower debt: collected=500, earnings=150, handed=200 → debt=150
+	got := cashSettlementDebt(500, 150, 200)
+	if got != 150 {
+		t.Fatalf("debt: got %.2f, want 150.00", got)
 	}
 }

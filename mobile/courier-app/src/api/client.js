@@ -75,10 +75,12 @@ client.interceptors.response.use(
       const refreshToken = await SecureStore.getItemAsync('refresh_token')
       if (!refreshToken) throw new Error('no_refresh_token')
       const { data } = await axios.post(`${API_URL}/api/v1/auth/refresh`, { refresh_token: refreshToken })
-      await SecureStore.setItemAsync('access_token', data.access_token)
-      await SecureStore.setItemAsync('refresh_token', data.refresh_token)
-      processQueue(null, data.access_token)
-      orig.headers.Authorization = `Bearer ${data.access_token}`
+      // Backend wraps response in { success, data: { access_token, refresh_token } }
+      const tokens = data.data
+      await SecureStore.setItemAsync('access_token', tokens.access_token)
+      await SecureStore.setItemAsync('refresh_token', tokens.refresh_token)
+      processQueue(null, tokens.access_token)
+      orig.headers.Authorization = `Bearer ${tokens.access_token}`
       return client(orig)
     } catch (e) {
       processQueue(e)
