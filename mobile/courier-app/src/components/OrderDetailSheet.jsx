@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, Pressable,
-  Alert, ActivityIndicator, Modal, Image,
+  Alert, ActivityIndicator, Modal,
   Animated, PanResponder, Dimensions, Linking, TextInput,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import * as ImagePicker from 'expo-image-picker'
 import { updateOrderStatus, reportAddressChanged, deferOrder } from '../api/orders'
-import client from '../api/client'
 import useAuthStore from '../store/authStore'
 import { resolveCreator } from '../lib/creator'
 
@@ -110,36 +108,13 @@ export function OrderDetailSheet({
   const [laterDate, setLaterDate]     = useState(null)
   const [newAddress, setNewAddress]   = useState('')
   const [stepLoading, setStepLoading] = useState(false)
-  const [proofUri, setProofUri]       = useState(null)
   const currentUserName = useAuthStore((st) => st.user?.full_name) || ''
 
   useEffect(() => {
-    if (order) { setStep(initialStep); setCancelReason(''); setLaterDate(null); setNewAddress(''); setProofUri(null) }
+    if (order) { setStep(initialStep); setCancelReason(''); setLaterDate(null); setNewAddress('') }
   }, [order?.id])
 
-  const resetStep  = () => { setStep('detail'); setCancelReason(''); setLaterDate(null); setNewAddress(''); setProofUri(null) }
-
-  const pickDeliveryPhoto = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') { Alert.alert('Нет доступа', 'Разрешите доступ к фото в настройках'); return }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 })
-    if (!result.canceled && result.assets?.[0]) setProofUri(result.assets[0].uri)
-  }
-
-  const doDelivered = async () => {
-    if (!proofUri) { Alert.alert('Нужно фото', 'Сделайте фото подтверждения доставки'); return }
-    setStepLoading(true)
-    try {
-      const form = new FormData()
-      form.append('file', { uri: proofUri, type: 'image/jpeg', name: 'proof.jpg' })
-      const up = await client.post('/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } })
-      const proof_url = up.data.data?.url || up.data.url || ''
-      onDelivered?.(order, { proof_url })
-      resetStep()
-    } catch (e) {
-      Alert.alert('Ошибка загрузки', e?.response?.data?.error?.message || 'Не удалось загрузить фото')
-    } finally { setStepLoading(false) }
-  }
+  const resetStep  = () => { setStep('detail'); setCancelReason(''); setLaterDate(null); setNewAddress('') }
   const handleClose = () => { resetStep(); onClose() }
 
   if (!order) return null
@@ -308,26 +283,6 @@ export function OrderDetailSheet({
               </TouchableOpacity>
             </>)}
 
-            {step === 'deliver_proof' && (<>
-              <Text style={ps.stepTitle}>Фото подтверждения</Text>
-              <Text style={ps.stepSub}>Сделайте фото доставленного заказа — квитанция, посылка или подпись клиента.</Text>
-              <TouchableOpacity style={ps.proofZone} onPress={pickDeliveryPhoto} activeOpacity={0.7}>
-                {proofUri
-                  ? <Image source={{ uri: proofUri }} style={ps.proofThumb} resizeMode="cover" />
-                  : (<>
-                      <Text style={ps.proofPlus}>📷</Text>
-                      <Text style={ps.proofZoneText}>Выбрать фото</Text>
-                    </>)
-                }
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[ps.btnPrimary, { backgroundColor: C.green }, (!proofUri || stepLoading) && ps.btnDisabled]}
-                disabled={!proofUri || stepLoading}
-                onPress={doDelivered}
-              >
-                {stepLoading ? <ActivityIndicator color="#fff" /> : <Text style={ps.btnText}>✓ Подтвердить доставку</Text>}
-              </TouchableOpacity>
-            </>)}
           </View>
         )}
 
@@ -513,7 +468,7 @@ export function OrderDetailSheet({
         {step === 'detail' && status === 'in_delivery' && (<>
           <TouchableOpacity
             style={[d.primaryBtn, { backgroundColor: C.green }, actionLoading && d.btnDisabled]}
-            onPress={() => setStep('deliver_proof')} disabled={actionLoading}
+            onPress={() => onDelivered?.(order, {})} disabled={actionLoading}
           >
             {actionLoading ? <ActivityIndicator color="#fff" /> : <Text style={d.primaryBtnText}>✓ Доставлен</Text>}
           </TouchableOpacity>
@@ -664,8 +619,4 @@ const ps = StyleSheet.create({
   radioActive:  { borderColor: C.blue, backgroundColor: C.blue },
   reasonText:   { fontSize: 15, color: C.muted, fontWeight: '600' },
   input:        { borderWidth: 1, borderColor: C.line, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: C.ink, backgroundColor: C.card, minHeight: 64, textAlignVertical: 'top', marginBottom: 16 },
-  proofZone:    { borderWidth: 1.5, borderColor: '#dfe5ef', borderStyle: 'dashed', borderRadius: 20, height: 160, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', marginBottom: 16, overflow: 'hidden' },
-  proofThumb:   { width: '100%', height: '100%', borderRadius: 20 },
-  proofPlus:    { fontSize: 32, marginBottom: 8 },
-  proofZoneText: { fontSize: 14, color: C.muted, fontWeight: '700' },
 })

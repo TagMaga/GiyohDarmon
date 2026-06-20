@@ -86,6 +86,12 @@ client.interceptors.response.use(
       processQueue(e)
       await SecureStore.deleteItemAsync('access_token')
       await SecureStore.deleteItemAsync('refresh_token')
+      // Sync zustand store — late-bound via require to avoid the circular import
+      // authStore → auth → client. By the time this catch fires all modules are loaded.
+      try {
+        const useAuthStore = require('../store/authStore').default
+        useAuthStore.setState({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false })
+      } catch {}
       router.replace('/(auth)/login')
       return Promise.reject(e)
     } finally {

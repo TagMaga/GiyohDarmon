@@ -108,6 +108,13 @@ export default function DispatcherBoard() {
   const [photoPreview, setPhotoPreview] = useState(null)
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'dark'
+    // One-time migration: pre-fix, useTheme.js wrote the main admin theme into
+    // dispatch-v2-theme, which could be 'light'. Clear that stale value once so
+    // the dispatcher always starts dark for existing users after this deploy.
+    if (!localStorage.getItem('dispatch-v2-migrated-v1')) {
+      localStorage.removeItem('dispatch-v2-theme')
+      localStorage.setItem('dispatch-v2-migrated-v1', '1')
+    }
     return window.localStorage.getItem('dispatch-v2-theme') || 'dark'
   })
 
