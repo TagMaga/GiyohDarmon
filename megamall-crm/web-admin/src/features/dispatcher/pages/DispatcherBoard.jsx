@@ -700,7 +700,7 @@ function Column({ col, orders, loading, customerMap, courierMap, selectedOrder, 
 function OrderCard({ order, customerMap, courierMap, selected, onSelect, onAction }) {
   const customer = resolveCustomer(order, customerMap)
   const courierDisp = resolveCourierDisplay(order, courierMap)
-  const address = resolveAddress(order) || resolveCity(order) || '—'
+  const address = resolveAddress(order) || customer?.address || resolveCity(order) || customer?.city || '—'
   const mins = orderAgeMinutes(order)
   const urgentClass = mins >= 60 || order.status === 'issue' || isOverdue(order) ? 'urgent-red' : mins >= 30 ? 'urgent-amber' : ''
   const cardColor = order.status === 'new' ? 'var(--text3)' : order.status === 'confirmed' ? 'var(--blue)' : order.status === 'issue' ? 'var(--red)' : order.status === 'delivered' ? 'var(--green)' : 'var(--amber)'
