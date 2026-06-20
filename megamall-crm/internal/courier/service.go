@@ -53,8 +53,8 @@ func (s *Service) Me(ctx context.Context, courierID uuid.UUID) (*CourierMeRespon
 
 // ─── My Orders ────────────────────────────────────────────────────────────────
 
-func (s *Service) MyOrders(ctx context.Context, courierID uuid.UUID) ([]MyOrderResponse, error) {
-	return s.repo.ListMyOrders(ctx, courierID)
+func (s *Service) MyOrders(ctx context.Context, courierID uuid.UUID, status string) ([]MyOrderResponse, error) {
+	return s.repo.ListMyOrders(ctx, courierID, status)
 }
 
 // ─── Available Orders ─────────────────────────────────────────────────────────

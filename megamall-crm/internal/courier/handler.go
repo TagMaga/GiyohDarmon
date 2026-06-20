@@ -34,7 +34,8 @@ func (h *Handler) me(c *gin.Context) {
 
 func (h *Handler) myOrders(c *gin.Context) {
 	claims := middleware.ClaimsFromContext(c)
-	orders, err := h.svc.MyOrders(c.Request.Context(), claims.UserID)
+	status := c.Query("status")
+	orders, err := h.svc.MyOrders(c.Request.Context(), claims.UserID, status)
 	if err != nil {
 		response.HandleError(c, err)
 		return

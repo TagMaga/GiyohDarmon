@@ -96,7 +96,7 @@ func (r *Repository) verifyActiveAssignment(ctx context.Context, orderID, courie
 // assign flow and the courier claim flow) instead of joining order_assignments,
 // so that delivered/returned orders remain visible even after the assignment row
 // is deactivated.
-func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID) ([]MyOrderResponse, error) {
+func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID, status string) ([]MyOrderResponse, error) {
 	type row struct {
 		OrderID              uuid.UUID          `gorm:"column:order_id"`
 		OrderNumber          string             `gorm:"column:order_number"`
@@ -159,6 +159,12 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID) ([]M
 			courierID,
 			[]orders.OrderStatus{orders.StatusCancelled},
 		).
+		Scopes(func(db *gorm.DB) *gorm.DB {
+			if status != "" {
+				return db.Where("o.status = ?", status)
+			}
+			return db
+		}).
 		Order("oa.assigned_at DESC NULLS LAST, o.created_at DESC").
 		Scan(&rows).Error
 	if err != nil {

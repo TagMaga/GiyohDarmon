@@ -619,8 +619,4 @@ const ps = StyleSheet.create({
   radioActive:  { borderColor: C.blue, backgroundColor: C.blue },
   reasonText:   { fontSize: 15, color: C.muted, fontWeight: '600' },
   input:        { borderWidth: 1, borderColor: C.line, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: C.ink, backgroundColor: C.card, minHeight: 64, textAlignVertical: 'top', marginBottom: 16 },
-  proofZone:    { borderWidth: 1.5, borderColor: '#dfe5ef', borderStyle: 'dashed', borderRadius: 20, height: 160, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc', marginBottom: 16, overflow: 'hidden' },
-  proofThumb:   { width: '100%', height: '100%', borderRadius: 20 },
-  proofPlus:    { fontSize: 32, marginBottom: 8 },
-  proofZoneText: { fontSize: 14, color: C.muted, fontWeight: '700' },
 })
