@@ -128,7 +128,7 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID, stat
 			o.status,
 			c.full_name AS customer_name,
 			c.phone AS customer_phone,
-			c.address AS customer_address,
+			COALESCE(o.delivery_address, c.address) AS customer_address,
 			creator.id AS creator_id,
 			creator.full_name AS creator_name,
 			creator.phone AS creator_phone,
@@ -311,7 +311,7 @@ func (r *Repository) ListAvailableOrders(ctx context.Context, courierID uuid.UUI
 			o.id AS order_id, o.order_number, o.status,
 			c.full_name AS customer_name,
 			c.phone AS customer_phone,
-			c.address AS customer_address,
+			COALESCE(o.delivery_address, c.address) AS customer_address,
 			creator.id AS creator_id,
 			creator.full_name AS creator_name,
 			creator.phone AS creator_phone,
@@ -421,32 +421,17 @@ func (r *Repository) AddressChanged(ctx context.Context, courierID, orderID uuid
 			return fmt.Errorf("deactivate assignment: %w", err)
 		}
 
+		updates := map[string]interface{}{
+			"courier_id": nil,
+			"status":     string(orders.StatusConfirmed),
+		}
+		if newAddress != "" {
+			updates["delivery_address"] = newAddress
+		}
 		if err := tx.WithContext(ctx).Table("orders").
 			Where("id = ?", orderID).
-			Updates(map[string]interface{}{
-				"courier_id": nil,
-				"status":     string(orders.StatusConfirmed),
-			}).Error; err != nil {
+			Updates(updates).Error; err != nil {
 			return fmt.Errorf("reset order: %w", err)
-		}
-
-		if newAddress != "" {
-			type custRow struct {
-				CustomerID uuid.UUID `gorm:"column:customer_id"`
-			}
-			var cr custRow
-			if err := tx.WithContext(ctx).Table("orders").
-				Select("customer_id").Where("id = ?", orderID).
-				Scan(&cr).Error; err != nil {
-				return fmt.Errorf("read order customer: %w", err)
-			}
-			if cr.CustomerID != uuid.Nil {
-				if err := tx.WithContext(ctx).Table("customers").
-					Where("id = ?", cr.CustomerID).
-					Update("address", newAddress).Error; err != nil {
-					return fmt.Errorf("update customer address: %w", err)
-				}
-			}
 		}
 
 		comment := "Смена адреса"

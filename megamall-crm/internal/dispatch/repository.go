@@ -494,12 +494,12 @@ func (r *Repository) ListOrderHistory(ctx context.Context, filter OrderHistoryFi
 			CASE WHEN o.status IN ('cancelled','returned') THEN ce.reason ELSE NULL END AS cancellation_reason,
 			c.full_name AS customer_name,
 			c.phone AS customer_phone,
-			c.address AS delivery_address
+			COALESCE(o.delivery_address, c.address) AS delivery_address
 		`).
 		Group(`
 			o.id, o.order_number, o.created_at, o.status, o.courier_id, la.courier_id,
 			cu.full_name, cu.phone, o.seller_id, s.full_name, o.total_amount, o.delivery_fee,
-			de.delivered_at, ps.process_started_at, ce.reason, c.full_name, c.phone, c.address
+			de.delivered_at, ps.process_started_at, ce.reason, c.full_name, c.phone, c.address, o.delivery_address
 		`).
 		Order("o.created_at DESC").
 		Limit(p.Limit).Offset(p.Offset()).
