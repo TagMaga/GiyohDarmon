@@ -150,6 +150,17 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		return nil, apperrors.BadRequest("order must have at least one item")
 	}
 
+	// Dispatcher must supply a seller_id when creating on behalf of a seller.
+	if actorRole == "dispatcher" && (req.SellerID == nil || *req.SellerID == uuid.Nil) {
+		return nil, apperrors.BadRequest("dispatcher must supply seller_id when creating an office order")
+	}
+
+	// Effective seller: for dispatcher it's the supplied seller_id; for everyone else it's themselves.
+	effectiveSellerID := actorID
+	if actorRole == "dispatcher" && req.SellerID != nil && *req.SellerID != uuid.Nil {
+		effectiveSellerID = *req.SellerID
+	}
+
 	// City is required and must be an active delivery city.
 	if req.CityID == uuid.Nil {
 		return nil, apperrors.BadRequest("city is required")
@@ -192,14 +203,15 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		totalAmount := subtotal
 
 		// ── Hierarchy snapshot ────────────────────────────────────────────────
-		hier, err := s.resolveHierarchy(ctx, actorID)
+		hier, err := s.resolveHierarchy(ctx, effectiveSellerID)
 		if err != nil {
 			return err
 		}
 
-		// ── Delivery fee from settings (single source of truth) ───────────────
-		// Backend-resolved only — sellers cannot set or override the delivery fee.
-		deliveryFee, err := delivery_settings.GetFee(s.db, deliveryMethod)
+		// ── Delivery fee: product-level first, global fallback ────────────────
+		// If the first product has a per-product fee set, use that; otherwise
+		// fall back to the global delivery_settings singleton.
+		deliveryFee, err := s.resolveDeliveryFeeForItems(ctx, items, deliveryMethod)
 		if err != nil {
 			return fmt.Errorf("resolve delivery fee: %w", err)
 		}
@@ -208,7 +220,7 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		// DeliveryFee is authoritative; the legacy delivery_tariffs table is not
 		// required, so creation never fails on a missing active tariff row.
 		snap, err := s.compSvc.BuildSnapshot(ctx, tx, compensation.SnapshotInput{
-			SellerID:       &actorID,
+			SellerID:       &effectiveSellerID,
 			SellerTeamID:   nil,
 			ManagerID:      hier.managerID,
 			ManagerTeamID:  hier.managerTeamID,
@@ -245,6 +257,14 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 			prepaymentStatus = PrepaymentStatusPendingVerification
 		}
 
+		// Dispatcher can override the initial status (e.g. force "new" for office orders).
+		if actorRole == "dispatcher" && req.ForceStatus != nil && *req.ForceStatus != "" {
+			forced := OrderStatus(*req.ForceStatus)
+			if forced == StatusNew || forced == StatusConfirmed {
+				initialStatus = forced
+			}
+		}
+
 		// Auto-classify prepayment type so the seller doesn't have to choose.
 		totalOrderAmount := totalAmount + deliveryFee
 		autoType := req.PrepaymentType
@@ -261,7 +281,7 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		o := &Order{
 			ID:               orderID,
 			CustomerID:       req.CustomerID,
-			SellerID:         actorID,
+			SellerID:         effectiveSellerID,
 			ManagerID:        hier.managerID,
 			TeamLeadID:       hier.teamLeadID,
 			ManagerTeamID:    hier.managerTeamID,
@@ -277,7 +297,8 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 			DeliveryFee:      deliveryFee,
 			NetRevenue:       netRevenue,
 			PrepaymentAmount: req.PrepaymentAmount,
-			Notes:            req.Notes,
+			Notes:           req.Notes,
+			DeliveryAddress: req.DeliveryAddress,
 
 			PrepaymentRequired: req.PrepaymentRequired,
 			PrepaymentType:     autoType,
@@ -480,7 +501,17 @@ func (s *Service) GetSnapshot(ctx context.Context, orderID uuid.UUID) (*compensa
 
 // ─── Update ───────────────────────────────────────────────────────────────────
 
+// Update applies a partial update to an order inside a transaction.
+// Sellers may update notes, delivery_address, delivery_method, customer contact,
+// items (triggers full inventory re-reservation and financial recalculation),
+// and prepayment / attachment fields. Terminal orders are rejected.
 func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req UpdateOrderRequest) (*Order, error) {
+	// Nil items slice  = "no change to items".
+	// Empty items slice = error; order must always have at least one item.
+	if req.Items != nil && len(req.Items) == 0 {
+		return nil, apperrors.BadRequest("items list must not be empty when provided")
+	}
+
 	var updated *Order
 	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		o, err := s.repo.GetByIDForUpdate(tx, ctx, orderID)
@@ -490,9 +521,175 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 		if o == nil {
 			return apperrors.NotFound("order")
 		}
+		if o.Status.IsTerminal() {
+			return apperrors.Unprocessable("cannot edit a terminal order")
+		}
+
+		// ── Simple scalar fields ──────────────────────────────────────────────
 		if req.Notes != nil {
 			o.Notes = req.Notes
 		}
+		if req.DeliveryAddress != nil {
+			o.DeliveryAddress = req.DeliveryAddress
+		}
+
+		// ── Delivery method (may change fee) ──────────────────────────────────
+		newMethod := o.DeliveryMethod
+		if req.DeliveryMethod != nil {
+			nm, err := normalizeDeliveryMethod(*req.DeliveryMethod)
+			if err != nil {
+				return err
+			}
+			newMethod = nm
+			o.DeliveryMethod = newMethod
+		}
+
+		// ── Customer contact ──────────────────────────────────────────────────
+		if req.CustomerName != nil || req.CustomerPhone != nil {
+			customerUpdates := map[string]interface{}{}
+			if req.CustomerName != nil {
+				customerUpdates["full_name"] = *req.CustomerName
+			}
+			if req.CustomerPhone != nil {
+				customerUpdates["phone"] = *req.CustomerPhone
+			}
+			if err := tx.WithContext(ctx).Table("customers").
+				Where("id = ?", o.CustomerID).
+				Updates(customerUpdates).Error; err != nil {
+				return fmt.Errorf("update customer: %w", err)
+			}
+		}
+
+		// ── Items: full replacement ───────────────────────────────────────────
+		if req.Items != nil {
+			for _, it := range req.Items {
+				if it.Quantity <= 0 {
+					return apperrors.BadRequest("item quantity must be > 0")
+				}
+				if it.UnitPrice < 0 {
+					return apperrors.BadRequest("item unit_price must be >= 0")
+				}
+			}
+
+			// 1. Release old inventory reservations.
+			for _, old := range o.Items {
+				inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, o.WarehouseID, old.ProductID)
+				if err != nil {
+					return fmt.Errorf("release inventory: %w", err)
+				}
+				newReserved := inv.ReservedQuantity - old.Quantity
+				if newReserved < 0 {
+					newReserved = 0
+				}
+				if err := s.invRepo.UpdateReservedQuantity(tx, ctx, inv.ID, newReserved); err != nil {
+					return fmt.Errorf("release inventory: %w", err)
+				}
+			}
+
+			// 2. Delete old order items.
+			if err := tx.WithContext(ctx).
+				Where("order_id = ?", o.ID).
+				Delete(&OrderItem{}).Error; err != nil {
+				return fmt.Errorf("delete old items: %w", err)
+			}
+
+			// 3. Build new items + subtotal.
+			subtotal := 0.0
+			newItems := make([]OrderItem, 0, len(req.Items))
+			for _, it := range req.Items {
+				total := float64(it.Quantity) * it.UnitPrice
+				subtotal += total
+				newItems = append(newItems, OrderItem{
+					ID:         uuid.New(),
+					OrderID:    o.ID,
+					ProductID:  it.ProductID,
+					Quantity:   it.Quantity,
+					UnitPrice:  it.UnitPrice,
+					TotalPrice: total,
+				})
+			}
+
+			// 4. Reserve new inventory.
+			for _, it := range newItems {
+				inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, o.WarehouseID, it.ProductID)
+				if err != nil {
+					return fmt.Errorf("reserve inventory: %w", err)
+				}
+				if inv.AvailableQuantity < it.Quantity {
+					return apperrors.BadRequest(fmt.Sprintf(
+						"insufficient stock for product %s: available %d, needed %d",
+						it.ProductID, inv.AvailableQuantity, it.Quantity,
+					))
+				}
+				if err := s.invRepo.UpdateReservedQuantity(tx, ctx, inv.ID, inv.ReservedQuantity+it.Quantity); err != nil {
+					return fmt.Errorf("reserve inventory: %w", err)
+				}
+			}
+
+			// 5. Insert new items.
+			if err := s.repo.CreateItems(ctx, tx, newItems); err != nil {
+				return err
+			}
+
+			// 6. Recalculate financials.
+			deliveryFee, err := s.resolveDeliveryFeeForItems(ctx, newItems, newMethod)
+			if err != nil {
+				return fmt.Errorf("resolve delivery fee: %w", err)
+			}
+			totalAmount := subtotal
+			netRevenue := totalAmount - deliveryFee
+
+			o.Subtotal = subtotal
+			o.TotalAmount = totalAmount
+			o.DeliveryFee = deliveryFee
+			o.NetRevenue = netRevenue
+
+			// Update snapshot financials.
+			if o.SnapshotID != nil {
+				if err := s.repo.UpdateFinancials(ctx, tx, o.ID, *o.SnapshotID, deliveryFee, netRevenue); err != nil {
+					return fmt.Errorf("update financials: %w", err)
+				}
+			}
+		}
+
+		// ── Prepayment fields ─────────────────────────────────────────────────
+		if req.PrepaymentRequired != nil {
+			o.PrepaymentRequired = *req.PrepaymentRequired
+		}
+		if req.PrepaymentAmount != nil {
+			o.PrepaymentAmount = *req.PrepaymentAmount
+		}
+		if req.PrepaymentReceiver != nil {
+			o.PrepaymentReceiver = req.PrepaymentReceiver
+		}
+		if req.PrepaymentComment != nil {
+			o.PrepaymentComment = req.PrepaymentComment
+		}
+
+		// ── Attachment URLs ───────────────────────────────────────────────────
+		attachmentURLs := []struct {
+			url      *string
+			fileType string
+		}{
+			{req.PaymentProofURL, "payment_proof"},
+			{req.CustomerChatURL, "customer_chat"},
+		}
+		for _, p := range attachmentURLs {
+			if p.url == nil || *p.url == "" {
+				continue
+			}
+			att := &OrderAttachment{
+				ID:         uuid.New(),
+				OrderID:    o.ID,
+				Type:       p.fileType,
+				FileURL:    *p.url,
+				UploadedBy: actorID,
+			}
+			if err := tx.WithContext(ctx).Create(att).Error; err != nil {
+				return fmt.Errorf("create attachment: %w", err)
+			}
+		}
+
 		if err := s.repo.Update(ctx, tx, o); err != nil {
 			return err
 		}
@@ -509,6 +706,121 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 		return nil, txErr
 	}
 	return updated, nil
+}
+
+// resolveDeliveryFeeForItems returns the delivery fee for an order.
+// Checks the first product's per-product fee; falls back to global delivery_settings.
+func (s *Service) resolveDeliveryFeeForItems(ctx context.Context, items []OrderItem, method string) (float64, error) {
+	if len(items) > 0 {
+		type productFees struct {
+			NormalDeliveryFee  *float64
+			ExpressDeliveryFee *float64
+		}
+		var pf productFees
+		s.db.WithContext(ctx).
+			Table("products").
+			Select("normal_delivery_fee, express_delivery_fee").
+			Where("id = ?", items[0].ProductID).
+			Scan(&pf)
+
+		switch method {
+		case "fast":
+			if pf.ExpressDeliveryFee != nil {
+				return *pf.ExpressDeliveryFee, nil
+			}
+		default:
+			if pf.NormalDeliveryFee != nil {
+				return *pf.NormalDeliveryFee, nil
+			}
+		}
+	}
+	return delivery_settings.GetFee(s.db, method)
+}
+
+// ─── Order Comments ───────────────────────────────────────────────────────────
+
+// orderCommentRow is a raw DB scan target for order_comments + author info.
+type orderCommentRow struct {
+	ID         uuid.UUID `gorm:"column:id"`
+	OrderID    uuid.UUID `gorm:"column:order_id"`
+	UserID     uuid.UUID `gorm:"column:user_id"`
+	AuthorName string    `gorm:"column:author_name"`
+	AuthorRole string    `gorm:"column:author_role"`
+	Comment    string    `gorm:"column:comment"`
+	Visibility string    `gorm:"column:visibility"`
+	CreatedAt  time.Time `gorm:"column:created_at"`
+}
+
+// GetOrderComments returns comments visible to a seller:
+// visibility = 'seller_visible' OR created by the requesting user.
+func (s *Service) GetOrderComments(ctx context.Context, orderID, requestingUserID uuid.UUID) ([]OrderCommentResponse, error) {
+	var rows []orderCommentRow
+	err := s.db.WithContext(ctx).
+		Raw(`SELECT oc.id, oc.order_id, oc.user_id,
+		            COALESCE(u.full_name, '') AS author_name,
+		            COALESCE(u.role::text, '') AS author_role,
+		            oc.comment, oc.visibility, oc.created_at
+		     FROM order_comments oc
+		     LEFT JOIN users u ON u.id = oc.user_id
+		     WHERE oc.order_id = ?
+		       AND (oc.visibility = 'seller_visible' OR oc.user_id = ?)
+		     ORDER BY oc.created_at ASC`, orderID, requestingUserID).
+		Scan(&rows).Error
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+
+	out := make([]OrderCommentResponse, len(rows))
+	for i, r := range rows {
+		out[i] = OrderCommentResponse{
+			ID:         r.ID,
+			OrderID:    r.OrderID,
+			UserID:     r.UserID,
+			AuthorName: r.AuthorName,
+			AuthorRole: r.AuthorRole,
+			Comment:    r.Comment,
+			Visibility: r.Visibility,
+			CreatedAt:  r.CreatedAt,
+		}
+	}
+	return out, nil
+}
+
+// AddOrderComment creates a comment on an order with seller_visible visibility.
+func (s *Service) AddOrderComment(ctx context.Context, orderID, actorID uuid.UUID, text string) (*OrderCommentResponse, error) {
+	// Verify order exists.
+	if _, err := s.GetByID(ctx, orderID); err != nil {
+		return nil, err
+	}
+
+	id := uuid.New()
+	now := time.Now().UTC()
+	err := s.db.WithContext(ctx).Exec(
+		`INSERT INTO order_comments (id, order_id, user_id, comment, visibility, created_at)
+		 VALUES (?, ?, ?, ?, 'seller_visible', ?)`,
+		id, orderID, actorID, text, now,
+	).Error
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+
+	// Fetch author name and role.
+	var authorInfo struct {
+		FullName string `gorm:"column:full_name"`
+		Role     string `gorm:"column:role"`
+	}
+	s.db.WithContext(ctx).Raw("SELECT full_name, role::text AS role FROM users WHERE id = ?", actorID).Scan(&authorInfo)
+
+	return &OrderCommentResponse{
+		ID:         id,
+		OrderID:    orderID,
+		UserID:     actorID,
+		AuthorName: authorInfo.FullName,
+		AuthorRole: authorInfo.Role,
+		Comment:    text,
+		Visibility: "seller_visible",
+		CreatedAt:  now,
+	}, nil
 }
 
 // ─── Status change ────────────────────────────────────────────────────────────
@@ -989,6 +1301,11 @@ func (s *Service) validateOrderTypeForRole(role string, ot OrderType) error {
 		}
 	case "owner":
 		// owner may create any type
+	case "dispatcher":
+		// dispatcher creates office orders on behalf of a seller
+		if ot != OrderTypeSeller {
+			return apperrors.Forbidden("dispatcher can only create seller_order (office orders)")
+		}
 	default:
 		return apperrors.Forbidden("your role cannot create orders")
 	}

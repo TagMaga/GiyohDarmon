@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/pagination"
 	"github.com/megamall/crm/pkg/response"
@@ -152,12 +153,23 @@ func (h *Handler) ListEvents(c *gin.Context) {
 		return
 	}
 
+	var orderID *uuid.UUID
+	if params.OrderID != "" {
+		parsed, parseErr := uuid.Parse(params.OrderID)
+		if parseErr != nil {
+			response.Error(c, apperrors.BadRequest("invalid order_id: "+parseErr.Error()))
+			return
+		}
+		orderID = &parsed
+	}
+
 	p := pagination.ParseFromQuery(c)
 
 	events, total, err := h.repo.ListFinancialEvents(
 		c.Request.Context(),
 		from, to,
 		params.EventType,
+		orderID,
 		p,
 	)
 	if err != nil {

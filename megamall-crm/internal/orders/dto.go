@@ -15,12 +15,13 @@ type OrderItemRequest struct {
 }
 
 type OrderItemResponse struct {
-	ID          uuid.UUID `json:"id"`
-	ProductID   uuid.UUID `json:"product_id"`
-	ProductName string    `json:"product_name"`
-	Quantity    int       `json:"quantity"`
-	UnitPrice   float64   `json:"unit_price"`
-	TotalPrice  float64   `json:"total_price"`
+	ID             uuid.UUID `json:"id"`
+	ProductID      uuid.UUID `json:"product_id"`
+	ProductName    string    `json:"product_name"`
+	ProductImageURL *string  `json:"product_image_url"`
+	Quantity       int       `json:"quantity"`
+	UnitPrice      float64   `json:"unit_price"`
+	TotalPrice     float64   `json:"total_price"`
 }
 
 // ─── Create Order ─────────────────────────────────────────────────────────────
@@ -31,8 +32,14 @@ type CreateOrderRequest struct {
 	WarehouseID    uuid.UUID          `json:"warehouse_id"     validate:"required"`
 	CityID         uuid.UUID          `json:"city_id"          validate:"required"` // delivery city (must be active)
 	Items          []OrderItemRequest `json:"items"            validate:"required,min=1,dive"`
-	Notes          *string            `json:"notes"`
-	DeliveryMethod string             `json:"delivery_method"` // "normal" | "fast" ("express" accepted as legacy alias); defaults to "normal"
+	Notes           *string            `json:"notes"`
+	DeliveryAddress *string            `json:"delivery_address"`
+	DeliveryMethod  string             `json:"delivery_method"` // "normal" | "fast" ("express" accepted as legacy alias); defaults to "normal"
+
+	// Dispatcher-only: create order on behalf of a specific seller.
+	SellerID    *uuid.UUID `json:"seller_id"`
+	// Dispatcher-only: override the initial status (e.g. "confirmed" to skip confirmation step).
+	ForceStatus *string    `json:"force_status"`
 
 	// Prepayment verification fields (Migration 00040)
 	PrepaymentRequired bool     `json:"prepayment_required"`
@@ -62,7 +69,35 @@ type OrderStatsResponse struct {
 // ─── Update Order ─────────────────────────────────────────────────────────────
 
 type UpdateOrderRequest struct {
-	Notes *string `json:"notes"`
+	Notes              *string            `json:"notes"`
+	DeliveryAddress    *string            `json:"delivery_address"`
+	DeliveryMethod     *string            `json:"delivery_method"`    // "normal" | "fast"
+	CustomerName       *string            `json:"customer_name"`
+	CustomerPhone      *string            `json:"customer_phone"`
+	Items              []OrderItemRequest `json:"items"`              // nil=no change; must have ≥1 if non-nil
+	PrepaymentRequired *bool              `json:"prepayment_required"`
+	PrepaymentAmount   *float64           `json:"prepayment_amount"`
+	PrepaymentReceiver *string            `json:"prepayment_receiver"`
+	PrepaymentComment  *string            `json:"prepayment_comment"`
+	PaymentProofURL    *string            `json:"payment_proof_url"`
+	CustomerChatURL    *string            `json:"customer_chat_url"`
+}
+
+// ─── Order Comments ────────────────────────────────────────────────────────────
+
+type AddOrderCommentRequest struct {
+	Comment string `json:"comment" validate:"required,min=1,max=2000"`
+}
+
+type OrderCommentResponse struct {
+	ID         uuid.UUID `json:"id"`
+	OrderID    uuid.UUID `json:"order_id"`
+	UserID     uuid.UUID `json:"user_id"`
+	AuthorName string    `json:"author_name"`
+	AuthorRole string    `json:"author_role"`
+	Comment    string    `json:"comment"`
+	Visibility string    `json:"visibility"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // ─── Status Change ────────────────────────────────────────────────────────────
@@ -205,11 +240,12 @@ type OrderResponse struct {
 	PrepaymentVerifiedAt      *time.Time `json:"prepayment_verified_at"`
 	PrepaymentRejectionReason *string    `json:"prepayment_rejection_reason"`
 
-	Notes       *string              `json:"notes"`
-	Items       []OrderItemResponse  `json:"items"`
-	Attachments []AttachmentResponse `json:"attachments"`
-	CreatedAt   time.Time            `json:"created_at"`
-	UpdatedAt   time.Time            `json:"updated_at"`
+	Notes           *string              `json:"notes"`
+	DeliveryAddress *string              `json:"delivery_address"`
+	Items           []OrderItemResponse  `json:"items"`
+	Attachments     []AttachmentResponse `json:"attachments"`
+	CreatedAt       time.Time            `json:"created_at"`
+	UpdatedAt       time.Time            `json:"updated_at"`
 
 	// ── Courier display (resolved from assignment history, see CourierInfo) ──
 	// current_*  = the courier actively holding the order (assigned/in_delivery).
@@ -326,12 +362,13 @@ func ToOrderResponse(o *Order) OrderResponse {
 	items := make([]OrderItemResponse, 0, len(o.Items))
 	for _, it := range o.Items {
 		items = append(items, OrderItemResponse{
-			ID:          it.ID,
-			ProductID:   it.ProductID,
-			ProductName: it.ProductName,
-			Quantity:    it.Quantity,
-			UnitPrice:   it.UnitPrice,
-			TotalPrice:  it.TotalPrice,
+			ID:              it.ID,
+			ProductID:       it.ProductID,
+			ProductName:     it.ProductName,
+			ProductImageURL: it.ProductImageURL,
+			Quantity:        it.Quantity,
+			UnitPrice:       it.UnitPrice,
+			TotalPrice:      it.TotalPrice,
 		})
 	}
 	attachments := make([]AttachmentResponse, 0, len(o.Attachments))
@@ -406,11 +443,12 @@ func ToOrderResponse(o *Order) OrderResponse {
 		PrepaymentVerifiedAt:      o.PrepaymentVerifiedAt,
 		PrepaymentRejectionReason: o.PrepaymentRejectionReason,
 
-		Notes:       o.Notes,
-		Items:       items,
-		Attachments: attachments,
-		CreatedAt:   o.CreatedAt,
-		UpdatedAt:   o.UpdatedAt,
+		Notes:           o.Notes,
+		DeliveryAddress: o.DeliveryAddress,
+		Items:           items,
+		Attachments:     attachments,
+		CreatedAt:       o.CreatedAt,
+		UpdatedAt:       o.UpdatedAt,
 	}
 }
 

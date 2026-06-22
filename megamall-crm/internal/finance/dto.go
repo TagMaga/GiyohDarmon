@@ -23,11 +23,12 @@ type PeriodQueryParams struct {
 	To   string `form:"to"`
 }
 
-// EventsQueryParams extends the period filter with an optional event_type.
+// EventsQueryParams extends the period filter with an optional event_type and order_id.
 type EventsQueryParams struct {
 	From      string `form:"from"`
 	To        string `form:"to"`
 	EventType string `form:"event_type"`
+	OrderID   string `form:"order_id"` // raw string; parsed to *uuid.UUID in handler
 }
 
 // ─── Finance summary response ──────────────────────────────────────────────────

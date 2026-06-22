@@ -154,7 +154,8 @@ func (r *Repository) List(ctx context.Context, f ListOrdersFilter, actorID uuid.
 		return nil, 0, fmt.Errorf("count orders: %w", err)
 	}
 	itemPreload := func(db *gorm.DB) *gorm.DB {
-		return db.Select("order_items.*, p.name as product_name").
+		return db.
+			Select("order_items.*, p.name as product_name, (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = order_items.product_id AND pi.is_primary = true LIMIT 1) as product_image_url").
 			Joins("LEFT JOIN products p ON p.id = order_items.product_id")
 	}
 	if err := q.Preload("Customer").Preload("Seller").Preload("Items", itemPreload).Order("orders.created_at DESC").
@@ -167,7 +168,8 @@ func (r *Repository) List(ctx context.Context, f ListOrdersFilter, actorID uuid.
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*Order, error) {
 	var o Order
 	itemPreloadFn := func(db *gorm.DB) *gorm.DB {
-		return db.Select("order_items.*, p.name as product_name").
+		return db.
+			Select("order_items.*, p.name as product_name, (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = order_items.product_id AND pi.is_primary = true LIMIT 1) as product_image_url").
 			Joins("LEFT JOIN products p ON p.id = order_items.product_id")
 	}
 	err := r.db.WithContext(ctx).
@@ -189,7 +191,8 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*Order, error) 
 func (r *Repository) GetByIDForUpdate(tx *gorm.DB, ctx context.Context, id uuid.UUID) (*Order, error) {
 	var o Order
 	itemPreloadFn2 := func(db *gorm.DB) *gorm.DB {
-		return db.Select("order_items.*, p.name as product_name").
+		return db.
+			Select("order_items.*, p.name as product_name, (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = order_items.product_id AND pi.is_primary = true LIMIT 1) as product_image_url").
 			Joins("LEFT JOIN products p ON p.id = order_items.product_id")
 	}
 	err := tx.WithContext(ctx).
@@ -216,7 +219,10 @@ func (r *Repository) Create(ctx context.Context, tx *gorm.DB, o *Order) error {
 }
 
 func (r *Repository) Update(ctx context.Context, tx *gorm.DB, o *Order) error {
-	if err := tx.WithContext(ctx).Save(o).Error; err != nil {
+	// Omit associations: Save() would otherwise upsert CustomerInfo/SellerInfo into
+	// their respective tables (customers, users), triggering INSERT paths that violate
+	// NOT NULL constraints (password_hash, role). Scalar order columns are still saved.
+	if err := tx.WithContext(ctx).Omit(clause.Associations).Save(o).Error; err != nil {
 		return fmt.Errorf("update order: %w", err)
 	}
 	return nil

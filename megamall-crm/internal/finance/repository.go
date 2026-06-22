@@ -112,11 +112,12 @@ func (r *Repository) GetCashSummary(
 
 // ListFinancialEvents returns paginated financial_events rows for owner view.
 // All event types are included (including company_revenue_earned with user_id=NULL).
-// eventType="" means no event_type filter.
+// eventType="" and orderID=nil mean no filter on those fields.
 func (r *Repository) ListFinancialEvents(
 	ctx context.Context,
 	from, to time.Time,
 	eventType string,
+	orderID *uuid.UUID,
 	p pagination.Params,
 ) ([]FinanceEventResponse, int, error) {
 	// Count
@@ -124,6 +125,9 @@ func (r *Repository) ListFinancialEvents(
 		Where("created_at >= ? AND created_at <= ?", from, to)
 	if eventType != "" {
 		cq = cq.Where("event_type = ?", eventType)
+	}
+	if orderID != nil {
+		cq = cq.Where("order_id = ?", *orderID)
 	}
 	var total int64
 	if err := cq.Count(&total).Error; err != nil {
@@ -143,9 +147,10 @@ func (r *Repository) ListFinancialEvents(
 		WHERE created_at >= ?
 		  AND created_at <= ?
 		`+eventTypeClause(eventType)+`
+		`+orderIDClause(orderID)+`
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
-	`, eventArgs(from, to, eventType, p.Limit, p.Offset())...)
+	`, eventArgs(from, to, eventType, orderID, p.Limit, p.Offset())...)
 
 	var rows []FinanceEventResponse
 	if err := q.Scan(&rows).Error; err != nil {
@@ -313,11 +318,22 @@ func eventTypeClause(eventType string) string {
 	return "AND event_type = ?"
 }
 
+// orderIDClause returns a SQL fragment for the optional order_id filter.
+func orderIDClause(orderID *uuid.UUID) string {
+	if orderID == nil {
+		return ""
+	}
+	return "AND order_id = ?"
+}
+
 // eventArgs builds the args slice for ListFinancialEvents raw SQL.
-func eventArgs(from, to time.Time, eventType string, limit, offset int) []interface{} {
+func eventArgs(from, to time.Time, eventType string, orderID *uuid.UUID, limit, offset int) []interface{} {
 	args := []interface{}{from, to}
 	if eventType != "" {
 		args = append(args, eventType)
+	}
+	if orderID != nil {
+		args = append(args, *orderID)
 	}
 	args = append(args, limit, offset)
 	return args
