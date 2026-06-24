@@ -25,6 +25,15 @@ export async function fetchEmployee(userId) {
   return unwrap(res)
 }
 
+export async function fetchEmployeesBatch(ids = []) {
+  if (!ids.length) return []
+  const params = new URLSearchParams()
+  ids.forEach(id => params.append('ids[]', id))
+  params.set('limit', '200')
+  const res = await client.get(`/users?${params.toString()}`)
+  return toArray(unwrap(res))
+}
+
 export async function createEmployee(payload) {
   const res = await client.post('/users', payload)
   return unwrap(res)
