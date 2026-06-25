@@ -253,7 +253,9 @@ export default function DispatcherBoard() {
   const { mutate: doConfirmTransaction, isPending: confirmingTransaction } = useMutation({
     mutationFn: (id) => confirmCashTransaction(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['dispatcher'] })
+      qc.invalidateQueries({ queryKey: ['dispatcher', 'cashTransactions'] })
+      qc.invalidateQueries({ queryKey: ['dispatcher', 'cashSettlement'] })
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.handovers })
       toast.success('Транзакция подтверждена')
     },
     onError: onErr,
@@ -261,7 +263,9 @@ export default function DispatcherBoard() {
   const { mutate: doRejectTransaction, isPending: rejectingTransaction } = useMutation({
     mutationFn: ({ id, reason }) => rejectCashTransaction(id, { reason }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['dispatcher'] })
+      qc.invalidateQueries({ queryKey: ['dispatcher', 'cashTransactions'] })
+      qc.invalidateQueries({ queryKey: ['dispatcher', 'cashSettlement'] })
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.handovers })
       toast.success('Транзакция отклонена')
     },
     onError: onErr,
@@ -498,11 +502,12 @@ export default function DispatcherBoard() {
       <CancelModal           open={modal === 'cancel'}            onClose={closeModal} order={activeOrder} />
       <CommentsDrawer        open={modal === 'comments'}          onClose={closeModal} order={activeOrder} />
       <RejectPrepaymentModal open={modal === 'reject_prepayment'} onClose={closeModal} order={activeOrder} />
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onCommand={(action) => {
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onCommand={(action, order) => {
         if (action === 'refresh') handleRefresh()
         if (action === 'viewCouriers') setCouriersOpen(true)
         if (action === 'viewCash') setFilters((prev) => ({ ...prev, tab: 'cash' }))
         if (action === 'viewIssues') setFilters((prev) => ({ ...prev, mobileStatus: 'issues' }))
+        if (action === 'selectOrder' && order) setSelectedOrder(order)
       }} orders={allOrders} />
       <ShortcutsToast open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <PhotoPreviewModal url={photoPreview} onClose={() => setPhotoPreview(null)} />

@@ -70,9 +70,9 @@ export default function CourierCashView({ summary, loading: summaryLoading, onHa
     staleTime: 0,
   })
 
-  const collected = summary?.total_collected    ?? summary?.TotalCollected    ?? 0
-  const fees      = summary?.total_delivery_fees ?? summary?.TotalDeliveryFees ?? 0
-  const toReturn  = summary?.total_to_return     ?? summary?.TotalToReturn     ?? 0
+  const collected = summary?.cash_to_handover   ?? 0
+  const fees      = summary?.total_delivery_fees ?? 0
+  const toReturn  = Math.max(0, collected - fees)
   const totalHandedOver = handovers.filter(h => (h.status ?? h.Status) === 'confirmed')
     .reduce((s, h) => s + (h.total_to_return ?? h.TotalToReturn ?? 0), 0)
 

@@ -73,7 +73,7 @@ export default function HandoverSheet({ open, onClose, summary }) {
   const qc      = useQueryClient()
   const toast   = useToast()
   const fileInputRef = useRef(null)
-  const suggested = summary?.total_to_return ?? summary?.TotalToReturn ?? ''
+  const suggested = Math.max(0, (summary?.cash_to_handover ?? 0) - (summary?.total_delivery_fees ?? 0))
 
   const [amount,  setAmount]  = useState('')
   const [comment, setComment] = useState('')

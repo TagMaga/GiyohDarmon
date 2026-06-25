@@ -85,7 +85,7 @@ export default function CourierHomeView({ myOrders = [], cashSummary, onOrderCli
 
   const norm       = currentOrder ? normalizeCourierOrder(currentOrder) : null
   const todayEarned = cashSummary?.total_delivery_fees ?? cashSummary?.TotalDeliveryFees ?? 0
-  const onHand     = cashSummary?.total_collected     ?? cashSummary?.TotalCollected     ?? 0
+  const onHand      = cashSummary?.cash_to_handover   ?? cashSummary?.CashToHandover     ?? 0
 
   return (
     <div style={S.view}>

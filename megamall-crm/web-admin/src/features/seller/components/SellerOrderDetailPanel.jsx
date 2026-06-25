@@ -200,6 +200,14 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
                     {fmtAmount(order.total_order_amount ?? ((order.total_amount ?? 0) + (order.delivery_fee ?? 0)))}
                   </span>
                 </div>
+                {(order.courier_payout ?? 0) > 0 && (
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="text-xs font-semibold text-slate-700">Комиссионная база</span>
+                    <span className="text-sm font-bold text-indigo-600">
+                      {fmtAmount((order.total_order_amount ?? order.total_amount ?? 0) - (order.courier_payout ?? 0))}
+                    </span>
+                  </div>
+                )}
                 {order.net_revenue != null && (
                   <div className="flex justify-between items-center pt-1">
                     <span className="text-xs text-slate-500">Чистая выручка</span>

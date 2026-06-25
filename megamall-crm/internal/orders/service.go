@@ -934,12 +934,19 @@ func (s *Service) AddOrderComment(ctx context.Context, orderID, actorID uuid.UUI
 		return nil, err
 	}
 
+	// Dispatchers and owners write internal-only notes; all other roles write
+	// seller_visible so the seller can see the comment thread.
+	visibility := "seller_visible"
+	if actorRole == "dispatcher" || actorRole == "owner" {
+		visibility = "internal"
+	}
+
 	id := uuid.New()
 	now := time.Now().UTC()
 	err := s.db.WithContext(ctx).Exec(
 		`INSERT INTO order_comments (id, order_id, user_id, comment, visibility, created_at)
-		 VALUES (?, ?, ?, ?, 'seller_visible', ?)`,
-		id, orderID, actorID, text, now,
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		id, orderID, actorID, text, visibility, now,
 	).Error
 	if err != nil {
 		return nil, apperrors.Internal(err)
@@ -960,7 +967,7 @@ func (s *Service) AddOrderComment(ctx context.Context, orderID, actorID uuid.UUI
 		AuthorRole: authorInfo.Role,
 		Comment:    text,
 		Text:       text,
-		Visibility: "seller_visible",
+		Visibility: visibility,
 		CreatedAt:  now,
 	}, nil
 }

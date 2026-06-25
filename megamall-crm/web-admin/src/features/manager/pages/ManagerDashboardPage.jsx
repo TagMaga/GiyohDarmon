@@ -158,7 +158,7 @@ export default function ManagerDashboardPage() {
   const recentMine = myOrders.slice(0, 5)
 
   const totalDelivered = teamOrders.filter(o => (o.status ?? o.Status) === 'delivered').length
-  const incomeTotal    = income?.total_earned ?? 0
+  const incomeTotal    = income?.total_income ?? 0
 
   const loading = teamLoading || membersLoading || ordersLoading
 

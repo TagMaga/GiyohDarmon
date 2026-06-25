@@ -171,7 +171,7 @@ export async function markReturn(id) {
 
 /** POST /dispatch/orders/:id/cancel */
 export async function cancelOrder(id, { reason }) {
-  const res = await client.post(`/dispatch/orders/${id}/cancel`, { reason })
+  const res = await client.post(`/dispatch/orders/${id}/cancel`, { comment: reason })
   return unwrap(res)
 }
 
@@ -203,7 +203,7 @@ export async function confirmHandover(id, { actual_returned }) {
 
 /** POST /dispatch/cash/handovers/:id/reject */
 export async function rejectHandover(id, { reason }) {
-  const res = await client.post(`/dispatch/cash/handovers/${id}/reject`, { reason })
+  const res = await client.post(`/dispatch/cash/handovers/${id}/reject`, { comment: reason })
   return unwrap(res)
 }
 

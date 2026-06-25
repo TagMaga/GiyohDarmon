@@ -365,7 +365,7 @@ export default function TeamLeadDashboardPage() {
   const conversion = myPeriodOrders.length > 0
     ? ((delivered / myPeriodOrders.length) * 100).toFixed(1)
     : '0.0'
-  const incomeTotal = teamIncome?.total_earned ?? 0
+  const incomeTotal = teamIncome?.total_income ?? 0
 
   // Recent orders (last 10)
   const recentOrders = useMemo(() =>

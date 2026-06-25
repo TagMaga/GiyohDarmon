@@ -202,8 +202,9 @@ export default function SellerIncomePage() {
             style={{ background: 'linear-gradient(135deg,#F0FDF4,#DCFCE7)' }}
           >
             <p className="text-xs text-emerald-800">
-              <span className="font-semibold">Формула: </span>
-              (Сумма заказа − Доставка) × {commissionPct}%
+              <span className="font-semibold">Комиссионная база</span> = Сумма заказа − тариф курьера
+              <br />
+              <span className="font-semibold">Доход продавца</span> = Комиссионная база × {commissionPct}%
             </p>
           </div>
         )}

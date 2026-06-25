@@ -151,6 +151,13 @@ function OrderContent({ orderId, userMap, teamMap }) {
         <Row label="Сумма товаров"  value={`${fmtAmount(field('total_amount', 'TotalAmount') ?? 0)} сомони`} accent="text-slate-900 font-bold" />
         {deliveryFee > 0 && <Row label="Доставка"       value={`${fmtAmount(deliveryFee)} сомони`} />}
         {courierPayout > 0 && <Row label="Тариф курьера" value={`${fmtAmount(courierPayout)} сомони`} />}
+        {courierPayout > 0 && (
+          <Row
+            label="Комиссионная база"
+            value={`${fmtAmount(Number(total) - Number(courierPayout))} сомони`}
+            accent="text-indigo-700"
+          />
+        )}
         <Row label="Итого к оплате" value={`${fmtAmount(total)} сомони`} accent="text-slate-900 font-bold" />
         <Row label="Чистая выручка" value={`${fmtAmount(netRevenue)} сомони`} accent="text-emerald-700" />
       </Section>
