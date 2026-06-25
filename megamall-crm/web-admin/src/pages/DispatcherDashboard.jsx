@@ -1,9 +1,5 @@
-import DispatcherBoard from '../features/dispatcher/pages/DispatcherBoard'
+import DispatcherPage from '../features/dispatcher/pages/DispatcherPage'
 
-/**
- * DispatcherDashboard — entry point for the /dispatcher route.
- * Delegates entirely to the Phase 8 DispatcherBoard feature.
- */
 export default function DispatcherDashboard() {
-  return <DispatcherBoard />
+  return <DispatcherPage />
 }
