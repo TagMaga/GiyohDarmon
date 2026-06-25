@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import DispatcherOrderCard from './DispatcherOrderCard'
 import EmptyState from '../../../../shared/components/EmptyState'
 import Skeleton from '../../../../shared/components/Skeleton'
-import { getOrderId, formatOrderLabel } from '../../utils/orderHelpers'
+import { getOrderId, formatOrderLabel, getCourierId } from '../../utils/orderHelpers'
 import { resolveCustomer } from '../../utils/resolveCustomer'
 
 const FILTERS = [
@@ -19,15 +19,23 @@ const FILTERS = [
 export default function DispatcherOrderList({
   orders, courierMap, counts, isLoading,
   selectedId, onSelect, onAction,
+  filter = 'all', onFilterChange,
+  courierFilter = null,
 }) {
-  const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
 
   const filtered = useMemo(() => {
     let list = orders
-    if (filter !== 'all') {
+
+    // Courier filter takes precedence — overrides status pill
+    if (courierFilter === 'unassigned') {
+      list = list.filter(o => o.status === 'confirmed' && !getCourierId(o))
+    } else if (courierFilter) {
+      list = list.filter(o => String(getCourierId(o)) === String(courierFilter))
+    } else if (filter !== 'all') {
       list = list.filter(o => o.status === filter)
     }
+
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(o => {
@@ -40,7 +48,7 @@ export default function DispatcherOrderList({
       })
     }
     return list
-  }, [orders, filter, search])
+  }, [orders, filter, courierFilter, search])
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -58,30 +66,41 @@ export default function DispatcherOrderList({
         </div>
       </div>
 
-      {/* Status filter pills */}
-      <div className="flex gap-1.5 px-4 pb-2 overflow-x-auto flex-shrink-0 scrollbar-hide">
-        {FILTERS.map(f => {
-          const count = f.key === 'all' ? counts.all : (counts[f.key] ?? 0)
-          return (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
-                filter === f.key
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-              }`}
-            >
-              {f.label}
-              {count > 0 && (
-                <span className={`ml-1 font-normal ${filter === f.key ? 'text-indigo-200' : 'text-slate-400'}`}>
-                  {count}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      {/* Status filter pills — hidden when courier filter is active */}
+      {!courierFilter && (
+        <div className="flex gap-1.5 px-4 pb-2 overflow-x-auto flex-shrink-0 scrollbar-hide">
+          {FILTERS.map(f => {
+            const count = f.key === 'all' ? counts.all : (counts[f.key] ?? 0)
+            return (
+              <button
+                key={f.key}
+                onClick={() => onFilterChange?.(f.key)}
+                className={`flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
+                  filter === f.key
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              >
+                {f.label}
+                {count > 0 && (
+                  <span className={`ml-1 font-normal ${filter === f.key ? 'text-indigo-200' : 'text-slate-400'}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Courier filter active label */}
+      {courierFilter && (
+        <div className="px-4 pb-2 flex-shrink-0">
+          <div className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 rounded-lg px-3 py-1.5">
+            {courierFilter === 'unassigned' ? 'Без курьера' : 'Фильтр по курьеру'}
+          </div>
+        </div>
+      )}
 
       {/* Order list */}
       <div className="flex-1 overflow-y-auto">
