@@ -69,13 +69,16 @@ export default function DashboardScreen() {
     ])
   }
 
-  const done     = orders.filter(o => o.status === 'delivered').length
-  const active   = orders.filter(o => ['assigned', 'in_delivery'].includes(o.status)).length
-  const inRoute  = orders.filter(o => ['assigned', 'in_delivery'].includes(o.status))
+  const getStatus = (o) => String(o?.status ?? o?.Status ?? '').toLowerCase()
+  const getPayout = (o) => Number(o?.courier_payout ?? o?.CourierPayout ?? o?.delivery_fee ?? o?.DeliveryFee ?? 0)
+  const deliveredOrders = orders.filter(o => getStatus(o) === 'delivered')
+  const done     = deliveredOrders.length
+  const active   = orders.filter(o => ['assigned', 'in_delivery'].includes(getStatus(o))).length
+  const inRoute  = orders.filter(o => ['assigned', 'in_delivery'].includes(getStatus(o)))
   const firstName = user?.full_name?.split(' ')[0] || 'Курьер'
   const initial   = firstName[0] || 'К'
   const fmt = (n) => Number(n || 0).toLocaleString()
-  const salary    = summary?.total_delivery_fees || 0
+  const salary    = deliveredOrders.reduce((sum, o) => sum + getPayout(o), 0)
   const collected = summary?.cash_to_handover || 0
 
   return (

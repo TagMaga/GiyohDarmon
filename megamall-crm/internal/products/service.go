@@ -284,18 +284,20 @@ func (s *Service) CreateProduct(ctx context.Context, actorID uuid.UUID, req Crea
 	}
 
 	p := &Product{
-		ID:            uuid.New(),
-		SKU:           req.SKU,
-		ArticleNumber: req.ArticleNumber,
-		Barcode:       req.Barcode,
-		Name:          req.Name,
-		Description:   req.Description,
-		CategoryID:    req.CategoryID,
-		SupplierID:    req.SupplierID,
-		PurchasePrice: req.PurchasePrice,
-		SalePrice:     req.SalePrice,
-		Weight:        req.Weight,
-		IsActive:      true,
+		ID:                 uuid.New(),
+		SKU:                req.SKU,
+		ArticleNumber:      req.ArticleNumber,
+		Barcode:            req.Barcode,
+		Name:               req.Name,
+		Description:        req.Description,
+		CategoryID:         req.CategoryID,
+		SupplierID:         req.SupplierID,
+		PurchasePrice:      req.PurchasePrice,
+		SalePrice:          req.SalePrice,
+		Weight:             req.Weight,
+		NormalDeliveryFee:  req.NormalDeliveryFee,
+		ExpressDeliveryFee: req.ExpressDeliveryFee,
+		IsActive:           true,
 	}
 	if err := s.repo.CreateProduct(ctx, p); err != nil {
 		return nil, err
@@ -365,6 +367,12 @@ func (s *Service) UpdateProduct(ctx context.Context, actorID, id uuid.UUID, req 
 	}
 	if req.Weight != nil {
 		p.Weight = req.Weight
+	}
+	if req.NormalDeliveryFee != nil {
+		p.NormalDeliveryFee = req.NormalDeliveryFee
+	}
+	if req.ExpressDeliveryFee != nil {
+		p.ExpressDeliveryFee = req.ExpressDeliveryFee
 	}
 	if req.IsActive != nil {
 		p.IsActive = *req.IsActive

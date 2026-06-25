@@ -43,6 +43,21 @@ func (h *Handler) myOrders(c *gin.Context) {
 	response.OK(c, orders)
 }
 
+func (h *Handler) orderDetail(c *gin.Context) {
+	orderID, err := parseID(c, "id")
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	order, svcErr := h.svc.GetOrderDetail(c.Request.Context(), claims.UserID, orderID)
+	if svcErr != nil {
+		response.HandleError(c, svcErr)
+		return
+	}
+	response.OK(c, order)
+}
+
 // ─── Available Orders ─────────────────────────────────────────────────────────
 
 func (h *Handler) availableOrders(c *gin.Context) {

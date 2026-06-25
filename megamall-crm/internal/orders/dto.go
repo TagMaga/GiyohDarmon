@@ -15,41 +15,41 @@ type OrderItemRequest struct {
 }
 
 type OrderItemResponse struct {
-	ID             uuid.UUID `json:"id"`
-	ProductID      uuid.UUID `json:"product_id"`
-	ProductName    string    `json:"product_name"`
-	ProductImageURL *string  `json:"product_image_url"`
-	Quantity       int       `json:"quantity"`
-	UnitPrice      float64   `json:"unit_price"`
-	TotalPrice     float64   `json:"total_price"`
+	ID              uuid.UUID `json:"id"`
+	ProductID       uuid.UUID `json:"product_id"`
+	ProductName     string    `json:"product_name"`
+	ProductImageURL *string   `json:"product_image_url"`
+	Quantity        int       `json:"quantity"`
+	UnitPrice       float64   `json:"unit_price"`
+	TotalPrice      float64   `json:"total_price"`
 }
 
 // ─── Create Order ─────────────────────────────────────────────────────────────
 
 type CreateOrderRequest struct {
-	CustomerID     uuid.UUID          `json:"customer_id"      validate:"required"`
-	OrderType      OrderType          `json:"order_type"       validate:"required"`
-	WarehouseID    uuid.UUID          `json:"warehouse_id"     validate:"required"`
-	CityID         uuid.UUID          `json:"city_id"          validate:"required"` // delivery city (must be active)
-	Items          []OrderItemRequest `json:"items"            validate:"required,min=1,dive"`
+	CustomerID      uuid.UUID          `json:"customer_id"      validate:"required"`
+	OrderType       OrderType          `json:"order_type"       validate:"required"`
+	WarehouseID     uuid.UUID          `json:"warehouse_id"     validate:"required"`
+	CityID          uuid.UUID          `json:"city_id"          validate:"required"` // delivery city (must be active)
+	Items           []OrderItemRequest `json:"items"            validate:"required,min=1,dive"`
 	Notes           *string            `json:"notes"`
 	DeliveryAddress *string            `json:"delivery_address"`
 	DeliveryMethod  string             `json:"delivery_method"` // "normal" | "fast" ("express" accepted as legacy alias); defaults to "normal"
 
 	// Dispatcher-only: create order on behalf of a specific seller.
-	SellerID    *uuid.UUID `json:"seller_id"`
+	SellerID *uuid.UUID `json:"seller_id"`
 	// Dispatcher-only: override the initial status (e.g. "confirmed" to skip confirmation step).
-	ForceStatus *string    `json:"force_status"`
+	ForceStatus *string `json:"force_status"`
 
 	// Prepayment verification fields (Migration 00040)
-	PrepaymentRequired bool     `json:"prepayment_required"`
-	PrepaymentType     *string  `json:"prepayment_type"`     // "partial" | "full" — computed automatically by service
-	PrepaymentAmount   float64  `json:"prepayment_amount"`
-	PrepaymentReceiver *string  `json:"prepayment_receiver"` // "dispatcher_card" | "company_card" | "cash" | "other"
-	PrepaymentComment  *string  `json:"prepayment_comment"`
+	PrepaymentRequired bool    `json:"prepayment_required"`
+	PrepaymentType     *string `json:"prepayment_type"` // "partial" | "full" — computed automatically by service
+	PrepaymentAmount   float64 `json:"prepayment_amount"`
+	PrepaymentReceiver *string `json:"prepayment_receiver"` // "dispatcher_card" | "company_card" | "cash" | "other"
+	PrepaymentComment  *string `json:"prepayment_comment"`
 	// Attachment URLs — client uploads file first via /upload, then passes URL here.
-	PaymentProofURL  *string `json:"payment_proof_url"`
-	CustomerChatURL  *string `json:"customer_chat_url"`
+	PaymentProofURL *string `json:"payment_proof_url"`
+	CustomerChatURL *string `json:"customer_chat_url"`
 }
 
 // ─── Order Stats (dashboard order-health) ───────────────────────────────────────
@@ -71,10 +71,10 @@ type OrderStatsResponse struct {
 type UpdateOrderRequest struct {
 	Notes              *string            `json:"notes"`
 	DeliveryAddress    *string            `json:"delivery_address"`
-	DeliveryMethod     *string            `json:"delivery_method"`    // "normal" | "fast"
+	DeliveryMethod     *string            `json:"delivery_method"` // "normal" | "fast"
 	CustomerName       *string            `json:"customer_name"`
 	CustomerPhone      *string            `json:"customer_phone"`
-	Items              []OrderItemRequest `json:"items"`              // nil=no change; must have ≥1 if non-nil
+	Items              []OrderItemRequest `json:"items"` // nil=no change; must have ≥1 if non-nil
 	PrepaymentRequired *bool              `json:"prepayment_required"`
 	PrepaymentAmount   *float64           `json:"prepayment_amount"`
 	PrepaymentReceiver *string            `json:"prepayment_receiver"`
@@ -96,6 +96,7 @@ type OrderCommentResponse struct {
 	AuthorName string    `json:"author_name"`
 	AuthorRole string    `json:"author_role"`
 	Comment    string    `json:"comment"`
+	Text       string    `json:"text"`
 	Visibility string    `json:"visibility"`
 	CreatedAt  time.Time `json:"created_at"`
 }
@@ -203,10 +204,10 @@ type OrderResponse struct {
 	ID          uuid.UUID `json:"id"`
 	OrderNumber string    `json:"order_number"`
 
-	CustomerID uuid.UUID        `json:"customer_id"`
+	CustomerID uuid.UUID         `json:"customer_id"`
 	Customer   *CustomerResponse `json:"customer,omitempty"`
-	Seller     *SellerResponse  `json:"seller,omitempty"`
-	SellerID   uuid.UUID        `json:"seller_id"`
+	Seller     *SellerResponse   `json:"seller,omitempty"`
+	SellerID   uuid.UUID         `json:"seller_id"`
 
 	ManagerID      *uuid.UUID `json:"manager_id"`
 	TeamLeadID     *uuid.UUID `json:"team_lead_id"`
@@ -220,15 +221,15 @@ type OrderResponse struct {
 	SnapshotID     *uuid.UUID  `json:"snapshot_id"`
 	DeliveryMethod string      `json:"delivery_method"`
 
-	Subtotal           float64 `json:"subtotal"`
-	DeliveryFee        float64 `json:"delivery_fee"`
-	CourierPayout      float64 `json:"courier_payout"`
-	TotalAmount        float64 `json:"total_amount"`       // = subtotal (product total)
-	TotalOrderAmount   float64 `json:"total_order_amount"` // = total_amount + delivery_fee
-	NetRevenue         float64 `json:"net_revenue"`
-	PrepaymentAmount   float64 `json:"prepayment_amount"`
-	AmountToCollect    float64 `json:"amount_to_collect"`  // = total_order_amount - prepayment_amount
-	PaymentLabel       string  `json:"payment_label"`      // cod | partial_prepayment | full_prepayment
+	Subtotal         float64 `json:"subtotal"`
+	DeliveryFee      float64 `json:"delivery_fee"`
+	CourierPayout    float64 `json:"courier_payout"`
+	TotalAmount      float64 `json:"total_amount"`       // = subtotal (product total)
+	TotalOrderAmount float64 `json:"total_order_amount"` // = total_amount + delivery_fee
+	NetRevenue       float64 `json:"net_revenue"`
+	PrepaymentAmount float64 `json:"prepayment_amount"`
+	AmountToCollect  float64 `json:"amount_to_collect"` // = total_order_amount - prepayment_amount
+	PaymentLabel     string  `json:"payment_label"`     // cod | partial_prepayment | full_prepayment
 
 	// Prepayment verification
 	PrepaymentRequired        bool       `json:"prepayment_required"`
@@ -274,10 +275,10 @@ type CourierInfo struct {
 // applyCourierDisplay populates the courier_* response fields from resolved
 // assignment info, following the business rule / data-source priority:
 //
-//	1. active assignment courier   (current holder)
-//	2. last assignment courier     (delivered / inactive history)
-//	3. orders.courier_id cache     (fallback when no assignment row resolved a name)
-//	4. null
+//  1. active assignment courier   (current holder)
+//  2. last assignment courier     (delivered / inactive history)
+//  3. orders.courier_id cache     (fallback when no assignment row resolved a name)
+//  4. null
 //
 // Display rules by order status:
 //   - delivered            → delivered_by = last courier, status "delivered_by"
@@ -463,9 +464,9 @@ type ListOrdersFilter struct {
 	City       string `form:"city"`
 	// Frontend sends "from" / "to" (YYYY-MM-DD). "date_from" / "date_to" accepted as aliases
 	// to avoid breaking any direct API callers. Repository merges them: date_from wins if set.
-	DateFrom string `form:"date_from"`
-	DateTo   string `form:"date_to"`
-	From     string `form:"from"`
-	To       string `form:"to"`
+	DateFrom  string `form:"date_from"`
+	DateTo    string `form:"date_to"`
+	From      string `form:"from"`
+	To        string `form:"to"`
 	OrderType string `form:"order_type"`
 }

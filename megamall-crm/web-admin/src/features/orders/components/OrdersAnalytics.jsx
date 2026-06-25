@@ -114,7 +114,9 @@ function RevenueTrend({ orders }) {
     orders.forEach(o => {
       const d = (o.created_at ?? o.CreatedAt ?? '').slice(0, 10)
       if (!d) return
-      const amt = Number(o.net_revenue ?? o.total_amount ?? o.amount ?? 0)
+      const totalOrd = Number(o.total_order_amount ?? o.total_amount ?? o.amount ?? 0)
+      const courPay  = Number(o.courier_payout ?? 0)
+      const amt = totalOrd - courPay
       map[d] = (map[d] ?? 0) + amt
     })
     return Object.entries(map)

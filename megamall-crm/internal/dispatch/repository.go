@@ -172,8 +172,52 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 			OrderIntakeEnabled:   row.OrderIntakeEnabled,
 			OrderIntakeReason:    row.OrderIntakeReason,
 			OrderIntakeUpdatedAt: row.OrderIntakeUpdatedAt,
+			CityIDs:              []uuid.UUID{},
+			CityNames:            []string{},
 		})
 	}
+
+	// Batch-load city assignments for all couriers.
+	if len(result) > 0 {
+		courierIDs := make([]uuid.UUID, len(result))
+		for i, o := range result {
+			courierIDs[i] = o.CourierID
+		}
+
+		type cityLinkRow struct {
+			CourierID uuid.UUID `gorm:"column:courier_id"`
+			CityID    uuid.UUID `gorm:"column:city_id"`
+			CityName  string    `gorm:"column:city_name"`
+		}
+		var cityLinks []cityLinkRow
+		r.db.WithContext(ctx).Raw(`
+			SELECT cc.courier_id, cc.city_id, c.name AS city_name
+			FROM courier_cities cc
+			JOIN cities c ON c.id = cc.city_id
+			WHERE cc.courier_id IN ?
+			ORDER BY c.name
+		`, courierIDs).Scan(&cityLinks)
+
+		type citySlices struct {
+			IDs   []uuid.UUID
+			Names []string
+		}
+		cityMap := make(map[uuid.UUID]*citySlices, len(result))
+		for _, cl := range cityLinks {
+			if cityMap[cl.CourierID] == nil {
+				cityMap[cl.CourierID] = &citySlices{}
+			}
+			cityMap[cl.CourierID].IDs = append(cityMap[cl.CourierID].IDs, cl.CityID)
+			cityMap[cl.CourierID].Names = append(cityMap[cl.CourierID].Names, cl.CityName)
+		}
+		for i := range result {
+			if s, ok := cityMap[result[i].CourierID]; ok {
+				result[i].CityIDs = s.IDs
+				result[i].CityNames = s.Names
+			}
+		}
+	}
+
 	return result, nil
 }
 
@@ -817,4 +861,29 @@ func (r *Repository) ListComments(ctx context.Context, orderID uuid.UUID, visibi
 		return nil, fmt.Errorf("list comments: %w", err)
 	}
 	return rows, nil
+}
+
+// ─── Sellers ──────────────────────────────────────────────────────────────────
+
+// ListSellers returns all active users with role=seller, ordered by name.
+func (r *Repository) ListSellers(ctx context.Context) ([]SellerInfo, error) {
+	type row struct {
+		ID       uuid.UUID `gorm:"column:id"`
+		FullName string    `gorm:"column:full_name"`
+		Phone    string    `gorm:"column:phone"`
+	}
+	var rows []row
+	if err := r.db.WithContext(ctx).
+		Table("users").
+		Select("id, full_name, phone").
+		Where("role = ? AND deleted_at IS NULL", "seller").
+		Order("full_name ASC").
+		Find(&rows).Error; err != nil {
+		return nil, fmt.Errorf("list sellers: %w", err)
+	}
+	out := make([]SellerInfo, len(rows))
+	for i, row := range rows {
+		out[i] = SellerInfo{ID: row.ID, FullName: row.FullName, Phone: row.Phone}
+	}
+	return out, nil
 }

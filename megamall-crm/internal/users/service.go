@@ -67,6 +67,22 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	return u, nil
 }
 
+func (s *Service) CanViewUser(ctx context.Context, actorID uuid.UUID, actorRole string, targetID uuid.UUID) (bool, error) {
+	if actorID == targetID || actorRole == string(RoleOwner) {
+		return true, nil
+	}
+
+	if actorRole != string(RoleManager) && actorRole != string(RoleSalesTeamLead) {
+		return false, nil
+	}
+
+	ok, err := s.repo.ShareTeam(ctx, actorID, targetID)
+	if err != nil {
+		return false, apperrors.Internal(err)
+	}
+	return ok, nil
+}
+
 func (s *Service) List(ctx context.Context, filter ListUsersFilter, p pagination.Params) ([]User, int, error) {
 	list, total, err := s.repo.List(ctx, filter, p)
 	if err != nil {
@@ -117,6 +133,25 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateUserReques
 		return nil, apperrors.Internal(err)
 	}
 
+	return u, nil
+}
+
+// PatchMe updates only the fields a user is allowed to edit for themselves.
+func (s *Service) PatchMe(ctx context.Context, id uuid.UUID, req PatchMeRequest) (*User, error) {
+	u, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+	if u == nil {
+		return nil, apperrors.NotFound("user")
+	}
+	if req.TelegramChatID != nil {
+		u.TelegramChatID = req.TelegramChatID
+	}
+	u.UpdatedAt = time.Now().UTC()
+	if err := s.repo.Update(ctx, u); err != nil {
+		return nil, apperrors.Internal(err)
+	}
 	return u, nil
 }
 

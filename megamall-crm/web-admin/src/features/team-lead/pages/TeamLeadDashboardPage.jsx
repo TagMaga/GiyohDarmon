@@ -25,7 +25,7 @@ import { fmtMoney }            from '../../hr/utils/hrHelpers'
 import useCurrentUser          from '../../../shared/hooks/useCurrentUser'
 import useMyTeam               from '../hooks/useMyTeam'
 import useTeamMembers          from '../../people/hooks/useTeamMembers'
-import useEmployees            from '../../people/hooks/useEmployees'
+import useEmployeesByIds       from '../../people/hooks/useEmployeesByIds'
 import useTeams                from '../../people/hooks/useTeams'
 import useTeamIncome           from '../../hr/hooks/useTeamIncome'
 import { buildUserMap }        from '../../people/utils/peopleHelpers'
@@ -306,11 +306,15 @@ export default function TeamLeadDashboardPage() {
   const { userId } = useCurrentUser()
   const { team, teamId, isLoading: teamLoading } = useMyTeam()
   const { data: members = [],     isLoading: membersLoading } = useTeamMembers(teamId)
-  const { data: allEmployees = [] } = useEmployees()
+  const memberIds = useMemo(() => members.map(m => m.user_id).filter(Boolean), [members])
+  const employeeIds = useMemo(
+    () => [...new Set([...memberIds, team?.manager_id, userId].filter(Boolean))],
+    [memberIds, team?.manager_id, userId]
+  )
+  const { data: teamEmployees = [] } = useEmployeesByIds(employeeIds)
   const { data: allTeams = [] }     = useTeams()
 
-  const userMap = useMemo(() => buildUserMap(allEmployees), [allEmployees])
-  const memberIds = useMemo(() => members.map(m => m.user_id).filter(Boolean), [members])
+  const userMap = useMemo(() => buildUserMap(teamEmployees), [teamEmployees])
   const sellers   = useMemo(() =>
     members.map(m => userMap[m.user_id]).filter(u => u && (u.role ?? u.Role) === 'seller'),
     [members, userMap]
@@ -387,7 +391,7 @@ export default function TeamLeadDashboardPage() {
   const dataLoading = teamLoading || membersLoading || periodLoading
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 space-y-5">
 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3">

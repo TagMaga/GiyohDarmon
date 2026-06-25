@@ -27,11 +27,12 @@ type BoardOrder struct {
 
 // UpdateCourierRequest is the dispatcher payload to edit a courier's profile.
 type UpdateCourierRequest struct {
-	FullName       string  `json:"full_name"        validate:"required,min=1"`
-	Surname        *string `json:"surname"`
-	Phone          string  `json:"phone"            validate:"required"`
-	Password       *string `json:"password"`        // empty = keep existing
-	TelegramChatID *string `json:"telegram_chat_id" validate:"required"`
+	FullName       string      `json:"full_name"        validate:"required,min=1"`
+	Surname        *string     `json:"surname"`
+	Phone          string      `json:"phone"            validate:"required"`
+	Password       *string     `json:"password"`         // empty = keep existing
+	TelegramChatID *string     `json:"telegram_chat_id" validate:"required"`
+	CityIDs        []uuid.UUID `json:"city_ids"`         // nil = unchanged; empty slice = remove all
 }
 
 // ToggleCourierActiveRequest toggles the courier's is_active flag.
@@ -41,12 +42,13 @@ type ToggleCourierActiveRequest struct {
 
 // CourierProfileResponse is returned after edit/toggle operations.
 type CourierProfileResponse struct {
-	CourierID      uuid.UUID `json:"courier_id"`
-	FullName       string    `json:"full_name"`
-	Surname        *string   `json:"surname"`
-	Phone          string    `json:"phone"`
-	TelegramChatID *string   `json:"telegram_chat_id"`
-	IsActive       bool      `json:"is_active"`
+	CourierID      uuid.UUID   `json:"courier_id"`
+	FullName       string      `json:"full_name"`
+	Surname        *string     `json:"surname"`
+	Phone          string      `json:"phone"`
+	TelegramChatID *string     `json:"telegram_chat_id"`
+	IsActive       bool        `json:"is_active"`
+	CityIDs        []uuid.UUID `json:"city_ids"`
 }
 
 // CourierOverview is a per-courier workload summary for the board sidebar.
@@ -73,9 +75,11 @@ type CourierOverview struct {
 	InDelivery           int        `json:"in_delivery"`     // status = in_delivery
 	IssueOrders          int        `json:"issue_orders"`    // status = issue
 	CashOwed             float64    `json:"cash_owed"`       // sum of (total_amount - prepayment) for delivered, not-yet-handovered
-	OrderIntakeEnabled   bool       `json:"order_intake_enabled"`
-	OrderIntakeReason    *string    `json:"order_intake_reason,omitempty"`
-	OrderIntakeUpdatedAt *time.Time `json:"order_intake_updated_at,omitempty"`
+	OrderIntakeEnabled   bool        `json:"order_intake_enabled"`
+	OrderIntakeReason    *string     `json:"order_intake_reason,omitempty"`
+	OrderIntakeUpdatedAt *time.Time  `json:"order_intake_updated_at,omitempty"`
+	CityIDs              []uuid.UUID `json:"city_ids"`
+	CityNames            []string    `json:"city_names"`
 }
 
 // CashSettlementFilter scopes courier settlement metrics. Nil From/To means
@@ -248,4 +252,13 @@ func CommentToResponse(c *OrderComment) CommentResponse {
 		Visibility: c.Visibility,
 		CreatedAt:  c.CreatedAt,
 	}
+}
+
+// ─── Sellers ──────────────────────────────────────────────────────────────────
+
+// SellerInfo is a minimal seller record for the dispatcher's seller dropdown.
+type SellerInfo struct {
+	ID       uuid.UUID `json:"id"`
+	FullName string    `json:"full_name"`
+	Phone    string    `json:"phone"`
 }

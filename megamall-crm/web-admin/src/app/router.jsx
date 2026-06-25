@@ -43,13 +43,18 @@ const ManagerIncomePage    = lazy(() => import('../features/manager/pages/Manage
 const ManagerOrdersPage    = lazy(() => import('../features/manager/pages/ManagerOrdersPage'))
 const ManagerSellersPage   = lazy(() => import('../features/manager/pages/ManagerSellersPage'))
 const ManagerMyOrdersPage  = lazy(() => import('../features/manager/pages/ManagerMyOrdersPage'))
+const ManagerProfilePage   = lazy(() => import('../features/manager/pages/ManagerProfilePage'))
 
 // Seller
-const SellerDashboard  = lazy(() => import('../pages/SellerDashboard'))
-const SellerHome       = lazy(() => import('../features/seller/pages/SellerHome'))
-const SellerOrders     = lazy(() => import('../features/seller/pages/SellerOrders'))
-const CreateOrder      = lazy(() => import('../features/seller/pages/CreateOrder'))
-const SellerIncomePage = lazy(() => import('../features/seller/pages/SellerIncomePage'))
+const SellerDashboard        = lazy(() => import('../pages/SellerDashboard'))
+const SellerHome             = lazy(() => import('../features/seller/pages/SellerHome'))
+const SellerOrders           = lazy(() => import('../features/seller/pages/SellerOrders'))
+const CreateOrder            = lazy(() => import('../features/seller/pages/CreateOrder'))
+const EditOrder              = lazy(() => import('../features/seller/pages/EditOrder'))
+const SellerIncomePage       = lazy(() => import('../features/seller/pages/SellerIncomePage'))
+const SellerProfilePage      = lazy(() => import('../features/seller/pages/SellerProfilePage'))
+const SellerProfileInfoPage  = lazy(() => import('../features/seller/pages/SellerProfileInfoPage'))
+const SellerTeamPage         = lazy(() => import('../features/seller/pages/SellerTeamPage'))
 
 // Dispatcher
 const DispatcherDashboard     = lazy(() => import('../pages/DispatcherDashboard'))
@@ -167,9 +172,18 @@ const router = createBrowserRouter([
         { path: 'income',     element: <Lazy><ManagerIncomePage /></Lazy> },
         { path: 'orders',     element: <Lazy><ManagerOrdersPage /></Lazy> },
         { path: 'sellers',    element: <Lazy><ManagerSellersPage /></Lazy> },
-        { path: 'my-orders',        element: <Lazy><ManagerMyOrdersPage /></Lazy> },
-        { path: 'my-orders/create', element: <Lazy><CreateOrder /></Lazy> },
-        { path: '*',                element: <ComingSoon /> },
+        { path: 'my-orders',             element: <Lazy><ManagerMyOrdersPage /></Lazy> },
+        { path: 'my-orders/create',      element: <Lazy><CreateOrder /></Lazy> },
+        { path: 'my-orders/:id/edit',    element: <Lazy><EditOrder /></Lazy> },
+        {
+          path: 'profile',
+          element: <Lazy><ManagerProfilePage /></Lazy>,
+          children: [
+            { index: true,  element: <Navigate to="info" replace /> },
+            { path: 'info', element: <Lazy><SellerProfileInfoPage /></Lazy> },
+          ],
+        },
+        { path: '*',                     element: <ComingSoon /> },
       ],
     }],
   },
@@ -186,10 +200,20 @@ const router = createBrowserRouter([
           children: [
             { index: true,           element: <Lazy><SellerHome /></Lazy> },
             { path: 'orders',        element: <Lazy><SellerOrders /></Lazy> },
-            { path: 'orders/create', element: <Lazy><CreateOrder /></Lazy> },
+            { path: 'orders/create',    element: <Lazy><CreateOrder /></Lazy> },
+            { path: 'orders/:id/edit', element: <Lazy><EditOrder /></Lazy> },
           ],
         },
         { path: 'income', element: <Lazy><SellerIncomePage /></Lazy> },
+        {
+          path: 'profile',
+          element: <Lazy><SellerProfilePage /></Lazy>,
+          children: [
+            { index: true, element: <Navigate to="info" replace /> },
+            { path: 'info', element: <Lazy><SellerProfileInfoPage /></Lazy> },
+            { path: 'team', element: <Lazy><SellerTeamPage /></Lazy> },
+          ],
+        },
         { path: '*',      element: <ComingSoon /> },
       ],
     }],

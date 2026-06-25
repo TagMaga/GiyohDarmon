@@ -92,30 +92,34 @@ func ToSupplierResponse(s *Supplier) SupplierResponse {
 // ─── Product ──────────────────────────────────────────────────────────────────
 
 type CreateProductRequest struct {
-	SKU           string     `json:"sku"            validate:"required,max=100"`
-	ArticleNumber *string    `json:"article_number"`
-	Barcode       *string    `json:"barcode"`
-	Name          string     `json:"name"           validate:"required,max=500"`
-	Description   *string    `json:"description"`
-	CategoryID    *uuid.UUID `json:"category_id"`
-	SupplierID    *uuid.UUID `json:"supplier_id"`
-	PurchasePrice *float64   `json:"purchase_price" validate:"omitempty,min=0"`
-	SalePrice     *float64   `json:"sale_price"     validate:"omitempty,min=0"`
-	Weight        *float64   `json:"weight"         validate:"omitempty,min=0"`
+	SKU                string     `json:"sku"                  validate:"required,max=100"`
+	ArticleNumber      *string    `json:"article_number"`
+	Barcode            *string    `json:"barcode"`
+	Name               string     `json:"name"                 validate:"required,max=500"`
+	Description        *string    `json:"description"`
+	CategoryID         *uuid.UUID `json:"category_id"`
+	SupplierID         *uuid.UUID `json:"supplier_id"`
+	PurchasePrice      *float64   `json:"purchase_price"       validate:"omitempty,min=0"`
+	SalePrice          *float64   `json:"sale_price"           validate:"omitempty,min=0"`
+	Weight             *float64   `json:"weight"               validate:"omitempty,min=0"`
+	NormalDeliveryFee  *float64   `json:"normal_delivery_fee"  validate:"omitempty,min=0"`
+	ExpressDeliveryFee *float64   `json:"express_delivery_fee" validate:"omitempty,min=0"`
 }
 
 type UpdateProductRequest struct {
-	SKU           *string    `json:"sku"            validate:"omitempty,max=100"`
-	ArticleNumber *string    `json:"article_number"`
-	Barcode       *string    `json:"barcode"`
-	Name          *string    `json:"name"           validate:"omitempty,max=500"`
-	Description   *string    `json:"description"`
-	CategoryID    *uuid.UUID `json:"category_id"`
-	SupplierID    *uuid.UUID `json:"supplier_id"`
-	PurchasePrice *float64   `json:"purchase_price" validate:"omitempty,min=0"`
-	SalePrice     *float64   `json:"sale_price"     validate:"omitempty,min=0"`
-	Weight        *float64   `json:"weight"         validate:"omitempty,min=0"`
-	IsActive      *bool      `json:"is_active"`
+	SKU                *string    `json:"sku"                  validate:"omitempty,max=100"`
+	ArticleNumber      *string    `json:"article_number"`
+	Barcode            *string    `json:"barcode"`
+	Name               *string    `json:"name"                 validate:"omitempty,max=500"`
+	Description        *string    `json:"description"`
+	CategoryID         *uuid.UUID `json:"category_id"`
+	SupplierID         *uuid.UUID `json:"supplier_id"`
+	PurchasePrice      *float64   `json:"purchase_price"       validate:"omitempty,min=0"`
+	SalePrice          *float64   `json:"sale_price"           validate:"omitempty,min=0"`
+	Weight             *float64   `json:"weight"               validate:"omitempty,min=0"`
+	NormalDeliveryFee  *float64   `json:"normal_delivery_fee"  validate:"omitempty,min=0"`
+	ExpressDeliveryFee *float64   `json:"express_delivery_fee" validate:"omitempty,min=0"`
+	IsActive           *bool      `json:"is_active"`
 }
 
 type AddProductImageRequest struct {
@@ -133,21 +137,23 @@ type ProductImageResponse struct {
 }
 
 type ProductResponse struct {
-	ID            uuid.UUID              `json:"id"`
-	SKU           string                 `json:"sku"`
-	ArticleNumber *string                `json:"article_number"`
-	Barcode       *string                `json:"barcode"`
-	Name          string                 `json:"name"`
-	Description   *string                `json:"description"`
-	CategoryID    *uuid.UUID             `json:"category_id"`
-	SupplierID    *uuid.UUID             `json:"supplier_id"`
-	PurchasePrice *float64               `json:"purchase_price"`
-	SalePrice     *float64               `json:"sale_price"`
-	Weight        *float64               `json:"weight"`
-	IsActive      bool                   `json:"is_active"`
-	Images        []ProductImageResponse `json:"images"`
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     time.Time              `json:"updated_at"`
+	ID                 uuid.UUID              `json:"id"`
+	SKU                string                 `json:"sku"`
+	ArticleNumber      *string                `json:"article_number"`
+	Barcode            *string                `json:"barcode"`
+	Name               string                 `json:"name"`
+	Description        *string                `json:"description"`
+	CategoryID         *uuid.UUID             `json:"category_id"`
+	SupplierID         *uuid.UUID             `json:"supplier_id"`
+	PurchasePrice      *float64               `json:"purchase_price"`
+	SalePrice          *float64               `json:"sale_price"`
+	Weight             *float64               `json:"weight"`
+	NormalDeliveryFee  *float64               `json:"normal_delivery_fee"`
+	ExpressDeliveryFee *float64               `json:"express_delivery_fee"`
+	IsActive           bool                   `json:"is_active"`
+	Images             []ProductImageResponse `json:"images"`
+	CreatedAt          time.Time              `json:"created_at"`
+	UpdatedAt          time.Time              `json:"updated_at"`
 }
 
 func ToProductResponse(p *Product) ProductResponse {
@@ -162,21 +168,23 @@ func ToProductResponse(p *Product) ProductResponse {
 		})
 	}
 	return ProductResponse{
-		ID:            p.ID,
-		SKU:           p.SKU,
-		ArticleNumber: p.ArticleNumber,
-		Barcode:       p.Barcode,
-		Name:          p.Name,
-		Description:   p.Description,
-		CategoryID:    p.CategoryID,
-		SupplierID:    p.SupplierID,
-		PurchasePrice: p.PurchasePrice,
-		SalePrice:     p.SalePrice,
-		Weight:        p.Weight,
-		IsActive:      p.IsActive,
-		Images:        images,
-		CreatedAt:     p.CreatedAt,
-		UpdatedAt:     p.UpdatedAt,
+		ID:                 p.ID,
+		SKU:                p.SKU,
+		ArticleNumber:      p.ArticleNumber,
+		Barcode:            p.Barcode,
+		Name:               p.Name,
+		Description:        p.Description,
+		CategoryID:         p.CategoryID,
+		SupplierID:         p.SupplierID,
+		PurchasePrice:      p.PurchasePrice,
+		SalePrice:          p.SalePrice,
+		Weight:             p.Weight,
+		NormalDeliveryFee:  p.NormalDeliveryFee,
+		ExpressDeliveryFee: p.ExpressDeliveryFee,
+		IsActive:           p.IsActive,
+		Images:             images,
+		CreatedAt:          p.CreatedAt,
+		UpdatedAt:          p.UpdatedAt,
 	}
 }
 

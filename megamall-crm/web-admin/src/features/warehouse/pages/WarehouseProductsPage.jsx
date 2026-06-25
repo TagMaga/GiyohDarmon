@@ -52,7 +52,7 @@ export default function WarehouseProductsPage() {
   }, [categoryFilter, data.products, search])
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in p-6">
       <PageHeader
         title="Товары"
         subtitle="Карточки товаров, SKU, штрихкоды, категории, цены и изображения."

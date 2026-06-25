@@ -28,6 +28,8 @@ const emptyForm = {
   purchase_price: '',
   sale_price: '',
   image_url: '',
+  normal_delivery_fee:  '',
+  express_delivery_fee: '',
 }
 
 export default function ProductModal({ open, onClose, product, categories = [], suppliers = [] }) {
@@ -51,6 +53,8 @@ export default function ProductModal({ open, onClose, product, categories = [], 
       purchase_price: getPurchasePrice(product) ?? '',
       sale_price: getSalePrice(product) ?? '',
       image_url: getProductImage(product) ?? '',
+      normal_delivery_fee:  product?.normal_delivery_fee  ?? product?.NormalDeliveryFee  ?? '',
+      express_delivery_fee: product?.express_delivery_fee ?? product?.ExpressDeliveryFee ?? '',
     })
   }, [open, product])
 
@@ -113,6 +117,8 @@ export default function ProductModal({ open, onClose, product, categories = [], 
         <SelectField label="Поставщик" value={form.supplier_id} onChange={(v) => setField('supplier_id', v)} options={suppliers} />
         <Field label="Закупочная цена" type="number" min="0" value={form.purchase_price} onChange={(v) => setField('purchase_price', v)} placeholder="0" />
         <Field label="Цена продажи" type="number" min="0" value={form.sale_price} onChange={(v) => setField('sale_price', v)} placeholder="0" />
+        <Field label="Доставка (обычная)" type="number" min="0" value={form.normal_delivery_fee} onChange={(v) => setField('normal_delivery_fee', v)} placeholder="Глобальные настройки" />
+        <Field label="Доставка (экспресс)" type="number" min="0" value={form.express_delivery_fee} onChange={(v) => setField('express_delivery_fee', v)} placeholder="Глобальные настройки" />
       </div>
 
       <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -133,6 +139,8 @@ function normalizePayload(form, isEdit) {
   if (form.supplier_id) payload.supplier_id = form.supplier_id
   if (form.purchase_price !== '') payload.purchase_price = Number(form.purchase_price)
   if (form.sale_price !== '') payload.sale_price = Number(form.sale_price)
+  if (form.normal_delivery_fee !== '')  payload.normal_delivery_fee  = Number(form.normal_delivery_fee)
+  if (form.express_delivery_fee !== '') payload.express_delivery_fee = Number(form.express_delivery_fee)
 
   if (isEdit) {
     return payload

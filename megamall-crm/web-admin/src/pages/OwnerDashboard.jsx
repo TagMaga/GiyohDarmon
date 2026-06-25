@@ -723,7 +723,7 @@ export default function OwnerDashboard() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="animate-fade-in space-y-6 pb-12">
+    <div className="animate-fade-in space-y-6 p-6 pb-12">
 
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

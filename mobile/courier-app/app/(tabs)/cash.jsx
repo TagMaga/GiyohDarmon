@@ -135,26 +135,25 @@ export default function CashScreen() {
     ])
   }
 
-  const collected = summary?.cash_to_handover || 0
-  const salary    = summary?.total_delivery_fees || 0
-  const toReturn  = Math.max(0, Number(collected) - Number(salary))
-  const cashOrders = summary?.orders_collected || 0
-  const pendingHandover = history.filter(h => h.status === 'pending').reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0)
-  const amtNum = parseFloat(actualAmount) || 0
-  const diff = amtNum - toReturn
-  const hasDiff = amtNum > 0
-
   // Earnings = courier's fixed delivery fee per delivered order (independent of
   // handover status). Built from the courier's delivered orders.
   const fullUrl = (u) => (!u ? null : u.startsWith('http') ? u : `${API_URL}${u}`)
   const earnings = delivered.map(o => ({
     id: o.order_id ?? o.id,
     number: o.order_number ?? o.OrderNumber ?? '—',
-    fee: Number(o.courier_payout ?? o.delivery_fee ?? o.DeliveryFee ?? 0),
+    fee: Number(o.courier_payout ?? o.CourierPayout ?? o.delivery_fee ?? o.DeliveryFee ?? 0),
     date: o.delivered_at ?? o.assigned_at ?? o.created_at,
     address: o.customer_address ?? o.customer?.address,
   }))
   const earningsTotal = earnings.reduce((sum, e) => sum + e.fee, 0)
+  const collected = summary?.cash_to_handover || 0
+  const salary    = earningsTotal
+  const toReturn  = Math.max(0, Number(collected) - Number(salary))
+  const cashOrders = summary?.orders_collected || 0
+  const pendingHandover = history.filter(h => h.status === 'pending').reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0)
+  const amtNum = parseFloat(actualAmount) || 0
+  const diff = amtNum - toReturn
+  const hasDiff = amtNum > 0
 
   return (
     <SafeAreaView style={s.safe}>

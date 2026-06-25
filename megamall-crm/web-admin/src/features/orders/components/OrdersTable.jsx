@@ -53,9 +53,9 @@ function resolveTeamName(teamMap, teamId) {
 function DesktopRow({ order, userMap, teamMap, onView }) {
   const { name, phone } = resolveCustomer(order)
   const status  = order.status ?? order.Status ?? ''
-  const amount  = resolveField(order, 'total_amount', 'amount', 'total', 'Amount') ?? 0
-  const delivery = resolveField(order, 'delivery_fee', 'DeliveryFee', 'courier_fee') ?? 0
-  const net     = resolveField(order, 'net_revenue', 'NetRevenue', 'company_revenue') ?? ''
+  const amount  = resolveField(order, 'total_order_amount', 'total_amount', 'amount', 'total', 'Amount') ?? 0
+  const delivery = resolveField(order, 'courier_payout', 'CourierPayout') ?? 0
+  const net     = Number(amount) - Number(delivery)
   const qty     = resolveField(order, 'quantity', 'Quantity', 'qty') ?? 1
 
   return (
@@ -74,7 +74,7 @@ function DesktopRow({ order, userMap, teamMap, onView }) {
         {delivery ? `${fmtAmount(delivery)} сомони` : '—'}
       </td>
       <td className="px-4 py-3 text-xs font-semibold text-emerald-700 whitespace-nowrap text-right">
-        {net !== '' ? `${fmtAmount(net)} сомони` : '—'}
+        {fmtAmount(net)} сомони
       </td>
       <td className="px-4 py-3">
         <Badge variant={STATUS_BADGE[status] ?? 'slate'} size="sm">
@@ -111,7 +111,7 @@ function DesktopRow({ order, userMap, teamMap, onView }) {
 function MobileCard({ order, userMap, teamMap, onView }) {
   const { name, phone } = resolveCustomer(order)
   const status  = order.status ?? order.Status ?? ''
-  const amount  = resolveField(order, 'total_amount', 'amount', 'total', 'Amount') ?? 0
+  const amount  = resolveField(order, 'total_order_amount', 'total_amount', 'amount', 'total', 'Amount') ?? 0
 
   return (
     <div className="card p-4 space-y-3">

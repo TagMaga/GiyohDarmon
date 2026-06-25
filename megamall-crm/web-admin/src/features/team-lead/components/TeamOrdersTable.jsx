@@ -30,8 +30,9 @@ const HEADERS = ['№', 'Клиент', 'Телефон', 'Товар', 'Сум�
 function DesktopRow({ order, userMap, onView }) {
   const { name, phone } = resolveCustomer(order)
   const status  = order.status ?? order.Status ?? ''
-  const amount  = field(order, 'total_amount', 'amount', 'total', 'Amount') ?? 0
-  const net     = field(order, 'net_revenue', 'NetRevenue', 'company_revenue')
+  const amount  = field(order, 'total_order_amount', 'total_amount', 'amount', 'total', 'Amount') ?? 0
+  const courierPayout = field(order, 'courier_payout', 'CourierPayout') ?? 0
+  const net     = Number(amount) - Number(courierPayout)
   const sellerId = order.seller_id ?? order.SellerID
   const seller   = sellerId ? (userMap[sellerId]?.full_name ?? userMap[sellerId]?.FullName ?? sellerId.slice(0,8)) : '—'
 
@@ -42,7 +43,7 @@ function DesktopRow({ order, userMap, onView }) {
       <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{phone ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-slate-700 max-w-[120px] truncate">{resolveProduct(order)}</td>
       <td className="px-4 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap text-right">{fmtAmount(amount)} сомони</td>
-      <td className="px-4 py-3 text-xs font-semibold text-emerald-700 whitespace-nowrap text-right">{net != null ? `${fmtAmount(net)} сомони` : '—'}</td>
+      <td className="px-4 py-3 text-xs font-semibold text-emerald-700 whitespace-nowrap text-right">{fmtAmount(net)} сомони</td>
       <td className="px-4 py-3"><Badge variant={STATUS_BADGE[status] ?? 'slate'} size="sm">{STATUS_LABELS[status] ?? status}</Badge></td>
       <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{seller}</td>
       <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{fmtDate(order.created_at ?? order.CreatedAt)}</td>
@@ -59,7 +60,7 @@ function DesktopRow({ order, userMap, onView }) {
 function MobileCard({ order, userMap, onView }) {
   const { name } = resolveCustomer(order)
   const status = order.status ?? order.Status ?? ''
-  const amount = field(order, 'total_amount', 'amount', 'total') ?? 0
+  const amount = field(order, 'total_order_amount', 'total_amount', 'amount', 'total') ?? 0
 
   return (
     <div className="card p-4 space-y-2.5">

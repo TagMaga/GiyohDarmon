@@ -216,7 +216,7 @@ export default function TeamProfilePage() {
 
   // ── Loading / error states ───────────────────────────────────────────────
   if (teamLoading) return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
       <CardSkeleton /><CardSkeleton /><CardSkeleton />
     </div>
   )
@@ -234,7 +234,7 @@ export default function TeamProfilePage() {
   const manager = team.manager_id   ? userName(userMap, team.manager_id)   : null
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6">
       {/* ── Back navigation ───────────────────────────────────────────── */}
       <button
         onClick={() => navigate('/owner/teams')}

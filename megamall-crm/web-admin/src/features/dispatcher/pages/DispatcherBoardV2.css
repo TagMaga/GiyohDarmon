@@ -399,6 +399,23 @@
 .dv2-courier-row { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text2); margin-top: 8px; gap: 8px; }
 .dv2-courier-row strong { color: var(--text); font-weight: 700; }
 .dv2-cash { font-size: 11px; color: var(--green); font-weight: 700; }
+.dv2-courier-cities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.dv2-city-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(99,102,241,.15);
+  color: var(--purple);
+  border: 1px solid rgba(99,102,241,.2);
+}
 .dv2-courier-intake-off {
   margin-top: 8px;
   padding: 7px 8px;
@@ -618,6 +635,7 @@
 .dv2-cash-sub { color: var(--text2); font-size: 12px; margin-top: 2px; }
 .dv2-cash-controls { display: flex; align-items: center; gap: 8px; }
 .dv2-date-tabs.hidden { visibility: hidden; pointer-events: none; }
+.dv2-field-label { display: block; font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
 .dv2-cash-select,
 .dv2-cash-custom input,
 .dv2-search-field input,

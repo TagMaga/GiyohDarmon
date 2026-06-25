@@ -55,7 +55,7 @@ export default function WarehouseMovementsPage() {
   }
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in p-6">
       <PageHeader title="Движения" subtitle="История операций по остаткам." icon={<ArrowLeftRight size={20} />} />
       {data.error && <Alert variant="error" title="Ошибка загрузки данных" className="mb-5">{data.error?.message}</Alert>}
 

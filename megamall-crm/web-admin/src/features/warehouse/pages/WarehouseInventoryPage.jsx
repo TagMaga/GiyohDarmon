@@ -86,7 +86,7 @@ export default function WarehouseInventoryPage() {
   }
 
   return (
-    <div className="animate-fade-in pb-20 lg:pb-0">
+    <div className="animate-fade-in p-6 pb-20 lg:pb-6">
       <PageHeader
         title="Остатки"
         subtitle="Быстрый поиск, доступность и операции по товарам."

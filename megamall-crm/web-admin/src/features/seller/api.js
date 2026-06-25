@@ -95,7 +95,59 @@ export async function fetchInventory(productId, warehouseId) {
   const res = await client.get('/inventory', {
     params: { product_id: productId, warehouse_id: warehouseId, limit: 1 },
   })
-  // Returns array; grab first item
   const data = unwrap(res)
   return Array.isArray(data) ? data[0] ?? null : data
+}
+
+// ── Me (self-service) ─────────────────────────────────────────────────────────
+/** GET /users/me */
+export async function fetchMe() {
+  const res = await client.get('/users/me')
+  return unwrap(res)
+}
+
+/** PATCH /users/me */
+export async function patchMe(payload) {
+  const res = await client.patch('/users/me', payload)
+  return unwrap(res)
+}
+
+/** GET /hr/compensation/me */
+export async function fetchMyCompensation() {
+  const res = await client.get('/hr/compensation/me')
+  return unwrap(res)
+}
+
+/** GET /hr/income/me/team-rank */
+export async function fetchMyTeamRank() {
+  const res = await client.get('/hr/income/me/team-rank')
+  return unwrap(res)
+}
+
+// ── Payouts ───────────────────────────────────────────────────────────────────
+/** GET /seller-payouts/me */
+export async function fetchMyPayouts() {
+  const res = await client.get('/seller-payouts/me')
+  const data = unwrap(res)
+  return Array.isArray(data) ? data : []
+}
+
+// ── Order comments ────────────────────────────────────────────────────────────
+/** GET /orders/:id/comments */
+export async function fetchOrderComments(orderId) {
+  const res = await client.get(`/orders/${orderId}/comments`)
+  const data = unwrap(res)
+  return Array.isArray(data) ? data : []
+}
+
+/** POST /orders/:id/comments */
+export async function addOrderComment(orderId, comment) {
+  const res = await client.post(`/orders/${orderId}/comments`, { comment })
+  return unwrap(res)
+}
+
+/** PATCH /orders/:id */
+export async function updateOrder(orderId, payload) {
+  const res = await client.patch(`/orders/${orderId}`, payload)
+  return unwrap(res)
 }

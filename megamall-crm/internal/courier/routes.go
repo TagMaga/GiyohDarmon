@@ -21,7 +21,8 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/available",              auth, courierRoles, h.availableOrders)
 	rg.POST("/available/:id/claim",   auth, courierRoles, h.claimOrder)
 
-	// Per-order delivery workflow
+	// Per-order detail and delivery workflow
+	rg.GET("/orders/:id",            auth, courierRoles, h.orderDetail)
 	rg.POST("/orders/:id/start",     auth, courierRoles, h.startDelivery)
 	rg.POST("/orders/:id/delivered", auth, courierRoles, h.markDelivered)
 	rg.POST("/orders/:id/returned",  auth, courierRoles, h.markReturned)

@@ -23,6 +23,9 @@ export const reportAddressChanged = (id, newAddress) =>
 export const deferOrder = (id, scheduledAt) =>
   client.post(`/courier/orders/${id}/defer`, { scheduled_at: scheduledAt })
 
+export const getOrderComments = (id) => client.get(`/orders/${id}/comments`)
+export const addOrderComment = (id, comment) => client.post(`/orders/${id}/comments`, { comment })
+
 export const getCashSummary = () => client.get('/courier/cash/summary')
 export const submitHandover = (data) => client.post('/courier/cash/handover', data)
 export const getHandoverHistory = () => client.get('/courier/cash/handovers')

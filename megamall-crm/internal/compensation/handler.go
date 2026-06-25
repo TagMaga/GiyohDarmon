@@ -400,6 +400,43 @@ func (h *Handler) SetEmployeeCompensation(c *gin.Context) {
 	response.Created(c, ToCompensationResponse(ec))
 }
 
+// ─── Seller self-service ──────────────────────────────────────────────────────
+
+// GetMyCompensation handles GET /hr/compensation/me.
+// Returns the authenticated user's own commission rate.
+func (h *Handler) GetMyCompensation(c *gin.Context) {
+	claims := middleware.ClaimsFromContext(c)
+	ec, err := h.svc.GetEmployeeCompensation(c.Request.Context(), claims.UserID)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	if ec == nil {
+		response.OK(c, nil)
+		return
+	}
+	response.OK(c, ToCompensationResponse(ec))
+}
+
+// TeamRankResponse is the payload for GET /hr/income/me/team-rank.
+type TeamRankResponse struct {
+	Rank         int `json:"rank"`
+	TotalMembers int `json:"total_members"`
+}
+
+// GetTeamRank handles GET /hr/income/me/team-rank.
+// Returns the authenticated seller's rank within their team based on this month's
+// seller_commission_earned events. No teammate income amounts are exposed.
+func (h *Handler) GetTeamRank(c *gin.Context) {
+	claims := middleware.ClaimsFromContext(c)
+	rank, total, err := h.svc.GetSellerTeamRank(c.Request.Context(), claims.UserID)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, TeamRankResponse{Rank: rank, TotalMembers: total})
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // parsePathUUID parses a UUID path parameter. Writes a 400 and returns false on failure.

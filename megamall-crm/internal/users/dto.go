@@ -40,29 +40,38 @@ type ListUsersFilter struct {
 
 // UserResponse is the public-facing user representation (no password hash).
 type UserResponse struct {
-	ID        uuid.UUID `json:"id"`
-	Phone     string    `json:"phone"`
-	Email     *string   `json:"email"`
-	FullName  string    `json:"full_name"`
-	Role      Role      `json:"role"`
-	IsActive  bool      `json:"is_active"`
-	AvatarURL *string   `json:"avatar_url"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID             uuid.UUID `json:"id"`
+	Phone          string    `json:"phone"`
+	Email          *string   `json:"email"`
+	FullName       string    `json:"full_name"`
+	Surname        *string   `json:"surname"`
+	Role           Role      `json:"role"`
+	IsActive       bool      `json:"is_active"`
+	AvatarURL      *string   `json:"avatar_url"`
+	TelegramChatID *string   `json:"telegram_chat_id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// PatchMeRequest allows a user to update their own editable profile fields.
+type PatchMeRequest struct {
+	TelegramChatID *string `json:"telegram_chat_id" validate:"omitempty,max=100"`
 }
 
 // ToResponse converts a User model to a UserResponse DTO.
 func ToResponse(u *User) UserResponse {
 	return UserResponse{
-		ID:        u.ID,
-		Phone:     u.Phone,
-		Email:     u.Email,
-		FullName:  u.FullName,
-		Role:      u.Role,
-		IsActive:  u.IsActive,
-		AvatarURL: u.AvatarURL,
-		CreatedAt: u.CreatedAt,
-		UpdatedAt: u.UpdatedAt,
+		ID:             u.ID,
+		Phone:          u.Phone,
+		Email:          u.Email,
+		FullName:       u.FullName,
+		Surname:        u.Surname,
+		Role:           u.Role,
+		IsActive:       u.IsActive,
+		AvatarURL:      u.AvatarURL,
+		TelegramChatID: u.TelegramChatID,
+		CreatedAt:      u.CreatedAt,
+		UpdatedAt:      u.UpdatedAt,
 	}
 }
 

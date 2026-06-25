@@ -13,7 +13,7 @@ import EmptyState        from '../../../shared/components/EmptyState'
 import { CardSkeleton }  from '../../../shared/components/Skeleton'
 import { fmtAmount }     from '../../../shared/orderStatusConfig'
 import useMyTeam         from '../hooks/useMyTeam'
-import useEmployees      from '../../people/hooks/useEmployees'
+import useEmployeesByIds from '../../people/hooks/useEmployeesByIds'
 import { buildUserMap }  from '../../people/utils/peopleHelpers'
 import useOwnerOrders    from '../../orders/hooks/useOwnerOrders'
 import useCurrentUser    from '../../../shared/hooks/useCurrentUser'
@@ -38,10 +38,10 @@ function StatCard({ icon, label, value, accent = 'indigo' }) {
 export default function TeamLeadManagerPage() {
   const { userId } = useCurrentUser()
   const { team, teamId, isLoading: teamLoading } = useMyTeam()
-  const { data: allEmployees = [], isLoading: empLoading } = useEmployees()
-  const userMap = useMemo(() => buildUserMap(allEmployees), [allEmployees])
-
   const managerId = team?.manager_id ?? null
+  const employeeIds = useMemo(() => managerId ? [managerId] : [], [managerId])
+  const { data: employees = [], isLoading: empLoading } = useEmployeesByIds(employeeIds)
+  const userMap = useMemo(() => buildUserMap(employees), [employees])
   const manager   = managerId ? userMap[managerId] : null
 
   // Orders for this period
@@ -76,7 +76,7 @@ export default function TeamLeadManagerPage() {
     : '?'
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-2xl mx-auto">
+    <div className="p-4 md:p-6 space-y-5">
       <div className="flex items-center gap-3">
         <div className="w-11 h-11 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600 flex-shrink-0">
           <UserCircle2 size={22} />

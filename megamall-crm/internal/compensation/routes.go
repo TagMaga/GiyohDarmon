@@ -60,6 +60,12 @@ func (h *Handler) RegisterRoutes(hr *gin.RouterGroup) {
 		comp.GET("/employees/:user_id/salary", ownerOnly, h.GetEmployeeCompensation)
 		comp.GET("/employees/:user_id/salary/history", ownerOnly, h.ListEmployeeCompensationHistory)
 		comp.POST("/employees/:user_id/salary", ownerOnly, h.SetEmployeeCompensation)
+
+		// Self-service: any income-eligible role reads own commission rate.
+		comp.GET("/me",
+			middleware.RequireRoles("owner", "seller", "manager", "sales_team_lead"),
+			h.GetMyCompensation,
+		)
 	}
 
 	// ── Financial events (extended multi-filter) ──────────────────────────────
@@ -76,6 +82,9 @@ func (h *Handler) RegisterRoutes(hr *gin.RouterGroup) {
 	{
 		// GET /hr/income/me — self income report
 		income.GET("/me", incomeRoles, h.GetMyIncome)
+
+		// GET /hr/income/me/team-rank — rank within own team (seller only path)
+		income.GET("/me/team-rank", incomeRoles, h.GetTeamRank)
 
 		// GET /hr/income/users/:id — cross-user income (RBAC enforced in service)
 		income.GET("/users/:id", incomeRoles, h.GetUserIncome)

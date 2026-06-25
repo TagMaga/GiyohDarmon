@@ -16,7 +16,7 @@ import { CardSkeleton }       from '../../../shared/components/Skeleton'
 import { STATUS_BADGE, fmtAmount } from '../../../shared/orderStatusConfig'
 import useMyTeam              from '../hooks/useMyTeam'
 import useTeamMembers         from '../../people/hooks/useTeamMembers'
-import useEmployees           from '../../people/hooks/useEmployees'
+import useEmployeesByIds      from '../../people/hooks/useEmployeesByIds'
 import { buildUserMap }       from '../../people/utils/peopleHelpers'
 import useOwnerOrders         from '../../orders/hooks/useOwnerOrders'
 import useCurrentUser         from '../../../shared/hooks/useCurrentUser'
@@ -182,8 +182,9 @@ export default function TeamLeadSellersPage() {
   const { userId } = useCurrentUser()
   const { teamId, isLoading: teamLoading } = useMyTeam()
   const { data: members = [], isLoading: membersLoading } = useTeamMembers(teamId)
-  const { data: allEmployees = [] } = useEmployees()
-  const userMap = useMemo(() => buildUserMap(allEmployees), [allEmployees])
+  const memberIds = useMemo(() => members.map(m => m.user_id).filter(Boolean), [members])
+  const { data: teamEmployees = [] } = useEmployeesByIds(memberIds)
+  const userMap = useMemo(() => buildUserMap(teamEmployees), [teamEmployees])
 
   const sellers = useMemo(() =>
     members
@@ -209,7 +210,7 @@ export default function TeamLeadSellersPage() {
   const loading = teamLoading || membersLoading
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 space-y-5">
       <div className="flex items-center gap-3">
         <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0">
           <Users size={22} />

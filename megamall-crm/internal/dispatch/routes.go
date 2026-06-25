@@ -14,6 +14,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	// Board
 	rg.GET("/board", auth, dispatcherRoles, h.getBoard)
 	rg.GET("/couriers/overview", auth, dispatcherRoles, h.getCouriersOverview)
+	rg.GET("/sellers", auth, dispatcherRoles, h.getSellers)
 	rg.PUT("/couriers/:id", auth, dispatcherRoles, h.editCourier)
 	rg.PATCH("/couriers/:id/active", auth, dispatcherRoles, h.toggleCourierActive)
 	rg.PATCH("/couriers/:id/order-intake", auth, dispatcherRoles, h.updateCourierOrderIntake)

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Truck, UserCheck, Package, UserX, Flame, Banknote, Flag,
   ClipboardList, Wallet, Check, AlertTriangle, CalendarDays, ChevronDown, WifiOff, Search, Image as ImageIcon, X,
-  Pencil, DollarSign, Power,
+  Pencil, DollarSign, Power, Plus,
 } from 'lucide-react'
 import { EditCourierModal, TariffsModal, ToggleActiveModal } from '../components/CourierManageModals'
 import useAuthStore   from '../../../shared/store/authStore'
@@ -12,6 +12,7 @@ import { useToast }   from '../../../shared/components/ToastProvider'
 import { KEYS }       from '../../../shared/queryKeys'
 import AccountMenu    from '../../../shared/components/AccountMenu'
 
+import CreateOfficeOrderModal from '../components/CreateOfficeOrderModal'
 import AssignCourierModal    from '../components/AssignCourierModal'
 import UnassignModal         from '../components/UnassignModal'
 import ScheduleModal         from '../components/ScheduleModal'
@@ -89,6 +90,7 @@ export default function DispatcherBoard() {
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [couriersOpen, setCouriersOpen] = useState(false)
+  const [createOrderOpen, setCreateOrderOpen] = useState(false)
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [cashRange, setCashRange] = useState(() => ({ preset: 'all', from: '', to: '' }))
   const [cashCourier, setCashCourier] = useState('')
@@ -195,7 +197,13 @@ export default function DispatcherBoard() {
 
   const filteredOrders = useMemo(() => {
     return allOrders.filter((order) => {
-      if (filters.courier && getCourierId(order) !== filters.courier) return false
+      if (filters.courier === 'unassigned') {
+        // Show only confirmed orders with no courier assigned
+        if (order.status !== 'confirmed') return false
+        if (getCourierId(order)) return false
+      } else if (filters.courier) {
+        if (getCourierId(order) !== filters.courier) return false
+      }
       if (filters.date !== 'all') {
         const when = order.scheduled_at || order.delivery_date
         if (filters.date === 'overdue' && !isOverdue(order)) return false
@@ -340,7 +348,7 @@ export default function DispatcherBoard() {
         onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
       />
 
-      <KpiBar counts={counts} couriers={courierList} orders={allOrders} cashOwed={cashOwed} setFilters={setFilters} />
+      <KpiBar counts={counts} couriers={courierList} orders={allOrders} cashOwed={cashOwed} setFilters={setFilters} onCreateOrder={() => setCreateOrderOpen(true)} />
 
       <TabBar
         tab={filters.tab}
@@ -356,6 +364,7 @@ export default function DispatcherBoard() {
           couriers={courierList}
           activeCourier={filters.courier}
           mobileOpen={couriersOpen}
+          unassignedCount={counts.unassigned}
           onSelect={(id) => {
             setFilters((prev) => ({ ...prev, courier: prev.courier === id ? '' : id }))
             setCouriersOpen(false)
@@ -479,6 +488,7 @@ export default function DispatcherBoard() {
 
       <BottomNav tab={filters.tab} counts={counts} onTab={(tab) => setFilters((prev) => ({ ...prev, tab }))} />
 
+      <CreateOfficeOrderModal open={createOrderOpen} onClose={() => setCreateOrderOpen(false)} />
       <AssignCourierModal    open={modal === 'assign'}            onClose={closeModal} order={activeOrder} mode="assign" />
       <AssignCourierModal    open={modal === 'reassign'}          onClose={closeModal} order={activeOrder} mode="reassign" />
       <UnassignModal         open={modal === 'unassign'}          onClose={closeModal} order={activeOrder} courierMap={courierMap} />
@@ -550,7 +560,7 @@ function Shortcut({ label, keys }) {
   )
 }
 
-function KpiBar({ counts, couriers, orders, cashOwed, setFilters }) {
+function KpiBar({ counts, couriers, orders, cashOwed, setFilters, onCreateOrder }) {
   const active = counts.new + counts.confirmed + counts.delivery + counts.issues
   const deliveredToday = orders.filter((order) => order.status === 'delivered' && isToday(order.delivered_at || order.updated_at || order.created_at)).length
   const busyCouriers = couriers.filter((courier) => Number(courier.active_orders ?? 0) > 0).length
@@ -569,6 +579,19 @@ function KpiBar({ counts, couriers, orders, cashOwed, setFilters }) {
       <Kpi mobileExtra icon={<Banknote size={18} />} value={fmt(cashOwed)} label="Наличные" />
       <div className="dv2-kpi-sep" />
       <Kpi mobileExtra icon={<Flag size={18} />} value={deliveredToday} label="Сегодня" />
+      <div className="dv2-kpi-sep dv2-hide-mobile" />
+      <button
+        className="dv2-kpi dv2-hide-mobile"
+        onClick={onCreateOrder}
+        title="Создать офисный заказ"
+        style={{ cursor: 'pointer', color: 'var(--blue)', gap: 6 }}
+      >
+        <span className="dv2-kpi-icon"><Plus size={18} /></span>
+        <div>
+          <div className="dv2-kpi-val" style={{ fontSize: 13 }}>Заказ</div>
+          <div className="dv2-kpi-lbl">Офис</div>
+        </div>
+      </button>
     </div>
   )
 }
@@ -603,7 +626,7 @@ function TabBar({ tab, date, counts, onTab, onDate }) {
   )
 }
 
-function CourierRail({ couriers, activeCourier, mobileOpen, onSelect }) {
+function CourierRail({ couriers, activeCourier, mobileOpen, onSelect, unassignedCount }) {
   const busy = couriers.filter((courier) => Number(courier.active_orders ?? 0) > 0).length
   const overloaded = couriers.filter((courier) => Number(courier.active_orders ?? 0) >= 5).length
   const cashRisk = couriers.filter((courier) => Number(courier.cash_owed ?? 0) > 0).length
@@ -622,6 +645,28 @@ function CourierRail({ couriers, activeCourier, mobileOpen, onSelect }) {
         </div>
       </div>
       <div className="dv2-courier-list">
+        {/* Special "unassigned" filter row */}
+        <button
+          className={`dv2-courier ${activeCourier === 'unassigned' ? 'selected' : ''}`}
+          onClick={() => onSelect('unassigned')}
+          style={{ marginBottom: 6 }}
+        >
+          <div className="dv2-courier-top">
+            <div className="dv2-courier-avatar" style={{ background: '#6366f1' }}>
+              <UserX size={12} />
+            </div>
+            <div className="dv2-courier-name">Без курьера</div>
+            {unassignedCount > 0 && (
+              <span style={{ background: 'rgba(239,68,68,0.18)', color: '#ef4444', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 8 }}>
+                {unassignedCount}
+              </span>
+            )}
+          </div>
+          <div className="dv2-courier-row" style={{ fontSize: 10, color: 'var(--text3)' }}>
+            Подтверждённые без назначения
+          </div>
+        </button>
+
         {couriers.length === 0 ? <EmptyState title="Нет курьеров" sub="Курьеры появятся после загрузки" /> : couriers.map((courier, i) => (
           <CourierCard key={courier.courier_id ?? courier.id ?? i} courier={courier} selected={activeCourier === (courier.courier_id ?? courier.id)} onSelect={onSelect} />
         ))}
@@ -664,6 +709,13 @@ function CourierCard({ courier, selected, onSelect }) {
         <span>Активных <strong>{active}</strong></span>
         <span className="dv2-cash">{fmt(cash)} сом</span>
       </div>
+      {Array.isArray(courier.city_names) && courier.city_names.length > 0 && (
+        <div className="dv2-courier-cities">
+          {courier.city_names.map((name) => (
+            <span key={name} className="dv2-city-tag">{name}</span>
+          ))}
+        </div>
+      )}
       {!intakeEnabled && (
         <div className="dv2-courier-intake-off">
           <strong>Приём заказов: выключен</strong>

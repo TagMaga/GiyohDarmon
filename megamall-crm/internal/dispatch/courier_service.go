@@ -39,7 +39,18 @@ func (s *Service) UpdateCourier(ctx context.Context, courierID uuid.UUID, req Up
 		updates["password_hash"] = string(hash)
 	}
 
-	updated, err := s.repo.UpdateCourierProfile(ctx, courierID, updates)
+	if _, err := s.repo.UpdateCourierProfile(ctx, courierID, updates); err != nil {
+		return nil, err
+	}
+
+	if req.CityIDs != nil {
+		if err := s.repo.setCourierCities(ctx, courierID, req.CityIDs); err != nil {
+			return nil, fmt.Errorf("update courier cities: %w", err)
+		}
+	}
+
+	// Reload to include city IDs in the response.
+	updated, err := s.repo.getCourierProfileResponse(ctx, courierID)
 	if err != nil {
 		return nil, err
 	}

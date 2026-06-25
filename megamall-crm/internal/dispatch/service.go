@@ -456,9 +456,13 @@ func (s *Service) AddComment(ctx context.Context, actorID uuid.UUID, orderID uui
 
 // ListComments returns comments for an order.
 // Dispatchers see all; other roles see only their visibility tier.
+// No order-existence pre-check: stale/cancelled orders return empty array
+// instead of 404 so the comments drawer stays functional.
 func (s *Service) ListComments(ctx context.Context, orderID uuid.UUID, visibilities []CommentVisibility) ([]OrderComment, error) {
-	if _, err := s.ordersSvc.GetByID(ctx, orderID); err != nil {
-		return nil, err
-	}
 	return s.repo.ListComments(ctx, orderID, visibilities)
+}
+
+// GetSellers returns all active sellers for the dispatcher's order creation form.
+func (s *Service) GetSellers(ctx context.Context) ([]SellerInfo, error) {
+	return s.repo.ListSellers(ctx)
 }

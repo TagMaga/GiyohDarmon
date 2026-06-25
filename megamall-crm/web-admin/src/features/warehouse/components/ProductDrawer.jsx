@@ -37,9 +37,18 @@ export default function ProductDrawer({
   onTransfer,
   onEdit,
 }) {
+  const productId = product ? getId(product) : undefined
+
+  // Fetch active FIFO batches for this product across all warehouses.
+  const { data: batches = [] } = useQuery({
+    queryKey: KEYS.warehouse.batches(undefined, productId),
+    queryFn: () => fetchBatches({ product_id: productId }),
+    enabled: !!productId,
+    staleTime: 30_000,
+  })
+
   if (!product) return null
 
-  const productId = getId(product)
   const stockRows = inventory.filter((inv) => (inv.product_id ?? inv.ProductID) === productId)
   const totalQty = stockRows.reduce((sum, inv) => sum + getQuantity(inv), 0)
   const totalAvailable = stockRows.reduce((sum, inv) => sum + getAvailableQty(inv), 0)
@@ -55,14 +64,6 @@ export default function ProductDrawer({
     .slice(0, 6)
   const image = getProductImage(product)
   const category = categoryMap[getProductCategoryId(product)]
-
-  // Fetch active FIFO batches for this product across all warehouses.
-  const { data: batches = [] } = useQuery({
-    queryKey: KEYS.warehouse.batches(undefined, productId),
-    queryFn: () => fetchBatches({ product_id: productId }),
-    enabled: !!productId,
-    staleTime: 30_000,
-  })
 
   // Compute inventory value from batch remaining quantities × unit costs.
   const inventoryValue = batches.reduce(

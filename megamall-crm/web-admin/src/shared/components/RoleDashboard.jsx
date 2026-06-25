@@ -11,7 +11,7 @@ export default function RoleDashboard({
   children,
 }) {
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in p-6">
       {/* Page header */}
       <PageHeader title={title} subtitle={subtitle} icon={headerIcon} />
 

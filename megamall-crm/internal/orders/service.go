@@ -14,6 +14,7 @@ package orders
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -297,8 +298,8 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 			DeliveryFee:      deliveryFee,
 			NetRevenue:       netRevenue,
 			PrepaymentAmount: req.PrepaymentAmount,
-			Notes:           req.Notes,
-			DeliveryAddress: req.DeliveryAddress,
+			Notes:            req.Notes,
+			DeliveryAddress:  req.DeliveryAddress,
 
 			PrepaymentRequired: req.PrepaymentRequired,
 			PrepaymentType:     autoType,
@@ -413,8 +414,10 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 }
 
 // normalizeDeliveryMethod maps a request delivery method to the canonical value.
-//   "" / "normal"      → "normal"
-//   "fast" / "express" → "fast"  ("express" kept as a legacy alias)
+//
+//	"" / "normal"      → "normal"
+//	"fast" / "express" → "fast"  ("express" kept as a legacy alias)
+//
 // Any other value is rejected.
 func normalizeDeliveryMethod(m string) (string, error) {
 	switch m {
@@ -524,6 +527,16 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 		if o.Status.IsTerminal() {
 			return apperrors.Unprocessable("cannot edit a terminal order")
 		}
+		if o.Status == StatusInDelivery {
+			return apperrors.Unprocessable("Этот заказ уже находится в доставке и больше не может быть изменён.")
+		}
+
+		// ── Snapshot old values for audit trail ──────────────────────────────
+		oldAddress := o.DeliveryAddress
+		oldNotes := o.Notes
+		oldMethod := o.DeliveryMethod
+		oldItems := make([]OrderItem, len(o.Items))
+		copy(oldItems, o.Items)
 
 		// ── Simple scalar fields ──────────────────────────────────────────────
 		if req.Notes != nil {
@@ -693,6 +706,94 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 		if err := s.repo.Update(ctx, tx, o); err != nil {
 			return err
 		}
+
+		// ── Audit trail: insert system comment per changed field ──────────────
+		auditNow := time.Now().UTC()
+		insertAudit := func(text string) {
+			tx.WithContext(ctx).Exec(
+				`INSERT INTO order_comments (id, order_id, user_id, comment, visibility, created_at)
+				 VALUES (?, ?, ?, ?, 'seller_visible', ?)`,
+				uuid.New(), orderID, actorID, text, auditNow,
+			)
+		}
+		derefStr := func(p *string) string {
+			if p == nil {
+				return ""
+			}
+			return *p
+		}
+		methodLabel := func(m string) string {
+			if m == "fast" {
+				return "Быстрая доставка"
+			}
+			return "Обычная доставка"
+		}
+
+		if derefStr(oldAddress) != derefStr(o.DeliveryAddress) {
+			insertAudit(fmt.Sprintf(
+				"Изменён адрес доставки\n\nСтарый:\n%s\n\nНовый:\n%s",
+				derefStr(oldAddress), derefStr(o.DeliveryAddress),
+			))
+		}
+		if derefStr(oldNotes) != derefStr(o.Notes) {
+			insertAudit(fmt.Sprintf(
+				"Изменён комментарий клиента\n\nСтарый:\n%s\n\nНовый:\n%s",
+				derefStr(oldNotes), derefStr(o.Notes),
+			))
+		}
+		if oldMethod != o.DeliveryMethod {
+			insertAudit(fmt.Sprintf(
+				"Изменён способ доставки\n\n%s → %s",
+				methodLabel(oldMethod), methodLabel(o.DeliveryMethod),
+			))
+		}
+		if req.Items != nil {
+			// Build product name map: prefer names from old items, fetch unknown from DB.
+			productNames := map[uuid.UUID]string{}
+			for _, it := range oldItems {
+				productNames[it.ProductID] = it.ProductName
+			}
+			for _, it := range req.Items {
+				if _, ok := productNames[it.ProductID]; !ok {
+					var name string
+					tx.WithContext(ctx).Table("products").Select("name").Where("id = ?", it.ProductID).Scan(&name)
+					productNames[it.ProductID] = name
+				}
+			}
+			oldQtyMap := map[uuid.UUID]int{}
+			for _, it := range oldItems {
+				oldQtyMap[it.ProductID] = it.Quantity
+			}
+			newQtyMap := map[uuid.UUID]int{}
+			for _, it := range req.Items {
+				newQtyMap[it.ProductID] = it.Quantity
+			}
+			var lines []string
+			for _, it := range oldItems {
+				name := productNames[it.ProductID]
+				if name == "" {
+					name = it.ProductID.String()[:8]
+				}
+				if newQ, exists := newQtyMap[it.ProductID]; !exists {
+					lines = append(lines, fmt.Sprintf("%s: %d → удалён", name, it.Quantity))
+				} else if newQ != it.Quantity {
+					lines = append(lines, fmt.Sprintf("%s: %d → %d", name, it.Quantity, newQ))
+				}
+			}
+			for _, it := range req.Items {
+				if _, had := oldQtyMap[it.ProductID]; !had {
+					name := productNames[it.ProductID]
+					if name == "" {
+						name = it.ProductID.String()[:8]
+					}
+					lines = append(lines, fmt.Sprintf("%s: добавлен ×%d", name, it.Quantity))
+				}
+			}
+			if len(lines) > 0 {
+				insertAudit("Изменил товары заказа\n\n" + strings.Join(lines, "\n"))
+			}
+		}
+
 		s.logger.LogAsync(activity.Entry{
 			ActorID:    &actorID,
 			Action:     "update",
@@ -751,9 +852,50 @@ type orderCommentRow struct {
 	CreatedAt  time.Time `gorm:"column:created_at"`
 }
 
-// GetOrderComments returns comments visible to a seller:
-// visibility = 'seller_visible' OR created by the requesting user.
-func (s *Service) GetOrderComments(ctx context.Context, orderID, requestingUserID uuid.UUID) ([]OrderCommentResponse, error) {
+func (s *Service) CanAccessOrder(ctx context.Context, orderID, actorID uuid.UUID, actorRole string) error {
+	o, err := s.GetByID(ctx, orderID)
+	if err != nil {
+		return err
+	}
+
+	switch actorRole {
+	case "owner", "dispatcher":
+		return nil
+	case "seller":
+		if o.SellerID == actorID {
+			return nil
+		}
+	case "manager":
+		if o.SellerID == actorID || (o.ManagerID != nil && *o.ManagerID == actorID) {
+			return nil
+		}
+	case "sales_team_lead":
+		if o.SellerID == actorID || (o.TeamLeadID != nil && *o.TeamLeadID == actorID) {
+			return nil
+		}
+	case "courier":
+		if o.CourierID != nil && *o.CourierID == actorID {
+			return nil
+		}
+		hasAssignment, assignErr := s.repo.HasCourierAssignment(ctx, orderID, actorID)
+		if assignErr != nil {
+			return apperrors.Internal(assignErr)
+		}
+		if hasAssignment {
+			return nil
+		}
+	}
+
+	return apperrors.Forbidden("you do not have access to this order")
+}
+
+// GetOrderComments returns the shared order comment thread for any role that can
+// access the order. Empty threads return [].
+func (s *Service) GetOrderComments(ctx context.Context, orderID, requestingUserID uuid.UUID, requestingRole string) ([]OrderCommentResponse, error) {
+	if err := s.CanAccessOrder(ctx, orderID, requestingUserID, requestingRole); err != nil {
+		return nil, err
+	}
+
 	var rows []orderCommentRow
 	err := s.db.WithContext(ctx).
 		Raw(`SELECT oc.id, oc.order_id, oc.user_id,
@@ -763,8 +905,7 @@ func (s *Service) GetOrderComments(ctx context.Context, orderID, requestingUserI
 		     FROM order_comments oc
 		     LEFT JOIN users u ON u.id = oc.user_id
 		     WHERE oc.order_id = ?
-		       AND (oc.visibility = 'seller_visible' OR oc.user_id = ?)
-		     ORDER BY oc.created_at ASC`, orderID, requestingUserID).
+		     ORDER BY oc.created_at ASC`, orderID).
 		Scan(&rows).Error
 	if err != nil {
 		return nil, apperrors.Internal(err)
@@ -779,6 +920,7 @@ func (s *Service) GetOrderComments(ctx context.Context, orderID, requestingUserI
 			AuthorName: r.AuthorName,
 			AuthorRole: r.AuthorRole,
 			Comment:    r.Comment,
+			Text:       r.Comment,
 			Visibility: r.Visibility,
 			CreatedAt:  r.CreatedAt,
 		}
@@ -786,10 +928,9 @@ func (s *Service) GetOrderComments(ctx context.Context, orderID, requestingUserI
 	return out, nil
 }
 
-// AddOrderComment creates a comment on an order with seller_visible visibility.
-func (s *Service) AddOrderComment(ctx context.Context, orderID, actorID uuid.UUID, text string) (*OrderCommentResponse, error) {
-	// Verify order exists.
-	if _, err := s.GetByID(ctx, orderID); err != nil {
+// AddOrderComment appends to the shared order comment thread.
+func (s *Service) AddOrderComment(ctx context.Context, orderID, actorID uuid.UUID, actorRole string, text string) (*OrderCommentResponse, error) {
+	if err := s.CanAccessOrder(ctx, orderID, actorID, actorRole); err != nil {
 		return nil, err
 	}
 
@@ -818,6 +959,7 @@ func (s *Service) AddOrderComment(ctx context.Context, orderID, actorID uuid.UUI
 		AuthorName: authorInfo.FullName,
 		AuthorRole: authorInfo.Role,
 		Comment:    text,
+		Text:       text,
 		Visibility: "seller_visible",
 		CreatedAt:  now,
 	}, nil

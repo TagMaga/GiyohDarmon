@@ -18,7 +18,7 @@ import { STATUS_LABELS }      from '../../../shared/orderStatusConfig'
 import { fmtAmount }          from '../../../shared/orderStatusConfig'
 import useMyTeam              from '../hooks/useMyTeam'
 import useTeamMembers         from '../../people/hooks/useTeamMembers'
-import useEmployees           from '../../people/hooks/useEmployees'
+import useEmployeesByIds      from '../../people/hooks/useEmployeesByIds'
 import { buildUserMap }       from '../../people/utils/peopleHelpers'
 import useOwnerOrders         from '../../orders/hooks/useOwnerOrders'
 import useCurrentUser         from '../../../shared/hooks/useCurrentUser'
@@ -218,8 +218,10 @@ export default function TeamLeadReportsPage() {
 
   const { userId } = useCurrentUser()
   const { teamId } = useMyTeam()
-  const { data: allEmployees = [] } = useEmployees()
-  const userMap = useMemo(() => buildUserMap(allEmployees), [allEmployees])
+  const { data: members = [] } = useTeamMembers(teamId)
+  const memberIds = useMemo(() => members.map(m => m.user_id).filter(Boolean), [members])
+  const { data: teamEmployees = [] } = useEmployeesByIds(memberIds)
+  const userMap = useMemo(() => buildUserMap(teamEmployees), [teamEmployees])
 
   const orderParams = useMemo(() => ({
     from, to,
@@ -232,7 +234,7 @@ export default function TeamLeadReportsPage() {
   const { items: orders, isLoading } = useOwnerOrders(orderParams)
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 space-y-5">
       <div className="flex items-center gap-3">
         <div className="w-11 h-11 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0">
           <BarChart2 size={22} />

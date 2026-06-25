@@ -621,3 +621,14 @@ func parseSettlementTime(raw string) (time.Time, error) {
 	}
 	return time.Time{}, apperrors.BadRequest("invalid date")
 }
+
+// ─── Sellers ──────────────────────────────────────────────────────────────────
+
+func (h *Handler) getSellers(c *gin.Context) {
+	sellers, err := h.svc.GetSellers(c.Request.Context())
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, sellers)
+}

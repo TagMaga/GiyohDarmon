@@ -42,7 +42,7 @@ func (h *Handler) listCities(c *gin.Context) {
 }
 
 func (h *Handler) createCity(c *gin.Context) {
-	if !h.requireOwner(c) {
+	if !h.requireOwnerOrDispatcher(c) {
 		return
 	}
 	var req CreateCityRequest
@@ -205,6 +205,15 @@ func (h *Handler) updateCourierPayout(c *gin.Context) {
 func (h *Handler) requireOwner(c *gin.Context) bool {
 	if middleware.ClaimsFromContext(c).Role != "owner" {
 		response.HandleError(c, apperrors.Forbidden("owner only"))
+		return false
+	}
+	return true
+}
+
+func (h *Handler) requireOwnerOrDispatcher(c *gin.Context) bool {
+	role := middleware.ClaimsFromContext(c).Role
+	if role != "owner" && role != "dispatcher" {
+		response.HandleError(c, apperrors.Forbidden("owner or dispatcher only"))
 		return false
 	}
 	return true

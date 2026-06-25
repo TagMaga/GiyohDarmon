@@ -23,9 +23,13 @@ func NewHandler(svc *Service) *Handler {
 
 // RegisterRoutes mounts user routes on the given router group.
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
+	// Self-service routes for any authenticated user.
+	rg.GET("/me", middleware.RequireAuth(), h.GetMe)
+	rg.PATCH("/me", middleware.RequireAuth(), h.PatchMe)
+
 	rg.POST("", middleware.RequireRoles(string(RoleOwner)), h.Create)
 	rg.GET("", middleware.RequireRoles(string(RoleOwner)), h.List)
-	rg.GET("/:id", middleware.RequireRoles(string(RoleOwner)), h.GetByID)
+	rg.GET("/:id", middleware.RequireAuth(), h.GetByID)
 	rg.PATCH("/:id", middleware.RequireRoles(string(RoleOwner)), h.Update)
 	rg.DELETE("/:id", middleware.RequireRoles(string(RoleOwner)), h.Delete)
 	// Any authenticated user can change their own password (RequireAuth enforced).
@@ -75,6 +79,17 @@ func (h *Handler) List(c *gin.Context) {
 func (h *Handler) GetByID(c *gin.Context) {
 	id, ok := parseUUID(c, "id")
 	if !ok {
+		return
+	}
+
+	claims := middleware.ClaimsFromContext(c)
+	allowed, err := h.svc.CanViewUser(c.Request.Context(), claims.UserID, claims.Role, id)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	if !allowed {
+		response.Error(c, apperrors.Forbidden("you do not have access to this user"))
 		return
 	}
 
@@ -154,6 +169,38 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// GetMe handles GET /users/me — returns the authenticated user's own profile.
+func (h *Handler) GetMe(c *gin.Context) {
+	claims := middleware.ClaimsFromContext(c)
+	u, err := h.svc.GetByID(c.Request.Context(), claims.UserID)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, ToResponse(u))
+}
+
+// PatchMe handles PATCH /users/me — lets any authenticated user edit their own
+// telegram_chat_id. All other fields require owner-level PATCH /users/:id.
+func (h *Handler) PatchMe(c *gin.Context) {
+	var req PatchMeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	u, err := h.svc.PatchMe(c.Request.Context(), claims.UserID, req)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, ToResponse(u))
 }
 
 // parseUUID parses a UUID path param and writes a 400 if invalid.

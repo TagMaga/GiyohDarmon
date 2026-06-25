@@ -6,7 +6,8 @@
  * Extra column: net revenue (commission context).
  */
 import { useState, useMemo }        from 'react'
-import { ClipboardList, RefreshCw } from 'lucide-react'
+import { useNavigate }              from 'react-router-dom'
+import { ClipboardList, RefreshCw, Pencil } from 'lucide-react'
 import { Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import Alert                        from '../../../shared/components/Alert'
 import Badge                        from '../../../shared/components/Badge'
@@ -17,7 +18,8 @@ import TeamOrdersFilters            from '../../team-lead/components/TeamOrdersF
 import { STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import { formatOrderLabel, getOrderId } from '../../dispatcher/utils/orderHelpers'
 import useManagerPersonalOrders     from '../hooks/useManagerPersonalOrders'
-import useEmployees                 from '../../people/hooks/useEmployees'
+import useCurrentUser               from '../../../shared/hooks/useCurrentUser'
+import useEmployeesByIds            from '../../people/hooks/useEmployeesByIds'
 import useTeams                     from '../../people/hooks/useTeams'
 import { buildUserMap }             from '../../people/utils/peopleHelpers'
 
@@ -33,13 +35,15 @@ function field(o, ...keys) {
 }
 
 const HEADERS = ['№', 'Клиент', 'Товар', 'Сумма', 'Чистая выручка', 'Статус', 'Дата', '']
+const EDITABLE_STATUSES = new Set(['new', 'confirmed', 'assigned'])
 
-function DesktopRow({ order, onView }) {
-  const name   = field(order,'customer_name','CustomerName') ?? order.customer?.full_name ?? '—'
+function DesktopRow({ order, onView, onEdit }) {
+  const name    = field(order,'customer_name','CustomerName') ?? order.customer?.full_name ?? '—'
   const product = field(order,'product_name','ProductName') ?? order.product?.name ?? '—'
-  const status = order.status ?? order.Status ?? ''
-  const amount = field(order,'total_amount','amount','total') ?? 0
-  const net    = field(order,'net_revenue','NetRevenue','company_revenue')
+  const status  = order.status ?? order.Status ?? ''
+  const amount  = field(order,'total_order_amount','total_amount','amount','total') ?? 0
+  const net     = Number(field(order,'net_revenue','NetRevenue') ?? 0)
+  const canEdit = EDITABLE_STATUSES.has(status)
 
   return (
     <tr className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
@@ -47,23 +51,32 @@ function DesktopRow({ order, onView }) {
       <td className="px-4 py-3 text-xs text-slate-800 max-w-[120px] truncate">{name}</td>
       <td className="px-4 py-3 text-xs text-slate-700 max-w-[120px] truncate">{product}</td>
       <td className="px-4 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap text-right">{fmtAmount(amount)} сомони</td>
-      <td className="px-4 py-3 text-xs font-semibold text-emerald-700 whitespace-nowrap text-right">{net != null ? `${fmtAmount(net)} сомони` : '—'}</td>
+      <td className="px-4 py-3 text-xs font-semibold text-emerald-700 whitespace-nowrap text-right">{fmtAmount(net)} сомони</td>
       <td className="px-4 py-3"><Badge variant={STATUS_BADGE[status]??'slate'} size="sm">{STATUS_LABELS[status]??status}</Badge></td>
       <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{fmtDate(order.created_at??order.CreatedAt)}</td>
       <td className="px-4 py-3">
-        <button onClick={() => onView(order)}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-semibold transition-colors min-h-[32px]">
-          <Eye size={12}/> Открыть
-        </button>
+        <div className="flex items-center gap-1.5">
+          {canEdit && (
+            <button onClick={() => onEdit(order)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-700 text-[11px] font-semibold transition-colors min-h-[32px]">
+              <Pencil size={11}/> Изменить
+            </button>
+          )}
+          <button onClick={() => onView(order)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-semibold transition-colors min-h-[32px]">
+            <Eye size={12}/> Открыть
+          </button>
+        </div>
       </td>
     </tr>
   )
 }
 
-function MobileCard({ order, onView }) {
-  const name   = field(order,'customer_name','CustomerName') ?? order.customer?.full_name ?? '—'
-  const status = order.status ?? order.Status ?? ''
-  const amount = field(order,'total_amount','amount','total') ?? 0
+function MobileCard({ order, onView, onEdit }) {
+  const name    = field(order,'customer_name','CustomerName') ?? order.customer?.full_name ?? '—'
+  const status  = order.status ?? order.Status ?? ''
+  const amount  = field(order,'total_order_amount','total_amount','amount','total') ?? 0
+  const canEdit = EDITABLE_STATUSES.has(status)
 
   return (
     <div className="card p-4 space-y-2">
@@ -78,10 +91,18 @@ function MobileCard({ order, onView }) {
         <span className="text-xs text-slate-400">{fmtDate(order.created_at??order.CreatedAt)}</span>
         <span className="text-sm font-bold text-slate-800">{fmtAmount(amount)} сомони</span>
       </div>
-      <button onClick={() => onView(order)}
-        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors min-h-[40px]">
-        <Eye size={13}/> Подробнее
-      </button>
+      <div className="flex gap-2">
+        {canEdit && (
+          <button onClick={() => onEdit(order)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-semibold transition-colors min-h-[40px]">
+            <Pencil size={13}/> Изменить
+          </button>
+        )}
+        <button onClick={() => onView(order)}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors min-h-[40px]">
+          <Eye size={13}/> Подробнее
+        </button>
+      </div>
     </div>
   )
 }
@@ -106,7 +127,7 @@ function PersonalKpiBar({ orders, loading }) {
   const total     = orders.length
   const delivered = orders.filter(o => (o.status??o.Status)==='delivered').length
   const revenue   = orders.filter(o => (o.status??o.Status)==='delivered')
-    .reduce((s,o) => s+Number(o.net_revenue??o.total_amount??0), 0)
+    .reduce((s,o) => s + Number(o.net_revenue ?? 0), 0)
   const conv      = total > 0 ? ((delivered/total)*100).toFixed(0) : '0'
 
   if (loading) return <div className="h-20 bg-slate-100 rounded-2xl animate-pulse" />
@@ -133,13 +154,20 @@ function PersonalKpiBar({ orders, loading }) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ManagerMyOrdersPage() {
+  const navigate = useNavigate()
   const def = currentMonthDefault()
   const [filters, setFilters] = useState({ from: def.from, to: def.to, page: 1, limit: 25 })
   const [selected, setSelected] = useState(null)
 
-  const { data: allEmployees = [] } = useEmployees()
+  function handleEdit(order) {
+    navigate(`/manager/my-orders/${order.id}/edit`, { state: { order } })
+  }
+
+  const { userId } = useCurrentUser()
+  const employeeIds = useMemo(() => userId ? [userId] : [], [userId])
+  const { data: currentEmployee = [] } = useEmployeesByIds(employeeIds)
   const { data: allTeams = [] }     = useTeams()
-  const userMap = useMemo(() => buildUserMap(allEmployees), [allEmployees])
+  const userMap = useMemo(() => buildUserMap(currentEmployee), [currentEmployee])
   const teamMap = useMemo(() => {
     const m = {}; allTeams.forEach(t => { if (t.id) m[t.id] = t }); return m
   }, [allTeams])
@@ -148,7 +176,7 @@ export default function ManagerMyOrdersPage() {
     useManagerPersonalOrders(filters)
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600 flex-shrink-0">
@@ -192,7 +220,7 @@ export default function ManagerMyOrdersPage() {
                     <EmptyState icon={<ClipboardList size={22}/>} title="Личных заказов нет" description="Заказы появятся здесь, когда вы создадите их лично." />
                   </td></tr>
                 )}
-                {!isLoading && items.map((o,i) => <DesktopRow key={getOrderId(o)??i} order={o} onView={setSelected}/>)}
+                {!isLoading && items.map((o,i) => <DesktopRow key={getOrderId(o)??i} order={o} onView={setSelected} onEdit={handleEdit}/>)}
               </tbody>
             </table>
           </div>
@@ -203,7 +231,7 @@ export default function ManagerMyOrdersPage() {
           {!isLoading && items.length === 0 && (
             <EmptyState icon={<ClipboardList size={22}/>} title="Личных заказов нет" description="Заказы появятся здесь, когда вы создадите их лично." />
           )}
-          {!isLoading && items.map((o,i) => <MobileCard key={getOrderId(o)??i} order={o} onView={setSelected}/>)}
+          {!isLoading && items.map((o,i) => <MobileCard key={getOrderId(o)??i} order={o} onView={setSelected} onEdit={handleEdit}/>)}
         </div>
 
         <Pagination meta={meta} page={filters.page??1} onPage={page => setFilters(f => ({...f, page}))} />

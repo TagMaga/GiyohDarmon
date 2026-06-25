@@ -114,15 +114,15 @@ export async function fetchHandovers() {
 }
 
 // ── Comments ──────────────────────────────────────────────────────────────────
-/** GET /dispatch/orders/:id/comments */
+/** GET /orders/:id/comments */
 export async function fetchComments(orderId) {
-  const res = await client.get(`/dispatch/orders/${orderId}/comments`)
+  const res = await client.get(`/orders/${orderId}/comments`)
   return unwrap(res)
 }
 
-/** POST /dispatch/orders/:id/comments */
-export async function addComment(orderId, { comment, visibility = 'internal' }) {
-  const res = await client.post(`/dispatch/orders/${orderId}/comments`, { comment, visibility })
+/** POST /orders/:id/comments */
+export async function addComment(orderId, { comment }) {
+  const res = await client.post(`/orders/${orderId}/comments`, { comment })
   return unwrap(res)
 }
 
@@ -219,6 +219,20 @@ export async function rejectCashTransaction(id, { reason }) {
   return unwrap(res)
 }
 
+// ── Cities ───────────────────────────────────────────────────────────────────
+/** GET /cities — active delivery cities */
+export async function fetchCities() {
+  const res = await client.get('/cities')
+  const parsed = unwrap(res)
+  return Array.isArray(parsed) ? parsed : []
+}
+
+/** POST /cities — create a new delivery city (owner or dispatcher) */
+export async function createCity(name) {
+  const res = await client.post('/cities', { name })
+  return unwrap(res)
+}
+
 // ── Order detail (full) ───────────────────────────────────────────────────────
 /** GET /orders/:id — full order detail with customer, seller, items, attachments */
 export async function fetchOrderDetail(id) {
@@ -236,4 +250,18 @@ export async function fetchOrderTimeline(id) {
 export async function fetchOrderPrepayments(id) {
   const res = await client.get(`/orders/${id}/prepayments`)
   return unwrap(res) ?? []
+}
+
+// ── Office order creation (dispatcher) ───────────────────────────────────────
+
+/** GET /dispatch/sellers — sellers the dispatcher can assign to an office order */
+export async function fetchSellers() {
+  const res = await client.get('/dispatch/sellers')
+  return unwrap(res) ?? []
+}
+
+/** POST /orders — create an office order on behalf of a seller */
+export async function createOfficeOrder(payload) {
+  const res = await client.post('/orders', payload)
+  return unwrap(res)
 }

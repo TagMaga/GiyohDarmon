@@ -16,7 +16,7 @@ export default function WarehouseReceivingPage() {
   })
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in p-6">
       <PageHeader
         title="Приёмка"
         subtitle="Проводите приход по полученному количеству, а не вручную по итоговому остатку."

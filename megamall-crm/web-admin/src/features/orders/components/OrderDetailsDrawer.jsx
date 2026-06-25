@@ -9,11 +9,16 @@
  *
  * Owner read-only — no action buttons for order workflow.
  */
-import { X, User2, Package, Users2, TrendingUp, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { X, User2, Package, Users2, TrendingUp, Loader2, MessageCircle } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import Badge from '../../../shared/components/Badge'
 import { STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import { useOwnerOrder, useOrderFinanceEvents } from '../hooks/useOwnerOrder'
 import { formatOrderLabel } from '../../../features/dispatcher/utils/orderHelpers'
+import { fetchCities } from '../../seller/api'
+import { KEYS } from '../../../shared/queryKeys'
+import OrderCommentsPanel from './OrderCommentsPanel'
 
 const EVENT_LABEL = {
   seller_commission:       'Комиссия продавца',
@@ -54,6 +59,12 @@ function Row({ label, value, accent }) {
 function OrderContent({ orderId, userMap, teamMap }) {
   const { data: order, isLoading: orderLoading } = useOwnerOrder(orderId)
   const { data: events = [], isLoading: eventsLoading } = useOrderFinanceEvents(orderId)
+  const { data: cities = [] } = useQuery({
+    queryKey: KEYS.seller.cities,
+    queryFn: fetchCities,
+    staleTime: 10 * 60 * 1000,
+  })
+  const citiesById = Object.fromEntries(cities.map((c) => [c.id, c.name]))
 
   if (orderLoading) {
     return (
@@ -69,7 +80,6 @@ function OrderContent({ orderId, userMap, teamMap }) {
 
   const status = order.status ?? order.Status ?? ''
 
-  // ── Resolve fields ──────────────────────────────────────────────────────
   function field(...keys) {
     for (const k of keys) if (order[k] != null) return order[k]
     return null
@@ -79,15 +89,15 @@ function OrderContent({ orderId, userMap, teamMap }) {
     order.customer?.full_name ?? order.customer?.name ?? '—'
   const customerPhone = field('customer_phone', 'CustomerPhone') ??
     order.customer?.phone ?? null
-  const address = field('delivery_address', 'address', 'Address') ??
-    order.customer?.address ?? null
+  const deliveryAddress = field('delivery_address') ?? null
+  const cityId = order.city_id ?? order.CityID ?? null
+  const cityName = cityId ? (citiesById[cityId] ?? null) : null
+  const customerNote = order.notes ?? null
 
-  const productName = field('product_name', 'ProductName') ??
-    order.product?.name ?? order.product?.Name ?? '—'
-  const qty         = field('quantity', 'Quantity', 'qty') ?? 1
-  const total       = field('total_amount', 'amount', 'total', 'Amount') ?? 0
-  const deliveryFee = field('delivery_fee', 'DeliveryFee', 'courier_fee') ?? 0
-  const netRevenue  = field('net_revenue', 'NetRevenue', 'company_revenue')
+  const total       = field('total_order_amount', 'total_amount', 'amount', 'total', 'Amount') ?? 0
+  const deliveryFee = field('delivery_fee', 'DeliveryFee') ?? 0
+  const courierPayout = field('courier_payout', 'CourierPayout') ?? 0
+  const netRevenue  = field('net_revenue', 'NetRevenue') ?? (Number(total) - Number(deliveryFee))
 
   function lookupUser(idFields) {
     for (const f of idFields) {
@@ -98,11 +108,15 @@ function OrderContent({ orderId, userMap, teamMap }) {
     }
     return null
   }
-  const seller   = lookupUser(['seller_id', 'SellerID'])
+  const sellerName   = order.seller?.full_name ?? lookupUser(['seller_id', 'SellerID'])
+  const sellerPhone  = order.seller?.phone ?? null
   const manager  = lookupUser(['manager_id', 'ManagerID'])
   const teamLead = lookupUser(['team_lead_id', 'TeamLeadID'])
   const teamId   = field('team_id', 'TeamID')
   const team     = teamId ? (teamMap[teamId]?.name ?? teamId.slice(0, 8)) : null
+
+  // Items list (when available from single-order fetch)
+  const items = order.items ?? []
 
   return (
     <div className="space-y-6">
@@ -116,28 +130,38 @@ function OrderContent({ orderId, userMap, teamMap }) {
 
       {/* Customer */}
       <Section icon={<User2 size={14} />} title="Клиент">
-        <Row label="Имя"    value={customerName} />
+        <Row label="Имя"     value={customerName} />
         <Row label="Телефон" value={customerPhone} />
-        {address && <Row label="Адрес" value={address} />}
+        {cityName       && <Row label="Город" value={cityName} />}
+        {deliveryAddress && <Row label="Адрес" value={deliveryAddress} />}
+        {customerNote   && <Row label="Комментарий клиента" value={customerNote} accent="text-amber-700" />}
       </Section>
 
-      {/* Order */}
+      {/* Order items */}
       <Section icon={<Package size={14} />} title="Заказ">
-        <Row label="Товар"          value={productName} />
-        <Row label="Количество"     value={qty} />
-        <Row label="Сумма"          value={`${fmtAmount(total)} сомони`} accent="text-slate-900 font-bold" />
-        {deliveryFee > 0 && <Row label="Доставка" value={`${fmtAmount(deliveryFee)} сомони`} />}
-        {netRevenue != null && (
-          <Row label="Чистая выручка" value={`${fmtAmount(netRevenue)} сомони`} accent="text-emerald-700" />
-        )}
+        {items.length > 0
+          ? items.map((it, i) => (
+              <Row
+                key={it.id ?? i}
+                label={`${it.product_name ?? '—'} × ${it.quantity}`}
+                value={`${fmtAmount(it.total_price)} сомони`}
+              />
+            ))
+          : null}
+        <Row label="Сумма товаров"  value={`${fmtAmount(field('total_amount', 'TotalAmount') ?? 0)} сомони`} accent="text-slate-900 font-bold" />
+        {deliveryFee > 0 && <Row label="Доставка"       value={`${fmtAmount(deliveryFee)} сомони`} />}
+        {courierPayout > 0 && <Row label="Тариф курьера" value={`${fmtAmount(courierPayout)} сомони`} />}
+        <Row label="Итого к оплате" value={`${fmtAmount(total)} сомони`} accent="text-slate-900 font-bold" />
+        <Row label="Чистая выручка" value={`${fmtAmount(netRevenue)} сомони`} accent="text-emerald-700" />
       </Section>
 
       {/* Assignment */}
       <Section icon={<Users2 size={14} />} title="Ответственные">
-        {seller   && <Row label="Продавец"           value={seller} />}
-        {manager  && <Row label="Менеджер"           value={manager} />}
-        {teamLead && <Row label="Руководитель группы" value={teamLead} />}
-        {team     && <Row label="Команда"            value={team} />}
+        {sellerName  && <Row label="Продавец" value={sellerName} />}
+        {sellerPhone && <Row label="Телефон продавца" value={sellerPhone} />}
+        {manager     && <Row label="Менеджер"           value={manager} />}
+        {teamLead    && <Row label="Руководитель группы" value={teamLead} />}
+        {team        && <Row label="Команда"            value={team} />}
       </Section>
 
       {/* Financial breakdown */}
@@ -166,6 +190,7 @@ function OrderContent({ orderId, userMap, teamMap }) {
 // ── Drawer shell ─────────────────────────────────────────────────────────────
 
 export default function OrderDetailsDrawer({ order, onClose, userMap = {}, teamMap = {} }) {
+  const [tab, setTab] = useState('details')
   const open = !!order
   const orderId = open
     ? (order.id ?? order.ID ?? order.order_id ?? null)
@@ -204,11 +229,32 @@ export default function OrderDetailsDrawer({ order, onClose, userMap = {}, teamM
           </button>
         </div>
 
+        <div className="px-5 pt-3 border-b border-slate-100">
+          <div className="flex gap-2">
+            {[
+              { id: 'details', label: 'Детали' },
+              { id: 'comments', label: 'Комментарии' },
+            ].map(item => (
+              <button
+                key={item.id}
+                onClick={() => setTab(item.id)}
+                className={`px-3 py-2 text-xs font-bold rounded-t-xl transition-colors ${
+                  tab === item.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                {item.id === 'comments' && <MessageCircle size={13} className="inline mr-1" />}
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">
-          {orderId && (
+          {orderId && tab === 'details' && (
             <OrderContent orderId={orderId} userMap={userMap} teamMap={teamMap} />
           )}
+          {orderId && tab === 'comments' && <OrderCommentsPanel orderId={orderId} compact />}
         </div>
       </div>
     </>

@@ -365,6 +365,47 @@ func (h *Handler) GetSnapshot(c *gin.Context) {
 	response.OK(c, snap)
 }
 
+// ─── Order Comments ───────────────────────────────────────────────────────────
+
+// GetOrderComments handles GET /orders/:id/comments.
+func (h *Handler) GetOrderComments(c *gin.Context) {
+	id, ok := parseUUID(c, "id")
+	if !ok {
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	comments, err := h.svc.GetOrderComments(c.Request.Context(), id, claims.UserID, claims.Role)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, comments)
+}
+
+// AddOrderComment handles POST /orders/:id/comments.
+func (h *Handler) AddOrderComment(c *gin.Context) {
+	id, ok := parseUUID(c, "id")
+	if !ok {
+		return
+	}
+	var req AddOrderCommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	comment, err := h.svc.AddOrderComment(c.Request.Context(), id, claims.UserID, claims.Role, req.Comment)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.Created(c, comment)
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 func parseUUID(c *gin.Context, param string) (uuid.UUID, bool) {

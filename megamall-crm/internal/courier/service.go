@@ -82,6 +82,11 @@ func (s *Service) ClaimOrder(ctx context.Context, courierID uuid.UUID, orderID u
 	return nil
 }
 
+// GetOrderDetail returns full order detail for a courier, enforcing ownership.
+func (s *Service) GetOrderDetail(ctx context.Context, courierID uuid.UUID, orderID uuid.UUID) (*MyOrderResponse, error) {
+	return s.repo.GetOrderByIDForCourier(ctx, courierID, orderID)
+}
+
 // ─── Delivery status transitions (delegate to orders.Service) ─────────────────
 
 // StartDelivery transitions assigned → in_delivery.

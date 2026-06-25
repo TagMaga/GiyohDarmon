@@ -5,13 +5,15 @@
  *   3. ToggleActiveModal — enable / disable courier with confirmation
  */
 import { useEffect, useRef, useState } from 'react'
-import { Pencil, Trash2, Plus, X } from 'lucide-react'
+import { Pencil, Trash2, Plus, X, MapPin } from 'lucide-react'
 import {
   updateCourier,
   toggleCourierActive,
   fetchCourierTariffs,
   createCourierTariff,
   deleteCourierTariff,
+  fetchCities,
+  createCity,
 } from '../api'
 
 // ── Design tokens (match DispatcherBoardV2) ──────────────────────────────────
@@ -157,10 +159,52 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
     password:         '',
     telegram_chat_id: courier.telegram_chat_id ?? '',
   })
+
+  // City / service zone state
+  const [cities,          setCities]         = useState([])
+  const [citiesLoading,   setCitiesLoading]  = useState(true)
+  const [selectedCityIDs, setSelectedCityIDs] = useState(
+    Array.isArray(courier.city_ids) ? courier.city_ids : []
+  )
+  const [newCityName,  setNewCityName]  = useState('')
+  const [addingCity,   setAddingCity]   = useState(false)
+  const [cityError,    setCityError]    = useState('')
+
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
 
+  // Load available cities once on mount
+  useEffect(() => {
+    fetchCities()
+      .then(setCities)
+      .catch(() => {})
+      .finally(() => setCitiesLoading(false))
+  }, [])
+
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }))
+
+  const toggleCity = (id) => {
+    setSelectedCityIDs((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+  }
+
+  const handleAddCity = async () => {
+    const name = newCityName.trim()
+    if (!name) return
+    setCityError('')
+    setAddingCity(true)
+    try {
+      const created = await createCity(name)
+      setCities((prev) => [...prev, created])
+      setSelectedCityIDs((prev) => [...prev, created.id])
+      setNewCityName('')
+    } catch (e) {
+      setCityError(e?.response?.data?.error?.message ?? 'Ошибка создания города')
+    } finally {
+      setAddingCity(false)
+    }
+  }
 
   const handleSave = async () => {
     setError('')
@@ -177,6 +221,7 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
         phone:            form.phone.trim(),
         password:         form.password.trim() || undefined,
         telegram_chat_id: form.telegram_chat_id.trim(),
+        city_ids:         selectedCityIDs,
       })
       onSuccess?.()
       onClose()
@@ -225,6 +270,75 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
             style={field.base} value={form.telegram_chat_id}
             onChange={set('telegram_chat_id')} placeholder="-1001234567890"
           />
+        </FieldGroup>
+
+        {/* ── Service zone / delivery cities ── */}
+        <FieldGroup>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <MapPin size={13} style={{ color: T.violet }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: T.text2, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Зона обслуживания
+            </span>
+          </div>
+
+          {citiesLoading ? (
+            <div style={{ fontSize: 13, color: T.text3, padding: '8px 0' }}>Загрузка городов…</div>
+          ) : (
+            <div style={{
+              background: T.card, borderRadius: 10, border: `1px solid ${T.border}`,
+              padding: '10px 12px', display: 'flex', flexWrap: 'wrap', gap: 8,
+            }}>
+              {cities.length === 0 && (
+                <span style={{ fontSize: 13, color: T.text3 }}>Нет доступных городов</span>
+              )}
+              {cities.map((city) => {
+                const selected = selectedCityIDs.includes(city.id)
+                return (
+                  <button
+                    key={city.id}
+                    type="button"
+                    onClick={() => toggleCity(city.id)}
+                    style={{
+                      padding: '5px 12px', borderRadius: 20, fontSize: 13, fontWeight: 600,
+                      cursor: 'pointer', transition: 'all 0.15s',
+                      background: selected ? T.violet : 'rgba(255,255,255,0.06)',
+                      color: selected ? '#fff' : T.text2,
+                      border: selected ? `1px solid ${T.violet}` : `1px solid ${T.border}`,
+                    }}
+                  >
+                    {city.name}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Add new city inline */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <input
+              style={{ ...field.base, flex: 1 }}
+              value={newCityName}
+              onChange={(e) => setNewCityName(e.target.value)}
+              placeholder="Новый город (например: Бохтар)"
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCity() } }}
+            />
+            <button
+              type="button"
+              onClick={handleAddCity}
+              disabled={addingCity || !newCityName.trim()}
+              style={{
+                background: addingCity || !newCityName.trim() ? 'rgba(255,255,255,0.06)' : T.blue,
+                color: addingCity || !newCityName.trim() ? T.text3 : '#fff',
+                border: 'none', borderRadius: 10, padding: '9px 14px',
+                fontWeight: 700, fontSize: 13, cursor: addingCity || !newCityName.trim() ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
+              }}
+            >
+              <Plus size={14} />
+              {addingCity ? '…' : 'Добавить'}
+            </button>
+          </div>
+          {cityError && <div style={{ marginTop: 6, fontSize: 12, color: T.red }}>{cityError}</div>}
         </FieldGroup>
 
         <ErrorMsg msg={error} />

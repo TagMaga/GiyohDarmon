@@ -76,7 +76,7 @@ export default function WarehouseDashboard() {
 
   if (data.warehousesLoading) {
     return (
-      <div className="animate-fade-in">
+      <div className="animate-fade-in p-6">
         <PageHeader title="Склад" subtitle="Загрузка складов…" icon={<Warehouse size={20} />} />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[1, 2, 3, 4].map((i) => <div key={i} className="h-32 rounded-2xl border border-slate-200 bg-white skeleton" />)}
@@ -87,7 +87,7 @@ export default function WarehouseDashboard() {
 
   if (!validWarehouses.length) {
     return (
-      <div className="animate-fade-in">
+      <div className="animate-fade-in p-6">
         <PageHeader title="Склад" subtitle="Склады не найдены" icon={<Warehouse size={20} />} />
         <EmptyState
           icon={<Warehouse size={22} />}
@@ -99,7 +99,7 @@ export default function WarehouseDashboard() {
   }
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in p-6">
       <PageHeader
         title="Склад"
         subtitle={selectedWarehouse ? getWarehouseName(selectedWarehouse) : 'Выберите склад'}

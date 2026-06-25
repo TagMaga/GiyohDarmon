@@ -5,7 +5,7 @@ import {
   LayoutDashboard, PlusCircle, LogOut, ShoppingBag,
   Truck, Settings,
   Archive, Package, ArrowLeftRight, PackagePlus, Trash2, BarChart3,
-  Building2, UserCog, FileBarChart,
+  Building2, UserCog, FileBarChart, User,
 } from 'lucide-react'
 import useAuthStore from '../store/authStore'
 import useProfile   from '../hooks/useProfile'
@@ -47,9 +47,9 @@ const NAV = {
   seller: [
     { label: 'Главная',       icon: Home,         path: '/seller' },
     { label: 'Мои заказы',    icon: ShoppingCart, path: '/seller/orders' },
-    { label: 'Создать заказ', icon: PlusCircle,   path: '/seller/orders/create' }, // fixed: was /seller/new-order
+    { label: 'Создать заказ', icon: PlusCircle,   path: '/seller/orders/create' },
     { label: 'Мои доходы',    icon: Wallet,       path: '/seller/income' },
-    // Клиенты removed — not yet implemented
+    { label: 'Профиль',       icon: User,         path: '/seller/profile' },
   ],
   dispatcher: [
     { label: 'Доска заказов', icon: LayoutDashboard, path: '/dispatcher' },

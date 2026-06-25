@@ -1,4 +1,5 @@
 import { normalizeCourierOrder, fmtMoney, getStatus, STATUS_LABEL } from '../utils/courierHelpers'
+import OrderCommentsPanel from '../../orders/components/OrderCommentsPanel'
 
 const S = {
   overlay: {
@@ -119,10 +120,15 @@ export default function OrderDetailOverlay({ order, onClose, onAction, pendingId
       {/* Notes */}
       {norm.notes && (
         <div style={S.card}>
-          <h3 style={S.cardH3}>💬 Комментарий</h3>
+          <h3 style={S.cardH3}>💬 Комментарий клиента</h3>
           <div style={{ fontSize: 17, fontWeight: 750 }}>{norm.notes}</div>
         </div>
       )}
+
+      <div style={{ ...S.card, color: '#071122', background: '#fff' }}>
+        <h3 style={{ ...S.cardH3, color: '#64748b' }}>Комментарии</h3>
+        <OrderCommentsPanel orderId={id} compact />
+      </div>
 
       {/* Payment */}
       <div style={S.card}>

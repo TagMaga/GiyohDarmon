@@ -56,10 +56,18 @@ function AvatarCircle({ initials, role, size = 36 }) {
 
 function ToggleSwitch({ active, onChange }) {
   return (
-    <button
-      onClick={e => { e.stopPropagation(); onChange(!active) }}
+    <span
       role="switch"
+      tabIndex={0}
       aria-checked={active}
+      onClick={e => { e.stopPropagation(); onChange(!active) }}
+      onKeyDown={e => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault()
+          e.stopPropagation()
+          onChange(!active)
+        }
+      }}
       style={{
         width: 36, height: 20, borderRadius: 99,
         background: active ? '#6366f1' : '#334155',
@@ -76,7 +84,7 @@ function ToggleSwitch({ active, onChange }) {
         transform: active ? 'translateX(16px)' : 'translateX(0)',
         display: 'block',
       }} />
-    </button>
+    </span>
   )
 }
 

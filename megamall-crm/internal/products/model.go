@@ -44,10 +44,12 @@ type Product struct {
 	Description   *string
 	CategoryID    *uuid.UUID `gorm:"type:uuid;column:category_id"`
 	SupplierID    *uuid.UUID `gorm:"type:uuid;column:supplier_id"`
-	PurchasePrice *float64   `gorm:"type:numeric(12,2);column:purchase_price"`
-	SalePrice     *float64   `gorm:"type:numeric(12,2);column:sale_price"`
-	Weight        *float64   `gorm:"type:numeric(10,3)"`
-	IsActive      bool       `gorm:"column:is_active;default:true;not null"`
+	PurchasePrice      *float64 `gorm:"type:numeric(12,2);column:purchase_price"`
+	SalePrice          *float64 `gorm:"type:numeric(12,2);column:sale_price"`
+	Weight             *float64 `gorm:"type:numeric(10,3)"`
+	NormalDeliveryFee  *float64 `gorm:"type:numeric(12,2);column:normal_delivery_fee"`
+	ExpressDeliveryFee *float64 `gorm:"type:numeric(12,2);column:express_delivery_fee"`
+	IsActive           bool     `gorm:"column:is_active;default:true;not null"`
 	CreatedAt     time.Time  `gorm:"autoCreateTime"`
 	UpdatedAt     time.Time  `gorm:"autoUpdateTime"`
 	DeletedAt     *time.Time `gorm:"index"`

@@ -12,12 +12,6 @@ import { KEYS } from '../../../shared/queryKeys'
 import { fmtDate } from '../statusConfig'
 import { getOrderId, formatOrderLabel } from '../utils/orderHelpers'
 
-const VISIBILITY_LABELS = {
-  internal:        'Внутренний',
-  courier_visible: 'Виден курьеру',
-  seller_visible:  'Виден продавцу',
-}
-
 /**
  * CommentsDrawer — slide-in panel (right side) for order comments.
  *
@@ -31,7 +25,6 @@ export default function CommentsDrawer({ open, onClose, order }) {
   const toast = useToast()
 
   const [text,       setText]      = useState('')
-  const [visibility, setVisibility] = useState('internal')
 
   // Lock scroll
   useEffect(() => {
@@ -57,7 +50,7 @@ export default function CommentsDrawer({ open, onClose, order }) {
   })
 
   const { mutate, isPending: sending, reset } = useMutation({
-    mutationFn: () => addComment(orderId, { comment: text.trim(), visibility }),
+    mutationFn: () => addComment(orderId, { comment: text.trim() }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.comments(orderId) })
       toast.success('Комментарий добавлен')
@@ -130,15 +123,6 @@ export default function CommentsDrawer({ open, onClose, order }) {
         {/* Add comment */}
         <div className="border-t border-slate-100 px-5 py-4 flex-shrink-0">
           <div className="space-y-3">
-            <select
-              value={visibility}
-              onChange={(e) => setVisibility(e.target.value)}
-              className="input text-xs py-2"
-            >
-              {Object.entries(VISIBILITY_LABELS).map(([val, label]) => (
-                <option key={val} value={val}>{label}</option>
-              ))}
-            </select>
             <div className="flex gap-2">
               <textarea
                 value={text}
@@ -170,21 +154,28 @@ export default function CommentsDrawer({ open, onClose, order }) {
 }
 
 function CommentItem({ comment }) {
-  const vis = VISIBILITY_LABELS[comment.visibility] ?? comment.visibility ?? 'Внутренний'
+  const role = {
+    seller: 'Продавец',
+    manager: 'Менеджер',
+    sales_team_lead: 'Тимлид',
+    dispatcher: 'Диспетчер',
+    owner: 'Владелец',
+    courier: 'Курьер',
+  }[comment.author_role] ?? comment.author_role ?? 'Роль'
   return (
     <div className="bg-slate-50 rounded-2xl p-3 space-y-1">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-slate-700">
-          {comment.author?.full_name ?? comment.created_by ?? 'Система'}
+          {comment.author_name ?? comment.author?.full_name ?? comment.created_by ?? 'Система'}
+          <span className="ml-2 inline-block text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+            {role}
+          </span>
         </span>
         <span className="text-[10px] text-slate-400 whitespace-nowrap">
           {fmtDate(comment.created_at)}
         </span>
       </div>
       <p className="text-sm text-slate-700 leading-relaxed">{comment.comment ?? comment.text}</p>
-      <span className="inline-block text-[10px] text-slate-400 bg-white border border-slate-100 px-2 py-0.5 rounded-full">
-        {vis}
-      </span>
     </div>
   )
 }

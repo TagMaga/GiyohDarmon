@@ -5,7 +5,7 @@ import {
   Animated, PanResponder, Dimensions, Linking, TextInput,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { updateOrderStatus, reportAddressChanged, deferOrder } from '../api/orders'
+import { updateOrderStatus, reportAddressChanged, deferOrder, getOrderComments, addOrderComment } from '../api/orders'
 import useAuthStore from '../store/authStore'
 import { resolveCreator } from '../lib/creator'
 
@@ -41,6 +41,14 @@ const DEFER_OPTIONS = [
   { key: 'd3', label: '+3 дня',       days: 3 },
   { key: 'd7', label: 'Через неделю', days: 7 },
 ]
+const ROLE_LABEL = {
+  seller: 'Продавец',
+  manager: 'Менеджер',
+  sales_team_lead: 'Тимлид',
+  dispatcher: 'Диспетчер',
+  owner: 'Владелец',
+  courier: 'Курьер',
+}
 
 function addDays(n) {
   const d = new Date(); d.setDate(d.getDate() + n); return d
@@ -108,10 +116,38 @@ export function OrderDetailSheet({
   const [laterDate, setLaterDate]     = useState(null)
   const [newAddress, setNewAddress]   = useState('')
   const [stepLoading, setStepLoading] = useState(false)
+  const [comments, setComments]       = useState([])
+  const [commentsLoading, setCommentsLoading] = useState(false)
+  const [commentText, setCommentText] = useState('')
+  const [commentSending, setCommentSending] = useState(false)
   const currentUserName = useAuthStore((st) => st.user?.full_name) || ''
 
   useEffect(() => {
-    if (order) { setStep(initialStep); setCancelReason(''); setLaterDate(null); setNewAddress('') }
+    if (order) {
+      setStep(initialStep)
+      setCancelReason('')
+      setLaterDate(null)
+      setNewAddress('')
+      setCommentText('')
+    }
+  }, [order?.id])
+
+  const loadComments = async () => {
+    if (!order?.id) return
+    setCommentsLoading(true)
+    try {
+      const { data } = await getOrderComments(order.id)
+      const body = data?.data ?? data
+      setComments(Array.isArray(body) ? body : [])
+    } catch {
+      setComments([])
+    } finally {
+      setCommentsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (order?.id) loadComments()
   }, [order?.id])
 
   const resetStep  = () => { setStep('detail'); setCancelReason(''); setLaterDate(null); setNewAddress('') }
@@ -189,6 +225,21 @@ export function OrderDetailSheet({
     } catch (e) {
       Alert.alert('Ошибка', e?.response?.data?.error?.message || 'Что-то пошло не так')
     } finally { setStepLoading(false) }
+  }
+
+  const sendComment = async () => {
+    const value = commentText.trim()
+    if (!value || commentSending) return
+    setCommentSending(true)
+    try {
+      await addOrderComment(order.id, value)
+      setCommentText('')
+      await loadComments()
+    } catch (e) {
+      Alert.alert('Ошибка', e?.response?.data?.error?.message || 'Не удалось добавить комментарий')
+    } finally {
+      setCommentSending(false)
+    }
   }
 
   const sheetHeight = step === 'detail' ? SHEET_H : SCREEN_H * 0.65
@@ -378,6 +429,49 @@ export function OrderDetailSheet({
             </SectionCard>
           )}
 
+          <SectionCard label="Комментарии">
+            {commentsLoading && (
+              <View style={d.commentsLoading}>
+                <ActivityIndicator color={C.violet} />
+                <Text style={d.commentsLoadingText}>Загрузка комментариев…</Text>
+              </View>
+            )}
+            {!commentsLoading && comments.length === 0 && (
+              <Text style={d.emptyComments}>Комментариев пока нет</Text>
+            )}
+            {!commentsLoading && comments.map((c, i) => (
+              <View key={c.id ?? i} style={d.commentThreadItem}>
+                <View style={d.commentThreadHeader}>
+                  <Text style={d.commentAuthor}>{c.author_name || '—'}</Text>
+                  <View style={d.commentRoleBadge}>
+                    <Text style={d.commentRoleText}>{ROLE_LABEL[c.author_role] || c.author_role || 'Роль'}</Text>
+                  </View>
+                </View>
+                <Text style={d.commentBody}>{c.comment || c.text}</Text>
+                <Text style={d.commentTime}>
+                  {c.created_at ? new Date(c.created_at).toLocaleString('ru-RU') : ''}
+                </Text>
+              </View>
+            ))}
+            <View style={d.commentInputRow}>
+              <TextInput
+                style={d.commentInput}
+                placeholder="Написать комментарий…"
+                placeholderTextColor={C.muted}
+                value={commentText}
+                onChangeText={setCommentText}
+                multiline
+              />
+              <TouchableOpacity
+                style={[d.commentSendBtn, (!commentText.trim() || commentSending) && d.btnDisabled]}
+                disabled={!commentText.trim() || commentSending}
+                onPress={sendComment}
+              >
+                {commentSending ? <ActivityIndicator color="#fff" /> : <Text style={d.commentSendText}>➤</Text>}
+              </TouchableOpacity>
+            </View>
+          </SectionCard>
+
           {/* PAYMENT ─────────────────────────────────────────────── */}
           <SectionCard label="Оплата">
             <PayRow label="Стоимость товаров" value={`${fmt(productTotal)} сом`} />
@@ -554,6 +648,20 @@ const d = StyleSheet.create({
   commentBox:   { backgroundColor: '#f8f4ff', borderRadius: 13, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#ece6ff' },
   commentLabel: { fontSize: 10, fontWeight: '900', color: C.violet, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 },
   commentText:  { fontSize: 13, color: C.ink, lineHeight: 19 },
+  commentsLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
+  commentsLoadingText: { fontSize: 12, color: C.muted, fontWeight: '700' },
+  emptyComments: { fontSize: 13, color: C.muted, fontWeight: '700', textAlign: 'center', paddingVertical: 12 },
+  commentThreadItem: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 14, padding: 12, marginBottom: 8 },
+  commentThreadHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  commentAuthor: { flex: 1, fontSize: 12, color: C.ink, fontWeight: '900' },
+  commentRoleBadge: { backgroundColor: '#eef3ff', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  commentRoleText: { fontSize: 10, color: C.violet, fontWeight: '900' },
+  commentBody: { fontSize: 13, color: C.ink, lineHeight: 19, fontWeight: '600' },
+  commentTime: { fontSize: 10, color: C.muted, fontWeight: '700', marginTop: 6 },
+  commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 4 },
+  commentInput: { flex: 1, minHeight: 42, maxHeight: 86, borderWidth: 1, borderColor: C.line, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: C.bg, color: C.ink, fontSize: 13, fontWeight: '700' },
+  commentSendBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: C.violet, alignItems: 'center', justifyContent: 'center' },
+  commentSendText: { color: '#fff', fontSize: 18, fontWeight: '900' },
 
   // Contact buttons
   contactRow:   { flexDirection: 'row', gap: 8 },

@@ -37,9 +37,13 @@ export default function DeliveriesScreen() {
     const m = String(o?.delivery_method ?? o?.DeliveryMethod ?? o?.deliveryMethod ?? '').toLowerCase()
     return m === 'fast' || m === 'express'
   }
+  const isActiveUrgent = (o) => {
+    const status = String(o?.status ?? o?.Status ?? '').toLowerCase()
+    return isUrgent(o) && !['delivered', 'returned', 'cancelled'].includes(status)
+  }
   const filtered = (() => {
     const base = activeFilter === 'all' ? orders : orders.filter(o => o.status === activeFilter)
-    return [...base].sort((a, b) => (isUrgent(b) ? 1 : 0) - (isUrgent(a) ? 1 : 0))
+    return [...base].sort((a, b) => (isActiveUrgent(b) ? 1 : 0) - (isActiveUrgent(a) ? 1 : 0))
   })()
   const openDetail  = (order) => { setSelectedOrder(order); setOpenStep('detail'); setActionLoading(false) }
   const closeDetail = () => setSelectedOrder(null)

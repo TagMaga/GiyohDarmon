@@ -12,7 +12,7 @@ export default function WarehouseWriteoffsPage() {
   const [open, setOpen] = useState(false)
   const rows = data.movements.filter((m) => getMovementType(m) === 'writeoff')
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in p-6">
       <PageHeader
         title="Списания"
         subtitle="Брак, потери, просрочка и корректировки остатков."

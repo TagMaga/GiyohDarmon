@@ -19,7 +19,7 @@ import { formatOrderLabel, getOrderId } from '../../dispatcher/utils/orderHelper
 import useCurrentUser      from '../../../shared/hooks/useCurrentUser'
 import useMyManagerTeam    from '../hooks/useMyManagerTeam'
 import useTeamMembers      from '../../people/hooks/useTeamMembers'
-import useEmployees        from '../../people/hooks/useEmployees'
+import useEmployeesByIds   from '../../people/hooks/useEmployeesByIds'
 import { buildUserMap }    from '../../people/utils/peopleHelpers'
 import useManagerOrders    from '../hooks/useManagerOrders'
 import useManagerPersonalOrders from '../hooks/useManagerPersonalOrders'
@@ -137,14 +137,15 @@ export default function ManagerDashboardPage() {
   const { userId } = useCurrentUser()
   const { teamId, isLoading: teamLoading } = useMyManagerTeam()
   const { data: members = [], isLoading: membersLoading } = useTeamMembers(teamId)
-  const { data: allEmployees = [] } = useEmployees()
-  const userMap = useMemo(() => buildUserMap(allEmployees), [allEmployees])
+  const memberIds  = useMemo(() => members.map(m => m.user_id).filter(Boolean), [members])
+  const employeeIds = useMemo(() => [...new Set([...memberIds, userId].filter(Boolean))], [memberIds, userId])
+  const { data: teamEmployees = [] } = useEmployeesByIds(employeeIds)
+  const userMap = useMemo(() => buildUserMap(teamEmployees), [teamEmployees])
 
   const sellers    = useMemo(() =>
     members.map(m => userMap[m.user_id]).filter(u => u && (u.role ?? u.Role) === 'seller'),
     [members, userMap]
   )
-  const memberIds  = useMemo(() => members.map(m => m.user_id).filter(Boolean), [members])
 
   const { from, to } = currentMonth()
   const monthParams = useMemo(() => ({ from, to, limit: 200, page: 1 }), [from, to])
@@ -162,7 +163,7 @@ export default function ManagerDashboardPage() {
   const loading = teamLoading || membersLoading || ordersLoading
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

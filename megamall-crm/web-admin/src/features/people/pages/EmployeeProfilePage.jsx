@@ -124,7 +124,7 @@ export default function EmployeeProfilePage() {
   const teamMap = useMemo(() => buildTeamMap(teams),    [teams])
 
   if (userLoading) return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
       <CardSkeleton /><CardSkeleton /><CardSkeleton />
     </div>
   )
@@ -146,7 +146,7 @@ export default function EmployeeProfilePage() {
   const currentParentId   = currentChainEntry?.parent_id ?? null
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto">
+    <div className="p-4 md:p-6">
       {/* Back */}
       <button onClick={() => navigate('/owner/employees')}
         className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-4 min-h-[44px]">

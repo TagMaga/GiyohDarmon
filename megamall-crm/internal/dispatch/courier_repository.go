@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/megamall/crm/internal/users"
 	apperrors "github.com/megamall/crm/pkg/errors"
+	"gorm.io/gorm"
 )
 
 // UpdateCourierProfile applies the given column updates to a courier user row.
@@ -46,6 +47,21 @@ func (r *Repository) getCourierProfileResponse(ctx context.Context, courierID uu
 	if err := r.db.WithContext(ctx).First(&u, "id = ? AND deleted_at IS NULL", courierID).Error; err != nil {
 		return nil, fmt.Errorf("fetch updated courier: %w", err)
 	}
+
+	type cityLink struct {
+		CityID uuid.UUID `gorm:"column:city_id"`
+	}
+	var links []cityLink
+	r.db.WithContext(ctx).
+		Table("courier_cities").
+		Select("city_id").
+		Where("courier_id = ?", courierID).
+		Scan(&links)
+	cityIDs := make([]uuid.UUID, 0, len(links))
+	for _, l := range links {
+		cityIDs = append(cityIDs, l.CityID)
+	}
+
 	return &CourierProfileResponse{
 		CourierID:      u.ID,
 		FullName:       u.FullName,
@@ -53,7 +69,24 @@ func (r *Repository) getCourierProfileResponse(ctx context.Context, courierID uu
 		Phone:          u.Phone,
 		TelegramChatID: u.TelegramChatID,
 		IsActive:       u.IsActive,
+		CityIDs:        cityIDs,
 	}, nil
+}
+
+// setCourierCities replaces a courier's city assignments atomically.
+func (r *Repository) setCourierCities(ctx context.Context, courierID uuid.UUID, cityIDs []uuid.UUID) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("DELETE FROM courier_cities WHERE courier_id = ?", courierID).Error; err != nil {
+			return fmt.Errorf("clear courier cities: %w", err)
+		}
+		for _, cid := range cityIDs {
+			row := map[string]interface{}{"courier_id": courierID, "city_id": cid}
+			if err := tx.Table("courier_cities").Create(&row).Error; err != nil {
+				return fmt.Errorf("assign city %s: %w", cid, err)
+			}
+		}
+		return nil
+	})
 }
 
 // isUniqueViolation detects PostgreSQL unique constraint errors.

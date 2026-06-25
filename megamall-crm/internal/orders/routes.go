@@ -8,10 +8,11 @@ import (
 // RegisterRoutes mounts all order routes.
 //
 // RBAC summary (full rules enforced in service.go):
-//   Create order:          seller, manager, sales_team_lead, owner
-//   View orders:           owner, sales_team_lead, manager, seller, dispatcher
-//   Change status:         dispatcher, owner (+ seller can cancel own new order)
-//   Add prepayment proof:  seller, dispatcher, owner
+//
+//	Create order:          seller, manager, sales_team_lead, owner
+//	View orders:           owner, sales_team_lead, manager, seller, dispatcher
+//	Change status:         dispatcher, owner (+ seller can cancel own new order)
+//	Add prepayment proof:  seller, dispatcher, owner
 //
 // warehouse_manager is intentionally excluded from orderRoles (P0 fix — Phase 24).
 // The users table has no warehouse_id column and warehouses has no manager_id, so
@@ -25,7 +26,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 		"owner", "sales_team_lead", "manager", "seller", "dispatcher",
 	)
 	// Roles that can create orders.
-	createRoles := middleware.RequireRoles("owner", "sales_team_lead", "manager", "seller")
+	createRoles := middleware.RequireRoles("owner", "sales_team_lead", "manager", "seller", "dispatcher")
 	// Roles that can change status (service enforces per-transition rules).
 	statusRoles := middleware.RequireRoles("owner", "dispatcher", "seller", "manager", "sales_team_lead")
 	// Roles that can add prepayments.
@@ -60,4 +61,10 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	// Phase 6: frozen financial snapshot for a delivered order.
 	snapshotRoles := middleware.RequireRoles("owner", "dispatcher", "manager", "sales_team_lead")
 	rg.GET("/:id/snapshot", snapshotRoles, h.GetSnapshot)
+
+	// Comments: one shared thread visible to every role that can access the order.
+	commentReadRoles := middleware.RequireRoles("owner", "sales_team_lead", "manager", "seller", "dispatcher", "courier")
+	commentWriteRoles := middleware.RequireRoles("owner", "sales_team_lead", "manager", "seller", "dispatcher", "courier")
+	rg.GET("/:id/comments", commentReadRoles, h.GetOrderComments)
+	rg.POST("/:id/comments", commentWriteRoles, h.AddOrderComment)
 }

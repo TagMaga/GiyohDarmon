@@ -380,6 +380,145 @@ func (r *Repository) ListAvailableOrders(ctx context.Context, courierID uuid.UUI
 	return result, int(total), nil
 }
 
+// GetOrderByIDForCourier fetches a single order's full detail for a courier.
+// Access is granted when the courier is assigned to the order (via courier_id cache)
+// OR when the order is confirmed with no active assignment and is in the courier's city.
+func (r *Repository) GetOrderByIDForCourier(ctx context.Context, courierID, orderID uuid.UUID) (*MyOrderResponse, error) {
+	type row struct {
+		OrderID              uuid.UUID          `gorm:"column:order_id"`
+		OrderNumber          string             `gorm:"column:order_number"`
+		Status               orders.OrderStatus `gorm:"column:status"`
+		CustomerName         string             `gorm:"column:customer_name"`
+		CustomerPhone        string             `gorm:"column:customer_phone"`
+		CustomerAddress      *string            `gorm:"column:customer_address"`
+		CreatorID            *uuid.UUID         `gorm:"column:creator_id"`
+		CreatorName          *string            `gorm:"column:creator_name"`
+		CreatorPhone         *string            `gorm:"column:creator_phone"`
+		CreatorRole          *string            `gorm:"column:creator_role"`
+		DeliveryMethod       string             `gorm:"column:delivery_method"`
+		ProductTotal         float64            `gorm:"column:product_total"`
+		DeliveryFee          float64            `gorm:"column:delivery_fee"`
+		CourierPayout        float64            `gorm:"column:courier_payout"`
+		PrepaymentAmount     float64            `gorm:"column:prepayment_amount"`
+		CourierCollectAmount float64            `gorm:"column:courier_collect_amount"`
+		ScheduledAt          *time.Time         `gorm:"column:scheduled_at"`
+		AssignedAt           *time.Time         `gorm:"column:assigned_at"`
+		Notes                *string            `gorm:"column:notes"`
+	}
+
+	var rw row
+	err := r.db.WithContext(ctx).
+		Table("orders o").
+		Select(`
+			o.id AS order_id,
+			o.order_number,
+			o.status,
+			c.full_name AS customer_name,
+			c.phone AS customer_phone,
+			COALESCE(o.delivery_address, c.address) AS customer_address,
+			creator.id AS creator_id,
+			creator.full_name AS creator_name,
+			creator.phone AS creator_phone,
+			creator.role AS creator_role,
+			COALESCE(o.delivery_method, 'normal') AS delivery_method,
+			o.total_amount AS product_total,
+			o.delivery_fee,
+			o.courier_payout,
+			o.prepayment_amount,
+			GREATEST(0, o.total_amount + o.delivery_fee - o.prepayment_amount) AS courier_collect_amount,
+			o.scheduled_at,
+			oa.assigned_at,
+			o.notes
+		`).
+		Joins("LEFT JOIN customers c ON c.id = o.customer_id").
+		Joins("LEFT JOIN users creator ON creator.id = o.seller_id").
+		Joins(`LEFT JOIN order_assignments oa
+			ON oa.order_id = o.id
+			AND oa.courier_id = ?
+			AND oa.assigned_at = (
+				SELECT MAX(oa2.assigned_at)
+				FROM order_assignments oa2
+				WHERE oa2.order_id = o.id AND oa2.courier_id = ?
+			)`, courierID, courierID).
+		Where(`o.id = ? AND o.deleted_at IS NULL AND (
+			o.courier_id = ?
+			OR (
+				o.status = ? AND
+				NOT EXISTS (
+					SELECT 1 FROM order_assignments oa3
+					WHERE oa3.order_id = o.id AND oa3.is_active = TRUE
+				) AND
+				o.city_id IN (
+					SELECT cc.city_id FROM courier_cities cc WHERE cc.courier_id = ?
+				)
+			)
+		)`, orderID, courierID, orders.StatusConfirmed, courierID).
+		Scan(&rw).Error
+	if err != nil {
+		return nil, fmt.Errorf("get order for courier: %w", err)
+	}
+	if rw.OrderID == uuid.Nil {
+		return nil, apperrors.NotFound("order")
+	}
+
+	totalOrderAmount := rw.ProductTotal + rw.DeliveryFee
+	result := &MyOrderResponse{
+		ID:          rw.OrderID,
+		OrderNumber: rw.OrderNumber,
+		Status:      rw.Status,
+		Customer: OrderCustomer{
+			FullName: rw.CustomerName,
+			Phone:    rw.CustomerPhone,
+			Address:  rw.CustomerAddress,
+		},
+		CreatorID:            rw.CreatorID,
+		CreatorName:          derefStr(rw.CreatorName),
+		CreatorPhone:         derefStr(rw.CreatorPhone),
+		CreatorRole:          derefStr(rw.CreatorRole),
+		DeliveryMethod:       rw.DeliveryMethod,
+		ProductTotal:         rw.ProductTotal,
+		DeliveryFee:          rw.DeliveryFee,
+		CourierPayout:        rw.CourierPayout,
+		PrepaymentAmount:     rw.PrepaymentAmount,
+		TotalOrderAmount:     totalOrderAmount,
+		AmountToCollect:      rw.CourierCollectAmount,
+		CourierCollectAmount: rw.CourierCollectAmount,
+		PaymentLabel:         paymentLabel(rw.PrepaymentAmount, totalOrderAmount),
+		ScheduledAt:          rw.ScheduledAt,
+		AssignedAt:           rw.AssignedAt,
+		Notes:                rw.Notes,
+		Items:                []OrderItemResponse{},
+	}
+
+	// Fetch items for this order.
+	type itemRow struct {
+		ProductID   string  `gorm:"column:product_id"`
+		ProductName string  `gorm:"column:product_name"`
+		Quantity    int     `gorm:"column:quantity"`
+		UnitPrice   float64 `gorm:"column:unit_price"`
+		TotalPrice  float64 `gorm:"column:total_price"`
+	}
+	var itemRows []itemRow
+	r.db.WithContext(ctx).
+		Table("order_items oi").
+		Select("oi.product_id::text, p.name AS product_name, oi.quantity, oi.unit_price, oi.total_price").
+		Joins("JOIN products p ON p.id = oi.product_id").
+		Where("oi.order_id = ?", orderID).
+		Scan(&itemRows)
+	for _, ir := range itemRows {
+		productUUID, _ := uuid.Parse(ir.ProductID)
+		result.Items = append(result.Items, OrderItemResponse{
+			ProductID:   productUUID,
+			ProductName: ir.ProductName,
+			Quantity:    ir.Quantity,
+			UnitPrice:   ir.UnitPrice,
+			TotalPrice:  ir.TotalPrice,
+		})
+	}
+
+	return result, nil
+}
+
 // GetOrderForClaim fetches and locks an order for the claim transaction.
 func (r *Repository) GetOrderForClaim(tx *gorm.DB, ctx context.Context, orderID uuid.UUID) (*orders.Order, error) {
 	var o orders.Order

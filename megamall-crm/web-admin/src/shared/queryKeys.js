@@ -18,13 +18,20 @@ export const KEYS = {
     orderDetail: (id) => ['dispatcher', 'order', id],
     timeline:    (id) => ['dispatcher', 'timeline', id],
     prepayments: (id) => ['dispatcher', 'prepayments', id],
+    sellers:     ['dispatcher', 'sellers'],
   },
   seller: {
-    orders:    ['seller', 'orders'],
-    customers: ['seller', 'customers'],
-    products:  ['seller', 'products'],
-    warehouses:['seller', 'warehouses', 'v2'],
-    inventory: (productId, warehouseId) => ['seller', 'inventory', productId, warehouseId],
+    orders:        ['seller', 'orders'],
+    customers:     ['seller', 'customers'],
+    products:      ['seller', 'products'],
+    warehouses:    ['seller', 'warehouses', 'v2'],
+    inventory:     (productId, warehouseId) => ['seller', 'inventory', productId, warehouseId],
+    me:            ['seller', 'me'],
+    compensation:  ['seller', 'compensation'],
+    teamRank:      ['seller', 'teamRank'],
+    payouts:       ['seller', 'payouts'],
+    orderComments: (orderId) => ['seller', 'order', orderId, 'comments'],
+    cities:        ['seller', 'cities'],
   },
   customers: {
     list:  ['customers', 'list'],
@@ -103,6 +110,7 @@ export const KEYS = {
     list:   (params) => ['orders', 'list',   params ?? {}],
     detail: (id)     => ['orders', 'detail', id],
     events: (id)     => ['orders', 'events', id],
+    comments: (id)   => ['orders', 'comments', id],
   },
   // ── Phase 17: Owner Logistics ─────────────────────────────────────────────
   logistics: {

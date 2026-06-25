@@ -1,14 +1,14 @@
 import { useMemo } from 'react'
 import useCurrentUser from './useCurrentUser'
-import useEmployee from '../../features/people/hooks/useEmployee'
+import { useSellerMe } from '../../features/seller/hooks/useSellerMe'
 import useAuthStore from '../store/authStore'
 
 export default function useProfile() {
   const { userId } = useCurrentUser()
   const { phone, role } = useAuthStore()
-  const { data: employee } = useEmployee(userId)
+  const { data: me } = useSellerMe()
 
-  const fullName = employee?.full_name ?? employee?.FullName ?? null
+  const fullName = me?.full_name ?? me?.FullName ?? null
 
   const initials = useMemo(() => {
     if (fullName) {
@@ -25,5 +25,5 @@ export default function useProfile() {
     return 'U'
   }, [fullName, role])
 
-  return { fullName, initials, phone, role, userId, employee }
+  return { fullName, initials, phone, role, userId, employee: me }
 }

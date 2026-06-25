@@ -204,8 +204,9 @@ type Order struct {
 	PrepaymentVerifiedAt      *time.Time `gorm:"column:prepayment_verified_at"`
 	PrepaymentRejectionReason *string    `gorm:"column:prepayment_rejection_reason"`
 
-	Notes     *string    `gorm:"type:text"`
-	CreatedAt time.Time  `gorm:"autoCreateTime"`
+	Notes           *string `gorm:"type:text"`
+	DeliveryAddress *string `gorm:"type:text;column:delivery_address"`
+	CreatedAt       time.Time  `gorm:"autoCreateTime"`
 	UpdatedAt time.Time  `gorm:"autoUpdateTime"`
 	DeletedAt *time.Time `gorm:"index"`
 
@@ -252,8 +253,9 @@ type OrderItem struct {
 	Quantity    int       `gorm:"not null"`
 	UnitPrice   float64   `gorm:"type:numeric(12,2);not null;column:unit_price"`
 	TotalPrice  float64   `gorm:"type:numeric(12,2);not null;column:total_price"`
-	// ProductName is populated at query time via LEFT JOIN products — not stored.
-	ProductName string    `gorm:"column:product_name;<-:false"`
+	// ProductName and ProductImageURL are populated at query time — not stored.
+	ProductName     string  `gorm:"column:product_name;<-:false"`
+	ProductImageURL *string `gorm:"column:product_image_url;<-:false"`
 }
 
 func (OrderItem) TableName() string { return "order_items" }

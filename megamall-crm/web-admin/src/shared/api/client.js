@@ -40,28 +40,43 @@ client.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// ── Response interceptor — handle 401 ───────────────────────────────────────
+// ── Response interceptor — handle 401 + stale-user 404 ─────────────────────
+function clearAuthAndRedirect() {
+  try {
+    const raw    = localStorage.getItem('megamall-crm-auth')
+    const parsed = JSON.parse(raw || '{}')
+    if (parsed?.state) {
+      parsed.state.token        = null
+      parsed.state.refreshToken = null
+      parsed.state.role         = null
+      parsed.state.phone        = null
+      localStorage.setItem('megamall-crm-auth', JSON.stringify(parsed))
+    }
+  } catch {
+    localStorage.removeItem('megamall-crm-auth')
+  }
+  window.location.href = '/login'
+}
+
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Clear persisted auth and hard-redirect to login.
-      // Phase 7: no token refresh.  Phase 8 will add refresh logic here.
-      try {
-        const raw    = localStorage.getItem('megamall-crm-auth')
-        const parsed = JSON.parse(raw || '{}')
-        if (parsed?.state) {
-          parsed.state.token        = null
-          parsed.state.refreshToken = null
-          parsed.state.role         = null
-          parsed.state.phone        = null
-          localStorage.setItem('megamall-crm-auth', JSON.stringify(parsed))
-        }
-      } catch {
-        localStorage.removeItem('megamall-crm-auth')
-      }
-      // Use hard redirect so the Zustand store re-hydrates cleanly
-      window.location.href = '/login'
+    const status = error.response?.status
+    // 401 — token invalid/expired.
+    if (status === 401) {
+      clearAuthAndRedirect()
+      return Promise.reject(error)
+    }
+    // 404 on /users/me — JWT is valid but the user record was deleted.
+    // Treat the same as 401: clear auth and redirect to login.
+    // Guard against infinite loop: only fire when not already on /login.
+    if (
+      status === 404 &&
+      error.config?.url?.endsWith('/users/me') &&
+      window.location.pathname !== '/login'
+    ) {
+      clearAuthAndRedirect()
+      return Promise.reject(error)
     }
     return Promise.reject(error)
   }

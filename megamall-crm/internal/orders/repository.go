@@ -101,8 +101,8 @@ func (r *Repository) List(ctx context.Context, f ListOrdersFilter, actorID uuid.
 		q = q.Where("manager_id = ? OR seller_id = ?", actorID, actorID)
 	case "sales_team_lead":
 		q = q.Where("team_lead_id = ? OR seller_id = ?", actorID, actorID)
-	// dispatcher and owner see all orders — no extra WHERE clause.
-	// warehouse_manager is NOT in orderRoles (Phase 24 P0 fix) and will never reach here.
+		// dispatcher and owner see all orders — no extra WHERE clause.
+		// warehouse_manager is NOT in orderRoles (Phase 24 P0 fix) and will never reach here.
 	}
 
 	if f.Status != "" {
@@ -246,6 +246,7 @@ func (r *Repository) UpdateStatus(ctx context.Context, tx *gorm.DB, id uuid.UUID
 //   - the LAST assignment's courier (most recent by assigned_at, any state) — so a
 //     delivered order whose assignment was later deactivated still resolves the
 //     courier who delivered it.
+//
 // Single query, no N+1. Orders with no assignment are simply absent from the map.
 func (r *Repository) GetCourierInfo(ctx context.Context, orderIDs []uuid.UUID) (map[uuid.UUID]CourierInfo, error) {
 	out := make(map[uuid.UUID]CourierInfo, len(orderIDs))
@@ -295,6 +296,18 @@ func (r *Repository) GetCourierInfo(ctx context.Context, orderIDs []uuid.UUID) (
 		}
 	}
 	return out, nil
+}
+
+func (r *Repository) HasCourierAssignment(ctx context.Context, orderID, courierID uuid.UUID) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Table("order_assignments").
+		Where("order_id = ? AND courier_id = ?", orderID, courierID).
+		Count(&count).Error
+	if err != nil {
+		return false, fmt.Errorf("check courier assignment: %w", err)
+	}
+	return count > 0, nil
 }
 
 // ReleaseAssignment deactivates any active courier assignment for the order and

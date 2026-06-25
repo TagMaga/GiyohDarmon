@@ -150,6 +150,22 @@ func (r *Repository) ExistsByID(ctx context.Context, id uuid.UUID) (bool, error)
 	return count > 0, nil
 }
 
+// ShareTeam reports whether two active users belong to the same hierarchy team.
+func (r *Repository) ShareTeam(ctx context.Context, a uuid.UUID, b uuid.UUID) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Table("user_hierarchy AS uh1").
+		Joins("JOIN user_hierarchy AS uh2 ON uh1.team_id = uh2.team_id").
+		Joins("JOIN users AS u1 ON u1.id = uh1.user_id AND u1.deleted_at IS NULL").
+		Joins("JOIN users AS u2 ON u2.id = uh2.user_id AND u2.deleted_at IS NULL").
+		Where("uh1.user_id = ? AND uh2.user_id = ? AND uh1.team_id IS NOT NULL", a, b).
+		Count(&count).Error
+	if err != nil {
+		return false, fmt.Errorf("share team check: %w", err)
+	}
+	return count > 0, nil
+}
+
 func isDuplicateKeyError(err error, constraint string) bool {
 	return err != nil && strings.Contains(err.Error(), constraint)
 }

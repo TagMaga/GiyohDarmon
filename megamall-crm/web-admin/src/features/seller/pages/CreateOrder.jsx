@@ -160,9 +160,8 @@ export default function CreateOrder() {
   const products   = Array.isArray(productsRaw)   ? productsRaw   : []
   const warehouses = Array.isArray(warehousesRaw) ? warehousesRaw : []
 
-  const normalFee  = deliverySettings?.normal_fee  ?? 0
-  const fastFee = deliverySettings?.fast_fee ?? 0
-  const deliveryFee = form.deliveryMode === 'fast' ? fastFee : normalFee
+  const globalNormalFee = deliverySettings?.normal_fee ?? 0
+  const globalFastFee   = deliverySettings?.fast_fee   ?? 0
 
   const autoWarehouse = useMemo(
     () => warehouses.find((w) => w.is_active === true) ?? warehouses[0] ?? null,
@@ -219,6 +218,15 @@ export default function CreateOrder() {
 
   // ── Calculations ─────────────────────────────────────────────────────────────
   const cartItems = Array.isArray(form.cartItems) ? form.cartItems : []
+  const firstProductId    = cartItems[0]?.product_id ?? null
+  const cartItems0Product = useMemo(
+    () => firstProductId ? products.find((p) => p.id === firstProductId) ?? null : null,
+    [firstProductId, products]
+  )
+  const normalFee   = cartItems0Product?.normal_delivery_fee  ?? cartItems0Product?.NormalDeliveryFee  ?? globalNormalFee
+  const fastFee     = cartItems0Product?.express_delivery_fee ?? cartItems0Product?.ExpressDeliveryFee ?? globalFastFee
+  const deliveryFee = form.deliveryMode === 'fast' ? fastFee : normalFee
+
   const productTotal    = useMemo(() => calcProductTotal(cartItems), [cartItems])
   const totalOrderAmount = useMemo(() => calcTotalOrderAmount(productTotal, deliveryFee), [productTotal, deliveryFee])
   const prepayAmt        = form.payMode === 'prepayment' ? Number(form.prepayAmount) || 0 : 0

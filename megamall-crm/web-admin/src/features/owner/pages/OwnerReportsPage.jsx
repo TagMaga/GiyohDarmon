@@ -50,7 +50,7 @@ const COLOR_MAP = {
 
 export default function OwnerReportsPage() {
   return (
-    <div className="p-4 md:p-6 space-y-8 max-w-[1000px] mx-auto">
+    <div className="p-4 md:p-6 space-y-8">
 
       {/* Header */}
       <div>

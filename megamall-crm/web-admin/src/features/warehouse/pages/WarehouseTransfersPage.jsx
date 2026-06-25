@@ -16,7 +16,7 @@ export default function WarehouseTransfersPage() {
   })
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in p-6">
       <PageHeader
         title="Перемещения"
         subtitle="Переносите остатки между складами с понятным источником и получателем."

@@ -892,6 +892,65 @@ func (s *Service) SetEmployeeCompensation(
 	return ec, nil
 }
 
+// GetSellerTeamRank returns (rank, totalTeamMembers, error) for the requesting seller
+// based on this month's seller_commission_earned financial events. No teammate amounts exposed.
+func (s *Service) GetSellerTeamRank(ctx context.Context, sellerID uuid.UUID) (int, int, error) {
+	type row struct {
+		UserID uuid.UUID `gorm:"column:user_id"`
+		Total  float64   `gorm:"column:total"`
+	}
+	var rows []row
+	err := s.db.WithContext(ctx).Raw(`
+		WITH team AS (
+		    SELECT team_id
+		    FROM user_hierarchy
+		    WHERE user_id = ?
+		    LIMIT 1
+		),
+		members AS (
+		    SELECT uh.user_id
+		    FROM user_hierarchy uh
+		    JOIN team t ON t.team_id IS NOT NULL AND uh.team_id = t.team_id
+		),
+		earnings AS (
+		    SELECT fe.user_id,
+		           COALESCE(SUM(fe.amount), 0) AS total
+		    FROM financial_events fe
+		    JOIN members m ON m.user_id = fe.user_id
+		    WHERE fe.event_type = 'seller_commission_earned'
+		      AND fe.created_at >= date_trunc('month', now())
+		    GROUP BY fe.user_id
+		),
+		all_members AS (
+		    SELECT m.user_id, COALESCE(e.total, 0) AS total
+		    FROM members m
+		    LEFT JOIN earnings e ON e.user_id = m.user_id
+		),
+		ranked AS (
+		    SELECT user_id, total,
+		           RANK() OVER (ORDER BY total DESC) AS rank
+		    FROM all_members
+		)
+		SELECT user_id, total FROM ranked ORDER BY rank
+	`, sellerID).Scan(&rows).Error
+	if err != nil {
+		return 1, 1, apperrors.Internal(err)
+	}
+	if len(rows) == 0 {
+		return 1, 1, nil
+	}
+
+	total := len(rows)
+	rank := 1
+	for i, r := range rows {
+		if r.UserID == sellerID {
+			rank = i + 1
+			break
+		}
+	}
+	return rank, total, nil
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // parseScopeIDs validates scope + ID combination and returns (userID, teamID).
