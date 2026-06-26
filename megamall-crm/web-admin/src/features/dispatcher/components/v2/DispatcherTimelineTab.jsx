@@ -5,6 +5,18 @@ import { KEYS } from '../../../../shared/queryKeys'
 import { fetchOrderTimeline } from '../../api'
 import { STATUS_HEX, fmtDate } from '../../statusConfig'
 
+function relTime(dateStr) {
+  if (!dateStr) return null
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const m = Math.floor(diff / 60_000)
+  if (m < 1)  return 'только что'
+  if (m < 60) return `${m} мин. назад`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} ч. назад`
+  const d = Math.floor(h / 24)
+  return `${d} дн. назад`
+}
+
 const EVENT_LABELS = {
   new:                  { label: 'Заказ создан',          color: '#64748b', Icon: Package      },
   confirmed:            { label: 'Подтверждён',           color: STATUS_HEX.confirmed  ?? '#0ea5e9', Icon: Check },
@@ -84,9 +96,12 @@ export default function DispatcherTimelineTab({ orderId }) {
                 <div className="flex-1 min-w-0 pb-1">
                   <div className="flex items-baseline justify-between gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-slate-800">{meta.label}</span>
-                    <span className="text-[10px] text-slate-400 flex-shrink-0">
-                      {fmtDate(event.created_at)}
-                    </span>
+                    <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                      <span className="text-[10px] text-slate-400">{fmtDate(event.created_at)}</span>
+                      {relTime(event.created_at) && (
+                        <span className="text-[9px] text-slate-300">{relTime(event.created_at)}</span>
+                      )}
+                    </div>
                   </div>
 
                   {event.actor_name && (

@@ -110,7 +110,30 @@ export async function fetchDispatchOrderHistory(params = {}) {
 /** GET /dispatch/cash/handovers */
 export async function fetchHandovers() {
   const res = await client.get('/dispatch/cash/handovers')
-  return unwrap(res)
+  const raw = unwrap(res)
+  const items = Array.isArray(raw) ? raw : (raw?.data ?? [])
+  // Backend returns PascalCase struct fields — normalize to snake_case
+  return items.map(h => ({
+    id:                  h.ID                ?? h.id,
+    courier_id:          h.CourierID         ?? h.courier_id,
+    dispatcher_id:       h.DispatcherID      ?? h.dispatcher_id,
+    total_collected:     h.TotalCollected    ?? h.total_collected    ?? 0,
+    total_delivery_fees: h.TotalDeliveryFees ?? h.total_delivery_fees ?? 0,
+    total_to_return:     h.TotalToReturn     ?? h.total_to_return     ?? 0,
+    actual_returned:     h.ActualReturned    ?? h.actual_returned,
+    status:              h.Status            ?? h.status             ?? 'pending',
+    comment:             h.Comment           ?? h.comment,
+    created_at:          h.CreatedAt         ?? h.created_at,
+    confirmed_at:        h.ConfirmedAt       ?? h.confirmed_at,
+    orders: (h.Orders ?? h.orders ?? []).map(o => ({
+      id:                o.ID                ?? o.id,
+      order_id:          o.OrderID           ?? o.order_id,
+      order_total:       o.OrderTotal        ?? o.order_total        ?? 0,
+      courier_collected: o.CourierCollected  ?? o.courier_collected  ?? 0,
+      courier_returns:   o.CourierReturns    ?? o.courier_returns    ?? 0,
+      delivery_fee:      o.DeliveryFee       ?? o.delivery_fee       ?? 0,
+    })),
+  }))
 }
 
 // ── Comments ──────────────────────────────────────────────────────────────────

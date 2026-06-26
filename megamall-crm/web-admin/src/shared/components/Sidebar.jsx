@@ -53,6 +53,7 @@ const NAV = {
   ],
   dispatcher: [
     { label: 'Доска заказов', icon: LayoutDashboard, path: '/dispatcher' },
+    { label: 'Касса',         icon: Wallet,          path: '/dispatcher/cash' },
   ],
   warehouse_manager: [
     { label: 'Рабочий стол', icon: Home,             path: '/warehouse' },

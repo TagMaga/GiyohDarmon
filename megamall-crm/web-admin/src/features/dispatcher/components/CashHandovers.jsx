@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Wallet, ChevronDown, ChevronUp } from 'lucide-react'
 import { KEYS } from '../../../shared/queryKeys'
-import { fetchHandovers, confirmHandover, rejectHandover } from '../api'
+import { fetchHandovers, confirmHandover, rejectHandover, fetchCouriersOverview } from '../api'
 import Badge      from '../../../shared/components/Badge'
 import Button     from '../../../shared/components/Button'
 import Alert      from '../../../shared/components/Alert'
@@ -154,6 +154,17 @@ export default function CashHandovers() {
     staleTime: 30_000,
   })
 
+  const { data: couriersRaw = [] } = useQuery({
+    queryKey: KEYS.dispatcher.couriers,
+    queryFn:  fetchCouriersOverview,
+    staleTime: 120_000,
+  })
+  const couriersArr = Array.isArray(couriersRaw) ? couriersRaw : (couriersRaw?.data ?? [])
+  const courierNameMap = couriersArr.reduce((m, c) => {
+    if (c.courier_id) m[c.courier_id] = c.full_name
+    return m
+  }, {})
+
   const handovers = Array.isArray(data) ? data : (data?.handovers ?? data?.data ?? [])
 
   function toggleExpand(id) {
@@ -201,7 +212,7 @@ export default function CashHandovers() {
               {!isPending && handovers.map((h) => {
                 const st     = HANDOVER_STATUS[h.status] ?? HANDOVER_STATUS.pending
                 const canAct = h.status === 'pending' || h.status === 'disputed'
-                const courier = h.courier?.full_name ?? h.courier_name ?? '—'
+                const courier = h.courier?.full_name ?? h.courier_name ?? courierNameMap[h.courier_id] ?? '—'
                 return (
                   <tr key={h.id} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
                     <td className="px-4 py-3 text-xs font-medium text-slate-800">{courier}</td>

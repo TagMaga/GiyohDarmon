@@ -18,7 +18,7 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
   const { role } = useAuthStore()
-  const isDispatcherBoard = location.pathname === '/dispatcher'
+  const isDispatcherBoard = location.pathname.startsWith('/dispatcher')
   const isSeller  = role === 'seller'
   const isManager = role === 'manager'
   const hasMobileNav = isSeller || isManager

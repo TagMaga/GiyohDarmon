@@ -1,4 +1,4 @@
-import { Users, ChevronLeft } from 'lucide-react'
+import { Users, ChevronLeft, Phone, Send } from 'lucide-react'
 import { fmt } from '../../statusConfig'
 
 function initials(name = '') {
@@ -112,6 +112,9 @@ function CourierCard({ courier, selected, highlighted, pending, onSelect }) {
   const cash       = Number(courier.cash_owed ?? 0)
   const intake     = courier.order_intake_enabled !== false
   const color      = avatarColor(name)
+  const cities     = Array.isArray(courier.city_names) ? courier.city_names : []
+  const phone      = courier.phone
+  const tgId       = courier.telegram_chat_id
 
   const dotCls = !intake ? 'bg-rose-400' : active > 0 ? 'bg-amber-400' : 'bg-emerald-400'
 
@@ -161,6 +164,11 @@ function CourierCard({ courier, selected, highlighted, pending, onSelect }) {
               <span className="text-amber-600 font-semibold ml-1">· {fmt(cash)} с.</span>
             )}
           </div>
+          {cities.length > 0 && (
+            <div className="text-[10px] text-slate-400 truncate leading-tight mt-0.5">
+              {cities.join(', ')}
+            </div>
+          )}
         </div>
       </div>
 
@@ -192,6 +200,32 @@ function CourierCard({ courier, selected, highlighted, pending, onSelect }) {
 
       {!intake && courier.order_intake_reason && (
         <p className="text-[10px] text-rose-500 mt-0.5 truncate">{courier.order_intake_reason}</p>
+      )}
+
+      {/* Quick actions — phone/telegram links (stop propagation so they don't toggle select) */}
+      {(phone || tgId) && (
+        <div className="flex gap-1.5 mt-1.5" onClick={e => e.stopPropagation()}>
+          {phone && (
+            <a
+              href={`tel:${phone}`}
+              className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-indigo-600 transition-colors px-1.5 py-0.5 rounded-lg hover:bg-white"
+            >
+              <Phone size={10} />
+              <span>Позвонить</span>
+            </a>
+          )}
+          {tgId && (
+            <a
+              href={`https://t.me/${tgId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-sky-500 transition-colors px-1.5 py-0.5 rounded-lg hover:bg-white"
+            >
+              <Send size={10} />
+              <span>Telegram</span>
+            </a>
+          )}
+        </div>
       )}
     </button>
   )

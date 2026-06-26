@@ -58,6 +58,7 @@ const SellerTeamPage         = lazy(() => import('../features/seller/pages/Selle
 
 // Dispatcher
 const DispatcherDashboard     = lazy(() => import('../pages/DispatcherDashboard'))
+const DispatcherCashDashboard = lazy(() => import('../features/dispatcher/pages/DispatcherCashPage'))
 
 // Warehouse
 const WarehouseDashboardPage = lazy(() => import('../features/warehouse/pages/WarehouseDashboard'))
@@ -226,8 +227,9 @@ const router = createBrowserRouter([
       path: '/dispatcher',
       element: <Layout />,
       children: [
-        { index: true, element: <Lazy><DispatcherDashboard /></Lazy> },
-        { path: '*',   element: <Navigate to="/dispatcher" replace /> },
+        { index: true,    element: <Lazy><DispatcherDashboard /></Lazy>     },
+        { path: 'cash',   element: <Lazy><DispatcherCashDashboard /></Lazy> },
+        { path: '*',      element: <Navigate to="/dispatcher" replace />    },
       ],
     }],
   },

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, RefreshCw, Users } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Plus, RefreshCw, Users, Wallet } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { KEYS } from '../../../shared/queryKeys'
 import { useToast } from '../../../shared/components/ToastProvider'
@@ -261,6 +262,13 @@ export default function DispatcherPage() {
             >
               <Users size={13} />
             </button>
+            <Link
+              to="/dispatcher/cash"
+              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
+              title="Касса"
+            >
+              <Wallet size={13} />
+            </Link>
             <button
               onClick={() => setCreateOpen(true)}
               className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
