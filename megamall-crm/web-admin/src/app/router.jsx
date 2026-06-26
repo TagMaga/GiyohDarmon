@@ -229,10 +229,10 @@ const router = createBrowserRouter([
       path: '/dispatcher',
       element: <Layout />,
       children: [
-        { index: true,      element: <Lazy><DispatcherDashboard /></Lazy>     },
+        { index: true,      element: <Lazy><DispatcherBoardV3 /></Lazy>        },
+        { path: 'v2',      element: <Lazy><DispatcherDashboard /></Lazy>     },
         { path: 'cash',    element: <Lazy><DispatcherCashDashboard /></Lazy> },
         { path: 'legacy',  element: <Lazy><DispatcherBoardLegacy /></Lazy>  },
-        { path: 'v3',      element: <Lazy><DispatcherBoardV3 /></Lazy>      },
         { path: '*',       element: <Navigate to="/dispatcher" replace />   },
       ],
     }],
