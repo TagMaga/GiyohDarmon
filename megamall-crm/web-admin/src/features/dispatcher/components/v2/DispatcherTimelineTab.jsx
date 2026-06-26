@@ -1,22 +1,23 @@
 import { useQuery } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Package, Check, CreditCard, Truck, AlertTriangle, X, MessageSquare, RotateCcw, Clock } from 'lucide-react'
 import Skeleton from '../../../../shared/components/Skeleton'
 import { KEYS } from '../../../../shared/queryKeys'
 import { fetchOrderTimeline } from '../../api'
 import { STATUS_HEX, fmtDate } from '../../statusConfig'
 
 const EVENT_LABELS = {
-  new:                  { label: 'Заказ создан',          color: '#64748b' },
-  confirmed:            { label: 'Подтверждён',           color: STATUS_HEX.confirmed  ?? '#0ea5e9' },
-  prepayment_pending:   { label: 'Ожидает предоплату',    color: '#f59e0b' },
-  prepayment_received:  { label: 'Предоплата получена',   color: '#10b981' },
-  assigned:             { label: 'Курьер назначен',       color: STATUS_HEX.assigned   ?? '#8b5cf6' },
-  in_delivery:          { label: 'В доставке',            color: STATUS_HEX.in_delivery ?? '#f59e0b' },
-  delivered:            { label: 'Доставлен',             color: STATUS_HEX.delivered  ?? '#10b981' },
-  returned:             { label: 'Возврат',               color: STATUS_HEX.returned   ?? '#f97316' },
-  issue:                { label: 'Проблема',              color: STATUS_HEX.issue      ?? '#ef4444' },
-  cancelled:            { label: 'Отменён',               color: STATUS_HEX.cancelled  ?? '#64748b' },
-  comment:              { label: 'Комментарий',           color: '#6366f1' },
+  new:                  { label: 'Заказ создан',          color: '#64748b', Icon: Package      },
+  confirmed:            { label: 'Подтверждён',           color: STATUS_HEX.confirmed  ?? '#0ea5e9', Icon: Check },
+  prepayment_pending:   { label: 'Ожидает предоплату',    color: '#f59e0b', Icon: CreditCard   },
+  prepayment_received:  { label: 'Предоплата получена',   color: '#10b981', Icon: CreditCard   },
+  assigned:             { label: 'Курьер назначен',       color: STATUS_HEX.assigned   ?? '#8b5cf6', Icon: Truck },
+  in_delivery:          { label: 'В доставке',            color: STATUS_HEX.in_delivery ?? '#f59e0b', Icon: Truck },
+  delivered:            { label: 'Доставлен',             color: STATUS_HEX.delivered  ?? '#10b981', Icon: Check },
+  returned:             { label: 'Возврат',               color: STATUS_HEX.returned   ?? '#f97316', Icon: RotateCcw },
+  issue:                { label: 'Проблема',              color: STATUS_HEX.issue      ?? '#ef4444', Icon: AlertTriangle },
+  cancelled:            { label: 'Отменён',               color: STATUS_HEX.cancelled  ?? '#64748b', Icon: X },
+  scheduled:            { label: 'Запланировано',         color: '#f59e0b', Icon: Clock },
+  comment:              { label: 'Комментарий',           color: '#6366f1', Icon: MessageSquare },
 }
 
 export default function DispatcherTimelineTab({ orderId }) {
@@ -68,15 +69,15 @@ export default function DispatcherTimelineTab({ orderId }) {
 
             return (
               <div key={event.id ?? i} className="flex gap-3 relative">
-                {/* Dot */}
+                {/* Dot / Icon */}
                 <div
                   className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center ring-4 ring-white z-10 ${isFirst ? 'shadow-sm' : ''}`}
                   style={{ background: `${meta.color}18`, border: `1.5px solid ${meta.color}40` }}
                 >
-                  <div
-                    className="w-2.5 h-2.5 rounded-full"
-                    style={{ background: meta.color }}
-                  />
+                  {meta.Icon
+                    ? <meta.Icon size={12} strokeWidth={2.5} style={{ color: meta.color }} />
+                    : <div className="w-2.5 h-2.5 rounded-full" style={{ background: meta.color }} />
+                  }
                 </div>
 
                 {/* Content */}

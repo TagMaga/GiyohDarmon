@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { Plus, RefreshCw, Users } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query'
 import { useToast } from '../../../shared/components/ToastProvider'
-import { confirmOrder } from '../api'
-import { getOrderId } from '../utils/orderHelpers'
+import { confirmOrder, assignCourier, reassignCourier } from '../api'
+import { getOrderId, getCourierId } from '../utils/orderHelpers'
 import { useDispatcherBoard } from '../hooks/useDispatcherBoard'
 
 import DispatcherKPIs        from '../components/v2/DispatcherKPIs'
@@ -31,11 +31,29 @@ export default function DispatcherPage() {
   const [filter,          setFilter]          = useState('all')
   const [courierFilter,   setCourierFilter]   = useState(null)
   const [showCourierRail, setShowCourierRail] = useState(true)
+  const [pendingCourierId, setPendingCourierId] = useState(null)
 
   const selectedOrder = useMemo(
     () => allOrders.find(o => getOrderId(o) === selectedId) ?? null,
     [allOrders, selectedId],
   )
+
+  // Current courier of the selected order — auto-highlights in the rail
+  const highlightedCourierId = useMemo(
+    () => (selectedOrder ? getCourierId(selectedOrder) : null),
+    [selectedOrder],
+  )
+
+  // Display name of the pending courier for the sticky bar
+  const pendingCourierName = useMemo(
+    () => (pendingCourierId ? (courierMap[pendingCourierId]?.full_name ?? null) : null),
+    [courierMap, pendingCourierId],
+  )
+
+  // Clear pending assignment when order changes or closes
+  useEffect(() => {
+    setPendingCourierId(null)
+  }, [selectedId])
 
   function selectOrder(order) {
     setSelectedId(getOrderId(order))
@@ -53,21 +71,43 @@ export default function DispatcherPage() {
 
   function handleFilterClick(f) {
     setFilter(f)
-    // Clear courier filter when changing status filter via KPI
     setCourierFilter(null)
   }
 
   function handleCourierSelect(id) {
-    setCourierFilter(id)
-    // Clear status filter pill when a courier is selected
-    if (id) setFilter('all')
+    if (selectedId && id && id !== 'unassigned') {
+      // Order is open — target courier for quick assign (toggle)
+      setPendingCourierId(prev => prev === id ? null : id)
+    } else {
+      // No order open — filter the list by courier
+      setCourierFilter(id)
+      if (id) setFilter('all')
+    }
   }
+
+  /* ── Mutations ─────────────────────────────────────────────── */
 
   const { mutate: doConfirm } = useMutation({
     mutationFn: (order) => confirmOrder(getOrderId(order)),
     onSuccess: () => { invalidateAll(); toast.success('Заказ подтверждён') },
     onError:   (err) => toast.error(err?.response?.data?.error?.message ?? 'Ошибка'),
   })
+
+  const { mutate: doAssign, isPending: isAssigning } = useMutation({
+    mutationFn: ({ orderId, courierId }) => assignCourier(orderId, { courier_id: courierId }),
+    onSuccess: () => { invalidateAll(); setPendingCourierId(null); toast.success('Курьер назначен') },
+    onError:   (err) => toast.error(err?.response?.data?.error?.message ?? 'Ошибка назначения'),
+  })
+
+  const { mutate: doReassign, isPending: isReassigning } = useMutation({
+    mutationFn: ({ orderId, courierId }) => reassignCourier(orderId, { courier_id: courierId }),
+    onSuccess: () => { invalidateAll(); setPendingCourierId(null); toast.success('Курьер переназначен') },
+    onError:   (err) => toast.error(err?.response?.data?.error?.message ?? 'Ошибка переназначения'),
+  })
+
+  const isMutating = isAssigning || isReassigning
+
+  /* ── Card-level inline actions (from ••• menu or sticky bar) ── */
 
   function handleCardAction(key, order) {
     if (key === 'confirm') {
@@ -77,15 +117,66 @@ export default function DispatcherPage() {
     }
   }
 
-  // Keyboard navigation
+  /* ── Workspace sticky bar inline actions ─────────────────────── */
+
+  function handleInlineAction(key, data) {
+    const orderId = getOrderId(selectedOrder)
+    switch (key) {
+      case 'confirm':
+        doConfirm(selectedOrder)
+        break
+      case 'quick_assign':
+        doAssign({ orderId, courierId: data?.courierId ?? pendingCourierId })
+        break
+      case 'quick_reassign':
+        doReassign({ orderId, courierId: data?.courierId ?? pendingCourierId })
+        break
+      case 'cancel_pending':
+        setPendingCourierId(null)
+        break
+      default:
+        handleAction(key, selectedOrder)
+    }
+  }
+
+  /* ── Keyboard navigation ─────────────────────────────────────── */
+
   useEffect(() => {
     function onKey(e) {
+      const isInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)
+
+      // Escape: clear pending first, then close workspace
       if (e.key === 'Escape') {
+        if (pendingCourierId) { setPendingCourierId(null); return }
         setSelectedId(null)
         return
       }
+
+      // Enter: trigger primary action on selected order
+      if (e.key === 'Enter' && selectedOrder && !isInput) {
+        e.preventDefault()
+        const status = selectedOrder.status
+        const orderId = getOrderId(selectedOrder)
+        if (pendingCourierId) {
+          const reassignable = ['assigned', 'in_delivery', 'issue'].includes(status)
+          if (reassignable)            doReassign({ orderId, courierId: pendingCourierId })
+          else if (status === 'confirmed') doAssign({ orderId, courierId: pendingCourierId })
+        } else if (status === 'new') {
+          doConfirm(selectedOrder)
+        }
+        return
+      }
+
+      // Cmd/Ctrl+K: focus search input
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        document.querySelector('[data-search-input]')?.focus()
+        return
+      }
+
+      // Arrow navigation through order list
       if (!['ArrowUp', 'ArrowDown'].includes(e.key) || !allOrders.length) return
-      if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) return
+      if (isInput) return
       e.preventDefault()
       const idx  = allOrders.findIndex(o => getOrderId(o) === selectedId)
       const next = e.key === 'ArrowUp'
@@ -95,7 +186,9 @@ export default function DispatcherPage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [allOrders, selectedId])
+  }, [allOrders, selectedId, selectedOrder, pendingCourierId])
+
+  /* ── Prop bundles ───────────────────────────────────────────── */
 
   const listProps = {
     orders: allOrders,
@@ -115,6 +208,10 @@ export default function DispatcherPage() {
     courierMap,
     onClose: () => setSelectedId(null),
     onAction: handleAction,
+    pendingCourierId,
+    pendingCourierName,
+    onInlineAction: handleInlineAction,
+    isPendingMutation: isMutating,
   }
 
   return (
@@ -173,6 +270,8 @@ export default function DispatcherPage() {
             selectedCourier={courierFilter}
             onSelect={handleCourierSelect}
             onCollapse={() => setShowCourierRail(false)}
+            highlightCourierId={highlightedCourierId}
+            pendingCourierId={pendingCourierId}
           />
         )}
       </div>

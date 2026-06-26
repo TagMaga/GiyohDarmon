@@ -14,7 +14,14 @@ function avatarColor(name = '') {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
 }
 
-export default function DispatcherCourierRail({ couriers = [], selectedCourier, onSelect, onCollapse }) {
+export default function DispatcherCourierRail({
+  couriers = [],
+  selectedCourier,
+  onSelect,
+  onCollapse,
+  highlightCourierId = null,  // current order's assigned courier (amber tint)
+  pendingCourierId   = null,  // user-targeted courier for quick assign (indigo CTA)
+}) {
   const total       = couriers.length
   const free        = couriers.filter(c => Number(c.active_orders ?? 0) === 0 && c.order_intake_enabled !== false).length
   const intakeOff   = couriers.filter(c => c.order_intake_enabled === false).length
@@ -65,14 +72,19 @@ export default function DispatcherCourierRail({ couriers = [], selectedCourier, 
             <p className="text-xs text-slate-400">Нет курьеров</p>
           </div>
         ) : (
-          couriers.map(courier => (
-            <CourierCard
-              key={courier.courier_id ?? courier.id}
-              courier={courier}
-              selected={selectedCourier === (courier.courier_id ?? courier.id)}
-              onSelect={onSelect}
-            />
-          ))
+          couriers.map(courier => {
+            const id = courier.courier_id ?? courier.id
+            return (
+              <CourierCard
+                key={id}
+                courier={courier}
+                selected={selectedCourier === id}
+                highlighted={highlightCourierId === id}
+                pending={pendingCourierId === id}
+                onSelect={onSelect}
+              />
+            )
+          })
         )}
       </div>
     </div>
@@ -91,7 +103,7 @@ function Chip({ label, value, color }) {
   )
 }
 
-function CourierCard({ courier, selected, onSelect }) {
+function CourierCard({ courier, selected, highlighted, pending, onSelect }) {
   const id         = courier.courier_id ?? courier.id
   const name       = courier.full_name ?? 'Курьер'
   const active     = Number(courier.active_orders ?? 0)
@@ -108,14 +120,22 @@ function CourierCard({ courier, selected, onSelect }) {
     inDelivery > 0 && `${inDelivery} в пути`,
   ].filter(Boolean).join(' · ')
 
+  // Visual priority: pending > highlighted > selected > default
+  let containerCls
+  if (pending) {
+    containerCls = 'bg-indigo-50 border border-indigo-400 ring-1 ring-indigo-300'
+  } else if (highlighted) {
+    containerCls = 'bg-amber-50 border border-amber-200'
+  } else if (selected) {
+    containerCls = 'bg-indigo-50 border border-indigo-200'
+  } else {
+    containerCls = 'hover:bg-slate-50 border border-transparent'
+  }
+
   return (
     <button
-      onClick={() => onSelect(selected ? null : id)}
-      className={`w-full text-left p-2.5 rounded-xl transition-colors ${
-        selected
-          ? 'bg-indigo-50 border border-indigo-200'
-          : 'hover:bg-slate-50 border border-transparent'
-      } ${!intake ? 'opacity-60' : ''}`}
+      onClick={() => onSelect(pending ? null : id)}
+      className={`w-full text-left p-2.5 rounded-xl transition-colors ${containerCls} ${!intake ? 'opacity-60' : ''}`}
     >
       <div className="flex items-center gap-2">
         {/* Avatar + status dot */}
@@ -143,6 +163,20 @@ function CourierCard({ courier, selected, onSelect }) {
           </div>
         </div>
       </div>
+
+      {/* Pending label: quick-assign ready */}
+      {pending && (
+        <div className="mt-1.5 text-[10px] font-bold text-indigo-600 text-right">
+          → Назначить
+        </div>
+      )}
+
+      {/* Highlighted label: currently assigned to selected order */}
+      {highlighted && !pending && (
+        <div className="mt-0.5 text-[10px] font-medium text-amber-600">
+          Назначен на заказ
+        </div>
+      )}
 
       {/* Load bar */}
       {active > 0 && (

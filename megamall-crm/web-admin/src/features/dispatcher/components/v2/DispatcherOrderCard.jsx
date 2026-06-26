@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import Badge from '../../../../shared/components/Badge'
 import { STATUS_BADGE, STATUS_LABELS } from '../../../../shared/orderStatusConfig'
 import { resolveCustomer, resolveCity } from '../../utils/resolveCustomer'
@@ -7,7 +8,7 @@ import DispatcherActionMenu from './DispatcherActionMenu'
 
 const fmt = (v) => v == null ? '—' : Number(v).toLocaleString('ru-RU', { maximumFractionDigits: 0 })
 
-export default function DispatcherOrderCard({ order, courierMap = {}, selected, onSelect, onAction }) {
+function DispatcherOrderCard({ order, courierMap = {}, selected, onSelect, onAction }) {
   const customer    = resolveCustomer(order, {})
   const courierDisp = resolveCourierDisplay(order, courierMap)
   const city        = resolveCity(order)
@@ -93,3 +94,5 @@ export default function DispatcherOrderCard({ order, courierMap = {}, selected, 
     </div>
   )
 }
+
+export default memo(DispatcherOrderCard)
