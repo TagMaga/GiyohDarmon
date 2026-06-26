@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Plus, RefreshCw, Users } from 'lucide-react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { KEYS } from '../../../shared/queryKeys'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { confirmOrder, assignCourier, reassignCourier } from '../api'
 import { getOrderId, getCourierId } from '../utils/orderHelpers'
@@ -22,6 +23,7 @@ import CreateOfficeOrderModal from '../components/CreateOfficeOrderModal'
 
 export default function DispatcherPage() {
   const toast = useToast()
+  const qc = useQueryClient()
   const { allOrders, courierList, courierMap, isLoading, invalidateAll, counts, cashOwed } = useDispatcherBoard()
 
   const [selectedId,      setSelectedId]      = useState(null)
@@ -95,14 +97,26 @@ export default function DispatcherPage() {
 
   const { mutate: doAssign, isPending: isAssigning } = useMutation({
     mutationFn: ({ orderId, courierId }) => assignCourier(orderId, { courier_id: courierId }),
-    onSuccess: () => { invalidateAll(); setPendingCourierId(null); toast.success('Курьер назначен') },
-    onError:   (err) => toast.error(err?.response?.data?.error?.message ?? 'Ошибка назначения'),
+    onSuccess: (_, { orderId }) => {
+      invalidateAll()
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(orderId) })
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.timeline(orderId) })
+      setPendingCourierId(null)
+      toast.success('Курьер назначен')
+    },
+    onError: (err) => toast.error(err?.response?.data?.error?.message ?? 'Ошибка назначения'),
   })
 
   const { mutate: doReassign, isPending: isReassigning } = useMutation({
     mutationFn: ({ orderId, courierId }) => reassignCourier(orderId, { courier_id: courierId }),
-    onSuccess: () => { invalidateAll(); setPendingCourierId(null); toast.success('Курьер переназначен') },
-    onError:   (err) => toast.error(err?.response?.data?.error?.message ?? 'Ошибка переназначения'),
+    onSuccess: (_, { orderId }) => {
+      invalidateAll()
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(orderId) })
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.timeline(orderId) })
+      setPendingCourierId(null)
+      toast.success('Курьер переназначен')
+    },
+    onError: (err) => toast.error(err?.response?.data?.error?.message ?? 'Ошибка переназначения'),
   })
 
   const isMutating = isAssigning || isReassigning

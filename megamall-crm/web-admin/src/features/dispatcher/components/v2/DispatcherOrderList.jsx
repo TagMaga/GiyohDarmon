@@ -58,6 +58,7 @@ export default function DispatcherOrderList({
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
             type="text"
+            data-search-input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Поиск по заказу, клиенту…"
