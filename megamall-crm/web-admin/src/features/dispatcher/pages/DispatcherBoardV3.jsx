@@ -414,7 +414,7 @@ export default function DispatcherBoardV3() {
         onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
       />
 
-      <KpiBar counts={counts} couriers={courierList} orders={allOrders} cashOwed={cashOwed} setFilters={setFilters} onCreateOrder={() => setCreateOrderOpen(true)} />
+      <KpiBar counts={counts} couriers={courierList} setFilters={setFilters} onCreateOrder={() => setCreateOrderOpen(true)} />
 
       <TabBar
         tab={filters.tab}
@@ -451,12 +451,8 @@ export default function DispatcherBoardV3() {
           <CashView
             rows={arr(cashSettlement.data)}
             couriers={courierList}
-            range={cashRange}
-            courierId={cashCourier}
             loading={cashSettlement.isPending}
             error={cashSettlement.error}
-            onRange={setCashRange}
-            onCourier={setCashCourier}
             onRetry={() => cashSettlement.refetch()}
             onCourierUpdated={() => {
               qc.invalidateQueries({ queryKey: KEYS.dispatcher.couriers })
@@ -649,25 +645,17 @@ function Shortcut({ label, keys }) {
   )
 }
 
-function KpiBar({ counts, couriers, orders, cashOwed, setFilters, onCreateOrder }) {
+function KpiBar({ counts, couriers, setFilters, onCreateOrder }) {
   const active = counts.new + counts.confirmed + counts.delivery + counts.issues
-  const deliveredToday = orders.filter((order) => order.status === 'delivered' && isToday(order.delivered_at || order.updated_at || order.created_at)).length
-  const busyCouriers = couriers.filter((courier) => Number(courier.active_orders ?? 0) > 0).length
-  const freeCouriers = Math.max(0, couriers.length - busyCouriers)
   const intakeDisabled = couriers.filter((courier) => courier.order_intake_enabled === false).length
 
   return (
     <div className="dv2-kpibar">
       <Kpi icon={<Truck size={18} />} value={couriers.length} label="Курьеров" />
-      <Kpi icon={<UserCheck size={18} />} value={freeCouriers} label="Свободны" />
       <Kpi alert={intakeDisabled > 0} icon={<UserX size={18} />} value={intakeDisabled} label="Не принимают" />
       <Kpi icon={<Package size={18} />} value={active} label="Активные" />
       <div className="dv2-kpi-sep" />
       <Kpi mobileExtra alert={counts.unassigned > 0} icon={<UserX size={18} />} value={counts.unassigned} label="Без курьера" onClick={() => setFilters((p) => ({ ...p, mobileStatus: 'confirmed', mobileTouched: true }))} />
-      <Kpi mobileExtra alert={counts.issues + counts.overdue > 0} icon={<Flame size={18} />} value={counts.issues + counts.overdue} label="Проблемы" onClick={() => setFilters((p) => ({ ...p, mobileStatus: 'issues', mobileTouched: true }))} />
-      <Kpi mobileExtra icon={<Banknote size={18} />} value={fmt(cashOwed)} label="Наличные" />
-      <div className="dv2-kpi-sep" />
-      <Kpi mobileExtra icon={<Flag size={18} />} value={deliveredToday} label="Сегодня" />
       <div className="dv2-kpi-sep dv2-hide-mobile" />
       <button
         className="dv2-kpi dv2-hide-mobile"
@@ -717,11 +705,6 @@ function TabBar({ tab, date, counts, onTab, onDate }) {
 
 // V3: CourierRail receives pendingCourierId + hasSelectedOrder
 function CourierRail({ couriers, activeCourier, mobileOpen, onSelect, unassignedCount, pendingCourierId, hasSelectedOrder }) {
-  const busy = couriers.filter((courier) => Number(courier.active_orders ?? 0) > 0).length
-  const overloaded = couriers.filter((courier) => Number(courier.active_orders ?? 0) >= 5).length
-  const cashRisk = couriers.filter((courier) => Number(courier.cash_owed ?? 0) > 0).length
-  const intakeDisabled = couriers.filter((courier) => courier.order_intake_enabled === false).length
-
   return (
     <aside className={`dv2-couriers ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="dv2-cs-header">
@@ -731,13 +714,6 @@ function CourierRail({ couriers, activeCourier, mobileOpen, onSelect, unassigned
             ↑ Нажмите курьера для назначения
           </div>
         )}
-        <div className="dv2-fleet-stats">
-          <FleetStat tone="green" value={Math.max(0, couriers.length - busy)} label="Свободны" />
-          <FleetStat tone="amber" value={busy} label="Заняты" />
-          <FleetStat tone="red" value={overloaded} label="Перегруз" />
-          <FleetStat tone="red" value={intakeDisabled} label="Не принимают" />
-          <FleetStat tone="gray" value={cashRisk} label="Долг" />
-        </div>
       </div>
       <div className="dv2-courier-list">
         <button
@@ -776,14 +752,6 @@ function CourierRail({ couriers, activeCourier, mobileOpen, onSelect, unassigned
   )
 }
 
-function FleetStat({ tone, value, label }) {
-  return (
-    <div className={`dv2-cs-stat ${tone}`}>
-      <div className="dv2-cs-stat-val">{value}</div>
-      <div className="dv2-cs-stat-lbl">{label}</div>
-    </div>
-  )
-}
 
 // V3: CourierCard — pending glow, phone/telegram links
 function CourierCard({ courier, selected, pending, hasSelectedOrder, onSelect }) {
@@ -1089,8 +1057,7 @@ function Info({ label, value, full }) {
   )
 }
 
-function CashView({ rows, couriers, range, courierId, loading, error, onRange, onCourier, onRetry, onCourierUpdated }) {
-  const [rangeOpen, setRangeOpen] = useState(false)
+function CashView({ rows, couriers, loading, error, onRetry, onCourierUpdated }) {
   const [editTarget,   setEditTarget]   = useState(null)
   const [tariffsTarget, setTariffsTarget] = useState(null)
   const [toggleTarget, setToggleTarget] = useState(null)
@@ -1101,25 +1068,7 @@ function CashView({ rows, couriers, range, courierId, loading, error, onRange, o
     return m
   }, [couriers])
 
-  const visibleRows = useMemo(() => {
-    if (range.preset === 'all') return rows
-    return rows.filter(hasCashSettlementActivity)
-  }, [range.preset, rows])
-
-  const summary = useMemo(() => {
-    const delivered = visibleRows.reduce((sum, row) => sum + Number(row.delivered ?? 0), 0)
-    const failed = visibleRows.reduce((sum, row) => sum + Number(row.failed ?? 0), 0)
-    const debt = visibleRows.reduce((sum, row) => sum + Number(row.cash_debt ?? 0), 0)
-    const earnings = visibleRows.reduce((sum, row) => sum + Number(row.earnings ?? 0), 0)
-    const total = delivered + failed
-    return {
-      delivered,
-      failed,
-      debt,
-      earnings,
-      success: total > 0 ? (delivered * 100) / total : null,
-    }
-  }, [visibleRows])
+  const visibleRows = useMemo(() => rows.filter(hasCashSettlementActivity), [rows])
 
   useEffect(() => {
     if (!error) return
@@ -1129,30 +1078,6 @@ function CashView({ rows, couriers, range, courierId, loading, error, onRange, o
   return (
   <>
     <section className="dv2-cash-view">
-      <div className="dv2-cash-compact-bar">
-        <CashRangePicker range={range} open={rangeOpen} onOpen={setRangeOpen} onRange={onRange} />
-        <select
-          className="dv2-cash-select"
-          value={courierId}
-          onChange={(e) => onCourier(e.target.value)}
-          aria-label="Курьер"
-        >
-          <option value="">Все курьеры</option>
-          {couriers.map((courier) => {
-            const id = courier.courier_id ?? courier.id
-            return <option key={id} value={id}>{courier.full_name ?? courier.courier_name ?? 'Курьер'}</option>
-          })}
-        </select>
-      </div>
-
-      <div className="dv2-kpi-strip">
-        <CashMetric label="Долг" value={`${fmt(summary.debt)} сом`} tone="red" />
-        <CashMetric label="Доставлено" value={fmt(summary.delivered)} tone="green" />
-        <CashMetric label="Неудача" value={fmt(summary.failed)} tone="amber" />
-        <CashMetric label="Заработок" value={`${fmt(summary.earnings)} сом`} tone="purple" />
-        <CashMetric label="Успех" value={summary.success == null ? '—' : `${Math.round(summary.success)}%`} tone="blue" />
-      </div>
-
       <div className="dv2-cash-table-wrap">
         <div className="dv2-cash-head">
           <div className="dv2-cash-title small">Курьеры</div>
