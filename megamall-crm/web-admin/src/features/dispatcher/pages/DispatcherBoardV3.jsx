@@ -647,15 +647,13 @@ function Shortcut({ label, keys }) {
 
 function KpiBar({ counts, couriers, setFilters, onCreateOrder }) {
   const active = counts.new + counts.confirmed + counts.delivery + counts.issues
-  const intakeDisabled = couriers.filter((courier) => courier.order_intake_enabled === false).length
 
   return (
     <div className="dv2-kpibar">
       <Kpi icon={<Truck size={18} />} value={couriers.length} label="Курьеров" />
-      <Kpi alert={intakeDisabled > 0} icon={<UserX size={18} />} value={intakeDisabled} label="Не принимают" />
       <Kpi icon={<Package size={18} />} value={active} label="Активные" />
       <div className="dv2-kpi-sep" />
-      <Kpi mobileExtra alert={counts.unassigned > 0} icon={<UserX size={18} />} value={counts.unassigned} label="Без курьера" onClick={() => setFilters((p) => ({ ...p, mobileStatus: 'confirmed', mobileTouched: true }))} />
+      <Kpi mobileExtra alert={counts.unassigned > 0} icon={<UserX size={18} />} value={counts.unassigned} label="Без курьера" onClick={() => setFilters((p) => ({ ...p, courier: p.courier === 'unassigned' ? '' : 'unassigned' }))} />
       <div className="dv2-kpi-sep dv2-hide-mobile" />
       <button
         className="dv2-kpi dv2-hide-mobile"
@@ -716,27 +714,6 @@ function CourierRail({ couriers, activeCourier, mobileOpen, onSelect, unassigned
         )}
       </div>
       <div className="dv2-courier-list">
-        <button
-          className={`dv2-courier ${activeCourier === 'unassigned' ? 'selected' : ''}`}
-          onClick={() => onSelect('unassigned')}
-          style={{ marginBottom: 6 }}
-        >
-          <div className="dv2-courier-top">
-            <div className="dv2-courier-avatar" style={{ background: '#6366f1' }}>
-              <UserX size={12} />
-            </div>
-            <div className="dv2-courier-name">Без курьера</div>
-            {unassignedCount > 0 && (
-              <span style={{ background: 'rgba(239,68,68,0.18)', color: '#ef4444', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 8 }}>
-                {unassignedCount}
-              </span>
-            )}
-          </div>
-          <div className="dv2-courier-row" style={{ fontSize: 10, color: 'var(--text3)' }}>
-            Подтверждённые без назначения
-          </div>
-        </button>
-
         {couriers.length === 0 ? <EmptyState title="Нет курьеров" sub="Курьеры появятся после загрузки" /> : couriers.map((courier, i) => (
           <CourierCard
             key={courier.courier_id ?? courier.id ?? i}
