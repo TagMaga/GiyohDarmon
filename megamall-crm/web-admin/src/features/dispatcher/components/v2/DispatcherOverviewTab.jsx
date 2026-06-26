@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { User, Phone, MapPin, Package, Banknote, Truck } from 'lucide-react'
+import { User, Phone, MapPin, Truck } from 'lucide-react'
 import Skeleton from '../../../../shared/components/Skeleton'
 import { fmtDate } from '../../statusConfig'
 import { resolveCustomer, resolveAddress, resolveCity } from '../../utils/resolveCustomer'
-import { resolveCourier, resolveCourierDisplay, getCourierId } from '../../utils/orderHelpers'
+import { resolveCourier, getCourierId } from '../../utils/orderHelpers'
 import DispatcherCommentsSummary from './DispatcherCommentsSummary'
 import DispatcherCommentsSheet   from './DispatcherCommentsSheet'
 
@@ -27,8 +27,8 @@ export default function DispatcherOverviewTab({ order, courierMap = {}, comments
 
   if (loading && !order?.customer) {
     return (
-      <div className="p-5 space-y-4">
-        {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 rounded-xl" />)}
+      <div className="p-4 space-y-3">
+        {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-9 rounded-xl" />)}
       </div>
     )
   }
@@ -48,176 +48,174 @@ export default function DispatcherOverviewTab({ order, courierMap = {}, comments
 
   const items         = Array.isArray(order.items) ? order.items : Array.isArray(order.order_items) ? order.order_items : []
   const courier       = resolveCourier(order, courierMap)
-  const courierDisp   = resolveCourierDisplay(order, courierMap)
   const courierId     = getCourierId(order)
   const courierData   = courierId ? courierMap[courierId] : null
 
   const canAssign     = ['new', 'confirmed'].includes(order.status)
   const canReassign   = ['assigned', 'in_delivery', 'issue'].includes(order.status)
-
-  const sellerName = order.seller?.full_name ?? order.seller_name ?? null
+  const sellerName    = order.seller?.full_name ?? order.seller_name ?? null
 
   return (
     <>
       <div className="flex-1 overflow-y-auto">
-        <div className="p-5 space-y-6">
+        {/* ── Desktop: 2-col grid / Mobile: single col ── */}
+        <div className="p-4 lg:grid lg:grid-cols-2 lg:gap-x-5 space-y-4 lg:space-y-0">
 
-          {/* ── Customer ────────────────────────────────── */}
-          <section>
-            <SectionHead>Клиент</SectionHead>
-            <div className="space-y-2">
-              <InfoRow icon={User}   value={customer.full_name || '—'} />
-              {customer.phone && (
-                <a href={`tel:${customer.phone}`} className="block">
-                  <InfoRow icon={Phone} value={customer.phone} blue />
-                </a>
-              )}
-              {fullAddress && <InfoRow icon={MapPin} value={fullAddress} />}
-              {customerNote && (
-                <div className="flex items-start gap-2 mt-1.5 bg-amber-50 rounded-xl px-3 py-2">
-                  <span className="text-amber-500 text-sm flex-shrink-0 mt-0.5">💬</span>
-                  <p className="text-xs text-amber-800">{customerNote}</p>
-                </div>
-              )}
-            </div>
-          </section>
+          {/* ── LEFT: Customer · Products · Assignment ── */}
+          <div className="space-y-4">
 
-          {/* ── Products ────────────────────────────────── */}
-          {items.length > 0 && (
             <section>
-              <SectionHead>Товары ({items.length})</SectionHead>
-              <div className="bg-slate-50 rounded-xl divide-y divide-slate-100">
-                {items.map((item, i) => (
-                  <div key={item.id ?? i} className="flex items-center justify-between px-3 py-2">
-                    <span className="text-xs text-slate-700 truncate flex-1 mr-2">
-                      {item.product_name ?? item.name ?? `Товар ${i + 1}`}
-                    </span>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-[10px] text-slate-400">×{item.quantity ?? 1}</span>
-                      {item.price != null && (
-                        <span className="text-xs font-semibold text-slate-700">{fmt(item.price)}</span>
+              <SectionHead>Клиент</SectionHead>
+              <div className="space-y-1.5">
+                <InfoRow icon={User}  value={customer.full_name || '—'} />
+                {customer.phone && (
+                  <a href={`tel:${customer.phone}`} className="block">
+                    <InfoRow icon={Phone} value={customer.phone} blue />
+                  </a>
+                )}
+                {fullAddress && <InfoRow icon={MapPin} value={fullAddress} />}
+                {customerNote && (
+                  <div className="flex items-start gap-2 mt-1 bg-amber-50 rounded-xl px-3 py-2">
+                    <span className="text-amber-500 text-sm flex-shrink-0">💬</span>
+                    <p className="text-xs text-amber-800 leading-relaxed">{customerNote}</p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {items.length > 0 && (
+              <section>
+                <SectionHead>Товары ({items.length})</SectionHead>
+                <div className="bg-slate-50 rounded-xl divide-y divide-slate-100">
+                  {items.map((item, i) => (
+                    <div key={item.id ?? i} className="flex items-center justify-between px-3 py-1.5">
+                      <span className="text-xs text-slate-700 truncate flex-1 mr-2">
+                        {item.product_name ?? item.name ?? `Товар ${i + 1}`}
+                      </span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] text-slate-400">×{item.quantity ?? 1}</span>
+                        {item.price != null && (
+                          <span className="text-xs font-semibold text-slate-700">{fmt(item.price)}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section>
+              <SectionHead>Курьер</SectionHead>
+              {courier ? (
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
+                      style={{ background: avatarColor(courier.full_name ?? '') }}
+                    >
+                      {initials(courier.full_name ?? '')}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800 leading-tight">{courier.full_name}</p>
+                      {courierData && (
+                        <p className="text-[10px] text-slate-400 leading-tight">
+                          {courierData.active_orders ?? 0} заказ.
+                          {Number(courierData.cash_owed ?? 0) > 0 && (
+                            <span className="text-amber-600 ml-1">· {fmt(courierData.cash_owed)} с.</span>
+                          )}
+                        </p>
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
+                  {canReassign && (
+                    <button
+                      onClick={() => onAction('reassign', order)}
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors"
+                    >
+                      Сменить
+                    </button>
+                  )}
+                </div>
+              ) : canAssign ? (
+                <button
+                  onClick={() => onAction(order.status === 'new' ? 'confirm' : 'assign', order)}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
+                >
+                  <Truck size={13} />
+                  {order.status === 'new' ? 'Подтвердить заказ' : 'Назначить курьера'}
+                </button>
+              ) : (
+                <p className="text-sm text-slate-400">Не назначен</p>
+              )}
             </section>
-          )}
 
-          {/* ── Delivery ────────────────────────────────── */}
-          {(order.delivery_method || order.scheduled_at || order.delivery_date) && (
+            {/* Seller — mobile only (shown in right col on desktop) */}
+            {sellerName && (
+              <section className="lg:hidden">
+                <SectionHead>Продавец</SectionHead>
+                <p className="text-sm text-slate-700 font-medium">{sellerName}</p>
+              </section>
+            )}
+          </div>
+
+          {/* ── RIGHT: Delivery · Finance · Comments ── */}
+          <div className="space-y-4">
+
+            {/* Seller — desktop only */}
+            {sellerName && (
+              <section className="hidden lg:block">
+                <SectionHead>Продавец</SectionHead>
+                <p className="text-sm text-slate-700 font-medium">{sellerName}</p>
+              </section>
+            )}
+
+            {(order.delivery_method || order.scheduled_at || order.delivery_date || deliveryFee > 0) && (
+              <section>
+                <SectionHead>Доставка</SectionHead>
+                <div className="bg-slate-50 rounded-xl px-3 py-2.5 space-y-1">
+                  {order.delivery_method && (
+                    <FinRow label="Способ" value={order.delivery_method} />
+                  )}
+                  {(order.scheduled_at || order.delivery_date) && (
+                    <FinRow label="Дата" value={fmtDate(order.scheduled_at ?? order.delivery_date)} />
+                  )}
+                  {deliveryFee > 0 && (
+                    <FinRow label="Тариф" value={`${fmt(deliveryFee)} сом`} />
+                  )}
+                </div>
+              </section>
+            )}
+
             <section>
-              <SectionHead>Доставка</SectionHead>
-              <div className="bg-slate-50 rounded-xl px-4 py-3 space-y-1.5">
-                {order.delivery_method && (
-                  <FinRow label="Способ" value={order.delivery_method} />
-                )}
-                {(order.scheduled_at || order.delivery_date) && (
-                  <FinRow
-                    label="Дата"
-                    value={fmtDate(order.scheduled_at ?? order.delivery_date)}
-                  />
+              <SectionHead>Финансы</SectionHead>
+              <div className="bg-slate-50 rounded-xl px-3 py-2.5 space-y-1">
+                {productTotal > 0 && deliveryFee > 0 && (
+                  <FinRow label="Товары" value={`${fmt(productTotal)} сом`} />
                 )}
                 {deliveryFee > 0 && (
-                  <FinRow label="Тариф" value={`${fmt(deliveryFee)} сом`} />
+                  <FinRow label="Доставка" value={`${fmt(deliveryFee)} сом`} />
+                )}
+                <FinRow label="Итого" value={`${fmt(totalOrderAmt)} сом`} bold />
+                {order.payment_method && (
+                  <FinRow label="Оплата" value={order.payment_method} />
+                )}
+                {isCash && toCollect > 0 && (
+                  <FinRow label="К получению" value={`${fmt(toCollect)} сом`} accent="text-amber-700" />
+                )}
+                {prepayAmt > 0 && (
+                  <FinRow label="Предоплата" value={`${fmt(prepayAmt)} сом`} />
                 )}
               </div>
             </section>
-          )}
 
-          {/* ── Finance ─────────────────────────────────── */}
-          <section>
-            <SectionHead>Финансы</SectionHead>
-            <div className="bg-slate-50 rounded-xl px-4 py-3 space-y-1.5">
-              {productTotal > 0 && deliveryFee > 0 && (
-                <FinRow label="Товары" value={`${fmt(productTotal)} сом`} />
-              )}
-              {deliveryFee > 0 && (
-                <FinRow label="Доставка" value={`${fmt(deliveryFee)} сом`} />
-              )}
-              <FinRow label="Итого" value={`${fmt(totalOrderAmt)} сом`} bold />
-              {order.payment_method && (
-                <FinRow label="Оплата" value={order.payment_method} />
-              )}
-              {isCash && toCollect > 0 && (
-                <FinRow
-                  label="К получению"
-                  value={`${fmt(toCollect)} сом`}
-                  accent="text-amber-700"
-                />
-              )}
-              {prepayAmt > 0 && (
-                <FinRow label="Предоплата" value={`${fmt(prepayAmt)} сом`} />
-              )}
-            </div>
-          </section>
-
-          {/* ── Assignment ──────────────────────────────── */}
-          <section>
-            <SectionHead>Курьер</SectionHead>
-
-            {courier ? (
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
-                    style={{ background: avatarColor(courier.full_name ?? '') }}
-                  >
-                    {initials(courier.full_name ?? '')}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{courier.full_name}</p>
-                    {courierData && (
-                      <p className="text-[10px] text-slate-400">
-                        {courierData.active_orders ?? 0} заказов
-                        {Number(courierData.cash_owed ?? 0) > 0 && (
-                          <span className="text-amber-600 ml-1">
-                            · {fmt(courierData.cash_owed)} сом долг
-                          </span>
-                        )}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                {canReassign && (
-                  <button
-                    onClick={() => onAction('reassign', order)}
-                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition-colors"
-                  >
-                    Сменить
-                  </button>
-                )}
-              </div>
-            ) : canAssign ? (
-              <button
-                onClick={() => onAction(order.status === 'new' ? 'confirm' : 'assign', order)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
-              >
-                <Truck size={14} />
-                {order.status === 'new' ? 'Подтвердить заказ' : 'Назначить курьера'}
-              </button>
-            ) : (
-              <p className="text-sm text-slate-400">Не назначен</p>
-            )}
-          </section>
-
-          {/* ── Seller ──────────────────────────────────── */}
-          {sellerName && (
-            <section>
-              <SectionHead>Продавец</SectionHead>
-              <p className="text-sm text-slate-700 font-medium">{sellerName}</p>
-            </section>
-          )}
-
-          {/* ── Latest comment ──────────────────────────── */}
-          <DispatcherCommentsSummary
-            comments={comments}
-            onShowAll={() => setCommentsOpen(true)}
-          />
+            <DispatcherCommentsSummary
+              comments={comments}
+              onShowAll={() => setCommentsOpen(true)}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Comments bottom sheet */}
       {commentsOpen && (
         <DispatcherCommentsSheet
           orderId={orderId}
@@ -230,7 +228,7 @@ export default function DispatcherOverviewTab({ order, courierMap = {}, comments
 
 function SectionHead({ children }) {
   return (
-    <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
       {children}
     </h3>
   )
@@ -239,7 +237,7 @@ function SectionHead({ children }) {
 function InfoRow({ icon: Icon, value, blue }) {
   return (
     <div className="flex items-center gap-2">
-      <Icon size={13} className={`flex-shrink-0 ${blue ? 'text-indigo-400' : 'text-slate-400'}`} />
+      <Icon size={12} className={`flex-shrink-0 ${blue ? 'text-indigo-400' : 'text-slate-400'}`} />
       <span className={`text-sm ${blue ? 'text-indigo-600 font-medium' : 'text-slate-700'}`}>{value}</span>
     </div>
   )

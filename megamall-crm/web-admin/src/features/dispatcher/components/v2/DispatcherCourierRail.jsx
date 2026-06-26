@@ -92,15 +92,21 @@ function Chip({ label, value, color }) {
 }
 
 function CourierCard({ courier, selected, onSelect }) {
-  const id      = courier.courier_id ?? courier.id
-  const name    = courier.full_name ?? 'Курьер'
-  const active  = Number(courier.active_orders ?? 0)
-  const cash    = Number(courier.cash_owed ?? 0)
-  const intake  = courier.order_intake_enabled !== false
-  const color   = avatarColor(name)
+  const id         = courier.courier_id ?? courier.id
+  const name       = courier.full_name ?? 'Курьер'
+  const active     = Number(courier.active_orders ?? 0)
+  const assigned   = Number(courier.assigned_orders ?? 0)
+  const inDelivery = Number(courier.in_delivery ?? 0)
+  const cash       = Number(courier.cash_owed ?? 0)
+  const intake     = courier.order_intake_enabled !== false
+  const color      = avatarColor(name)
 
-  // Status dot: green = idle+intake, amber = busy, red = intake off
-  const dotCls  = !intake ? 'bg-rose-400' : active > 0 ? 'bg-amber-400' : 'bg-emerald-400'
+  const dotCls = !intake ? 'bg-rose-400' : active > 0 ? 'bg-amber-400' : 'bg-emerald-400'
+
+  const breakdown = [
+    assigned   > 0 && `${assigned} назн.`,
+    inDelivery > 0 && `${inDelivery} в пути`,
+  ].filter(Boolean).join(' · ')
 
   return (
     <button
@@ -112,7 +118,7 @@ function CourierCard({ courier, selected, onSelect }) {
       } ${!intake ? 'opacity-60' : ''}`}
     >
       <div className="flex items-center gap-2">
-        {/* Avatar */}
+        {/* Avatar + status dot */}
         <div className="relative flex-shrink-0">
           <div
             className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
@@ -123,13 +129,16 @@ function CourierCard({ courier, selected, onSelect }) {
           <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${dotCls}`} />
         </div>
 
-        {/* Name + load */}
+        {/* Name + stats */}
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-semibold text-slate-800 truncate">{name}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1.5">
-            <span>{active} заказ{active === 1 ? '' : active < 5 ? 'а' : 'ов'}</span>
+          <div className="text-xs font-semibold text-slate-800 truncate leading-tight">{name}</div>
+          <div className="text-[10px] text-slate-400 mt-0.5 leading-tight">
+            {active === 0
+              ? <span className="text-emerald-600 font-medium">Свободен</span>
+              : <span>{active} акт.{breakdown ? ` (${breakdown})` : ''}</span>
+            }
             {cash > 0 && (
-              <span className="text-amber-600 font-semibold">· {fmt(cash)} с.</span>
+              <span className="text-amber-600 font-semibold ml-1">· {fmt(cash)} с.</span>
             )}
           </div>
         </div>
@@ -148,7 +157,7 @@ function CourierCard({ courier, selected, onSelect }) {
       )}
 
       {!intake && courier.order_intake_reason && (
-        <p className="text-[10px] text-rose-500 mt-1 truncate">{courier.order_intake_reason}</p>
+        <p className="text-[10px] text-rose-500 mt-0.5 truncate">{courier.order_intake_reason}</p>
       )}
     </button>
   )

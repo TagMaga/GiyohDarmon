@@ -12,7 +12,7 @@ import DispatcherActionMenu   from './DispatcherActionMenu'
 
 const TABS = [
   { key: 'overview',  label: 'Обзор'   },
-  { key: 'timeline',  label: 'История' },
+  { key: 'timeline',  label: 'Активность' },
 ]
 
 export default function DispatcherWorkspace({ order, courierMap = {}, onClose, onAction }) {

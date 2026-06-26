@@ -58,6 +58,8 @@ export function getCourierId(order) {
   if (!order) return null
   return (
     order.courier_id ||
+    order.current_courier_id ||
+    order.delivered_by_courier_id ||
     order.courier?.id ||
     order.assigned_courier?.id ||
     order.assignment?.courier_id ||
