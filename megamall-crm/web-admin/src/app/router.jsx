@@ -60,6 +60,7 @@ const SellerTeamPage         = lazy(() => import('../features/seller/pages/Selle
 const DispatcherDashboard     = lazy(() => import('../pages/DispatcherDashboard'))
 const DispatcherCashDashboard = lazy(() => import('../features/dispatcher/pages/DispatcherCashPage'))
 const DispatcherBoardLegacy   = lazy(() => import('../features/dispatcher/pages/DispatcherBoard'))
+const DispatcherBoardV3       = lazy(() => import('../features/dispatcher/pages/DispatcherBoardV3'))
 
 // Warehouse
 const WarehouseDashboardPage = lazy(() => import('../features/warehouse/pages/WarehouseDashboard'))
@@ -231,6 +232,7 @@ const router = createBrowserRouter([
         { index: true,      element: <Lazy><DispatcherDashboard /></Lazy>     },
         { path: 'cash',    element: <Lazy><DispatcherCashDashboard /></Lazy> },
         { path: 'legacy',  element: <Lazy><DispatcherBoardLegacy /></Lazy>  },
+        { path: 'v3',      element: <Lazy><DispatcherBoardV3 /></Lazy>      },
         { path: '*',       element: <Navigate to="/dispatcher" replace />   },
       ],
     }],
