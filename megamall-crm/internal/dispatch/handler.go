@@ -613,6 +613,9 @@ func applyDateRange(c *gin.Context, from, to **time.Time) error {
 }
 
 func parseSettlementTime(raw string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		return t.UTC(), nil
+	}
 	if t, err := time.Parse(time.RFC3339, raw); err == nil {
 		return t.UTC(), nil
 	}
