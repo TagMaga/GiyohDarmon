@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, Pressable,
-  Alert, ActivityIndicator, Modal,
+  Alert, ActivityIndicator, Modal, Image,
   Animated, PanResponder, Dimensions, Linking, TextInput,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Phone, MessageCircle, Send, MapPin } from 'lucide-react-native'
 import { updateOrderStatus, reportAddressChanged, deferOrder, getOrderComments, addOrderComment } from '../api/orders'
 import useAuthStore from '../store/authStore'
 import { resolveCreator } from '../lib/creator'
@@ -110,7 +111,6 @@ export function BottomSheet({ visible, onClose, children, height = SHEET_H }) {
 export function OrderDetailSheet({
   order, onClose, onStart, onDelivered, actionLoading, onRefresh, initialStep = 'detail',
 }) {
-  // All hooks before any conditional return
   const [step, setStep]               = useState(initialStep)
   const [cancelReason, setCancelReason] = useState('')
   const [laterDate, setLaterDate]     = useState(null)
@@ -120,6 +120,7 @@ export function OrderDetailSheet({
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [commentText, setCommentText] = useState('')
   const [commentSending, setCommentSending] = useState(false)
+  const [expandedComments, setExpandedComments] = useState({})
   const currentUserName = useAuthStore((st) => st.user?.full_name) || ''
 
   useEffect(() => {
@@ -129,6 +130,7 @@ export function OrderDetailSheet({
       setLaterDate(null)
       setNewAddress('')
       setCommentText('')
+      setExpandedComments({})
     }
   }, [order?.id])
 
@@ -166,15 +168,18 @@ export function OrderDetailSheet({
   const prepayAmt     = Number(order.prepayment_amount ?? 0)
   const collectAmt    = Number(order.amount_to_collect ?? order.courier_collect_amount ?? 0)
   const hasPrepay     = prepayAmt > 0
-  const prepayStatus  = order.prepayment_status   // none | pending_verification | verified | rejected
+  const prepayStatus  = order.prepayment_status
   const prepayLabel   = order.prepayment_type === 'full' ? 'Полная предоплата' : 'Частичная предоплата'
 
-  // Client comment (various field names the backend might use)
   const clientComment = order.notes || order.comment || order.customer_comment || ''
 
-  // Seller info — either from enriched `seller` object or creator fallback
   const sellerName  = order.seller?.full_name || order.seller_name || null
   const sellerPhone = order.seller?.phone || order.seller_phone || null
+
+  // Merged creator display — prefer enriched seller data when available
+  const creatorName  = sellerName || creator.name
+  const creatorPhone = sellerPhone || creator.phone
+  const showCreator  = sellerName || creator.hasCreator
 
   const callPhone = () => {
     const phone = order.customer?.phone
@@ -191,8 +196,7 @@ export function OrderDetailSheet({
       Alert.alert('Telegram не установлен', 'Установите приложение Telegram')
     )
   }
-  const callCreator = () => creator.phone && Linking.openURL(`tel:${creator.phone}`)
-  const callSeller  = () => sellerPhone && Linking.openURL(`tel:${sellerPhone}`)
+  const callCreatorPhone = () => creatorPhone && Linking.openURL(`tel:${creatorPhone}`)
 
   const doStatus = async (st, comment) => {
     setStepLoading(true)
@@ -242,6 +246,9 @@ export function OrderDetailSheet({
     }
   }
 
+  const toggleComment = (id) =>
+    setExpandedComments(prev => ({ ...prev, [id]: !prev[id] }))
+
   const sheetHeight = step === 'detail' ? SHEET_H : SCREEN_H * 0.65
 
   return (
@@ -266,7 +273,7 @@ export function OrderDetailSheet({
         keyboardShouldPersistTaps="handled"
       >
 
-        {/* ── Sub-flows (problem / change step) ──────────────────── */}
+        {/* ── Sub-flows ──────────────────────────────────────────── */}
         {step !== 'detail' && (
           <View>
             {step === 'menu' && PROBLEM_OPTIONS.map(opt => (
@@ -340,10 +347,14 @@ export function OrderDetailSheet({
         {/* ── Main detail view ────────────────────────────────────── */}
         {step === 'detail' && (<>
 
-          {/* CLIENT ──────────────────────────────────────────────── */}
+          {/* 1. CLIENT ───────────────────────────────────────────── */}
           <SectionCard label="Клиент">
             <View style={d.clientRow}>
-              <View style={d.avatar}><Text style={{ fontSize: 24 }}>👤</Text></View>
+              <View style={d.avatar}>
+                <Text style={d.avatarInitial}>
+                  {(order.customer?.full_name || '?')[0].toUpperCase()}
+                </Text>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={d.clientName}>{order.customer?.full_name || '—'}</Text>
                 {order.customer?.phone
@@ -351,16 +362,16 @@ export function OrderDetailSheet({
                   : null}
               </View>
             </View>
-            {(order.customer?.address || order.customer?.city) && (
+
+            {(order.customer?.address || order.customer?.city || order.delivery_address) && (
               <View style={d.infoRow}>
-                <Text style={d.infoIcon}>📍</Text>
+                <MapPin size={14} color={C.muted} style={{ marginTop: 1 }} />
                 <Text style={d.infoText}>
-                  {[order.customer.address, order.customer.city].filter(Boolean).join(', ')}
+                  {order.delivery_address || [order.customer.address, order.customer.city].filter(Boolean).join(', ')}
                 </Text>
               </View>
             )}
 
-            {/* Client comment */}
             {!!clientComment && (
               <View style={d.commentBox}>
                 <Text style={d.commentLabel}>Комментарий</Text>
@@ -368,111 +379,49 @@ export function OrderDetailSheet({
               </View>
             )}
 
-            {/* Contact buttons */}
             <View style={d.contactRow}>
-              <TouchableOpacity style={d.contactBtn} onPress={callPhone}>
-                <Text style={d.contactIcon}>📞</Text>
-                <Text style={d.contactLabel}>Звонок</Text>
+              <TouchableOpacity style={[d.contactBtn, d.contactBtnCall]} onPress={callPhone}>
+                <Phone size={20} color={C.blue} strokeWidth={2.5} />
+                <Text style={[d.contactLabel, { color: C.blue }]}>Звонок</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={d.contactBtn} onPress={openWhatsApp}>
-                <Text style={d.contactIcon}>💬</Text>
-                <Text style={d.contactLabel}>WhatsApp</Text>
+              <TouchableOpacity style={[d.contactBtn, d.contactBtnWa]} onPress={openWhatsApp}>
+                <MessageCircle size={20} color="#25D366" strokeWidth={2.5} />
+                <Text style={[d.contactLabel, { color: '#25D366' }]}>WhatsApp</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={d.contactBtn} onPress={openTelegram}>
-                <Text style={d.contactIcon}>✈️</Text>
-                <Text style={d.contactLabel}>Telegram</Text>
+              <TouchableOpacity style={[d.contactBtn, d.contactBtnTg]} onPress={openTelegram}>
+                <Send size={20} color="#229ED9" strokeWidth={2.5} />
+                <Text style={[d.contactLabel, { color: '#229ED9' }]}>Telegram</Text>
               </TouchableOpacity>
             </View>
           </SectionCard>
 
-          {/* SELLER / CREATOR ────────────────────────────────────── */}
-          {/* Show dedicated seller block if we have enriched seller data */}
-          {sellerName && (
-            <SectionCard label="Продавец">
-              <View style={d.personRow}>
-                <View style={d.personAvatar}><Text style={{ fontSize: 18 }}>🏪</Text></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={d.personName}>{sellerName}</Text>
-                  {sellerPhone
-                    ? <Pressable onPress={callSeller} hitSlop={6}>
-                        {({ pressed }) => <Text style={[d.personPhone, pressed && { opacity: 0.6 }]}>📞 {sellerPhone}</Text>}
-                      </Pressable>
-                    : <Text style={d.personPhoneMuted}>Телефон не указан</Text>
+          {/* 2. PRODUCTS ─────────────────────────────────────────── */}
+          {Array.isArray(order.items) && order.items.length > 0 && (
+            <SectionCard label={`Товары · ${order.items.length} шт`}>
+              {order.items.map((item, i) => (
+                <View
+                  key={item.product_id ?? item.id ?? i}
+                  style={[d.productRow, i === order.items.length - 1 && { borderBottomWidth: 0 }]}
+                >
+                  {item.image_url
+                    ? <Image source={{ uri: item.image_url }} style={d.productThumb} />
+                    : <View style={d.productThumbPlaceholder}>
+                        <Text style={d.productThumbInitial}>
+                          {(item.product_name || item.name || '?')[0].toUpperCase()}
+                        </Text>
+                      </View>
                   }
-                </View>
-                <View style={d.rolePill}><Text style={d.rolePillText}>Продавец</Text></View>
-              </View>
-            </SectionCard>
-          )}
-
-          {/* Creator block (always shown; may overlap with seller if same person) */}
-          {creator.hasCreator && (
-            <SectionCard label="Создал заказ">
-              <View style={d.personRow}>
-                <View style={d.personAvatar}><Text style={{ fontSize: 18 }}>👤</Text></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={d.personName}>{creator.name}</Text>
-                  {creator.phone
-                    ? <Pressable onPress={callCreator} hitSlop={6}>
-                        {({ pressed }) => <Text style={[d.personPhone, pressed && { opacity: 0.6 }]}>📞 {creator.phone}</Text>}
-                      </Pressable>
-                    : <Text style={d.personPhoneMuted}>Телефон не указан</Text>
-                  }
-                </View>
-                {creator.isOwn
-                  ? <View style={[d.rolePill, { backgroundColor: `${C.green}18` }]}><Text style={[d.rolePillText, { color: C.green }]}>Мой заказ</Text></View>
-                  : creator.roleLabel
-                    ? <View style={[d.rolePill, { backgroundColor: `${creator.roleColor}18` }]}><Text style={[d.rolePillText, { color: creator.roleColor }]}>{creator.roleLabel}</Text></View>
-                    : null
-                }
-              </View>
-            </SectionCard>
-          )}
-
-          <SectionCard label="Комментарии">
-            {commentsLoading && (
-              <View style={d.commentsLoading}>
-                <ActivityIndicator color={C.violet} />
-                <Text style={d.commentsLoadingText}>Загрузка комментариев…</Text>
-              </View>
-            )}
-            {!commentsLoading && comments.length === 0 && (
-              <Text style={d.emptyComments}>Комментариев пока нет</Text>
-            )}
-            {!commentsLoading && comments.map((c, i) => (
-              <View key={c.id ?? i} style={d.commentThreadItem}>
-                <View style={d.commentThreadHeader}>
-                  <Text style={d.commentAuthor}>{c.author_name || '—'}</Text>
-                  <View style={d.commentRoleBadge}>
-                    <Text style={d.commentRoleText}>{ROLE_LABEL[c.author_role] || c.author_role || 'Роль'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={d.productName}>{item.product_name || item.name || 'Товар'}</Text>
+                    <Text style={d.productQty}>{item.quantity} шт</Text>
                   </View>
+                  <Text style={d.productPrice}>{fmt(item.total_price ?? item.price)} сом</Text>
                 </View>
-                <Text style={d.commentBody}>{c.comment || c.text}</Text>
-                <Text style={d.commentTime}>
-                  {c.created_at ? new Date(c.created_at).toLocaleString('ru-RU') : ''}
-                </Text>
-              </View>
-            ))}
-            <View style={d.commentInputRow}>
-              <TextInput
-                style={d.commentInput}
-                placeholder="Написать комментарий…"
-                placeholderTextColor={C.muted}
-                value={commentText}
-                onChangeText={setCommentText}
-                multiline
-              />
-              <TouchableOpacity
-                style={[d.commentSendBtn, (!commentText.trim() || commentSending) && d.btnDisabled]}
-                disabled={!commentText.trim() || commentSending}
-                onPress={sendComment}
-              >
-                {commentSending ? <ActivityIndicator color="#fff" /> : <Text style={d.commentSendText}>➤</Text>}
-              </TouchableOpacity>
-            </View>
-          </SectionCard>
+              ))}
+            </SectionCard>
+          )}
 
-          {/* PAYMENT ─────────────────────────────────────────────── */}
+          {/* 3. PAYMENT ─────────────────────────────────────────── */}
           <SectionCard label="Оплата">
             <PayRow label="Стоимость товаров" value={`${fmt(productTotal)} сом`} />
             <PayRow
@@ -490,8 +439,6 @@ export function OrderDetailSheet({
                 : <Text style={[d.collectVal, { color: C.green, fontSize: 16 }]}>✓ Оплачено</Text>
               }
             </View>
-
-            {/* Prepayment status pill */}
             {hasPrepay && (
               <View style={d.prepayRow}>
                 {prepayStatus === 'verified' && (
@@ -513,24 +460,102 @@ export function OrderDetailSheet({
             )}
           </SectionCard>
 
-          {/* PRODUCTS ────────────────────────────────────────────── */}
-          {Array.isArray(order.items) && order.items.length > 0 && (
-            <SectionCard label={`Товары · ${order.items.length} шт`}>
-              {order.items.map((item, i) => (
-                <View
-                  key={item.product_id ?? item.id ?? i}
-                  style={[d.productRow, i === order.items.length - 1 && { borderBottomWidth: 0 }]}
-                >
-                  <View style={d.productThumb}><Text style={{ fontSize: 18 }}>🛍️</Text></View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={d.productName}>{item.product_name || item.name || 'Товар'}</Text>
-                    <Text style={d.productQty}>{item.quantity} шт</Text>
-                  </View>
-                  <Text style={d.productPrice}>{fmt(item.total_price ?? item.price)} сом</Text>
+          {/* 4. CREATOR / SELLER (merged) ───────────────────────── */}
+          {showCreator && (
+            <SectionCard label="Создал заказ">
+              <View style={d.personRow}>
+                <View style={d.personAvatar}>
+                  <Text style={d.personAvatarInitial}>
+                    {(creatorName || '?')[0].toUpperCase()}
+                  </Text>
                 </View>
-              ))}
+                <View style={{ flex: 1 }}>
+                  <Text style={d.personName}>{creatorName}</Text>
+                  {creatorPhone
+                    ? <Pressable onPress={callCreatorPhone} hitSlop={6}>
+                        {({ pressed }) => (
+                          <Text style={[d.personPhone, pressed && { opacity: 0.6 }]}>
+                            {creatorPhone}
+                          </Text>
+                        )}
+                      </Pressable>
+                    : <Text style={d.personPhoneMuted}>Телефон не указан</Text>
+                  }
+                </View>
+                {sellerName
+                  ? <View style={d.rolePill}><Text style={d.rolePillText}>Продавец</Text></View>
+                  : creator.isOwn
+                    ? <View style={[d.rolePill, { backgroundColor: `${C.green}18` }]}>
+                        <Text style={[d.rolePillText, { color: C.green }]}>Мой заказ</Text>
+                      </View>
+                    : creator.roleLabel
+                      ? <View style={[d.rolePill, { backgroundColor: `${creator.roleColor}18` }]}>
+                          <Text style={[d.rolePillText, { color: creator.roleColor }]}>{creator.roleLabel}</Text>
+                        </View>
+                      : null
+                }
+              </View>
             </SectionCard>
           )}
+
+          {/* 5. COMMENTS ────────────────────────────────────────── */}
+          <SectionCard label="Комментарии">
+            {commentsLoading && (
+              <View style={d.commentsLoading}>
+                <ActivityIndicator color={C.violet} />
+                <Text style={d.commentsLoadingText}>Загрузка комментариев…</Text>
+              </View>
+            )}
+            {!commentsLoading && comments.length === 0 && (
+              <Text style={d.emptyComments}>Комментариев пока нет</Text>
+            )}
+            {!commentsLoading && comments.map((c, i) => {
+              const bodyText = c.comment || c.text || ''
+              const isLong = bodyText.length > 120
+              const isExpanded = !!expandedComments[c.id ?? i]
+              return (
+                <View key={c.id ?? i} style={d.commentThreadItem}>
+                  <View style={d.commentThreadHeader}>
+                    <Text style={d.commentAuthor}>{c.author_name || '—'}</Text>
+                    <View style={d.commentRoleBadge}>
+                      <Text style={d.commentRoleText}>{ROLE_LABEL[c.author_role] || c.author_role || 'Роль'}</Text>
+                    </View>
+                  </View>
+                  <Text style={d.commentBody} numberOfLines={isExpanded ? undefined : 3}>
+                    {bodyText}
+                  </Text>
+                  {isLong && (
+                    <TouchableOpacity onPress={() => toggleComment(c.id ?? i)} hitSlop={6}>
+                      <Text style={d.showMoreText}>{isExpanded ? 'Скрыть' : 'Показать больше'}</Text>
+                    </TouchableOpacity>
+                  )}
+                  <Text style={d.commentTime}>
+                    {c.created_at ? new Date(c.created_at).toLocaleString('ru-RU') : ''}
+                  </Text>
+                </View>
+              )
+            })}
+            <View style={d.commentInputRow}>
+              <TextInput
+                style={d.commentInput}
+                placeholder="Написать комментарий…"
+                placeholderTextColor={C.muted}
+                value={commentText}
+                onChangeText={setCommentText}
+                multiline
+              />
+              <TouchableOpacity
+                style={[d.commentSendBtn, (!commentText.trim() || commentSending) && d.btnDisabled]}
+                disabled={!commentText.trim() || commentSending}
+                onPress={sendComment}
+              >
+                {commentSending
+                  ? <ActivityIndicator color="#fff" />
+                  : <Send size={18} color="#fff" strokeWidth={2.5} />
+                }
+              </TouchableOpacity>
+            </View>
+          </SectionCard>
 
           {/* ISSUE REASON ─────────────────────────────────────────── */}
           {status === 'issue' && (order.issue_comment || order.notes) && (
@@ -638,45 +663,50 @@ const d = StyleSheet.create({
   // Client
   clientRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   avatar:       { width: 50, height: 50, borderRadius: 17, backgroundColor: '#eef3ff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line },
+  avatarInitial: { fontSize: 20, fontWeight: '900', color: C.violet },
   clientName:   { fontSize: 18, fontWeight: '900', color: C.ink, letterSpacing: -0.3 },
   clientPhone:  { fontSize: 13, color: C.muted, fontWeight: '600', marginTop: 2 },
   infoRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 10 },
-  infoIcon:     { fontSize: 13, marginTop: 2 },
   infoText:     { flex: 1, fontSize: 13, color: C.ink, fontWeight: '600', lineHeight: 19 },
 
   // Client comment
   commentBox:   { backgroundColor: '#f8f4ff', borderRadius: 13, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#ece6ff' },
   commentLabel: { fontSize: 10, fontWeight: '900', color: C.violet, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 },
   commentText:  { fontSize: 13, color: C.ink, lineHeight: 19 },
-  commentsLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
-  commentsLoadingText: { fontSize: 12, color: C.muted, fontWeight: '700' },
-  emptyComments: { fontSize: 13, color: C.muted, fontWeight: '700', textAlign: 'center', paddingVertical: 12 },
-  commentThreadItem: { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 14, padding: 12, marginBottom: 8 },
-  commentThreadHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  commentAuthor: { flex: 1, fontSize: 12, color: C.ink, fontWeight: '900' },
-  commentRoleBadge: { backgroundColor: '#eef3ff', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-  commentRoleText: { fontSize: 10, color: C.violet, fontWeight: '900' },
-  commentBody: { fontSize: 13, color: C.ink, lineHeight: 19, fontWeight: '600' },
-  commentTime: { fontSize: 10, color: C.muted, fontWeight: '700', marginTop: 6 },
-  commentInputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 4 },
-  commentInput: { flex: 1, minHeight: 42, maxHeight: 86, borderWidth: 1, borderColor: C.line, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: C.bg, color: C.ink, fontSize: 13, fontWeight: '700' },
-  commentSendBtn: { width: 42, height: 42, borderRadius: 14, backgroundColor: C.violet, alignItems: 'center', justifyContent: 'center' },
-  commentSendText: { color: '#fff', fontSize: 18, fontWeight: '900' },
 
   // Contact buttons
-  contactRow:   { flexDirection: 'row', gap: 8 },
-  contactBtn:   { flex: 1, backgroundColor: C.bg, borderRadius: 13, paddingVertical: 10, alignItems: 'center', borderWidth: 1, borderColor: C.line },
-  contactIcon:  { fontSize: 17, marginBottom: 3 },
-  contactLabel: { fontSize: 11, fontWeight: '800', color: C.ink },
+  contactRow:       { flexDirection: 'row', gap: 8 },
+  contactBtn:       { flex: 1, borderRadius: 14, paddingVertical: 11, alignItems: 'center', gap: 5, borderWidth: 1 },
+  contactBtnCall:   { backgroundColor: '#f0f7ff', borderColor: '#d0e4ff' },
+  contactBtnWa:     { backgroundColor: '#f0fff6', borderColor: '#c3f0d5' },
+  contactBtnTg:     { backgroundColor: '#f0f8ff', borderColor: '#c5dff5' },
+  contactLabel:     { fontSize: 11, fontWeight: '800' },
 
-  // Person row (seller / creator)
-  personRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  personAvatar: { width: 42, height: 42, borderRadius: 13, backgroundColor: '#eef3ff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line, flexShrink: 0 },
-  personName:   { fontSize: 15, fontWeight: '900', color: C.ink, marginBottom: 3 },
-  personPhone:  { fontSize: 13, color: C.blue, fontWeight: '700' },
-  personPhoneMuted: { fontSize: 13, color: C.muted, fontWeight: '600' },
-  rolePill:     { backgroundColor: `${C.violet}18`, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0 },
-  rolePillText: { fontSize: 11, fontWeight: '900', color: C.violet },
+  // Comments (thread)
+  commentsLoading:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
+  commentsLoadingText: { fontSize: 12, color: C.muted, fontWeight: '700' },
+  emptyComments:       { fontSize: 13, color: C.muted, fontWeight: '700', textAlign: 'center', paddingVertical: 12 },
+  commentThreadItem:   { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 14, padding: 12, marginBottom: 8 },
+  commentThreadHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  commentAuthor:       { flex: 1, fontSize: 12, color: C.ink, fontWeight: '900' },
+  commentRoleBadge:    { backgroundColor: '#eef3ff', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  commentRoleText:     { fontSize: 10, color: C.violet, fontWeight: '900' },
+  commentBody:         { fontSize: 13, color: C.ink, lineHeight: 19, fontWeight: '600' },
+  showMoreText:        { fontSize: 12, color: C.violet, fontWeight: '800', marginTop: 4 },
+  commentTime:         { fontSize: 10, color: C.muted, fontWeight: '700', marginTop: 6 },
+  commentInputRow:     { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 4 },
+  commentInput:        { flex: 1, minHeight: 42, maxHeight: 86, borderWidth: 1, borderColor: C.line, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: C.bg, color: C.ink, fontSize: 13, fontWeight: '700' },
+  commentSendBtn:      { width: 42, height: 42, borderRadius: 14, backgroundColor: C.violet, alignItems: 'center', justifyContent: 'center' },
+
+  // Person row (creator merged)
+  personRow:         { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  personAvatar:      { width: 42, height: 42, borderRadius: 13, backgroundColor: '#eef3ff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line, flexShrink: 0 },
+  personAvatarInitial: { fontSize: 16, fontWeight: '900', color: C.violet },
+  personName:        { fontSize: 15, fontWeight: '900', color: C.ink, marginBottom: 3 },
+  personPhone:       { fontSize: 13, color: C.blue, fontWeight: '700' },
+  personPhoneMuted:  { fontSize: 13, color: C.muted, fontWeight: '600' },
+  rolePill:          { backgroundColor: `${C.violet}18`, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0 },
+  rolePillText:      { fontSize: 11, fontWeight: '900', color: C.violet },
 
   // Payment
   payRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 },
@@ -690,41 +720,43 @@ const d = StyleSheet.create({
   prepayPillText: { fontSize: 13, fontWeight: '800' },
 
   // Products
-  productRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.line },
-  productThumb: { width: 40, height: 40, borderRadius: 11, backgroundColor: '#eef5ff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#dbe8fb' },
-  productName:  { fontSize: 14, fontWeight: '800', color: C.ink, marginBottom: 2 },
-  productQty:   { fontSize: 12, color: C.muted, fontWeight: '600' },
-  productPrice: { fontSize: 14, fontWeight: '900', color: C.ink },
+  productRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.line },
+  productThumb:        { width: 48, height: 48, borderRadius: 12, borderWidth: 1, borderColor: C.line },
+  productThumbPlaceholder: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#eef5ff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#dbe8fb' },
+  productThumbInitial: { fontSize: 18, fontWeight: '900', color: C.blue },
+  productName:         { fontSize: 14, fontWeight: '800', color: C.ink, marginBottom: 2 },
+  productQty:          { fontSize: 12, color: C.muted, fontWeight: '600' },
+  productPrice:        { fontSize: 14, fontWeight: '900', color: C.ink },
 
   // Issue box
-  issueBox:     { backgroundColor: '#fff4f4', borderRadius: 14, padding: 13, borderWidth: 1, borderColor: '#ffd5d5' },
-  issueLabel:   { fontSize: 11, fontWeight: '900', color: C.red, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5 },
-  issueText:    { fontSize: 13, color: C.ink, lineHeight: 19 },
+  issueBox:   { backgroundColor: '#fff4f4', borderRadius: 14, padding: 13, borderWidth: 1, borderColor: '#ffd5d5' },
+  issueLabel: { fontSize: 11, fontWeight: '900', color: C.red, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5 },
+  issueText:  { fontSize: 13, color: C.ink, lineHeight: 19 },
 
   // Action bar
-  actionBar:    { gap: 10, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.line },
-  primaryBtn:   { borderRadius: 18, paddingVertical: 16, alignItems: 'center' },
+  actionBar:      { gap: 10, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.line },
+  primaryBtn:     { borderRadius: 18, paddingVertical: 16, alignItems: 'center' },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '900' },
-  secondaryBtn: { borderRadius: 18, paddingVertical: 13, alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.line },
+  secondaryBtn:   { borderRadius: 18, paddingVertical: 13, alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.line },
   secondaryBtnText: { fontSize: 15, fontWeight: '800', color: C.ink },
-  btnDisabled:  { opacity: 0.45 },
+  btnDisabled:    { opacity: 0.45 },
 })
 
 const ps = StyleSheet.create({
-  stepTitle:    { fontSize: 20, fontWeight: '900', color: C.ink, marginBottom: 8 },
-  stepSub:      { fontSize: 14, color: C.muted, marginBottom: 20, lineHeight: 20 },
-  optRow:       { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.line },
-  optIcon:      { width: 44, height: 44, borderRadius: 14, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line },
-  optLabel:     { fontSize: 15, fontWeight: '800', color: C.ink, marginBottom: 2 },
-  optDesc:      { fontSize: 12, color: C.muted, fontWeight: '600' },
-  chevron:      { fontSize: 22, color: C.muted },
-  btnPrimary:   { backgroundColor: C.blue, borderRadius: 18, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
-  btnText:      { color: '#fff', fontSize: 16, fontWeight: '900' },
-  btnDisabled:  { opacity: 0.45 },
-  reasonRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.line },
+  stepTitle: { fontSize: 20, fontWeight: '900', color: C.ink, marginBottom: 8 },
+  stepSub:   { fontSize: 14, color: C.muted, marginBottom: 20, lineHeight: 20 },
+  optRow:    { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.line },
+  optIcon:   { width: 44, height: 44, borderRadius: 14, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line },
+  optLabel:  { fontSize: 15, fontWeight: '800', color: C.ink, marginBottom: 2 },
+  optDesc:   { fontSize: 12, color: C.muted, fontWeight: '600' },
+  chevron:   { fontSize: 22, color: C.muted },
+  btnPrimary:  { backgroundColor: C.blue, borderRadius: 18, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
+  btnText:     { color: '#fff', fontSize: 16, fontWeight: '900' },
+  btnDisabled: { opacity: 0.45 },
+  reasonRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.line },
   reasonRowActive: { backgroundColor: '#f0f4ff', borderRadius: 12, paddingHorizontal: 10, marginHorizontal: -10 },
-  radio:        { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: C.line },
-  radioActive:  { borderColor: C.blue, backgroundColor: C.blue },
-  reasonText:   { fontSize: 15, color: C.muted, fontWeight: '600' },
-  input:        { borderWidth: 1, borderColor: C.line, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: C.ink, backgroundColor: C.card, minHeight: 64, textAlignVertical: 'top', marginBottom: 16 },
+  radio:       { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: C.line },
+  radioActive: { borderColor: C.blue, backgroundColor: C.blue },
+  reasonText:  { fontSize: 15, color: C.muted, fontWeight: '600' },
+  input:       { borderWidth: 1, borderColor: C.line, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: C.ink, backgroundColor: C.card, minHeight: 64, textAlignVertical: 'top', marginBottom: 16 },
 })
