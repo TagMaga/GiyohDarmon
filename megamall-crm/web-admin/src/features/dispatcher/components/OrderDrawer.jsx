@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   X, Phone, MapPin, User, Truck, Package, Clock,
   Banknote, CheckCircle, XCircle, AlertCircle, ZoomIn,
-  ChevronDown, ChevronUp, Users,
+  ChevronDown, ChevronUp, Users, MessageSquare, Send, Loader2,
 } from 'lucide-react'
 import { KEYS } from '../../../shared/queryKeys'
 import { STATUS_HEX, fmt, fmtDate } from '../statusConfig'
 import { resolveCustomer, resolveAddress, resolveCity } from '../utils/resolveCustomer'
 import { resolveCourier, resolveCourierDisplay, formatOrderLabel, getCourierId } from '../utils/orderHelpers'
-import { fetchOrderDetail, fetchOrderTimeline, fetchOrderPrepayments } from '../api'
+import { fetchOrderDetail, fetchOrderTimeline, fetchOrderPrepayments, fetchComments, addComment } from '../api'
 
 /* ── Design tokens (dark CRM) ──────────────────────────────────────── */
 const BG      = '#0a111e'
@@ -469,6 +469,15 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
             </div>
           </CollapsibleSection>
 
+          {/* ── КОММЕНТАРИИ (collapsed by default) ───────────────────── */}
+          <CollapsibleSection
+            title="Комментарии"
+            icon={<MessageSquare size={10} />}
+            defaultCollapsed
+          >
+            <CommentsSection orderId={orderId} open={open} />
+          </CollapsibleSection>
+
           {/* ── ДОПОЛНИТЕЛЬНО: seller + metadata (collapsed by default) */}
           <CollapsibleSection
             title="Дополнительно"
@@ -522,15 +531,6 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
               ))}
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => onAction('comment', order)}
-                className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-colors"
-                style={{ border: `1px solid ${BORDER}`, color: TEXT2 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                Комментарий
-              </button>
               {actions.filter(a => a.ghost).map(a => (
                 <button
                   key={a.key}
@@ -602,6 +602,78 @@ function PayRow({ label, value, valueColor, bold }) {
     <div className="flex items-center justify-between gap-2">
       <span className="text-[11px]" style={{ color: TEXT3 }}>{label}</span>
       <span className={`text-[11px] tabular-nums ${bold ? 'font-bold' : 'font-medium'}`} style={{ color: valueColor ?? TEXT2 }}>{value}</span>
+    </div>
+  )
+}
+
+function CommentsSection({ orderId, open }) {
+  const qc = useQueryClient()
+  const [text, setText] = useState('')
+
+  const { data: comments = [], isPending: loading, isError } = useQuery({
+    queryKey: KEYS.dispatcher.comments(orderId),
+    queryFn:  () => fetchComments(orderId),
+    enabled:  !!orderId && open,
+    retry:    false,
+    staleTime: 30_000,
+  })
+
+  const { mutate: submit, isPending: sending } = useMutation({
+    mutationFn: () => addComment(orderId, { comment: text.trim() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.comments(orderId) })
+      setText('')
+    },
+  })
+
+  return (
+    <div className="px-4 pb-4">
+      {loading && <Skeleton lines={2} />}
+      {isError && (
+        <div className="text-xs italic py-2" style={{ color: `${AMBER}99` }}>Комментарии недоступны</div>
+      )}
+      {!loading && !isError && comments.length === 0 && (
+        <div className="flex items-center gap-1.5 py-2">
+          <MessageSquare size={11} style={{ color: TEXT3 }} />
+          <span className="text-xs italic" style={{ color: TEXT3 }}>Нет комментариев</span>
+        </div>
+      )}
+      {!loading && Array.isArray(comments) && comments.map((c, i) => (
+        <div key={c.id ?? i} className="rounded-xl p-2.5 mb-2" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="text-[11px] font-semibold" style={{ color: TEXT1 }}>
+              {c.author_name ?? c.author?.full_name ?? c.created_by ?? 'Система'}
+            </span>
+            <span className="text-[10px] font-mono" style={{ color: TEXT3 }}>{fmtDate(c.created_at)}</span>
+          </div>
+          <p className="text-[11px] leading-relaxed" style={{ color: TEXT2 }}>{c.comment ?? c.text}</p>
+        </div>
+      ))}
+      <div className="mt-2 flex gap-2">
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          rows={2}
+          placeholder="Добавить комментарий…"
+          className="flex-1 resize-none rounded-xl px-3 py-2 text-xs outline-none"
+          style={{ background: CARD, border: `1px solid ${BORDER}`, color: TEXT1, lineHeight: 1.5 }}
+          onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey && text.trim()) submit() }}
+        />
+        <button
+          onClick={() => text.trim() && submit()}
+          disabled={!text.trim() || sending}
+          className="self-end flex items-center justify-center rounded-xl transition-opacity"
+          style={{
+            width: 36, height: 36, flexShrink: 0,
+            background: text.trim() ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(255,255,255,0.05)',
+            color: text.trim() ? '#fff' : TEXT3,
+            opacity: sending ? 0.6 : 1,
+          }}
+        >
+          {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+        </button>
+      </div>
+      <p className="text-[9px] mt-1.5" style={{ color: TEXT3 }}>Ctrl + Enter для отправки</p>
     </div>
   )
 }
