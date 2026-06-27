@@ -67,11 +67,12 @@ type OrderCustomer struct {
 }
 
 type OrderItemResponse struct {
-	ProductID   uuid.UUID `json:"product_id"`
-	ProductName string    `json:"product_name"`
-	Quantity    int       `json:"quantity"`
-	UnitPrice   float64   `json:"unit_price"`
-	TotalPrice  float64   `json:"total_price"`
+	ProductID       uuid.UUID `json:"product_id"`
+	ProductName     string    `json:"product_name"`
+	ProductImageURL *string   `json:"product_image_url"`
+	Quantity        int       `json:"quantity"`
+	UnitPrice       float64   `json:"unit_price"`
+	TotalPrice      float64   `json:"total_price"`
 }
 
 // MyOrderResponse is a courier's order with customer details for the mobile app.

@@ -217,17 +217,18 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID, stat
 		}
 
 		type itemRow struct {
-			OrderID     string  `gorm:"column:order_id"`
-			ProductID   string  `gorm:"column:product_id"`
-			ProductName string  `gorm:"column:product_name"`
-			Quantity    int     `gorm:"column:quantity"`
-			UnitPrice   float64 `gorm:"column:unit_price"`
-			TotalPrice  float64 `gorm:"column:total_price"`
+			OrderID         string  `gorm:"column:order_id"`
+			ProductID       string  `gorm:"column:product_id"`
+			ProductName     string  `gorm:"column:product_name"`
+			ProductImageURL *string `gorm:"column:product_image_url"`
+			Quantity        int     `gorm:"column:quantity"`
+			UnitPrice       float64 `gorm:"column:unit_price"`
+			TotalPrice      float64 `gorm:"column:total_price"`
 		}
 		var itemRows []itemRow
 		r.db.WithContext(ctx).
 			Table("order_items oi").
-			Select("oi.order_id::text, oi.product_id::text, p.name AS product_name, oi.quantity, oi.unit_price, oi.total_price").
+			Select("oi.order_id::text, oi.product_id::text, p.name AS product_name, oi.quantity, oi.unit_price, oi.total_price, (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = oi.product_id AND pi.is_primary = true LIMIT 1) AS product_image_url").
 			Joins("JOIN products p ON p.id = oi.product_id").
 			Where("oi.order_id::text IN ?", idStrs).
 			Scan(&itemRows)
@@ -240,11 +241,12 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID, stat
 			if idx, ok := idxByID[orderUUID]; ok {
 				productUUID, _ := uuid.Parse(ir.ProductID)
 				result[idx].Items = append(result[idx].Items, OrderItemResponse{
-					ProductID:   productUUID,
-					ProductName: ir.ProductName,
-					Quantity:    ir.Quantity,
-					UnitPrice:   ir.UnitPrice,
-					TotalPrice:  ir.TotalPrice,
+					ProductID:       productUUID,
+					ProductName:     ir.ProductName,
+					ProductImageURL: ir.ProductImageURL,
+					Quantity:        ir.Quantity,
+					UnitPrice:       ir.UnitPrice,
+					TotalPrice:      ir.TotalPrice,
 				})
 			}
 		}
@@ -492,27 +494,29 @@ func (r *Repository) GetOrderByIDForCourier(ctx context.Context, courierID, orde
 
 	// Fetch items for this order.
 	type itemRow struct {
-		ProductID   string  `gorm:"column:product_id"`
-		ProductName string  `gorm:"column:product_name"`
-		Quantity    int     `gorm:"column:quantity"`
-		UnitPrice   float64 `gorm:"column:unit_price"`
-		TotalPrice  float64 `gorm:"column:total_price"`
+		ProductID       string  `gorm:"column:product_id"`
+		ProductName     string  `gorm:"column:product_name"`
+		ProductImageURL *string `gorm:"column:product_image_url"`
+		Quantity        int     `gorm:"column:quantity"`
+		UnitPrice       float64 `gorm:"column:unit_price"`
+		TotalPrice      float64 `gorm:"column:total_price"`
 	}
 	var itemRows []itemRow
 	r.db.WithContext(ctx).
 		Table("order_items oi").
-		Select("oi.product_id::text, p.name AS product_name, oi.quantity, oi.unit_price, oi.total_price").
+		Select("oi.product_id::text, p.name AS product_name, oi.quantity, oi.unit_price, oi.total_price, (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = oi.product_id AND pi.is_primary = true LIMIT 1) AS product_image_url").
 		Joins("JOIN products p ON p.id = oi.product_id").
 		Where("oi.order_id = ?", orderID).
 		Scan(&itemRows)
 	for _, ir := range itemRows {
 		productUUID, _ := uuid.Parse(ir.ProductID)
 		result.Items = append(result.Items, OrderItemResponse{
-			ProductID:   productUUID,
-			ProductName: ir.ProductName,
-			Quantity:    ir.Quantity,
-			UnitPrice:   ir.UnitPrice,
-			TotalPrice:  ir.TotalPrice,
+			ProductID:       productUUID,
+			ProductName:     ir.ProductName,
+			ProductImageURL: ir.ProductImageURL,
+			Quantity:        ir.Quantity,
+			UnitPrice:       ir.UnitPrice,
+			TotalPrice:      ir.TotalPrice,
 		})
 	}
 
