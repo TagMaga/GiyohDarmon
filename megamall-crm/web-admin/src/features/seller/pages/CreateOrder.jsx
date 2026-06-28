@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ShoppingCart, Search, X, Package, AlertCircle } from 'lucide-react'
 import { useToast } from '../../../shared/components/ToastProvider'
@@ -158,6 +159,7 @@ export function formatDeliveryFee(fee) {
 export default function CreateOrder() {
   const toast = useToast()
   const qc = useQueryClient()
+  const navigate = useNavigate()
 
   const [form, setForm] = useState(() => loadDraft() ?? EMPTY_FORM)
   const [success, setSuccess] = useState(null)
@@ -386,6 +388,7 @@ export default function CreateOrder() {
     setSubmitError(null)
     uploadedProofUrl.current = null
     clearDraft()
+    navigate('/seller')
   }
 
   // ── Validation ───────────────────────────────────────────────────────────────
@@ -595,7 +598,7 @@ export default function CreateOrder() {
             className="btn btn-md flex items-center justify-center gap-2 border border-slate-300 text-slate-600 bg-white hover:bg-slate-50"
           >
             <X size={16} />
-            Очистить
+            Отмена
           </button>
           <button
             type="button"
