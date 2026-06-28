@@ -155,14 +155,15 @@ export default function SellerProfilePage() {
       {/* ═══════════════════════════════════════════════════════════
           MOBILE LAYOUT
       ═══════════════════════════════════════════════════════════ */}
-      <div className="lg:hidden min-h-screen p-6" style={{ background: '#F2F4F7' }}>
+      <div className="lg:hidden min-h-screen" style={{ background: '#F2F4F7' }}>
         {/* Profile header */}
         <div
-          className="relative overflow-hidden px-5 pt-10 pb-8"
+          className="relative overflow-hidden px-[10px] pb-8"
           style={{
             background: 'linear-gradient(135deg, #1E293B 0%, #334155 100%)',
             borderRadius: '0 0 32px 32px',
             boxShadow: '0 8px 32px rgba(15,23,42,0.3)',
+            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 40px)',
           }}
         >
           <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/5 -translate-y-12 translate-x-12" />
@@ -203,7 +204,7 @@ export default function SellerProfilePage() {
           )}
         </div>
 
-        <div className="px-4 pt-5 pb-28">
+        <div className="px-[10px] pt-4 pb-28">
           {isRoot ? (
             <div className="space-y-3">
               {NAV_CARDS.map(card => (

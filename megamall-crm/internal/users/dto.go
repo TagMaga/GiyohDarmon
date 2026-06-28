@@ -21,7 +21,6 @@ type CreateUserRequest struct {
 // UpdateUserRequest is the payload for PATCH /users/:id.
 type UpdateUserRequest struct {
 	Phone       *string    `json:"phone"         validate:"omitempty,min=7,max=20"`
-	Email       *string    `json:"email"         validate:"omitempty,email"`
 	FullName    *string    `json:"full_name"     validate:"omitempty,min=2,max=255"`
 	Role        *Role      `json:"role"          validate:"omitempty"`
 	IsActive    *bool      `json:"is_active"`

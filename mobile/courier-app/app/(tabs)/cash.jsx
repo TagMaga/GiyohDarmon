@@ -148,9 +148,9 @@ export default function CashScreen() {
     address: o.customer_address ?? o.customer?.address,
   }))
   const earningsTotal = earnings.reduce((sum, e) => sum + e.fee, 0)
-  const collected = summary?.cash_to_handover || 0
-  const salary    = earningsTotal
-  const toReturn  = Math.max(0, Number(collected) - Number(salary))
+  const toReturn  = Math.max(0, Number(summary?.cash_to_handover || 0))
+  const salary    = Number(summary?.total_delivery_fees || 0)
+  const collected = toReturn + salary
   const cashOrders = summary?.orders_collected || 0
   const pendingHandover = history.filter(h => h.status === 'pending').reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0)
   const totalHandedOver = history.filter(h => h.status === 'confirmed').reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0)

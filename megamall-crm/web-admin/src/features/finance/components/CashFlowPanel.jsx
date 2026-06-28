@@ -3,7 +3,8 @@
  *
  * Shows:
  *   - Собрано (cash_collected)
- *   - Возвращено (cash_returned)
+ *   - Зарплата курьера (courier_payout_kept)
+ *   - Сдано (cash_returned)
  *   - На руках (cash_outstanding)
  *   - Передач подтверждено / ожидает
  *
@@ -11,7 +12,7 @@
  *   cash     {object}  FinanceCashSummary
  *   loading  {bool}
  */
-import { CheckCircle2, Clock, Banknote, ArrowDownLeft, Wallet } from 'lucide-react'
+import { CheckCircle2, Clock, Banknote, ArrowDownLeft, Wallet, Truck } from 'lucide-react'
 import Badge    from '../../../shared/components/Badge'
 import { fmtMoney } from '../../hr/utils/hrHelpers'
 
@@ -39,6 +40,7 @@ export default function CashFlowPanel({ cash, loading = false }) {
 
   const collected   = cash?.cash_collected   ?? 0
   const returned    = cash?.cash_returned    ?? 0
+  const salaryKept  = cash?.courier_payout_kept ?? 0
   const outstanding = cash?.cash_outstanding ?? 0
   const confirmed   = cash?.handovers_confirmed ?? 0
   const pending     = cash?.handovers_pending   ?? 0
@@ -50,8 +52,7 @@ export default function CashFlowPanel({ cash, loading = false }) {
         <Banknote size={16} className="text-slate-400" />
       </div>
 
-      {/* Three cash metrics */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {/* Собрано */}
         <div className="space-y-0.5">
           <div className="flex items-center gap-1">
@@ -59,6 +60,14 @@ export default function CashFlowPanel({ cash, loading = false }) {
             <p className="text-[10px] text-slate-400 uppercase tracking-wide">Собрано</p>
           </div>
           <p className="text-base font-bold text-slate-900 tabular-nums">{fmtMoney(collected)}</p>
+        </div>
+
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1">
+            <Truck size={11} className="text-sky-500" />
+            <p className="text-[10px] text-slate-400 uppercase tracking-wide">Зарплата</p>
+          </div>
+          <p className="text-base font-bold text-slate-900 tabular-nums">{fmtMoney(salaryKept)}</p>
         </div>
 
         {/* Возвращено */}
@@ -91,6 +100,10 @@ export default function CashFlowPanel({ cash, loading = false }) {
               style={{ width: `${Math.min((returned / collected) * 100, 100)}%` }}
             />
             <div
+              className="h-full bg-sky-400 transition-all duration-500"
+              style={{ width: `${Math.min((salaryKept / collected) * 100, 100)}%` }}
+            />
+            <div
               className="h-full bg-rose-400 transition-all duration-500"
               style={{ width: `${Math.min((outstanding / collected) * 100, 100)}%` }}
             />
@@ -98,6 +111,9 @@ export default function CashFlowPanel({ cash, loading = false }) {
           <div className="flex items-center gap-3 text-[10px] text-slate-400">
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> Сдано
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-sky-400 inline-block" /> Зарплата
             </span>
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-rose-400 inline-block" /> На руках

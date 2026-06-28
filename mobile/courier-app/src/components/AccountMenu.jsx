@@ -56,7 +56,7 @@ export function AccountMenu({
 
           <MenuRow icon="●" label={isOnline ? 'Онлайн' : 'Не на линии'} value={isOnline ? 'Принимать заказы' : 'Пауза'} onPress={onToggleOnline} accent={isOnline ? C.green : C.muted} />
           <MenuRow icon="⟳" label="Обновить данные" value="Синхронизация" onPress={refresh} />
-          <MenuRow icon="⌨" label="Доставки" value="Открыть список заказов" onPress={() => { onClose(); router.push('/(tabs)/deliveries') }} />
+          <MenuRow icon="⌨" label="Мои заказы" value="Открыть список заказов" onPress={() => { onClose(); router.push('/(tabs)/deliveries') }} />
           <MenuRow icon="▤" label="Касса" value="Выручка и сдача наличных" onPress={() => { onClose(); router.push('/(tabs)/cash') }} />
 
           <View style={s.divider} />

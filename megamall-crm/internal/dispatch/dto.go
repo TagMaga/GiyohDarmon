@@ -159,6 +159,7 @@ type OrderHistoryRow struct {
 	SellerName         string                `json:"seller_name"`
 	TotalAmount        float64               `json:"total_amount"`
 	DeliveryFee        float64               `json:"delivery_fee"`
+	CourierPayout      float64               `json:"courier_payout"`
 	DeliveredAt        *time.Time            `json:"delivered_at"`
 	ProcessSeconds     *int                  `json:"process_seconds"`
 	CancellationReason *string               `json:"cancellation_reason"`

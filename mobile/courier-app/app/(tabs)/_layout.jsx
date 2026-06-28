@@ -28,8 +28,8 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="dashboard"  options={{ title: 'Главная',   tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} /> }} />
-      <Tabs.Screen name="deliveries" options={{ title: 'Доставки',  tabBarIcon: ({ focused }) => <TabIcon emoji="📦" focused={focused} /> }} />
-      <Tabs.Screen name="claimable"  options={{ title: 'Доступные', tabBarIcon: ({ focused }) => <TabIcon emoji="🎯" focused={focused} /> }} />
+      <Tabs.Screen name="deliveries" options={{ title: 'Мои заказы',  tabBarIcon: ({ focused }) => <TabIcon emoji="📦" focused={focused} /> }} />
+      <Tabs.Screen name="claimable"  options={{ title: 'Общий заказ', tabBarIcon: ({ focused }) => <TabIcon emoji="🎯" focused={focused} /> }} />
       <Tabs.Screen name="cash"       options={{ title: 'Касса',     tabBarIcon: ({ focused }) => <TabIcon emoji="💰" focused={focused} /> }} />
       <Tabs.Screen name="profile"    options={{ href: null }} />
     </Tabs>

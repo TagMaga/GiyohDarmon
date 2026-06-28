@@ -1,8 +1,8 @@
 /**
  * OrdersTable — owner read-only orders table with pagination.
  *
- * Columns: №, Клиент, Телефон, Товар, Кол-во, Сумма, Доставка, Чистая выручка,
- *          Статус, Продавец, Менеджер, Команда, Дата, Действие (view)
+ * Columns: №, Клиент, Телефон, Товар, Кол-во, Сумма, Доставка,
+ *          Статус, Курьер, Продавец, Менеджер, Команда, Дата, Действие (view)
  *
  * Mobile: condensed card layout below md.
  * Desktop: full table at md+.
@@ -31,9 +31,32 @@ function resolveCustomer(order) {
 }
 
 function resolveProduct(order) {
+  const items = order.items ?? order.Items ?? []
+  const first = Array.isArray(items) ? items[0] : null
+  if (first) {
+    const quantity = items.reduce((sum, item) => sum + Number(item.quantity ?? item.Quantity ?? 0), 0)
+    return {
+      name: first.product_name ?? first.ProductName ?? first.product?.name ?? first.product?.Name ?? '—',
+      image: first.product_image_url ?? first.ProductImageURL ?? first.product?.image_url ?? null,
+      extra: items.length > 1 ? `+${items.length - 1}` : null,
+      quantity: quantity || 1,
+    }
+  }
   const p = order.product ?? order.Product
-  if (p) return p.name ?? p.Name ?? '—'
-  return resolveField(order, 'product_name', 'ProductName') ?? '—'
+  if (p) {
+    return {
+      name: p.name ?? p.Name ?? '—',
+      image: p.image_url ?? p.ImageURL ?? null,
+      extra: null,
+      quantity: resolveField(order, 'quantity', 'Quantity', 'qty') ?? 1,
+    }
+  }
+  return {
+    name: resolveField(order, 'product_name', 'ProductName') ?? '—',
+    image: resolveField(order, 'product_image_url', 'ProductImageURL'),
+    extra: null,
+    quantity: resolveField(order, 'quantity', 'Quantity', 'qty') ?? 1,
+  }
 }
 
 function resolveUserName(userMap, userId) {
@@ -48,6 +71,39 @@ function resolveTeamName(teamMap, teamId) {
   return t ? t.name : teamId.slice(0,8)
 }
 
+function resolveCourierName(order) {
+  return resolveField(
+    order,
+    'courier_display_name',
+    'CourierDisplayName',
+    'current_courier_name',
+    'CurrentCourierName',
+    'delivered_by_courier_name',
+    'DeliveredByCourierName'
+  )
+}
+
+function ProductCell({ product }) {
+  return (
+    <div className="flex items-center gap-2 min-w-[170px] max-w-[220px]">
+      {product.image ? (
+        <img
+          src={product.image}
+          alt=""
+          className="h-9 w-9 rounded-lg object-cover border border-slate-100 bg-slate-50 flex-shrink-0"
+          loading="lazy"
+        />
+      ) : (
+        <div className="h-9 w-9 rounded-lg border border-slate-100 bg-slate-50 flex-shrink-0" />
+      )}
+      <div className="min-w-0">
+        <p className="truncate font-medium text-slate-700">{product.name}</p>
+        {product.extra && <p className="text-[10px] text-slate-400">{product.extra} товар</p>}
+      </div>
+    </div>
+  )
+}
+
 // ── Desktop row ──────────────────────────────────────────────────────────────
 
 function DesktopRow({ order, userMap, teamMap, onView }) {
@@ -55,8 +111,9 @@ function DesktopRow({ order, userMap, teamMap, onView }) {
   const status  = order.status ?? order.Status ?? ''
   const amount  = resolveField(order, 'total_order_amount', 'total_amount', 'amount', 'total', 'Amount') ?? 0
   const delivery = resolveField(order, 'courier_payout', 'CourierPayout') ?? 0
-  const net     = Number(amount) - Number(delivery)
-  const qty     = resolveField(order, 'quantity', 'Quantity', 'qty') ?? 1
+  const product = resolveProduct(order)
+  const qty     = product.quantity
+  const teamId  = order.team_id ?? order.TeamID ?? order.manager_team_id ?? order.ManagerTeamID ?? order.team_lead_team_id ?? order.TeamLeadTeamID
 
   return (
     <tr className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
@@ -65,7 +122,9 @@ function DesktopRow({ order, userMap, teamMap, onView }) {
       </td>
       <td className="px-4 py-3 text-xs text-slate-800 max-w-[120px] truncate">{name}</td>
       <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{phone ?? '—'}</td>
-      <td className="px-4 py-3 text-xs text-slate-700 max-w-[140px] truncate">{resolveProduct(order)}</td>
+      <td className="px-4 py-3 text-xs text-slate-700">
+        <ProductCell product={product} />
+      </td>
       <td className="px-4 py-3 text-xs text-center text-slate-600">{qty}</td>
       <td className="px-4 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap text-right">
         {fmtAmount(amount)} сомони
@@ -73,22 +132,22 @@ function DesktopRow({ order, userMap, teamMap, onView }) {
       <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap text-right">
         {delivery ? `${fmtAmount(delivery)} сомони` : '—'}
       </td>
-      <td className="px-4 py-3 text-xs font-semibold text-emerald-700 whitespace-nowrap text-right">
-        {fmtAmount(net)} сомони
-      </td>
       <td className="px-4 py-3">
         <Badge variant={STATUS_BADGE[status] ?? 'slate'} size="sm">
           {STATUS_LABELS[status] ?? status}
         </Badge>
       </td>
       <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
-        {resolveUserName(userMap, order.seller_id ?? order.SellerID) ?? '—'}
+        {resolveCourierName(order) ?? '—'}
+      </td>
+      <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
+        {order.seller?.full_name ?? order.Seller?.FullName ?? resolveUserName(userMap, order.seller_id ?? order.SellerID) ?? '—'}
       </td>
       <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
         {resolveUserName(userMap, order.manager_id ?? order.ManagerID) ?? '—'}
       </td>
       <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
-        {resolveTeamName(teamMap, order.team_id ?? order.TeamID) ?? '—'}
+        {resolveTeamName(teamMap, teamId) ?? '—'}
       </td>
       <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
         {fmtDate(order.created_at ?? order.CreatedAt)}
@@ -112,6 +171,7 @@ function MobileCard({ order, userMap, teamMap, onView }) {
   const { name, phone } = resolveCustomer(order)
   const status  = order.status ?? order.Status ?? ''
   const amount  = resolveField(order, 'total_order_amount', 'total_amount', 'amount', 'total', 'Amount') ?? 0
+  const product = resolveProduct(order)
 
   return (
     <div className="card p-4 space-y-3">
@@ -127,7 +187,7 @@ function MobileCard({ order, userMap, teamMap, onView }) {
       </div>
 
       <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
-        <span>{resolveProduct(order)}</span>
+        <ProductCell product={product} />
         <span className="font-bold text-slate-800">{fmtAmount(amount)} сомони</span>
       </div>
 
@@ -182,7 +242,7 @@ function Pagination({ meta, page, onPage }) {
 
 const HEADERS = [
   '№', 'Клиент', 'Телефон', 'Товар', 'Кол-во', 'Сумма', 'Доставка',
-  'Чистая выручка', 'Статус', 'Продавец', 'Менеджер', 'Команда', 'Дата', '',
+  'Статус', 'Курьер', 'Продавец', 'Менеджер', 'Команда', 'Дата', '',
 ]
 
 export default function OrdersTable({
@@ -200,7 +260,7 @@ export default function OrdersTable({
       {/* ── Desktop ── */}
       <div className="hidden md:block card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1100px]">
+          <table className="w-full text-sm min-w-[1280px]">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/70">
                 {HEADERS.map((h, i) => (

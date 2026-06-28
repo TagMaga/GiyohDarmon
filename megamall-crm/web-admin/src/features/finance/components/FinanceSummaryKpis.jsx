@@ -7,7 +7,7 @@
  *   summary  {object|null}  FinanceSummaryResponse from /finance/summary
  *   loading  {bool}
  */
-import { TrendingUp, Truck, BarChart2, Building2, Users2, Wallet } from 'lucide-react'
+import { TrendingUp, Truck, BarChart2, Package, Users2, Wallet } from 'lucide-react'
 import KpiCard         from '../../../shared/components/KpiCard'
 import { KpiSkeleton } from '../../../shared/components/Skeleton'
 import { fmtMoney }    from '../../hr/utils/hrHelpers'
@@ -23,7 +23,6 @@ export default function FinanceSummaryKpis({ summary, loading = false }) {
 
   const orders  = summary?.orders  ?? {}
   const revenue = summary?.revenue ?? {}
-  const cash    = summary?.cash    ?? {}
 
   const cards = [
     {
@@ -46,9 +45,9 @@ export default function FinanceSummaryKpis({ summary, loading = false }) {
       color: 'emerald',
     },
     {
-      label: 'Доход компании',
-      value: fmtMoney(revenue.company_revenue_earned ?? 0),
-      icon:  <Building2 size={20} />,
+      label: 'Себестоимость',
+      value: fmtMoney(orders.product_cost ?? 0),
+      icon:  <Package size={20} />,
       color: 'violet',
     },
     {
@@ -58,10 +57,10 @@ export default function FinanceSummaryKpis({ summary, loading = false }) {
       color: 'amber',
     },
     {
-      label: 'Касса на руках',
-      value: fmtMoney(cash.cash_outstanding ?? 0),
+      label: 'Валовая прибыль',
+      value: fmtMoney(orders.gross_profit ?? 0),
       icon:  <Wallet size={20} />,
-      color: cash.cash_outstanding > 0 ? 'rose' : 'emerald',
+      color: (orders.gross_profit ?? 0) >= 0 ? 'emerald' : 'rose',
     },
   ]
 

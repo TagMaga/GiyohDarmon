@@ -1,21 +1,30 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Send, Package, MessageCircle, Clock, Phone, ExternalLink, Pencil } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { X, Send, Package, MessageCircle, Clock, Phone, ExternalLink, Pencil, User } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
 import { STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import { useOrderComments, useAddOrderComment } from '../hooks/useOrderComments'
 import { roleLabel } from '../../orders/components/OrderCommentsPanel'
+import { fetchOrderTimeline } from '../../dispatcher/api'
+import { KEYS } from '../../../shared/queryKeys'
 
 const EDITABLE_STATUSES = new Set(['new', 'confirmed', 'assigned'])
 
+const ROLE_BADGE = {
+  seller:     { label: 'Продавец',    color: '#7C3AED', bg: '#F5F3FF' },
+  dispatcher: { label: 'Диспетчер',   color: '#2563EB', bg: '#EFF6FF' },
+  courier:    { label: 'Курьер',       color: '#059669', bg: '#ECFDF5' },
+}
+
 const TIMELINE_STEPS = [
-  { status: 'new',                 label: 'Создан' },
-  { status: 'confirmed',           label: 'Подтверждён' },
-  { status: 'prepayment_pending',  label: 'Ожидает предоплату' },
-  { status: 'prepayment_received', label: 'Предоплата получена' },
-  { status: 'assigned',            label: 'Назначен курьер' },
-  { status: 'in_delivery',         label: 'В доставке' },
-  { status: 'delivered',           label: 'Доставлен' },
+  { status: 'new',                 label: 'Создан',              role: 'seller' },
+  { status: 'confirmed',           label: 'Подтверждён',         role: 'dispatcher' },
+  { status: 'prepayment_pending',  label: 'Ожидает предоплату',  role: 'dispatcher' },
+  { status: 'prepayment_received', label: 'Предоплата получена', role: 'dispatcher' },
+  { status: 'assigned',            label: 'Назначен курьер',     role: 'dispatcher' },
+  { status: 'in_delivery',         label: 'В доставке',          role: 'courier' },
+  { status: 'delivered',           label: 'Доставлен',           role: 'courier' },
 ]
 
 const STATUS_ORDER = TIMELINE_STEPS.map(s => s.status)
@@ -28,6 +37,11 @@ export default function OrderDetailBottomSheet({ order, onClose, citiesById = {}
 
   const { data: comments = [], isLoading: commentsLoading } = useOrderComments(order?.id)
   const addComment = useAddOrderComment(order?.id)
+  const { data: timelineEvents = [] } = useQuery({
+    queryKey: KEYS.dispatcher.timeline(order?.id),
+    queryFn: () => fetchOrderTimeline(order?.id),
+    enabled: !!order?.id,
+  })
 
   useEffect(() => {
     if (order) {
@@ -233,28 +247,44 @@ export default function OrderDetailBottomSheet({ order, onClose, citiesById = {}
           {/* ── СТАТУСЫ tab ── */}
           {activeTab === 'timeline' && (
             <div className="p-5">
-              <div className="relative pl-4">
-                <div className="absolute left-7 top-3 bottom-3 w-px bg-slate-200" />
+              <div className="space-y-3">
                 {TIMELINE_STEPS.map((step, idx) => {
                   const done = idx <= currentIdx
                   const active = order.status === step.status
+                  const event = timelineEvents.find(e => e.to_status === step.status)
+                  const rb = ROLE_BADGE[step.role]
                   return (
-                    <div key={step.status} className="relative flex items-center gap-3 pb-5 last:pb-0">
-                      <div className={`relative z-10 w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all
-                        ${active ? 'ring-4 ring-indigo-100' : ''}
-                        ${active ? 'bg-indigo-600' : done ? 'bg-emerald-500' : 'bg-slate-200'}`}>
-                        <div className="w-2 h-2 rounded-full bg-white" />
+                    <div key={step.status} className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
+                      active ? 'bg-indigo-50 border border-indigo-100' :
+                      done   ? 'bg-slate-50' : 'opacity-40'
+                    }`}>
+                      {/* Step number */}
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                        active ? 'bg-indigo-600 text-white' :
+                        done   ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
+                      }`}>
+                        {idx + 1}
                       </div>
-                      <p className={`text-sm ${active ? 'font-bold text-indigo-700' : done ? 'text-slate-700 font-medium' : 'text-slate-400'}`}>
-                        {step.label}
-                      </p>
+                      {/* Label + actor */}
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold ${active ? 'text-indigo-700' : done ? 'text-slate-800' : 'text-slate-400'}`}>
+                          {step.label}
+                        </p>
+                        {event ? (
+                          <p className="text-xs text-slate-500 mt-0.5 truncate">
+                            {event.actor_name} · {fmtDate(event.created_at)}
+                          </p>
+                        ) : (
+                          <p className="text-xs mt-0.5" style={{ color: rb.color }}>{rb.label}</p>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
                 {['returned', 'cancelled'].includes(order.status) && (
-                  <div className="relative flex items-center gap-3">
-                    <div className="relative z-10 w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-red-500 ring-4 ring-red-100">
-                      <div className="w-2 h-2 rounded-full bg-white" />
+                  <div className="flex items-center gap-3 rounded-2xl px-4 py-3 bg-red-50 border border-red-100">
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-red-500 text-white text-xs font-bold">
+                      !
                     </div>
                     <p className="text-sm font-bold text-red-600">
                       {order.status === 'returned' ? 'Возврат' : 'Отменён'}

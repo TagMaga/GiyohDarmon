@@ -19,6 +19,7 @@ import { Settings, Plus } from 'lucide-react'
 
 const ALL_SCOPES = ['global', 'team', 'employee']
 const ALL_TYPES  = ['seller_rate','manager_team_rate','manager_personal_rate','team_lead_pool_rate','company_rate']
+const DEFAULT_NOTE = 'Обновлено без примечания'
 
 // ── Create config modal ───────────────────────────────────────────────────────
 
@@ -129,8 +130,7 @@ function DisableModal({ open, onClose, config }) {
   const { mutate, isPending, error, reset } = useMutation({
     mutationFn: () => {
       if (!effectiveTo) throw new Error('Укажите дату отключения')
-      if (!notes.trim()) throw new Error('Причина обязательна')
-      return disableConfig(config.id, { effective_to: new Date(effectiveTo).toISOString(), notes: notes.trim() })
+      return disableConfig(config.id, { effective_to: new Date(effectiveTo).toISOString(), notes: notes.trim() || DEFAULT_NOTE })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.hr.configs })
@@ -152,9 +152,6 @@ function DisableModal({ open, onClose, config }) {
         <Alert variant="warning">Конфигурация будет деактивирована с указанной даты.</Alert>
         <div><label className="input-label">Дата отключения *</label>
           <input type="datetime-local" value={effectiveTo} onChange={e => setEffectiveTo(e.target.value)} className="input mt-1" />
-        </div>
-        <div><label className="input-label">Причина *</label>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} className="input resize-none mt-1" rows={2} />
         </div>
       </div>
     </Modal>

@@ -104,12 +104,6 @@ export default function SellerOrders() {
         <PageHeader
           title="Мои заказы"
           subtitle={`Всего: ${orders.length}`}
-          action={
-            <Link to="/seller/orders/create" className="btn btn-primary btn-md flex items-center gap-2">
-              <Plus size={16} />
-              Новый заказ
-            </Link>
-          }
         />
         <div className="mb-4">{filtersSection}</div>
         <SellerOrderMobileCard

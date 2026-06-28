@@ -777,9 +777,9 @@ func (r *Repository) CreateStatusLog(ctx context.Context, s *CourierStatusLog) e
 //
 // Formula per order:
 //
-//	courier_collected = total_amount - prepayment_amount
-//	delivery_fee      = delivery_fee
-//	courier_returns   = courier_collected - delivery_fee
+//	courier_collected = total_amount + delivery_fee - prepayment_amount
+//	delivery_fee      = courier_payout kept as courier salary
+//	courier_returns   = courier_collected - courier_payout
 func (r *Repository) FindEligibleHandoverOrders(tx *gorm.DB, ctx context.Context, courierID uuid.UUID) ([]orders.Order, error) {
 	var rows []orders.Order
 	err := tx.WithContext(ctx).
@@ -913,10 +913,10 @@ func (r *Repository) GetCashSummary(ctx context.Context, courierID uuid.UUID) (*
 	// orders attached to a CONFIRMED handover here. Pending amounts are surfaced
 	// separately (see pending_amount below).
 	err := r.db.WithContext(ctx).Raw(`
-		SELECT
-			COUNT(*)                                                                          AS cnt,
-			COALESCE(SUM(courier_payout), 0)                                                   AS total_fees,
-			COALESCE(SUM(GREATEST(0, total_amount + delivery_fee - prepayment_amount)), 0)     AS cash_to_handover
+			SELECT
+				COUNT(*) AS cnt,
+				COALESCE(SUM(courier_payout), 0) AS total_fees,
+				COALESCE(SUM(GREATEST(0, total_amount + delivery_fee - prepayment_amount - courier_payout)), 0) AS cash_to_handover
 		FROM orders
 		WHERE courier_id = ?
 		  AND status = 'delivered'

@@ -49,7 +49,7 @@ export default function ClaimableScreen() {
   return (
     <SafeAreaView style={s.safe}>
       <View style={s.header}>
-        <Text style={s.headTitle}>Доступные</Text>
+        <Text style={s.headTitle}>Общий заказ</Text>
         <Text style={s.headSub}>{orders.length} заказов рядом</Text>
       </View>
 

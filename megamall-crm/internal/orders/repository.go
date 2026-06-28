@@ -120,6 +120,19 @@ func (r *Repository) List(ctx context.Context, f ListOrdersFilter, actorID uuid.
 	if f.CustomerID != "" {
 		q = q.Where("customer_id = ?", f.CustomerID)
 	}
+	if f.NoCourier {
+		q = q.
+			Where("orders.courier_id IS NULL").
+			Where(`NOT EXISTS (
+				SELECT 1 FROM order_assignments oa
+				WHERE oa.order_id = orders.id AND oa.is_active = TRUE
+			)`)
+	} else if f.CourierID != "" {
+		q = q.Where(`orders.courier_id = ? OR EXISTS (
+			SELECT 1 FROM order_assignments oa
+			WHERE oa.order_id = orders.id AND oa.courier_id = ?
+		)`, f.CourierID, f.CourierID)
+	}
 	if f.OrderType != "" {
 		q = q.Where("order_type = ?", f.OrderType)
 	}

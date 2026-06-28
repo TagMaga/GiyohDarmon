@@ -7,8 +7,8 @@ import { OrderCard } from '../../src/components/OrderCard'
 
 const FILTERS = [
   { key: 'all',         label: 'Все' },
-  { key: 'in_delivery', label: 'Активные' },
   { key: 'assigned',    label: 'Назначены' },
+  { key: 'in_delivery', label: 'В Путь' },
   { key: 'delivered',   label: 'Доставлены' },
   { key: 'returned',    label: 'Возвраты' },
 ]
@@ -73,7 +73,7 @@ export default function DeliveriesScreen() {
       {/* Header */}
       <View style={s.header}>
         <View>
-          <Text style={s.headTitle}>Доставки</Text>
+          <Text style={s.headTitle}>Мои заказы</Text>
           <Text style={s.headSub}>Сегодня · {orders.length} заказов</Text>
         </View>
         <View style={s.onlinePill}>

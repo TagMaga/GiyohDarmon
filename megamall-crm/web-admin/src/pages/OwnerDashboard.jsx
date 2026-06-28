@@ -23,12 +23,11 @@ import {
 import {
   RefreshCw, ArrowRight, Banknote, Truck,
   PackageX, UserPlus, Settings2, PlusCircle,
-  ChevronRight, TrendingUp, TrendingDown, ShoppingCart,
+  ChevronRight,
   BarChart2, Wallet, Package, ShoppingBag, Activity,
-  AlertTriangle, Users, Trophy, Zap, ArrowUpRight, ArrowDownRight,
+  AlertTriangle, Users, Trophy, Zap,
 } from 'lucide-react'
 
-import KpiCard              from '../shared/components/KpiCard'
 import useFinanceSummary    from '../features/finance/hooks/useFinanceSummary'
 import useFinanceCash       from '../features/finance/hooks/useFinanceCash'
 import useLogisticsDashboard from '../features/logistics/hooks/useLogisticsDashboard'
@@ -49,9 +48,8 @@ const PERIODS = [
   { key: 'today',     label: 'Сегодня' },
   { key: 'yesterday', label: 'Вчера' },
   { key: '7d',        label: '7 дней' },
-  { key: '30d',       label: '30 дней' },
   { key: 'month',     label: 'Месяц' },
-  { key: 'all',       label: 'Всё время' },
+  { key: 'custom',    label: 'Период' },
 ]
 
 function periodRange(key) {
@@ -64,23 +62,6 @@ function periodRange(key) {
     case '30d':       return { from: toYMD(minus(29)), to: toYMD(now) }
     case 'month':     return { from: toYMD(new Date(now.getFullYear(), now.getMonth(), 1)), to: toYMD(now) }
     default:          return {}
-  }
-}
-
-function previousPeriodRange(key) {
-  const now   = new Date()
-  const minus = (n) => { const d = new Date(now); d.setDate(d.getDate() - n); return d }
-  switch (key) {
-    case 'today':     { const y = minus(1); return { from: toYMD(y), to: toYMD(y) } }
-    case 'yesterday': { const d = minus(2); return { from: toYMD(d), to: toYMD(d) } }
-    case '7d':        return { from: toYMD(minus(13)), to: toYMD(minus(7)) }
-    case '30d':       return { from: toYMD(minus(59)), to: toYMD(minus(30)) }
-    case 'month': {
-      const s = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      const e = new Date(now.getFullYear(), now.getMonth(), 0)
-      return { from: toYMD(s), to: toYMD(e) }
-    }
-    default: return null
   }
 }
 
@@ -129,42 +110,69 @@ function LinkBtn({ onClick, children }) {
   )
 }
 
-// ── BLOCK 1 — Hero KPI ────────────────────────────────────────────────────────
+// ── BLOCK 1 — Finance formula strip ────────────────────────────────────────────
 
-function HeroKpi({ value, prevValue, loading, label }) {
-  const delta     = prevValue != null ? value - prevValue : null
-  const deltaPct  = (prevValue != null && prevValue !== 0) ? (delta / Math.abs(prevValue)) * 100 : null
-  const isUp      = delta !== null && delta >= 0
-  const hasChange = delta !== null
+function FinanceSummaryStrip({ orders, revenue, loading }) {
+  const grossProfit = Number(orders?.gross_profit || 0)
+  const metrics = [
+    { label: 'Продажи товаров', value: `${fmtMoney(orders?.total_sales)} TJS`, dot: 'bg-sky-500', tone: 'text-sky-950', panel: 'from-sky-50 to-cyan-100' },
+    { label: 'Доставлено заказов', value: fmtNum(orders?.delivered_count), dot: 'bg-indigo-500', tone: 'text-indigo-950', panel: 'from-indigo-50 to-violet-100' },
+    { label: 'Доставка курьерам', value: `${fmtMoney(orders?.delivery_fees)} TJS`, dot: 'bg-violet-500', tone: 'text-violet-950', panel: 'from-violet-50 to-fuchsia-100' },
+    { label: '40% Команды', value: `${fmtMoney(revenue?.total_employee_payouts)} TJS`, dot: 'bg-amber-500', tone: 'text-amber-950', panel: 'from-amber-50 to-yellow-100' },
+    { label: 'Себестоимость товара', value: `${fmtMoney(orders?.product_cost)} TJS`, dot: 'bg-emerald-500', tone: 'text-emerald-950', panel: 'from-emerald-50 to-teal-100' },
+    { label: 'Валовая прибыль', value: `${fmtMoney(grossProfit)} TJS`, dot: 'bg-rose-500', tone: 'text-rose-950', panel: 'from-rose-50 to-orange-100', result: true },
+  ]
+
+  if (loading) {
+    return (
+      <section className="rounded-3xl border border-slate-100 bg-white shadow-sm p-5">
+        <div className="h-5 w-40 bg-slate-100 rounded-lg animate-pulse mb-4" />
+        <div className="grid grid-cols-2 lg:grid-cols-6 divide-x divide-slate-100 overflow-hidden rounded-2xl border border-slate-100">
+          {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="h-20 bg-slate-50 animate-pulse" />)}
+        </div>
+      </section>
+    )
+  }
 
   return (
-    <div className="rounded-3xl border border-slate-100 bg-white shadow-sm px-7 py-6 flex flex-col gap-1">
-      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">{label}</p>
-      {loading ? (
-        <div className="h-14 w-56 bg-slate-100 rounded-2xl animate-pulse mt-2" />
-      ) : (
-        <p className="text-[52px] font-bold leading-none tracking-tight text-slate-900 tabular-nums mt-1">
-          {fmtMoney(value)}{' '}
-          <span className="text-[28px] font-semibold text-slate-400">с</span>
-        </p>
-      )}
-      {hasChange && !loading && (
-        <div className={`flex items-center gap-1.5 mt-1 ${isUp ? 'text-emerald-600' : 'text-rose-500'}`}>
-          {isUp ? <ArrowUpRight size={15} /> : <ArrowDownRight size={15} />}
-          <span className="text-[13px] font-semibold tabular-nums">
-            {isUp ? '+' : ''}{fmtMoney(delta)} с
-          </span>
-          {deltaPct !== null && (
-            <span className="text-[12px] font-medium opacity-80">
-              ({isUp ? '+' : ''}{deltaPct.toFixed(1)}% vs. предыдущий период)
-            </span>
-          )}
-        </div>
-      )}
-      {!hasChange && !loading && (
-        <p className="text-xs text-slate-400 mt-1">Нет данных для сравнения</p>
-      )}
-    </div>
+    <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
+        {metrics.slice(0, 3).map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-2xl border border-white/70 bg-gradient-to-br ${item.panel} px-7 py-7 min-h-[150px] shadow-sm`}
+          >
+            <div className="flex items-center gap-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${item.dot}`} />
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
+                {item.label}
+              </p>
+            </div>
+            <p className={`mt-5 text-[42px] font-bold leading-tight tabular-nums ${item.tone}`}>{item.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 pt-0">
+        {metrics.slice(3).map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-2xl border bg-gradient-to-br ${item.panel} px-7 py-7 min-h-[150px] shadow-sm ${
+              item.result
+                ? 'border-rose-300 ring-4 ring-rose-100 shadow-lg shadow-rose-100'
+                : 'border-white/70'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${item.dot}`} />
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
+                {item.label}
+              </p>
+            </div>
+            <p className={`mt-5 font-bold leading-tight tabular-nums ${item.result ? 'text-[48px]' : 'text-[42px]'} ${item.tone}`}>{item.value}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -492,29 +500,30 @@ function LogisticsOverview({ data, loading, onNav }) {
 // ── BLOCK 8 — Financial waterfall ─────────────────────────────────────────────
 
 function FinancialWaterfall({ summary, loading }) {
-  const o = summary?.orders  ?? {}
-  const r = summary?.revenue ?? {}
+	const o = summary?.orders  ?? {}
+	const r = summary?.revenue ?? {}
 
-  const clientPaid  = Number(o.total_sales || 0) + Number(o.delivery_fees || 0)
-  const sellers     = Number(r.seller_commission_earned || 0)
-  const managers    = Number(r.manager_personal_commission_earned || 0) + Number(r.manager_team_commission_earned || 0)
-  const teamLeads   = Number(r.team_lead_pool_earned || 0)
-  const company     = Number(r.company_revenue_earned || 0)
-  const couriers    = Number(r.courier_payouts || 0)
-  const netProfit   = company - couriers
+	const totalSales  = Number(o.total_sales || 0)
+	const delivery    = Number(o.delivery_fees || 0)
+	const netRevenue  = Number(o.net_revenue || 0)
+	const sellers     = Number(r.seller_commission_earned || 0)
+	const managers    = Number(r.manager_personal_commission_earned || 0) + Number(r.manager_team_commission_earned || 0)
+	const teamLeads   = Number(r.team_lead_pool_earned || 0)
+	const teams       = Number(r.total_employee_payouts || 0)
+	const productCost = Number(o.product_cost || 0)
+	const grossProfit = Number(o.gross_profit || 0)
 
-  const maxBar = Math.max(clientPaid, 1)
-  const barW = (v) => `${Math.max(4, (Math.abs(v) / maxBar) * 100).toFixed(1)}%`
+	const maxBar = Math.max(totalSales, 1)
+	const barW = (v) => `${Math.max(4, (Math.abs(v) / maxBar) * 100).toFixed(1)}%`
 
-  const rows = [
-    { label: 'Оплачено клиентами',   value: clientPaid, color: 'bg-indigo-500',  type: 'base' },
-    { label: '− Комиссия продавцов', value: sellers,    color: 'bg-rose-400',    type: 'sub'  },
-    { label: '− Комиссия менеджеров',value: managers,   color: 'bg-rose-300',    type: 'sub'  },
-    { label: '− Доля тимлидов',      value: teamLeads,  color: 'bg-rose-200',    type: 'sub'  },
-    { label: '= Доход компании',      value: company,    color: 'bg-emerald-500', type: 'result'},
-    { label: '− Выплаты курьерам',   value: couriers,   color: 'bg-amber-400',   type: 'sub'  },
-    { label: '= Чистая прибыль',      value: netProfit,  color: netProfit >= 0 ? 'bg-emerald-600' : 'bg-rose-600', type: 'final' },
-  ]
+	const rows = [
+		{ label: 'Продажи товаров',         value: totalSales,  color: 'bg-indigo-500',  type: 'base' },
+		{ label: '− Доставка курьерам',     value: delivery,    color: 'bg-sky-400',     type: 'sub'  },
+		{ label: '= Чистая выручка',        value: netRevenue,  color: 'bg-emerald-500', type: 'result'},
+		{ label: '− Команды',               value: teams,       color: 'bg-amber-400',   type: 'sub'  },
+		{ label: '− Себестоимость товара',  value: productCost, color: 'bg-violet-400',  type: 'sub'  },
+		{ label: '= Валовая прибыль',       value: grossProfit, color: grossProfit >= 0 ? 'bg-emerald-600' : 'bg-rose-600', type: 'final' },
+	]
 
   if (loading) {
     return (
@@ -536,10 +545,10 @@ function FinancialWaterfall({ summary, loading }) {
                 {row.label}
               </span>
               <span className={`text-[13px] tabular-nums ${row.type === 'final' ? 'font-bold' : 'font-semibold'} ${
-                row.type === 'sub' ? 'text-rose-600'
-                : row.type === 'final' && netProfit < 0 ? 'text-rose-600'
-                : 'text-slate-900'
-              }`}>
+								row.type === 'sub' ? 'text-rose-600'
+								: row.type === 'final' && grossProfit < 0 ? 'text-rose-600'
+								: 'text-slate-900'
+							}`}>
                 {row.type === 'sub' ? '−' : ''}{fmtMoney(row.value)} с
               </span>
             </div>
@@ -658,13 +667,12 @@ export default function OwnerDashboard() {
   const navigate = useNavigate()
   const qc       = useQueryClient()
   const [period, setPeriod] = useState('month')
-  const range    = useMemo(() => periodRange(period), [period])
-  const prevRange = useMemo(() => previousPeriodRange(period), [period])
+  const [customRange, setCustomRange] = useState(() => periodRange('month'))
+  const range    = useMemo(() => period === 'custom' ? customRange : periodRange(period), [period, customRange])
   const onNav    = useCallback((to) => navigate(to), [navigate])
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const { data: summary,  isLoading: sumLoading,   isFetching: sumFetching } = useFinanceSummary(range)
-  const { data: prevSum,  isLoading: prevLoading  } = useFinanceSummary(prevRange ?? {})
   const { data: stats,    isLoading: statsLoading } = useOrderStats(range)
   const { data: logi,     isLoading: logiLoading  } = useLogisticsDashboard()
   const { data: cashData, isLoading: cashLoading  } = useFinanceCash({ ...range, limit: 5 })
@@ -676,27 +684,8 @@ export default function OwnerDashboard() {
   const { data: teams     = [], isLoading: teamsLoading }   = useTeamPerformance(range)
 
   // ── Derived KPIs ──────────────────────────────────────────────────────────
-  const o          = summary?.orders  ?? {}
-  const rev        = summary?.revenue ?? {}
-  const prevRev    = prevSum?.revenue ?? {}
-  const clientPaid = Number(o.total_sales || 0) + Number(o.delivery_fees || 0)
-  const company    = Number(rev.company_revenue_earned || 0)
-  const courier    = Number(rev.courier_payouts || 0)
-  const netProfit  = company - courier
-  const cashOnHand = logi?.cash_in_circulation ?? 0
-  const kpiLoading = sumLoading || statsLoading
-
-  const prevNetProfit = prevRange
-    ? Number(prevRev.company_revenue_earned || 0) - Number(prevRev.courier_payouts || 0)
-    : null
-
-  const kpis = [
-    { label: 'Выручка клиентов', value: `${fmtMoney(clientPaid)} с`, icon: <TrendingUp size={22}/>,   color: 'indigo'  },
-    { label: 'Продажи товаров',  value: `${fmtMoney(o.total_sales)} с`, icon: <ShoppingCart size={22}/>, color: 'sky'  },
-    { label: 'Доход компании',   value: `${fmtMoney(company)} с`,     icon: <BarChart2 size={22}/>,    color: 'emerald' },
-    { label: 'Касса у курьеров', value: `${fmtMoney(cashOnHand)} с`,  icon: <Wallet size={22}/>,       color: cashOnHand > 0 ? 'amber' : 'sky' },
-  ]
-
+	const o          = summary?.orders  ?? {}
+	const rev        = summary?.revenue ?? {}
   // ── Alerts ────────────────────────────────────────────────────────────────
   const lowStockCount = inventory.filter(i => getStockStatus(i) === 'low_stock' || getStockStatus(i) === 'out_of_stock').length
   const alerts = []
@@ -731,7 +720,7 @@ export default function OwnerDashboard() {
           <h1 className="text-xl font-bold text-slate-900">Панель владельца</h1>
           <p className="text-xs text-slate-400 mt-0.5">Командный центр компании</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-xl bg-slate-100 p-0.5">
             {PERIODS.map((p) => (
               <button
@@ -745,6 +734,25 @@ export default function OwnerDashboard() {
               </button>
             ))}
           </div>
+          {period === 'custom' && (
+            <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-0.5">
+              <input
+                type="date"
+                value={customRange.from || ''}
+                onChange={(event) => setCustomRange((current) => ({ ...current, from: event.target.value }))}
+                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-indigo-300"
+                aria-label="Дата от"
+              />
+              <span className="px-1 text-xs font-medium text-slate-400">—</span>
+              <input
+                type="date"
+                value={customRange.to || ''}
+                onChange={(event) => setCustomRange((current) => ({ ...current, to: event.target.value }))}
+                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none transition-colors focus:border-indigo-300"
+                aria-label="Дата до"
+              />
+            </div>
+          )}
           <button
             onClick={handleRefresh}
             className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0"
@@ -755,33 +763,11 @@ export default function OwnerDashboard() {
         </div>
       </div>
 
-      {/* BLOCK 1 — Hero profit + secondary KPIs */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_1fr] gap-3">
-        {/* Hero — spans full width on mobile, 2 cols on lg */}
-        <div className="lg:col-span-2">
-          <HeroKpi
-            label="Чистая прибыль компании"
-            value={netProfit}
-            prevValue={prevNetProfit}
-            loading={sumLoading || (prevRange != null && prevLoading)}
-          />
-        </div>
-        {/* Secondary KPIs */}
-        {kpis.slice(0, 2).map((k) => (
-          <KpiCard key={k.label} label={k.label} value={k.value} icon={k.icon} color={k.color} loading={kpiLoading} />
-        ))}
-      </div>
-      {/* Second row of KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Доставка с клиентов',  value: `${fmtMoney(o.delivery_fees)} с`, icon: <Truck size={22}/>,       color: 'violet'  },
-          { label: 'Выплаты курьерам',     value: `${fmtMoney(courier)} с`,          icon: <Banknote size={22}/>,     color: 'amber'   },
-          { label: 'Доход компании',       value: `${fmtMoney(company)} с`,           icon: <BarChart2 size={22}/>,    color: 'emerald' },
-          { label: 'Заказов',             value: fmtNum(stats?.total),               icon: <Package size={22}/>,     color: 'indigo'  },
-        ].map((k) => (
-          <KpiCard key={k.label} label={k.label} value={k.value} icon={k.icon} color={k.color} loading={kpiLoading} />
-        ))}
-      </div>
+      <FinanceSummaryStrip
+        orders={summary?.orders}
+        revenue={summary?.revenue}
+        loading={sumLoading}
+      />
 
       {/* BLOCK 4 — Attention center (always above fold) */}
       <AttentionCenter items={alerts} loading={alertsLoading} onNav={onNav} />

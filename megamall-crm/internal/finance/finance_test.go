@@ -19,6 +19,7 @@ func TestBuildRevenueSummary_AllEventTypes(t *testing.T) {
 		{EventType: "manager_personal_commission_earned", Total: 16},
 		{EventType: "manager_team_commission_earned", Total: 4.8},
 		{EventType: "team_lead_pool_earned", Total: 145.6},
+		{EventType: "courier_fee_earned", Total: 200},
 	}
 
 	rev := buildRevenueSummary(rows)
@@ -37,6 +38,9 @@ func TestBuildRevenueSummary_AllEventTypes(t *testing.T) {
 	}
 	if !near2(rev.TeamLeadPoolEarned, 145.6) {
 		t.Errorf("team_lead_pool: got %.2f, want 145.6", rev.TeamLeadPoolEarned)
+	}
+	if !near2(rev.CourierPayouts, 200) {
+		t.Errorf("courier_payouts: got %.2f, want 200", rev.CourierPayouts)
 	}
 }
 
@@ -102,13 +106,14 @@ func TestBuildRevenueSummary_EmptyRows(t *testing.T) {
 
 // ─── Cash outstanding calculation ─────────────────────────────────────────────
 
-// TestCashOutstanding_Standard verifies cash_outstanding = collected - returned.
+// TestCashOutstanding_Standard verifies cash_outstanding = collected - returned - courier salary kept.
 func TestCashOutstanding_Standard(t *testing.T) {
-	collected := 1300.0
-	returned := 1060.0
-	want := 240.0
+	collected := 1000.0
+	returned := 800.0
+	courierSalary := 200.0
+	want := 0.0
 
-	got := roundFloat(collected - returned)
+	got := roundFloat(collected - returned - courierSalary)
 
 	if !near2(got, want) {
 		t.Errorf("cash_outstanding: got %.2f, want %.2f", got, want)
@@ -190,8 +195,8 @@ func TestRoundFloat_TwoDecimals(t *testing.T) {
 	}{
 		{214.40, 214.40},
 		{4.80, 4.80},
-		{0.005, 0.01},  // rounds up
-		{0.004, 0.00},  // rounds down
+		{0.005, 0.01}, // rounds up
+		{0.004, 0.00}, // rounds down
 		{-0.005, -0.01},
 	}
 	for _, tc := range cases {

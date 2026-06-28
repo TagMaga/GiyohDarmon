@@ -36,10 +36,10 @@ type EventsQueryParams struct {
 // FinanceSummaryResponse is returned by GET /finance/summary.
 // All monetary values are in the local currency unit (two-decimal precision).
 type FinanceSummaryResponse struct {
-	Period  FinancePeriod       `json:"period"`
-	Orders  FinanceOrdersSummary `json:"orders"`
+	Period  FinancePeriod         `json:"period"`
+	Orders  FinanceOrdersSummary  `json:"orders"`
 	Revenue FinanceRevenueSummary `json:"revenue"`
-	Cash    FinanceCashSummary  `json:"cash"`
+	Cash    FinanceCashSummary    `json:"cash"`
 }
 
 // FinancePeriod echoes the effective date range used for the query.
@@ -52,26 +52,28 @@ type FinancePeriod struct {
 // FinanceOrdersSummary covers order-level aggregates from the orders table.
 // Only delivered orders are counted for monetary figures.
 type FinanceOrdersSummary struct {
-	TotalCount     int     `json:"total_count"`     // delivered orders in period
-	DeliveredCount int     `json:"delivered_count"` // same as total_count (all delivered)
-	TotalSales     float64 `json:"total_sales"`     // SUM(total_amount)
-	DeliveryFees   float64 `json:"delivery_fees"`   // SUM(delivery_fee)
-	NetRevenue     float64 `json:"net_revenue"`     // SUM(net_revenue)
+	TotalCount         int     `json:"total_count"`          // delivered orders in period
+	DeliveredCount     int     `json:"delivered_count"`      // same as total_count (all delivered)
+	TotalSales         float64 `json:"total_sales"`          // SUM(total_amount)
+	DeliveryFees       float64 `json:"delivery_fees"`        // SUM(courier_payout) kept by couriers
+	ClientDeliveryFees float64 `json:"client_delivery_fees"` // SUM(delivery_fee) charged to clients
+	NetRevenue         float64 `json:"net_revenue"`          // total_sales - delivery_fees
+	ProductCost        float64 `json:"product_cost"`         // SUM(quantity * purchase_price)
+	GrossProfit        float64 `json:"gross_profit"`         // total_sales - delivery_fees - payouts - product_cost
 }
 
 // FinanceRevenueSummary covers financial_events aggregates grouped by event_type.
 // Orphan events (order_id IS NULL) are excluded.
 type FinanceRevenueSummary struct {
-	CompanyRevenueEarned              float64 `json:"company_revenue_earned"`
-	SellerCommissionEarned            float64 `json:"seller_commission_earned"`
-	ManagerPersonalCommissionEarned   float64 `json:"manager_personal_commission_earned"`
-	ManagerTeamCommissionEarned       float64 `json:"manager_team_commission_earned"`
-	TeamLeadPoolEarned                float64 `json:"team_lead_pool_earned"`
-	TotalEmployeePayouts              float64 `json:"total_employee_payouts"`
-	// CourierPayouts is the company expense paid to couriers (courier_fee_earned),
-	// independent of client delivery fees. Company net profit ≈
-	// company_revenue_earned − courier_payouts (− fixed expenses).
-	CourierPayouts                    float64 `json:"courier_payouts"`
+	CompanyRevenueEarned            float64 `json:"company_revenue_earned"`
+	SellerCommissionEarned          float64 `json:"seller_commission_earned"`
+	ManagerPersonalCommissionEarned float64 `json:"manager_personal_commission_earned"`
+	ManagerTeamCommissionEarned     float64 `json:"manager_team_commission_earned"`
+	TeamLeadPoolEarned              float64 `json:"team_lead_pool_earned"`
+	TotalEmployeePayouts            float64 `json:"total_employee_payouts"`
+	// CourierPayouts is the delivery salary earned by couriers (courier_fee_earned).
+	// In cash handovers this amount is kept by the courier from collected cash.
+	CourierPayouts float64 `json:"courier_payouts"`
 }
 
 // FinanceCashSummary covers cash_handovers aggregates.
@@ -79,9 +81,10 @@ type FinanceRevenueSummary struct {
 type FinanceCashSummary struct {
 	HandoversConfirmed int     `json:"handovers_confirmed"`
 	HandoversPending   int     `json:"handovers_pending"`
-	CashCollected      float64 `json:"cash_collected"`  // SUM(total_collected) confirmed
-	CashReturned       float64 `json:"cash_returned"`   // SUM(actual_returned)  confirmed
-	CashOutstanding    float64 `json:"cash_outstanding"` // collected − returned
+	CashCollected      float64 `json:"cash_collected"`      // SUM(total_collected) confirmed
+	CashReturned       float64 `json:"cash_returned"`       // SUM(actual_returned)  confirmed
+	CourierPayoutKept  float64 `json:"courier_payout_kept"` // courier salary kept from cash
+	CashOutstanding    float64 `json:"cash_outstanding"`    // collected − returned − courier_payout_kept
 }
 
 // ─── Finance events response ───────────────────────────────────────────────────
@@ -119,10 +122,12 @@ type FinanceCashHandoverResponse struct {
 
 // ordersSummaryRow is scanned from the orders aggregate query.
 type ordersSummaryRow struct {
-	TotalCount     int     `gorm:"column:total_count"`
-	TotalSales     float64 `gorm:"column:total_sales"`
-	DeliveryFees   float64 `gorm:"column:delivery_fees"`
-	NetRevenue     float64 `gorm:"column:net_revenue"`
+	TotalCount         int     `gorm:"column:total_count"`
+	TotalSales         float64 `gorm:"column:total_sales"`
+	DeliveryFees       float64 `gorm:"column:delivery_fees"`
+	ClientDeliveryFees float64 `gorm:"column:client_delivery_fees"`
+	NetRevenue         float64 `gorm:"column:net_revenue"`
+	ProductCost        float64 `gorm:"column:product_cost"`
 }
 
 // eventAggRow is scanned from the financial_events GROUP BY event_type query.
@@ -133,10 +138,11 @@ type eventAggRow struct {
 
 // cashSummaryRow is scanned from the cash_handovers aggregate query.
 type cashSummaryRow struct {
-	ConfirmedCount int     `gorm:"column:confirmed_count"`
-	PendingCount   int     `gorm:"column:pending_count"`
-	CashCollected  float64 `gorm:"column:cash_collected"`
-	CashReturned   float64 `gorm:"column:cash_returned"`
+	ConfirmedCount    int     `gorm:"column:confirmed_count"`
+	PendingCount      int     `gorm:"column:pending_count"`
+	CashCollected     float64 `gorm:"column:cash_collected"`
+	CashReturned      float64 `gorm:"column:cash_returned"`
+	CourierPayoutKept float64 `gorm:"column:courier_payout_kept"`
 }
 
 // handoverRow is scanned for paginated cash handover rows.
@@ -159,7 +165,7 @@ type handoverRow struct {
 
 // DailyPoint is one day's worth of revenue data for GET /finance/daily.
 type DailyPoint struct {
-	Date           string  `json:"date"`            // YYYY-MM-DD
+	Date           string  `json:"date"` // YYYY-MM-DD
 	OrdersCount    int     `json:"orders_count"`
 	TotalSales     float64 `json:"total_sales"`     // SUM(total_amount) of delivered orders
 	DeliveryFees   float64 `json:"delivery_fees"`   // SUM(delivery_fee)
@@ -182,9 +188,9 @@ type SellerPerformanceRow struct {
 	Rank            int       `json:"rank"`
 	SellerID        uuid.UUID `json:"seller_id"`
 	FullName        string    `json:"full_name"`
-	OrdersCount     int       `json:"orders_count"`    // delivered in period
-	TotalRevenue    float64   `json:"total_revenue"`   // SUM(total_amount) delivered
-	TotalCommission float64   `json:"total_commission"`// seller_commission_earned events
+	OrdersCount     int       `json:"orders_count"`     // delivered in period
+	TotalRevenue    float64   `json:"total_revenue"`    // SUM(total_amount) delivered
+	TotalCommission float64   `json:"total_commission"` // seller_commission_earned events
 }
 
 // sellerPerfRow is the internal GORM scan target for GetSellerPerformance.
@@ -201,8 +207,8 @@ type sellerPerfRow struct {
 // TeamPerformanceRow is one team's aggregated stats for GET /finance/teams.
 type TeamPerformanceRow struct {
 	TeamLeadID     uuid.UUID `json:"team_lead_id"`
-	TeamName       string    `json:"team_name"`       // from teams.name (may be empty string)
-	TeamLeadName   string    `json:"team_lead_name"`  // from users.full_name
+	TeamName       string    `json:"team_name"`      // from teams.name (may be empty string)
+	TeamLeadName   string    `json:"team_lead_name"` // from users.full_name
 	OrdersCount    int       `json:"orders_count"`
 	TotalRevenue   float64   `json:"total_revenue"`
 	CompanyRevenue float64   `json:"company_revenue"`

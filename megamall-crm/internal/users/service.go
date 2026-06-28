@@ -107,9 +107,6 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateUserReques
 	if req.Phone != nil {
 		u.Phone = *req.Phone
 	}
-	if req.Email != nil {
-		u.Email = req.Email
-	}
 	if req.FullName != nil {
 		u.FullName = *req.FullName
 	}

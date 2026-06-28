@@ -1347,7 +1347,7 @@ function OrderHistoryRowView({ row }) {
       <td>{row.courier_name || '—'}</td>
       <td>{row.seller_name || '—'}</td>
       <td><span className="dv2-cash-num">{formatMoney(row.total_amount)}</span></td>
-      <td><span className="dv2-cash-num purple">{formatMoney(row.delivery_fee)}</span></td>
+      <td><span className="dv2-cash-num purple">{formatMoney(row.courier_payout)}</span></td>
       <td>{formatFullDate(row.delivered_at)}</td>
       <td>{formatDuration(row.process_seconds)}</td>
       <td className="dv2-note-cell">{['cancelled', 'returned'].includes(row.status) ? (row.cancellation_reason || '—') : '—'}</td>
@@ -1367,7 +1367,7 @@ function OrderHistoryCard({ row }) {
         <Info label="Сумма" value={formatMoney(row.total_amount)} />
         <Info label="Курьер" value={row.courier_name || '—'} />
         <Info label="Seller" value={row.seller_name || '—'} />
-        <Info label="Тариф" value={formatMoney(row.delivery_fee)} />
+        <Info label="Тариф" value={formatMoney(row.courier_payout)} />
         <Info label="Доставлен" value={formatFullDate(row.delivered_at)} />
         <Info label="Ср. время" value={formatDuration(row.process_seconds)} />
         <Info full label="Товар" value={<ProductLines products={row.products} />} />

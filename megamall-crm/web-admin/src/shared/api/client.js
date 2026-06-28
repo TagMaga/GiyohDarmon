@@ -1,12 +1,5 @@
 import axios from 'axios'
 
-/**
- * Axios instance.
- *
- * baseURL is relative (/api/v1) so all requests go through the Vite dev-server
- * proxy → http://localhost:8080.  In production, point the reverse proxy (nginx
- * etc.) to the Go backend and the same relative URL will work unchanged.
- */
 const client = axios.create({
   baseURL: '/api/v1',
   timeout: 12_000,
@@ -16,23 +9,15 @@ const client = axios.create({
 })
 
 // ── Request interceptor — attach Bearer token ────────────────────────────────
-// TODO: token in localStorage is vulnerable to XSS. Migrate to httpOnly-cookie
-//       session when this admin panel needs to be hardened for public deployment.
 client.interceptors.request.use(
   (config) => {
-    // Import lazily to avoid circular-module issues at load time
-    // (authStore imports nothing from here, but this file is loaded before the
-    // store is fully initialised on first render)
     const raw = localStorage.getItem('megamall-crm-auth')
     if (raw) {
       try {
-        const parsed = JSON.parse(raw)
-        const token  = parsed?.state?.token
-        if (token) {
-          config.headers['Authorization'] = `Bearer ${token}`
-        }
+        const token = JSON.parse(raw)?.state?.token
+        if (token) config.headers['Authorization'] = `Bearer ${token}`
       } catch {
-        // Malformed localStorage value — ignore
+        // malformed — ignore
       }
     }
     return config
@@ -40,11 +25,19 @@ client.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// ── Response interceptor — handle 401 + stale-user 404 ─────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function getStoredAuth() {
+  try {
+    const raw = localStorage.getItem('megamall-crm-auth')
+    return JSON.parse(raw || '{}')
+  } catch {
+    return {}
+  }
+}
+
 function clearAuthAndRedirect() {
   try {
-    const raw    = localStorage.getItem('megamall-crm-auth')
-    const parsed = JSON.parse(raw || '{}')
+    const parsed = getStoredAuth()
     if (parsed?.state) {
       parsed.state.token        = null
       parsed.state.refreshToken = null
@@ -58,18 +51,62 @@ function clearAuthAndRedirect() {
   window.location.href = '/login'
 }
 
+// Track whether a refresh is already in flight so parallel 401s don't each
+// trigger their own refresh call.
+let refreshPromise = null
+
+async function tryRefresh() {
+  const refreshToken = getStoredAuth()?.state?.refreshToken
+  if (!refreshToken) return false
+
+  try {
+    const res = await axios.post('/api/v1/auth/refresh', { refresh_token: refreshToken })
+    const { access_token, refresh_token: newRefresh } = res.data?.data ?? res.data ?? {}
+    if (!access_token) return false
+
+    // Persist new tokens
+    const parsed = getStoredAuth()
+    if (parsed?.state) {
+      parsed.state.token        = access_token
+      parsed.state.refreshToken = newRefresh ?? refreshToken
+      localStorage.setItem('megamall-crm-auth', JSON.stringify(parsed))
+    }
+    return access_token
+  } catch {
+    return false
+  }
+}
+
+// ── Response interceptor — 401 → try refresh → retry once ───────────────────
 client.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error.response?.status
-    // 401 — token invalid/expired.
-    if (status === 401) {
+    const originalRequest = error.config
+
+    // 401 and not already a retry
+    if (status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
+
+      // Deduplicate: if a refresh is already in flight, wait for it
+      if (!refreshPromise) {
+        refreshPromise = tryRefresh().finally(() => { refreshPromise = null })
+      }
+
+      const newToken = await refreshPromise
+
+      if (newToken) {
+        // Retry the original request with the new token
+        originalRequest.headers['Authorization'] = `Bearer ${newToken}`
+        return client(originalRequest)
+      }
+
+      // Refresh failed — log out
       clearAuthAndRedirect()
       return Promise.reject(error)
     }
-    // 404 on /users/me — JWT is valid but the user record was deleted.
-    // Treat the same as 401: clear auth and redirect to login.
-    // Guard against infinite loop: only fire when not already on /login.
+
+    // 404 on /users/me — user record deleted
     if (
       status === 404 &&
       error.config?.url?.endsWith('/users/me') &&
@@ -78,6 +115,7 @@ client.interceptors.response.use(
       clearAuthAndRedirect()
       return Promise.reject(error)
     }
+
     return Promise.reject(error)
   }
 )

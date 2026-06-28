@@ -38,6 +38,7 @@ import { KEYS }          from '../../../shared/queryKeys'
 import useConfigs        from '../../hr/hooks/useConfigs'
 import { createConfig, disableConfig } from '../api'
 import { fmtPct, fmtDate, isConfigActive } from '../utils/peopleHelpers'
+const DEFAULT_NOTE = 'Обновлено без примечания'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -273,10 +274,9 @@ function DisableRuleModal({ open, onClose, config, scopeId, roleTitle }) {
   const { mutate, isPending, error, reset } = useMutation({
     mutationFn: () => {
       if (!effectiveTo) throw new Error('Укажите дату отключения')
-      if (!notes.trim()) throw new Error('Причина обязательна')
       return disableConfig(config.id, {
         effective_to: new Date(effectiveTo).toISOString(),
-        notes:        notes.trim(),
+        notes:        notes.trim() || DEFAULT_NOTE,
       })
     },
     onSuccess: () => {
@@ -311,13 +311,6 @@ function DisableRuleModal({ open, onClose, config, scopeId, roleTitle }) {
           <input
             type="datetime-local" value={effectiveTo}
             onChange={e => setEffectiveTo(e.target.value)} className="input mt-1"
-          />
-        </div>
-        <div>
-          <label className="input-label">Причина *</label>
-          <textarea
-            value={notes} onChange={e => setNotes(e.target.value)}
-            className="input resize-none mt-1" rows={2}
           />
         </div>
       </div>

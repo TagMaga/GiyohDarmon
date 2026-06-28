@@ -162,6 +162,14 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		effectiveSellerID = *req.SellerID
 	}
 
+	// Customer must exist in the customers table.
+	if req.CustomerID == uuid.Nil {
+		return nil, apperrors.BadRequest("customer is required")
+	}
+	if err := s.validateCustomerExists(ctx, req.CustomerID); err != nil {
+		return nil, err
+	}
+
 	// City is required and must be an active delivery city.
 	if req.CityID == uuid.Nil {
 		return nil, apperrors.BadRequest("city is required")
@@ -428,6 +436,21 @@ func normalizeDeliveryMethod(m string) (string, error) {
 	default:
 		return "", apperrors.BadRequest(fmt.Sprintf("unknown delivery method: %q", m))
 	}
+}
+
+// validateCustomerExists ensures the customer exists in the customers table.
+func (s *Service) validateCustomerExists(ctx context.Context, customerID uuid.UUID) error {
+	var count int64
+	if err := s.db.WithContext(ctx).
+		Table("customers").
+		Where("id = ?", customerID).
+		Count(&count).Error; err != nil {
+		return apperrors.Internal(fmt.Errorf("validate customer: %w", err))
+	}
+	if count == 0 {
+		return apperrors.BadRequest("customer not found — please re-select or create a new customer")
+	}
+	return nil
 }
 
 // validateActiveCity ensures the city exists and is active.

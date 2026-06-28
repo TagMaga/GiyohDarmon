@@ -25,7 +25,6 @@ const NAV = {
     { label: 'Команды',    icon: Users2,        path: '/owner/teams' },
     { label: 'Сотрудники', icon: Users,         path: '/owner/employees' },
     { label: 'Склад',      icon: Building2,     path: '/owner/warehouse' },
-    { label: 'HR',         icon: UserCheck,     path: '/owner/hr' },
     { label: 'Команда',    icon: BookUser,      path: '/owner/team-directory' },
     { label: 'Настройки',  icon: Settings,      path: '/owner/settings' },
     { label: 'Отчёты',     icon: FileBarChart,  path: '/owner/reports' },

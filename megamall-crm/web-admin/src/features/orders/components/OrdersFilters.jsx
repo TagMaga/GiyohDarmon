@@ -1,7 +1,7 @@
 /**
  * OrdersFilters — filter bar for Owner Orders Center.
  *
- * Filters: date range, status, team, seller, manager, product, search.
+ * Filters: date range, status, team, seller, manager, courier, product, search.
  * Search is debounced 400ms. All filter changes call onChange({ ...filters }).
  */
 import { useState, useEffect, useRef } from 'react'
@@ -25,6 +25,7 @@ export default function OrdersFilters({
   teams    = [],
   sellers  = [],
   managers = [],
+  couriers = [],
   products = [],
 }) {
   const [searchRaw, setSearchRaw] = useState(filters.search ?? '')
@@ -50,7 +51,8 @@ export default function OrdersFilters({
 
   const hasActive = !!(
     filters.status || filters.team_id || filters.seller_id ||
-    filters.manager_id || filters.from || filters.to || (filters.search ?? '').trim()
+    filters.manager_id || filters.courier_id || filters.no_courier ||
+    filters.from || filters.to || (filters.search ?? '').trim()
   )
 
   return (
@@ -148,6 +150,28 @@ export default function OrdersFilters({
             <option value="">Все менеджеры</option>
             {managers.map(u => (
               <option key={u.id} value={u.id}>{u.full_name ?? u.FullName ?? u.id}</option>
+            ))}
+          </select>
+        )}
+
+        {/* Courier */}
+        {couriers.length > 0 && (
+          <select
+            value={filters.no_courier ? '__none__' : (filters.courier_id ?? '')}
+            onChange={e => {
+              const value = e.target.value
+              if (value === '__none__') {
+                onChange({ ...filters, courier_id: '', no_courier: true, page: 1 })
+              } else {
+                onChange({ ...filters, courier_id: value, no_courier: false, page: 1 })
+              }
+            }}
+            className="input flex-1 min-w-[140px]"
+          >
+            <option value="">Все курьеры</option>
+            <option value="__none__">Без курьера</option>
+            {couriers.map(c => (
+              <option key={c.courier_id} value={c.courier_id}>{c.full_name ?? c.phone ?? c.courier_id}</option>
             ))}
           </select>
         )}

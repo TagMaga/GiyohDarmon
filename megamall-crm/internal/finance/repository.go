@@ -44,18 +44,37 @@ func (r *Repository) GetOrdersSummary(
 ) (ordersSummaryRow, error) {
 	var row ordersSummaryRow
 	err := r.db.WithContext(ctx).Raw(`
-		SELECT
-			COUNT(*)                                    AS total_count,
-			COALESCE(SUM(o.total_amount), 0)            AS total_sales,
-			COALESCE(SUM(o.delivery_fee), 0)            AS delivery_fees,
-			COALESCE(SUM(o.net_revenue), 0)             AS net_revenue
-		FROM orders o
-		JOIN order_timeline tl ON tl.order_id = o.id
-		WHERE o.deleted_at   IS NULL
-		  AND tl.to_status   = 'delivered'
-		  AND tl.created_at >= ?
-		  AND tl.created_at <= ?
-	`, from, to).Scan(&row).Error
+			WITH delivered_orders AS (
+				SELECT DISTINCT
+					o.id,
+					o.total_amount,
+					o.delivery_fee,
+					o.courier_payout
+				FROM orders o
+				JOIN order_timeline tl ON tl.order_id = o.id
+				WHERE o.deleted_at   IS NULL
+				  AND tl.to_status   = 'delivered'
+				  AND tl.created_at >= ?
+				  AND tl.created_at <= ?
+			),
+			product_costs AS (
+				SELECT
+					oi.order_id,
+					COALESCE(SUM(oi.quantity * COALESCE(p.purchase_price, 0)), 0) AS product_cost
+				FROM order_items oi
+				JOIN products p ON p.id = oi.product_id
+				GROUP BY oi.order_id
+			)
+			SELECT
+				COUNT(*)                                             AS total_count,
+				COALESCE(SUM(d.total_amount), 0)                     AS total_sales,
+				COALESCE(SUM(d.courier_payout), 0)                   AS delivery_fees,
+				COALESCE(SUM(d.delivery_fee), 0)                     AS client_delivery_fees,
+				COALESCE(SUM(d.total_amount - d.courier_payout), 0)  AS net_revenue,
+				COALESCE(SUM(pc.product_cost), 0)                    AS product_cost
+			FROM delivered_orders d
+			LEFT JOIN product_costs pc ON pc.order_id = d.id
+		`, from, to).Scan(&row).Error
 	if err != nil {
 		return ordersSummaryRow{}, fmt.Errorf("get orders summary: %w", err)
 	}
@@ -93,15 +112,35 @@ func (r *Repository) GetCashSummary(
 ) (cashSummaryRow, error) {
 	var row cashSummaryRow
 	err := r.db.WithContext(ctx).Raw(`
-		SELECT
-			COUNT(*) FILTER (WHERE status = 'confirmed')                           AS confirmed_count,
-			COUNT(*) FILTER (WHERE status = 'pending')                             AS pending_count,
-			COALESCE(SUM(total_collected)  FILTER (WHERE status = 'confirmed'), 0) AS cash_collected,
-			COALESCE(SUM(actual_returned)  FILTER (WHERE status = 'confirmed'), 0) AS cash_returned
-		FROM cash_handovers
-		WHERE created_at >= ?
-		  AND created_at <= ?
-	`, from, to).Scan(&row).Error
+			WITH handover_totals AS (
+				SELECT
+					COUNT(*) FILTER (WHERE status = 'confirmed')                           AS confirmed_count,
+					COUNT(*) FILTER (WHERE status = 'pending')                             AS pending_count,
+					COALESCE(SUM(total_collected)  FILTER (WHERE status = 'confirmed'), 0) AS cash_collected,
+					COALESCE(SUM(actual_returned)  FILTER (WHERE status = 'confirmed'), 0) AS cash_returned
+				FROM cash_handovers
+				WHERE created_at >= ?
+				  AND created_at <= ?
+			),
+			courier_salary AS (
+				SELECT
+					COALESCE(SUM(o.courier_payout), 0) AS courier_payout_kept
+				FROM cash_handovers ch
+				JOIN cash_handover_orders cho ON cho.handover_id = ch.id
+				JOIN orders o ON o.id = cho.order_id
+				WHERE ch.status = 'confirmed'
+				  AND ch.created_at >= ?
+				  AND ch.created_at <= ?
+			)
+			SELECT
+				ht.confirmed_count,
+				ht.pending_count,
+				ht.cash_collected,
+				ht.cash_returned,
+				cs.courier_payout_kept
+			FROM handover_totals ht
+			CROSS JOIN courier_salary cs
+		`, from, to, from, to).Scan(&row).Error
 	if err != nil {
 		return cashSummaryRow{}, fmt.Errorf("get cash summary: %w", err)
 	}

@@ -30,6 +30,7 @@ import OrdersAnalytics             from '../components/OrdersAnalytics'
 
 import useEmployees  from '../../people/hooks/useEmployees'
 import useTeams      from '../../people/hooks/useTeams'
+import useLogisticsCouriers from '../../logistics/hooks/useLogisticsCouriers'
 import { buildUserMap } from '../../people/utils/peopleHelpers'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ export default function OwnerOrdersPage() {
   // ── People data ──────────────────────────────────────────────────────────
   const { data: allEmployees = [] } = useEmployees()
   const { data: allTeams     = [] } = useTeams()
+  const { data: couriers     = [] } = useLogisticsCouriers()
 
   const userMap = useMemo(() => buildUserMap(allEmployees), [allEmployees])
   const teamMap = useMemo(() => {
@@ -94,10 +96,12 @@ export default function OwnerOrdersPage() {
     ...(filters.team_id    ? { team_id:    filters.team_id }    : {}),
     ...(filters.seller_id  ? { seller_id:  filters.seller_id }  : {}),
     ...(filters.manager_id ? { manager_id: filters.manager_id } : {}),
+    ...(filters.courier_id ? { courier_id: filters.courier_id } : {}),
+    ...(filters.no_courier ? { no_courier: true } : {}),
     ...(filters.search     ? { search:     filters.search }     : {}),
     limit: 500,
     page:  1,
-  }), [filters.from, filters.to, filters.status, filters.team_id, filters.seller_id, filters.manager_id, filters.search])
+  }), [filters.from, filters.to, filters.status, filters.team_id, filters.seller_id, filters.manager_id, filters.courier_id, filters.no_courier, filters.search])
 
   const {
     items: allOrders,
@@ -156,6 +160,7 @@ export default function OwnerOrdersPage() {
         teams={allTeams}
         sellers={sellers}
         managers={managers}
+        couriers={couriers}
       />
 
       {/* ── Table ───────────────────────────────────────────────────────── */}

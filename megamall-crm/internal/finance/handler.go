@@ -104,10 +104,16 @@ func (h *Handler) GetSummary(c *gin.Context) {
 
 	// Build revenue breakdown from event_type rows.
 	rev := buildRevenueSummary(revenueRes.rows)
+	grossProfit := roundFloat(
+		ordersRes.row.TotalSales -
+			ordersRes.row.DeliveryFees -
+			rev.TotalEmployeePayouts -
+			ordersRes.row.ProductCost,
+	)
 
 	// Build cash summary.
 	cs := cashRes.row
-	cashOutstanding := cs.CashCollected - cs.CashReturned
+	cashOutstanding := roundFloat(cs.CashCollected - cs.CashReturned - cs.CourierPayoutKept)
 
 	resp := FinanceSummaryResponse{
 		Period: FinancePeriod{
@@ -117,11 +123,14 @@ func (h *Handler) GetSummary(c *gin.Context) {
 			To:   to.In(h.loc).Format("2006-01-02"),
 		},
 		Orders: FinanceOrdersSummary{
-			TotalCount:     ordersRes.row.TotalCount,
-			DeliveredCount: ordersRes.row.TotalCount, // all delivered
-			TotalSales:     ordersRes.row.TotalSales,
-			DeliveryFees:   ordersRes.row.DeliveryFees,
-			NetRevenue:     ordersRes.row.NetRevenue,
+			TotalCount:         ordersRes.row.TotalCount,
+			DeliveredCount:     ordersRes.row.TotalCount, // all delivered
+			TotalSales:         ordersRes.row.TotalSales,
+			DeliveryFees:       ordersRes.row.DeliveryFees,
+			ClientDeliveryFees: ordersRes.row.ClientDeliveryFees,
+			NetRevenue:         ordersRes.row.NetRevenue,
+			ProductCost:        ordersRes.row.ProductCost,
+			GrossProfit:        grossProfit,
 		},
 		Revenue: rev,
 		Cash: FinanceCashSummary{
@@ -129,6 +138,7 @@ func (h *Handler) GetSummary(c *gin.Context) {
 			HandoversPending:   cs.PendingCount,
 			CashCollected:      cs.CashCollected,
 			CashReturned:       cs.CashReturned,
+			CourierPayoutKept:  cs.CourierPayoutKept,
 			CashOutstanding:    cashOutstanding,
 		},
 	}

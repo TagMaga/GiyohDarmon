@@ -13,14 +13,12 @@ export default function EditEmployeeModal({ open, onClose, user }) {
   const toast = useToast()
 
   const [fullName, setFullName] = useState('')
-  const [email,    setEmail]    = useState('')
   const [role,     setRole]     = useState('seller')
   const [isActive, setIsActive] = useState(true)
 
   useEffect(() => {
     if (user) {
       setFullName(user.full_name ?? user.FullName ?? '')
-      setEmail(user.email ?? '')
       setRole(user.role ?? user.Role ?? 'seller')
       setIsActive(user.is_active !== false)
     }
@@ -31,7 +29,6 @@ export default function EditEmployeeModal({ open, onClose, user }) {
       if (!fullName.trim()) throw new Error('Имя обязательно')
       return updateEmployee(user.id, {
         full_name: fullName.trim(),
-        email:     email.trim() || undefined,
         role,
         is_active: isActive,
       })
@@ -57,9 +54,6 @@ export default function EditEmployeeModal({ open, onClose, user }) {
       <div className="space-y-4">
         <div><label className="input-label">Полное имя *</label>
           <input value={fullName} onChange={e => setFullName(e.target.value)} className="input mt-1" />
-        </div>
-        <div><label className="input-label">Email</label>
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input mt-1" />
         </div>
         <div><label className="input-label">Роль *</label>
           <select value={role} onChange={e => setRole(e.target.value)} className="input mt-1">

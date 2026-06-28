@@ -69,15 +69,20 @@ export default function SellerOrderMobileCard({
             </Badge>
           </div>
 
-          {/* City + date + amount */}
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <div className="flex items-center gap-2 text-xs text-slate-400 min-w-0 flex-1">
-              {order.city_id && citiesById[order.city_id] && (
-                <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium flex-shrink-0">
-                  {citiesById[order.city_id]}
-                </span>
+          {/* City + date + address + amount */}
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                {order.city_id && citiesById[order.city_id] && (
+                  <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                    {citiesById[order.city_id]}
+                  </span>
+                )}
+                <span className="flex-shrink-0">{fmtDate(order.created_at)}</span>
+              </div>
+              {order.delivery_address && (
+                <p className="text-xs text-slate-500 truncate">{order.delivery_address}</p>
               )}
-              <span className="truncate">{fmtDate(order.created_at)}</span>
             </div>
             <div className="text-right flex-shrink-0">
               <p className="text-sm font-black text-slate-900">

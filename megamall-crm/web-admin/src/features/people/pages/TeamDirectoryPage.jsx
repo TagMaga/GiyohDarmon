@@ -14,20 +14,27 @@
  *   PATCH /users/:id                — status / profile update
  */
 
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query'
 import {
-  Search, X, ChevronLeft, Edit2, Upload, Check, Phone,
-  Mail, MapPin, Calendar, Briefcase, Clock, Users,
-  TrendingUp, Shield, AlertTriangle,
+  Search, X, ChevronLeft, Edit2, Upload, Phone,
+  MapPin, Calendar, Briefcase, Clock, Users,
+  TrendingUp,
 } from 'lucide-react'
 
 import {
   fetchEmployees, fetchTeams, fetchTeamMembers,
-  fetchEmployeeCompensation, fetchEmployeeConfigs,
+  fetchEmployeeCompensation, fetchEmployeeConfigs, fetchTeamConfigs,
+  createConfig, disableConfig,
   updateEmployee, uploadUserAvatar,
 } from '../api'
-import { ROLE_LABEL, COMMISSION_TYPE_LABEL, fmtDate, fmtPct } from '../utils/peopleHelpers'
+import { ALL_ROLES, ROLE_LABEL, COMMISSION_TYPE_LABEL, fmtDate, fmtMoney, fmtPct, isConfigActive } from '../utils/peopleHelpers'
+import Modal               from '../../../shared/components/Modal'
+import Button              from '../../../shared/components/Button'
+import Alert               from '../../../shared/components/Alert'
+import Badge               from '../../../shared/components/Badge'
+import { useToast }        from '../../../shared/components/ToastProvider'
+import AssignTeamModal     from '../components/AssignTeamModal'
 
 // ── Status config ─────────────────────────────────────────────────────────────
 
@@ -63,7 +70,7 @@ function calcTenure(hireDateIso) {
   const rem = months % 12
   if (yrs === 0) return `${rem} мес.`
   if (rem === 0) return `${yrs} г.`
-  return `${yrs}.${Math.round(rem / 12 * 10)} лет`
+  return `${yrs} г. ${rem} мес.`
 }
 
 function calcAge(dobIso) {
@@ -142,29 +149,6 @@ function useDirectory() {
   return { employees, teams, teamColorMap, membershipMap, loading: empLoading || teamLoading, invalidate }
 }
 
-// ── Avatar component ──────────────────────────────────────────────────────────
-
-function Avatar({ url, name, size = 'md', color = '#6366f1' }) {
-  const sizes = { sm: 'w-10 h-10 text-xs', md: 'w-14 h-14 text-sm', lg: 'w-[148px] h-[148px] text-3xl' }
-  const cls = sizes[size] ?? sizes.md
-
-  if (url) {
-    return (
-      <img
-        src={url}
-        alt={name}
-        className={`${cls} rounded-2xl object-cover block flex-shrink-0`}
-        onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
-      />
-    )
-  }
-  return (
-    <div className={`${cls} rounded-2xl flex items-center justify-center font-bold text-white flex-shrink-0`} style={{ background: color }}>
-      {initials(name).toUpperCase()}
-    </div>
-  )
-}
-
 // ── Status chip ───────────────────────────────────────────────────────────────
 
 function StatusChip({ status, small = false }) {
@@ -237,13 +221,18 @@ function PersonCard({ person, teamColor, teamName, onClick }) {
 
 // ── Detail panel ──────────────────────────────────────────────────────────────
 
-function DetailPanel({ person, teamColor, teamName, onBack, onUpdated }) {
+function DetailPanel({ person, teamId, teamColor, teamName, teams, employees, onBack, onUpdated }) {
   const qc        = useQueryClient()
   const fileRef   = useRef()
   const color     = teamColor ?? '#6366f1'
 
+  const [editOpen,      setEditOpen]      = useState(false)
   const [editingStatus, setEditingStatus] = useState(false)
   const [pendingStatus, setPendingStatus] = useState(person.status ?? 'offline')
+
+  useEffect(() => {
+    setPendingStatus(person.status ?? 'offline')
+  }, [person.status])
 
   // Compensation data
   const { data: comp }    = useQuery({
@@ -254,19 +243,31 @@ function DetailPanel({ person, teamColor, teamName, onBack, onUpdated }) {
     queryKey: ['emp-configs', person.id],
     queryFn:  () => fetchEmployeeConfigs(person.id),
   })
+  const { data: teamConfigs = [] } = useQuery({
+    queryKey: ['team-configs', teamId],
+    queryFn:  () => fetchTeamConfigs(teamId),
+    enabled: !!teamId,
+  })
+
+  function patchCache(updated) {
+    qc.setQueryData(['people'], (old) =>
+      Array.isArray(old) ? old.map(u => u.id === updated.id ? updated : u) : old
+    )
+    qc.invalidateQueries({ queryKey: ['people'] })
+  }
 
   const updateMut = useMutation({
     mutationFn: (body) => updateEmployee(person.id, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['people'] })
+    onSuccess: (updated) => {
+      patchCache(updated)
       onUpdated?.()
     },
   })
 
   const avatarMut = useMutation({
     mutationFn: (file) => uploadUserAvatar(person.id, file),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['people'] })
+    onSuccess: (updated) => {
+      patchCache(updated)
       onUpdated?.()
     },
   })
@@ -320,7 +321,7 @@ function DetailPanel({ person, teamColor, teamName, onBack, onUpdated }) {
             <div className="absolute top-0 left-0 right-0 h-1.5 z-10" style={{ background: color }} />
 
             {person.avatar_url ? (
-              <img src={person.avatar_url} alt={person.full_name} className="w-full h-full object-cover" />
+              <img src={`${person.avatar_url}?t=${person.updated_at ?? ''}`} alt={person.full_name} className="w-full h-full object-cover" />
             ) : (
               <div
                 className="w-full h-full flex items-center justify-center text-5xl font-extrabold"
@@ -378,7 +379,7 @@ function DetailPanel({ person, teamColor, teamName, onBack, onUpdated }) {
         {/* Edit button */}
         <button
           className="flex items-center gap-2 h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[13.5px] font-semibold transition-colors flex-shrink-0"
-          onClick={() => {/* future edit modal */}}
+          onClick={() => setEditOpen(true)}
         >
           <Edit2 size={14} />
           Редактировать
@@ -406,13 +407,22 @@ function DetailPanel({ person, teamColor, teamName, onBack, onUpdated }) {
               <InfoField icon={Calendar} label="Дата рождения" value={person.date_of_birth ? fmtDate(person.date_of_birth) : '—'} />
               <InfoField icon={Briefcase} label="Дата найма"   value={person.hire_date    ? fmtDate(person.hire_date)    : '—'} />
               <InfoField icon={Phone}    label="Телефон"       value={person.phone ?? '—'} />
-              <InfoField icon={Mail}     label="Email"         value={person.email ?? '—'} />
               <InfoField icon={MapPin}   label="Адрес"         value={person.address ?? '—'} className="col-span-2" />
             </div>
           </div>
 
-          {/* Compensation panel */}
-          <CompensationPanel person={person} comp={comp} configs={configs} />
+          {/* Pay panel */}
+          <PayPanel
+            person={person}
+            teamId={teamId}
+            teamName={teamName}
+            teamColor={teamColor}
+            teams={teams}
+            employees={employees}
+            empConfigs={configs}
+            teamConfigs={teamConfigs}
+            salaryData={comp}
+          />
         </div>
 
         {/* Right — status & history */}
@@ -483,6 +493,13 @@ function DetailPanel({ person, teamColor, teamName, onBack, onUpdated }) {
           </div>
         </div>
       </div>
+
+      <EditPersonModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        person={person}
+        onSaved={onUpdated}
+      />
     </div>
   )
 }
@@ -509,93 +526,464 @@ function TimelineItem({ date, text }) {
   )
 }
 
-// ── Compensation panel ────────────────────────────────────────────────────────
+// ── Pay panel ─────────────────────────────────────────────────────────────────
 
-function CompensationPanel({ person, comp, configs = [] }) {
-  const isCourier         = person.role === 'courier'
-  const isCommissionRole  = ['seller', 'manager', 'sales_team_lead'].includes(person.role)
+// Commission rows per role (commission_type → display config)
+const COMM_ROWS = {
+  seller:         [{ ct: 'seller_rate',           label: 'Комиссия продавца',    accent: 'emerald' }],
+  manager:        [{ ct: 'manager_team_rate',      label: 'Комиссия с команды',   accent: 'violet'  },
+                   { ct: 'manager_personal_rate',  label: 'Личные заказы',        accent: 'sky'     }],
+  sales_team_lead:[{ ct: 'team_lead_pool_rate',    label: 'Пул руководителя',     accent: 'amber'   }],
+}
 
-  if (isCourier) {
-    return (
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-        <h2 className="text-[14px] font-bold text-slate-900 mb-4 tracking-tight">Оплата</h2>
-        <div className="flex items-start gap-3 bg-amber-50 rounded-xl p-4 border border-amber-100">
-          <TrendingUp size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
-          <p className="text-[13px] text-amber-700 font-medium">
-            Оплата рассчитывается по тарифу доставки. Детали — в разделе Курьеры.
-          </p>
-        </div>
-      </div>
-    )
-  }
+const COMP_KIND_LABEL = { percent: 'Процент', fixed: 'Фиксированная', mixed: 'Смешанная', none: 'Не назначено' }
+const COMP_KIND_BADGE = { percent: 'indigo', fixed: 'emerald', mixed: 'violet', none: 'slate' }
+const DEFAULT_NOTE = 'Обновлено без примечания'
 
-  // Fixed salary (from EmployeeCompensation record)
-  const fixedSalary     = comp?.fixed_salary   != null ? `${Number(comp.fixed_salary).toLocaleString('ru-RU')} ${comp.currency ?? 'TJS'}` : null
-  const commissionRate  = comp?.commission_rate != null ? `${(comp.commission_rate * 100).toFixed(2).replace(/\.?0+$/, '')}%` : null
-  const kind            = comp?.compensation_type
+// ── Modal: set fixed salary / compensation kind ────────────────────────────────
+function SetSalaryModal({ open, onClose, personId, current }) {
+  const qc    = useQueryClient()
+  const toast = useToast()
+  const [kind,    setKind]    = useState(current?.compensation_type ?? 'fixed')
+  const [salary,  setSalary]  = useState(current?.fixed_salary    != null ? String(current.fixed_salary)              : '')
+  const [rate,    setRate]    = useState(current?.commission_rate  != null ? String(current.commission_rate * 100)     : '')
+  const [from,    setFrom]    = useState('')
+  const [notes,   setNotes]   = useState('')
 
-  // Active configs for commission roles
-  const activeConfigs = configs.filter(c => c.is_active !== false && !c.effective_to)
+  useEffect(() => {
+    if (open) {
+      setKind(current?.compensation_type ?? 'fixed')
+      setSalary(current?.fixed_salary    != null ? String(current.fixed_salary)          : '')
+      setRate(current?.commission_rate   != null ? String(current.commission_rate * 100) : '')
+      setFrom(''); setNotes('')
+    }
+  }, [open])
 
-  if (!comp && configs.length === 0) {
-    return (
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-        <h2 className="text-[14px] font-bold text-slate-900 mb-4 tracking-tight">Компенсация</h2>
-        <div className="flex items-start gap-3 bg-slate-50 rounded-xl p-4 border border-slate-100">
-          <Clock size={16} className="text-slate-400 mt-0.5 flex-shrink-0" />
-          <p className="text-[13px] text-slate-500 font-medium">
-            Компенсация ещё не настроена. Перейдите в раздел HR → Сотрудники.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const { mutate, isPending, error, reset } = useMutation({
+    mutationFn: async () => {
+      if (!from)        throw new Error('Укажите дату начала')
+      const body = { compensation_type: kind, effective_from: from + 'T00:00:00Z', notes: notes.trim() || DEFAULT_NOTE }
+      if (kind === 'fixed' || kind === 'mixed') {
+        const s = parseFloat(salary)
+        if (isNaN(s) || s <= 0) throw new Error('Укажите сумму оклада')
+        body.fixed_salary = s
+      }
+      if (kind === 'percent' || kind === 'mixed') {
+        const r = parseFloat(rate)
+        if (isNaN(r) || r <= 0 || r > 100) throw new Error('Укажите процент 0–100')
+        body.commission_rate = r / 100
+      }
+      const { setEmployeeCompensation } = await import('../api')
+      return setEmployeeCompensation(personId, body)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['emp-comp', personId] })
+      toast.success('Оклад обновлён')
+      reset(); onClose()
+    },
+  })
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-      <h2 className="text-[14px] font-bold text-slate-900 mb-5 tracking-tight">Компенсация</h2>
-      <div className="space-y-3">
-        {/* Fixed salary row */}
-        {(kind === 'fixed' || kind === 'mixed') && fixedSalary && (
-          <CompRow label="Оклад (фикс.)" value={fixedSalary} accent="emerald" />
+    <Modal open={open} onClose={onClose} title="Настроить оклад / схему" size="md"
+      footer={<>
+        <Button variant="secondary" onClick={onClose} disabled={isPending}>Отмена</Button>
+        <Button variant="primary" onClick={() => mutate()} loading={isPending}>Сохранить</Button>
+      </>}
+    >
+      {error && <Alert variant="error" className="mb-4">{error.response?.data?.error?.message ?? error.message}</Alert>}
+      <div className="space-y-4">
+        <div>
+          <label className="input-label">Схема оплаты *</label>
+          <select value={kind} onChange={e => setKind(e.target.value)} className="input mt-1">
+            <option value="fixed">Фиксированный оклад</option>
+            <option value="percent">Процент от заказов</option>
+            <option value="mixed">Смешанная (оклад + %)</option>
+            <option value="none">Не назначено</option>
+          </select>
+        </div>
+        {(kind === 'fixed' || kind === 'mixed') && (
+          <div>
+            <label className="input-label">Оклад (TJS/мес) *</label>
+            <input type="number" min="0" step="0.01" value={salary}
+              onChange={e => setSalary(e.target.value)} className="input mt-1" placeholder="3000" />
+          </div>
         )}
-        {/* Commission rate row */}
-        {(kind === 'percent' || kind === 'mixed') && commissionRate && (
-          <CompRow label="Ставка комиссии" value={commissionRate} accent="indigo" />
+        {(kind === 'percent' || kind === 'mixed') && (
+          <div>
+            <label className="input-label">Процент комиссии *</label>
+            <div className="relative mt-1">
+              <input type="number" min="0" max="100" step="0.01" value={rate}
+                onChange={e => setRate(e.target.value)} className="input pr-8" placeholder="5" />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400 pointer-events-none">%</span>
+            </div>
+          </div>
         )}
-        {/* Per-config rows for commission roles */}
-        {isCommissionRole && activeConfigs.map(cfg => (
-          <CompRow
-            key={cfg.id}
-            label={COMMISSION_TYPE_LABEL[cfg.commission_type] ?? cfg.commission_type}
-            value={`${(cfg.rate * 100).toFixed(2).replace(/\.?0+$/, '')}%`}
-            accent="violet"
-            scope={cfg.user_id ? 'Индивид.' : cfg.team_id ? 'Команда' : 'Глобальный'}
-          />
-        ))}
+        <div>
+          <label className="input-label">Действует с *</label>
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="input mt-1" />
+        </div>
       </div>
-      <p className="mt-4 text-[11px] text-slate-400">
-        Для изменения ставок перейдите в HR → Сотрудники → {person.full_name}
-      </p>
+    </Modal>
+  )
+}
+
+// ── Modal: set personal commission rate override ───────────────────────────────
+function PersonalRateModal({ open, onClose, personId, commType, label, existing }) {
+  const qc    = useQueryClient()
+  const toast = useToast()
+  const [rate,  setRate]  = useState(existing ? String(+(existing.rate * 100).toFixed(4)) : '')
+  const [from,  setFrom]  = useState('')
+  const [notes, setNotes] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      setRate(existing ? String(+(existing.rate * 100).toFixed(4)) : '')
+      setFrom(''); setNotes('')
+    }
+  }, [open])
+
+  const { mutate, isPending, error, reset } = useMutation({
+    mutationFn: async () => {
+      const r = parseFloat(rate)
+      if (isNaN(r) || r <= 0 || r > 100) throw new Error('Введите процент 0–100')
+      if (!from)         throw new Error('Укажите дату начала')
+      const note = notes.trim() || DEFAULT_NOTE
+      if (existing) {
+        await disableConfig(existing.id, {
+          effective_to: from + 'T00:00:00Z',
+          notes: `Заменено: ${note}`,
+        })
+      }
+      return createConfig({
+        scope: 'employee', user_id: personId,
+        commission_type: commType,
+        rate: r / 100,
+        effective_from: from + 'T00:00:00Z',
+        notes: note,
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['emp-configs', personId] })
+      toast.success('Ставка обновлена')
+      reset(); onClose()
+    },
+  })
+
+  return (
+    <Modal open={open} onClose={onClose} title={`Личная ставка — ${label}`} size="md"
+      footer={<>
+        <Button variant="secondary" onClick={onClose} disabled={isPending}>Отмена</Button>
+        <Button variant="primary" onClick={() => mutate()} loading={isPending}>
+          {existing ? 'Обновить' : 'Сохранить'}
+        </Button>
+      </>}
+    >
+      {error && <Alert variant="error" className="mb-4">{error.response?.data?.error?.message ?? error.message}</Alert>}
+      <div className="space-y-4">
+        <div>
+          <label className="input-label">Процент *</label>
+          <div className="relative mt-1">
+            <input type="number" min="0" max="100" step="0.01" value={rate}
+              onChange={e => setRate(e.target.value)} className="input pr-8" placeholder="10" />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400 pointer-events-none">%</span>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">Персональная ставка — переопределяет командную.</p>
+        </div>
+        <div>
+          <label className="input-label">Действует с *</label>
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="input mt-1" />
+          {existing && <p className="text-xs text-slate-400 mt-1">Текущая ставка будет закрыта с этой даты.</p>}
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ── Commission rate row ────────────────────────────────────────────────────────
+function CommRateRow({ rowDef, empConfig, teamConfig, personId }) {
+  const [open, setOpen] = useState(false)
+  const active = empConfig ?? teamConfig
+  const isPersonal = !!empConfig
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-2 py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-100">
+        <div className="min-w-0">
+          <p className="text-[12.5px] font-semibold text-slate-700">{rowDef.label}</p>
+          {isPersonal && (
+            <p className="text-[10px] text-indigo-500 font-medium mt-0.5">Личная ставка</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {active ? (
+            <span className="text-[13px] font-bold text-indigo-700">{fmtPct(active.rate)}</span>
+          ) : (
+            <span className="text-[12px] text-slate-400 italic">Не задано</span>
+          )}
+          <button
+            onClick={() => setOpen(true)}
+            className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors px-2 py-1 rounded-lg hover:bg-indigo-50 min-h-[28px]"
+          >
+            {active ? 'Изменить' : 'Задать'}
+          </button>
+        </div>
+      </div>
+      <PersonalRateModal
+        open={open} onClose={() => setOpen(false)}
+        personId={personId} commType={rowDef.ct} label={rowDef.label}
+        existing={empConfig ?? null}
+      />
+    </>
+  )
+}
+
+// ── Main pay panel ─────────────────────────────────────────────────────────────
+function PayPanel({ person, teamId, teamName, teamColor, teams, employees, empConfigs, teamConfigs, salaryData }) {
+  const [showTeam,    setShowTeam]    = useState(false)
+  const [showSalary,  setShowSalary]  = useState(false)
+  const isCourier = person.role === 'courier'
+
+  const color = teamColor ?? '#6366f1'
+
+  // Index configs by commission_type
+  const empByType  = {}
+  const teamByType = {}
+  empConfigs.filter(isConfigActive).forEach(c => { empByType[c.commission_type] = c })
+  teamConfigs.filter(isConfigActive).forEach(c => { teamByType[c.commission_type] = c })
+
+  const commRows = COMM_ROWS[person.role] ?? []
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-5">
+      <h2 className="text-[14px] font-bold text-slate-900 tracking-tight">Оплата</h2>
+
+      {/* ── Team row ──────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-2 py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-100">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+          <p className="text-[12.5px] font-semibold text-slate-700 truncate">{teamName ?? 'Без команды'}</p>
+        </div>
+        <button
+          onClick={() => setShowTeam(true)}
+          className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors px-2 py-1 rounded-lg hover:bg-indigo-50 min-h-[28px] flex-shrink-0"
+        >
+          Изменить команду
+        </button>
+      </div>
+
+      {/* ── Courier note ──────────────────────────────────────────────────── */}
+      {isCourier && (
+        <div className="flex items-start gap-3 bg-amber-50 rounded-xl p-4 border border-amber-100">
+          <TrendingUp size={15} className="text-amber-600 mt-0.5 flex-shrink-0" />
+          <p className="text-[12.5px] text-amber-700 font-medium">
+            Оплата по тарифу доставки.
+          </p>
+        </div>
+      )}
+
+      {/* ── Salary card (non-courier) ──────────────────────────────────────── */}
+
+      {/* ── Commission rates ───────────────────────────────────────────────── */}
+      {commRows.length > 0 && (
+        <div>
+          <p className="text-[10.5px] font-semibold text-slate-400 uppercase tracking-widest mb-2">Ставки комиссии</p>
+          <div className="space-y-2">
+            {commRows.map(rowDef => (
+              <CommRateRow
+                key={rowDef.ct}
+                rowDef={rowDef}
+                empConfig={empByType[rowDef.ct] ?? null}
+                teamConfig={teamByType[rowDef.ct] ?? null}
+                personId={person.id}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
+      <AssignTeamModal
+        open={showTeam}
+        onClose={() => setShowTeam(false)}
+        user={person}
+        teams={teams}
+        users={employees}
+        current={teamId ? { team_id: teamId } : null}
+      />
+      <SetSalaryModal
+        open={showSalary}
+        onClose={() => setShowSalary(false)}
+        personId={person.id}
+        current={salaryData}
+      />
     </div>
   )
 }
 
-function CompRow({ label, value, accent = 'slate', scope }) {
-  const accents = {
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    indigo:  'bg-indigo-50  text-indigo-700  border-indigo-100',
-    violet:  'bg-violet-50  text-violet-700  border-violet-100',
-    slate:   'bg-slate-50   text-slate-700   border-slate-100',
-  }
+// ── Edit modal ────────────────────────────────────────────────────────────────
+
+function EditPersonModal({ open, onClose, person, onSaved }) {
+  const qc    = useQueryClient()
+  const toast = useToast()
+
+  const [fullName,    setFullName]    = useState('')
+  const [phone,       setPhone]       = useState('')
+  const [role,        setRole]        = useState('seller')
+  const [isActive,    setIsActive]    = useState(true)
+  const [status,      setStatus]      = useState('offline')
+  const [hireDate,    setHireDate]    = useState('')
+  const [dob,         setDob]         = useState('')
+  const [address,     setAddress]     = useState('')
+
+  useEffect(() => {
+    if (!person) return
+    setFullName(person.full_name ?? '')
+    setPhone(person.phone ?? '')
+    setRole(person.role ?? 'seller')
+    setIsActive(person.is_active !== false)
+    setStatus(person.status ?? 'offline')
+    setHireDate(person.hire_date ? person.hire_date.slice(0, 10) : '')
+    setDob(person.date_of_birth ? person.date_of_birth.slice(0, 10) : '')
+    setAddress(person.address ?? '')
+  }, [person])
+
+  const { mutate, isPending, error, reset } = useMutation({
+    mutationFn: () => {
+      if (!fullName.trim()) throw new Error('Имя обязательно')
+      return updateEmployee(person.id, {
+        full_name:     fullName.trim(),
+        phone:         phone.trim()   || undefined,
+        role,
+        is_active:     isActive,
+        status,
+        hire_date:     hireDate ? hireDate + 'T00:00:00Z' : undefined,
+        date_of_birth: dob     ? dob + 'T00:00:00Z'     : undefined,
+        address:       address.trim() || undefined,
+      })
+    },
+    onSuccess: (updated) => {
+      qc.setQueryData(['people'], (old) =>
+        Array.isArray(old) ? old.map(u => u.id === updated.id ? updated : u) : old
+      )
+      qc.invalidateQueries({ queryKey: ['people'] })
+      toast.success('Данные обновлены')
+      reset()
+      onSaved?.()
+      onClose()
+    },
+  })
+
+  if (!person) return null
+
   return (
-    <div className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-100">
-      <div>
-        <p className="text-[12.5px] font-semibold text-slate-700">{label}</p>
-        {scope && <p className="text-[10.5px] text-slate-400">{scope}</p>}
+    <Modal
+      open={open}
+      onClose={() => { reset(); onClose() }}
+      title="Редактировать сотрудника"
+      size="lg"
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => { reset(); onClose() }} disabled={isPending}>Отмена</Button>
+          <Button variant="primary" onClick={() => mutate()} loading={isPending}>Сохранить</Button>
+        </>
+      }
+    >
+      {error && (
+        <Alert variant="error" className="mb-4">
+          {error.response?.data?.error?.message ?? error.message}
+        </Alert>
+      )}
+
+      <div className="space-y-5">
+        {/* Row 1 — name + phone */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="input-label">Полное имя *</label>
+            <input
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+              className="input mt-1"
+              placeholder="Имя Фамилия"
+            />
+          </div>
+          <div>
+            <label className="input-label">Телефон</label>
+            <input
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              className="input mt-1"
+              placeholder="+992 93 000 00 00"
+            />
+          </div>
+        </div>
+
+        {/* Row 2 — role */}
+        <div>
+          <label className="input-label">Должность *</label>
+          <select value={role} onChange={e => setRole(e.target.value)} className="input mt-1">
+            {ALL_ROLES.filter(r => r !== 'owner').map(r => (
+              <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Row 3 — hire date + dob */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="input-label">Дата найма</label>
+            <input
+              type="date"
+              value={hireDate}
+              onChange={e => setHireDate(e.target.value)}
+              className="input mt-1"
+            />
+          </div>
+          <div>
+            <label className="input-label">Дата рождения</label>
+            <input
+              type="date"
+              value={dob}
+              onChange={e => setDob(e.target.value)}
+              className="input mt-1"
+            />
+          </div>
+        </div>
+
+        {/* Row 4 — status + is_active */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="input-label">Статус</label>
+            <select value={status} onChange={e => setStatus(e.target.value)} className="input mt-1">
+              {STATUS_OPTIONS.map(o => (
+                <option key={o.key} value={o.key}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-end pb-[2px]">
+            <label className="flex items-center gap-2.5 cursor-pointer min-h-[44px]">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={e => setIsActive(e.target.checked)}
+                className="w-4 h-4 rounded accent-indigo-600"
+              />
+              <span className="text-[13.5px] text-slate-700 font-medium">Активный сотрудник</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Row 5 — address */}
+        <div>
+          <label className="input-label">Адрес</label>
+          <input
+            value={address}
+            onChange={e => setAddress(e.target.value)}
+            className="input mt-1"
+            placeholder="г. Душанбе, ул. ..."
+          />
+        </div>
       </div>
-      <span className={`text-[13px] font-bold px-2.5 py-1 rounded-lg border ${accents[accent]}`}>{value}</span>
-    </div>
+    </Modal>
   )
 }
 
@@ -720,11 +1108,14 @@ export default function TeamDirectoryPage() {
     const tName  = tid ? teamNameMap[tid]  : null
 
     return (
-      <div className="p-4 md:p-6 max-w-5xl mx-auto pb-16">
+      <div className="p-4 md:p-6 pb-16">
         <DetailPanel
           person={selectedPerson}
+          teamId={tid}
           teamColor={tColor}
           teamName={tName}
+          teams={teams}
+          employees={employees}
           onBack={() => setSelected(null)}
           onUpdated={handleUpdated}
         />

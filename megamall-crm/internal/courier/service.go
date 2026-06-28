@@ -253,7 +253,7 @@ func (s *Service) UpdateStatus(ctx context.Context, courierID uuid.UUID, req Upd
 // Algorithm:
 //  1. Find delivered orders for courier NOT in any pending/confirmed handover.
 //  2. For each order: collected = total_amount + delivery_fee - prepayment_amount (= amount_to_collect);
-//     returns = collected - delivery_fee = total_amount - prepayment_amount.
+//     returns = collected - courier_payout because the courier keeps their delivery salary.
 //  3. Sum totals.
 //  4. Create CashHandover + CashHandoverOrder rows in one transaction.
 func (s *Service) SubmitHandover(ctx context.Context, courierID uuid.UUID, req SubmitHandoverRequest) (*CashHandover, error) {
@@ -279,13 +279,16 @@ func (s *Service) SubmitHandover(ctx context.Context, courierID uuid.UUID, req S
 			if collected < 0 {
 				collected = 0
 			}
-			// returns = the FULL client cash. The courier hands back everything;
-			// courier payout is a separate company expense (ledger), never kept
-			// from the cash collected.
-			returns := collected
+			// returns = client cash minus the courier's delivery salary. The salary
+			// is stored as courier_payout and is kept from the collected cash.
+			courierSalary := o.CourierPayout
+			returns := collected - courierSalary
+			if returns < 0 {
+				returns = 0
+			}
 
 			totalCollected += collected
-			totalFees += o.DeliveryFee
+			totalFees += courierSalary
 			totalReturn += returns
 
 			lines = append(lines, CashHandoverOrder{
@@ -295,7 +298,7 @@ func (s *Service) SubmitHandover(ctx context.Context, courierID uuid.UUID, req S
 				OrderTotal:       o.TotalAmount,
 				PrepaymentAmount: o.PrepaymentAmount,
 				CourierCollected: collected,
-				DeliveryFee:      o.DeliveryFee,
+				DeliveryFee:      courierSalary,
 				CourierReturns:   returns,
 			})
 		}

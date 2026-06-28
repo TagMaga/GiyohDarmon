@@ -1,21 +1,30 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { X, Send, Package, MessageCircle, Clock, Phone, ExternalLink, Calendar, MapPin, User, FileText, Pencil } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
 import { STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import { useOrderComments, useAddOrderComment } from '../hooks/useOrderComments'
 import { roleLabel } from '../../orders/components/OrderCommentsPanel'
+import { fetchOrderTimeline } from '../../dispatcher/api'
+import { KEYS } from '../../../shared/queryKeys'
 
 const EDITABLE_STATUSES = new Set(['new', 'confirmed', 'assigned'])
 
+const ROLE_BADGE = {
+  seller:     { label: 'Продавец',  color: '#7C3AED', bg: '#F5F3FF' },
+  dispatcher: { label: 'Диспетчер', color: '#2563EB', bg: '#EFF6FF' },
+  courier:    { label: 'Курьер',    color: '#059669', bg: '#ECFDF5' },
+}
+
 const TIMELINE_STEPS = [
-  { status: 'new',                 label: 'Создан' },
-  { status: 'confirmed',           label: 'Подтверждён' },
-  { status: 'prepayment_pending',  label: 'Ожидает предоплату' },
-  { status: 'prepayment_received', label: 'Предоплата получена' },
-  { status: 'assigned',            label: 'Назначен курьер' },
-  { status: 'in_delivery',         label: 'В доставке' },
-  { status: 'delivered',           label: 'Доставлен' },
+  { status: 'new',                 label: 'Создан',              role: 'seller' },
+  { status: 'confirmed',           label: 'Подтверждён',         role: 'dispatcher' },
+  { status: 'prepayment_pending',  label: 'Ожидает предоплату',  role: 'dispatcher' },
+  { status: 'prepayment_received', label: 'Предоплата получена', role: 'dispatcher' },
+  { status: 'assigned',            label: 'Назначен курьер',     role: 'dispatcher' },
+  { status: 'in_delivery',         label: 'В доставке',          role: 'courier' },
+  { status: 'delivered',           label: 'Доставлен',           role: 'courier' },
 ]
 const STATUS_ORDER = TIMELINE_STEPS.map(s => s.status)
 
@@ -26,6 +35,11 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
 
   const { data: comments = [] } = useOrderComments(order?.id)
   const addComment = useAddOrderComment(order?.id)
+  const { data: timelineEvents = [] } = useQuery({
+    queryKey: KEYS.dispatcher.timeline(order?.id),
+    queryFn: () => fetchOrderTimeline(order?.id),
+    enabled: !!order?.id,
+  })
 
   if (!order) {
     return (
@@ -256,44 +270,38 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
         {/* ── СТАТУСЫ ── */}
         {activeTab === 'timeline' && (
           <div className="p-6">
-            <div className="relative pl-10">
-              {/* Vertical line */}
-              <div className="absolute left-4 top-4 bottom-4 w-px bg-slate-100" />
-
-              <div className="space-y-1">
-                {TIMELINE_STEPS.map((step, idx) => {
-                  const done   = idx <= currentIdx
-                  const active = idx === currentIdx
-                  return (
-                    <div key={step.status} className="flex items-center gap-3 py-2.5 relative">
-                      <div
-                        className={`absolute -left-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 transition-all
-                          ${active ? 'shadow-lg shadow-indigo-200' : ''}`}
-                        style={{
-                          background: active ? '#4F46E5' : done ? '#10B981' : '#F1F5F9',
-                        }}
-                      >
-                        {done && !active && (
-                          <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                        {active && <div className="w-2 h-2 rounded-full bg-white" />}
-                        {!done && !active && <div className="w-2 h-2 rounded-full bg-slate-300" />}
-                      </div>
-                      <span className={`text-sm font-medium
-                        ${active ? 'text-indigo-700 font-bold' : done ? 'text-slate-700' : 'text-slate-300'}`}>
+            <div className="space-y-2">
+              {TIMELINE_STEPS.map((step, idx) => {
+                const done   = idx <= currentIdx
+                const active = idx === currentIdx
+                const event  = timelineEvents.find(e => e.to_status === step.status)
+                const rb = ROLE_BADGE[step.role]
+                return (
+                  <div key={step.status} className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
+                    active ? 'bg-indigo-50 border border-indigo-100' :
+                    done   ? 'bg-slate-50' : 'opacity-40'
+                  }`}>
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                      active ? 'bg-indigo-600 text-white' :
+                      done   ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
+                    }`}>
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-semibold ${active ? 'text-indigo-700' : done ? 'text-slate-800' : 'text-slate-400'}`}>
                         {step.label}
-                      </span>
-                      {active && (
-                        <span className="ml-auto text-[10px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">
-                          Текущий
-                        </span>
+                      </p>
+                      {event ? (
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">
+                          {event.actor_name} · {fmtDate(event.created_at)}
+                        </p>
+                      ) : (
+                        <p className="text-xs mt-0.5" style={{ color: rb.color }}>{rb.label}</p>
                       )}
                     </div>
-                  )
-                })}
-              </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}

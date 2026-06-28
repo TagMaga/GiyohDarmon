@@ -13,8 +13,6 @@ import { Banknote, Coins } from 'lucide-react'
  *   totalOrderAmount {number} — product_total + delivery_fee
  *   onFileChange   {fn}       — (file: File|null) => void
  *   proofFile      {File|null}
- *   chatUrl        {string}
- *   onChatUrlChange {fn}
  */
 export default function PaymentModeSelector({
   mode,
@@ -26,8 +24,6 @@ export default function PaymentModeSelector({
   totalOrderAmount = 0,
   onFileChange,
   proofFile,
-  chatUrl,
-  onChatUrlChange,
 }) {
   const hasPrepay = mode === 'prepayment'
   const pa = Number(prepayAmount) || 0
@@ -187,18 +183,6 @@ export default function PaymentModeSelector({
                 </button>
               </div>
             )}
-          </div>
-
-          {/* Chat link */}
-          <div className="space-y-1">
-            <label className="input-label">Ссылка на переписку с клиентом (необязательно)</label>
-            <input
-              type="url"
-              value={chatUrl}
-              onChange={(e) => onChatUrlChange?.(e.target.value)}
-              placeholder="https://t.me/…"
-              className="input"
-            />
           </div>
         </div>
       )}

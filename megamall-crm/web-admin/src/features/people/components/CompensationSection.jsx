@@ -21,6 +21,7 @@ const ALL_TYPES = [
   'seller_rate', 'manager_team_rate', 'manager_personal_rate',
   'team_lead_pool_rate', 'company_rate',
 ]
+const DEFAULT_NOTE = 'Обновлено без примечания'
 
 const COMP_KIND_LABEL = {
   percent: 'Процент',
@@ -124,10 +125,9 @@ function DisableModal({ open, onClose, config, scope, scopeId }) {
   const { mutate, isPending, error, reset } = useMutation({
     mutationFn: () => {
       if (!effectiveTo) throw new Error('Укажите дату отключения')
-      if (!notes.trim()) throw new Error('Причина обязательна')
       return disableConfig(config.id, {
         effective_to: new Date(effectiveTo).toISOString(),
-        notes:        notes.trim(),
+        notes:        notes.trim() || DEFAULT_NOTE,
       })
     },
     onSuccess: () => {
@@ -157,10 +157,6 @@ function DisableModal({ open, onClose, config, scope, scopeId }) {
           <label className="input-label">Дата отключения *</label>
           <input type="datetime-local" value={effectiveTo} onChange={e => setEffectiveTo(e.target.value)} className="input mt-1" />
         </div>
-        <div>
-          <label className="input-label">Причина *</label>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} className="input resize-none mt-1" rows={2} />
-        </div>
       </div>
     </Modal>
   )
@@ -181,12 +177,11 @@ function SetSalaryModal({ open, onClose, scopeId, current }) {
   const { mutate, isPending, error, reset } = useMutation({
     mutationFn: () => {
       if (!effectiveFrom) throw new Error('Укажите дату начала')
-      if (!notes.trim())  throw new Error('Причина обязательна')
 
       const body = {
         compensation_type: kind,
         effective_from:    new Date(effectiveFrom).toISOString(),
-        notes:             notes.trim(),
+        notes:             notes.trim() || DEFAULT_NOTE,
       }
 
       if (kind === 'fixed' || kind === 'mixed') {

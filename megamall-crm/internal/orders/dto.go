@@ -461,6 +461,7 @@ type ListOrdersFilter struct {
 	ManagerID  string `form:"manager_id"`
 	TeamLeadID string `form:"team_lead_id"`
 	CustomerID string `form:"customer_id"`
+	CourierID  string `form:"courier_id"`
 	City       string `form:"city"`
 	// Frontend sends "from" / "to" (YYYY-MM-DD). "date_from" / "date_to" accepted as aliases
 	// to avoid breaking any direct API callers. Repository merges them: date_from wins if set.
@@ -469,4 +470,5 @@ type ListOrdersFilter struct {
 	From      string `form:"from"`
 	To        string `form:"to"`
 	OrderType string `form:"order_type"`
+	NoCourier bool   `form:"no_courier"`
 }

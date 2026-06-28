@@ -78,10 +78,6 @@ export default function SellerHome() {
                 : `${stats.todayCount} заказов сегодня · ${fmtAmount(stats.todayEarnings)} заработано`}
             </p>
           </div>
-          <Link to="/seller/orders/create" className="btn btn-primary btn-md">
-            <Plus size={16} />
-            Новый заказ
-          </Link>
         </div>
 
         {/* 4 KPI cards */}
@@ -108,8 +104,8 @@ export default function SellerHome() {
             loading={isLoading}
           />
           <KpiCard
-            label="Ждут предоплату"
-            value={isLoading ? '—' : String(stats.prepaymentCount)}
+            label="Заработано сегодня"
+            value={isLoading ? '—' : fmtAmount(stats.todayEarnings)}
             icon={<Wallet size={20} />}
             color="violet"
             loading={isLoading}
@@ -139,14 +135,16 @@ export default function SellerHome() {
       {/* ═══════════════════════════════════════════════════════════
           MOBILE LAYOUT  (below lg)
       ═══════════════════════════════════════════════════════════ */}
-      <div className="lg:hidden min-h-screen p-6" style={{ background: '#F2F4F7' }}>
+      <div className="lg:hidden min-h-screen" style={{ background: '#F2F4F7' }}>
         {/* Hero */}
         <div
-          className="relative overflow-hidden px-5 pt-10 pb-8"
+          className="relative overflow-hidden px-[10px] pb-8"
           style={{
             background: 'linear-gradient(135deg, #4F46E5 0%, #6D28D9 100%)',
             borderRadius: '0 0 32px 32px',
             boxShadow: '0 8px 32px rgba(79,70,229,0.35)',
+            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 40px)',
+            margin: '0 10px',
           }}
         >
           <div className="absolute top-0 right-0 w-56 h-56 rounded-full bg-white/5 -translate-y-20 translate-x-20" />
@@ -168,15 +166,7 @@ export default function SellerHome() {
           </div>
         </div>
 
-        <div className="px-4 pb-28 space-y-5 pt-5">
-          {/* KPI grid */}
-          <div className="grid grid-cols-2 gap-3">
-            <StatCard label="Заказов сегодня"  value={stats.todayCount}      bg="linear-gradient(135deg,#E8F1FB,#D4E6F7)" color="#2563EB" loading={isLoading} />
-            <StatCard label="Активные"          value={stats.activeCount}     bg="linear-gradient(135deg,#FFF8F0,#FFEDE0)" color="#D97706" loading={isLoading} />
-            <StatCard label="Доставлено"        value={stats.deliveredCount}  bg="linear-gradient(135deg,#E8F5F0,#D4EDE0)" color="#059669" loading={isLoading} />
-            <StatCard label="Ждут предоплату"   value={stats.prepaymentCount} bg="linear-gradient(135deg,#F0EBF8,#E4DBF0)" color="#7C3AED" loading={isLoading} />
-          </div>
-
+        <div className="pb-28 space-y-5" style={{ padding: '10px', paddingBottom: '7rem' }}>
           {/* Info strip */}
           <div className="grid grid-cols-2 gap-3">
             {commissionPct !== null && (
@@ -290,10 +280,15 @@ function RecentCard({ order, cityName, onDetail }) {
         </Badge>
       </div>
 
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <div className="flex items-center gap-2 text-xs text-slate-400">
-          {cityName && <span className="bg-slate-100 px-2 py-0.5 rounded-full">{cityName}</span>}
-          <span>{fmtDate(order.created_at)}</span>
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
+            {cityName && <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium flex-shrink-0">{cityName}</span>}
+            <span className="flex-shrink-0">{fmtDate(order.created_at)}</span>
+          </div>
+          {order.delivery_address && (
+            <p className="text-xs text-slate-500 truncate">{order.delivery_address}</p>
+          )}
         </div>
         <span className="text-sm font-bold text-slate-900">
           {fmtAmount(order.total_order_amount ?? order.total_amount)}

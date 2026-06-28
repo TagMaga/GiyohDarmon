@@ -146,6 +146,11 @@
     @apply bg-slate-100 rounded-xl animate-pulse;
   }
 
+  /* ── Mobile page container — 10px side gutters, no top/bottom padding ── */
+  .page-container {
+    padding: 0 10px;
+  }
+
   /* ── Scrollbar hide (StatusTabs horizontal scroll) ── */
   .scrollbar-none {
     -ms-overflow-style: none;

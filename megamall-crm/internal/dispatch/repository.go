@@ -497,6 +497,7 @@ func (r *Repository) ListOrderHistory(ctx context.Context, filter OrderHistoryFi
 		SellerName         string             `gorm:"column:seller_name"`
 		TotalAmount        float64            `gorm:"column:total_amount"`
 		DeliveryFee        float64            `gorm:"column:delivery_fee"`
+		CourierPayout      float64            `gorm:"column:courier_payout"`
 		DeliveredAt        *time.Time         `gorm:"column:delivered_at"`
 		ProcessSeconds     *float64           `gorm:"column:process_seconds"`
 		CancellationReason *string            `gorm:"column:cancellation_reason"`
@@ -529,6 +530,7 @@ func (r *Repository) ListOrderHistory(ctx context.Context, filter OrderHistoryFi
 			s.full_name AS seller_name,
 			o.total_amount,
 			o.delivery_fee,
+			COALESCE(o.courier_payout, 0) AS courier_payout,
 			de.delivered_at,
 			CASE
 				WHEN de.delivered_at IS NOT NULL AND de.delivered_at >= COALESCE(ps.process_started_at, o.created_at)
@@ -542,7 +544,7 @@ func (r *Repository) ListOrderHistory(ctx context.Context, filter OrderHistoryFi
 		`).
 		Group(`
 			o.id, o.order_number, o.created_at, o.status, o.courier_id, la.courier_id,
-			cu.full_name, cu.phone, o.seller_id, s.full_name, o.total_amount, o.delivery_fee,
+			cu.full_name, cu.phone, o.seller_id, s.full_name, o.total_amount, o.delivery_fee, o.courier_payout,
 			de.delivered_at, ps.process_started_at, ce.reason, c.full_name, c.phone, c.address, o.delivery_address
 		`).
 		Order("o.created_at DESC").
@@ -575,6 +577,7 @@ func (r *Repository) ListOrderHistory(ctx context.Context, filter OrderHistoryFi
 			SellerName:         row.SellerName,
 			TotalAmount:        row.TotalAmount,
 			DeliveryFee:        row.DeliveryFee,
+			CourierPayout:      row.CourierPayout,
 			DeliveredAt:        row.DeliveredAt,
 			ProcessSeconds:     seconds,
 			CancellationReason: row.CancellationReason,

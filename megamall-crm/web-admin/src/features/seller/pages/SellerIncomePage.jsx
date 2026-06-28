@@ -219,14 +219,15 @@ export default function SellerIncomePage() {
       {/* ═══════════════════════════════════════════════════════════
           MOBILE LAYOUT
       ═══════════════════════════════════════════════════════════ */}
-      <div className="lg:hidden min-h-screen p-6" style={{ background: '#F2F4F7' }}>
+      <div className="lg:hidden min-h-screen" style={{ background: '#F2F4F7' }}>
         {/* Mobile hero */}
         <div
-          className="relative overflow-hidden px-5 pt-10 pb-8 mb-1"
+          className="relative overflow-hidden px-[10px] pb-8 mb-1"
           style={{
             background: 'linear-gradient(135deg, #059669 0%, #0D9488 100%)',
             borderRadius: '0 0 32px 32px',
             boxShadow: '0 8px 32px rgba(5,150,105,0.35)',
+            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 40px)',
           }}
         >
           <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white/5 -translate-y-16 translate-x-16" />
@@ -240,7 +241,7 @@ export default function SellerIncomePage() {
           </div>
         </div>
 
-        <div className="px-4 pb-28 space-y-4 pt-4">
+        <div className="px-[10px] pt-4 pb-28 space-y-4">
           {/* Info strip */}
           <div className="grid grid-cols-3 gap-3">
             {commissionPct !== null && (
