@@ -392,7 +392,6 @@ export default function CreateOrder() {
   const canSubmit = (() => {
     if (!form.phone.trim()) return false
     if (!form.fullName.trim()) return false
-    if (!form.cityId) return false
     if (cartItems.length === 0) return false
     if (cartItems.some((i) => calcPayloadUnitPrice(i) <= 0)) return false
     if (form.payMode === 'prepayment') {
@@ -463,7 +462,7 @@ export default function CreateOrder() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <label className="input-label">Город доставки *</label>
+              <label className="input-label">Город доставки</label>
               <select
                 value={form.cityId}
                 onChange={(e) => {
@@ -584,12 +583,7 @@ export default function CreateOrder() {
               <AlertCircle size={10} /> Добавьте хотя бы один товар
             </p>
           )}
-          {!canSubmit && cartItems.length > 0 && !form.cityId && (
-            <p className="text-[10px] text-slate-400 mb-1 flex items-center gap-1">
-              <AlertCircle size={10} /> Выберите город доставки
-            </p>
-          )}
-          {!canSubmit && cartItems.length > 0 && form.cityId && form.payMode === 'prepayment' && prepayAmt > totalOrderAmount && (
+          {!canSubmit && cartItems.length > 0 && form.payMode === 'prepayment' && prepayAmt > totalOrderAmount && (
             <p className="text-[10px] text-rose-500 mb-1 flex items-center gap-1">
               <AlertCircle size={10} /> Предоплата не может быть больше итога заказа
             </p>
