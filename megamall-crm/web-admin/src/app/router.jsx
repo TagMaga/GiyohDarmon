@@ -25,9 +25,10 @@ const OwnerSettingsPage       = lazy(() => import('../features/owner/pages/Owner
 const OwnerReportsPage        = lazy(() => import('../features/owner/pages/OwnerReportsPage'))
 
 // People / HR (owner sub-pages)
-const TeamsHub            = lazy(() => import('../features/people/pages/TeamsHub'))
-const TeamProfilePage     = lazy(() => import('../features/people/pages/TeamProfilePage'))
-const EmployeeProfilePage = lazy(() => import('../features/people/pages/EmployeeProfilePage'))
+const TeamsHub              = lazy(() => import('../features/people/pages/TeamsHub'))
+const TeamProfilePage       = lazy(() => import('../features/people/pages/TeamProfilePage'))
+const EmployeeProfilePage   = lazy(() => import('../features/people/pages/EmployeeProfilePage'))
+const TeamDirectoryPage     = lazy(() => import('../features/people/pages/TeamDirectoryPage'))
 
 // Team Lead
 const TeamLeadDashboardPage = lazy(() => import('../features/team-lead/pages/TeamLeadDashboardPage'))
@@ -117,6 +118,7 @@ const router = createBrowserRouter([
         { path: 'teams/:teamId',     element: <Lazy><TeamProfilePage /></Lazy> },
         { path: 'employees',         element: <Lazy><TeamsHub /></Lazy> },
         { path: 'employees/:userId', element: <Lazy><EmployeeProfilePage /></Lazy> },
+        { path: 'team-directory',    element: <Lazy><TeamDirectoryPage /></Lazy> },
 
         { path: 'finance', element: <Lazy><OwnerFinancePage /></Lazy> },
         { path: 'orders',         element: <Lazy><OwnerOrdersPage /></Lazy> },

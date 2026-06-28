@@ -5,7 +5,7 @@ import {
   LayoutDashboard, PlusCircle, LogOut, ShoppingBag,
   Truck, Settings,
   Archive, Package, ArrowLeftRight, PackagePlus, Trash2, BarChart3,
-  Building2, UserCog, FileBarChart, User,
+  Building2, UserCog, FileBarChart, User, BookUser,
 } from 'lucide-react'
 import useAuthStore from '../store/authStore'
 import useProfile   from '../hooks/useProfile'
@@ -26,6 +26,7 @@ const NAV = {
     { label: 'Сотрудники', icon: Users,         path: '/owner/employees' },
     { label: 'Склад',      icon: Building2,     path: '/owner/warehouse' },
     { label: 'HR',         icon: UserCheck,     path: '/owner/hr' },
+    { label: 'Команда',    icon: BookUser,      path: '/owner/team-directory' },
     { label: 'Настройки',  icon: Settings,      path: '/owner/settings' },
     { label: 'Отчёты',     icon: FileBarChart,  path: '/owner/reports' },
   ],

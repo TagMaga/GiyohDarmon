@@ -38,7 +38,7 @@ export default function SellerTeamPage() {
     : `Вы #${rank} в команде`
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-6">
       {/* ── Rank hero card ───────────────────────────────────────────────── */}
       <div
         className="rounded-[24px] p-8 text-center"

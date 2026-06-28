@@ -55,7 +55,9 @@ export default function CashScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [showHandover, setShowHandover] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [cashTab, setCashTab]       = useState('handover')
+  const [cashTab, setCashTab]         = useState('handover')
+  const [periodFilter, setPeriodFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [attachments, setAttachments] = useState([])
   const [actualAmount, setActualAmount] = useState('')
   const [notes, setNotes]           = useState('')
@@ -151,6 +153,44 @@ export default function CashScreen() {
   const toReturn  = Math.max(0, Number(collected) - Number(salary))
   const cashOrders = summary?.orders_collected || 0
   const pendingHandover = history.filter(h => h.status === 'pending').reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0)
+  const totalHandedOver = history.filter(h => h.status === 'confirmed').reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0)
+
+  const PERIOD_OPTIONS = [
+    { key: 'all',   label: 'Все' },
+    { key: 'today', label: 'Сегодня' },
+    { key: 'week',  label: 'Неделя' },
+    { key: 'month', label: 'Месяц' },
+  ]
+  const STATUS_OPTIONS = [
+    { key: 'all',       label: 'Все' },
+    { key: 'confirmed', label: 'Подтверждено' },
+    { key: 'pending',   label: 'Ожидает' },
+    { key: 'rejected',  label: 'Отклонено' },
+  ]
+
+  const filteredHistory = history.filter(h => {
+    if (statusFilter !== 'all' && h.status !== statusFilter) return false
+    if (periodFilter !== 'all' && h.created_at) {
+      const d = dayjs(h.created_at)
+      const now = dayjs()
+      if (periodFilter === 'today' && !d.isSame(now, 'day')) return false
+      if (periodFilter === 'week'  && d.isBefore(now.subtract(7,  'day'))) return false
+      if (periodFilter === 'month' && d.isBefore(now.subtract(30, 'day'))) return false
+    }
+    return true
+  })
+
+  const openPeriodFilter = () => Alert.alert('Период', '', [
+    ...PERIOD_OPTIONS.map(o => ({ text: o.label, onPress: () => setPeriodFilter(o.key) })),
+    { text: 'Отмена', style: 'cancel' },
+  ])
+  const openStatusFilter = () => Alert.alert('Статус', '', [
+    ...STATUS_OPTIONS.map(o => ({ text: o.label, onPress: () => setStatusFilter(o.key) })),
+    { text: 'Отмена', style: 'cancel' },
+  ])
+
+  const periodLabel = PERIOD_OPTIONS.find(o => o.key === periodFilter)?.label || 'Период'
+  const statusLabel = STATUS_OPTIONS.find(o => o.key === statusFilter)?.label || 'Статус'
   const amtNum = parseFloat(actualAmount) || 0
   const diff = amtNum - toReturn
   const hasDiff = amtNum > 0
@@ -201,51 +241,79 @@ export default function CashScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Segmented control */}
-            <View style={s.segmented}>
-              <TouchableOpacity style={[s.seg, cashTab === 'handover' && s.segActive]} onPress={() => setCashTab('handover')}>
-                <Text style={[s.segText, cashTab === 'handover' && s.segActiveText]}>Сдача наличных</Text>
+            {/* KPI cards (act as tabs) */}
+            <View style={s.kpiRow}>
+              <TouchableOpacity
+                style={[s.kpiCard, cashTab === 'handover' && s.kpiCardActive]}
+                onPress={() => setCashTab('handover')}
+                activeOpacity={0.8}
+              >
+                <Text style={s.kpiLabel}>Сдано наличных</Text>
+                <Text style={s.kpiValue}>{fmt(totalHandedOver)}</Text>
+                <Text style={s.kpiUnit}>TJS</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[s.seg, cashTab === 'earnings' && s.segActive]} onPress={() => setCashTab('earnings')}>
-                <Text style={[s.segText, cashTab === 'earnings' && s.segActiveText]}>Заработки</Text>
+              <TouchableOpacity
+                style={[s.kpiCard, cashTab === 'earnings' && s.kpiCardActive]}
+                onPress={() => setCashTab('earnings')}
+                activeOpacity={0.8}
+              >
+                <Text style={s.kpiLabel}>Заработки</Text>
+                <Text style={s.kpiValue}>{fmt(earningsTotal)}</Text>
+                <Text style={s.kpiUnit}>TJS</Text>
               </TouchableOpacity>
             </View>
 
+            {/* Handover tab */}
             {cashTab === 'handover' && (
               <>
-                <View style={s.listHead}>
-                  <Text style={s.listTitle}>СДАЧА НАЛИЧНЫХ</Text>
-                  <Text style={s.listTotal}>Всего сдано: <Text style={{ color: C.orange }}>{fmt(history.filter(h => h.status === 'confirmed').reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0))} TJS</Text></Text>
+                <View style={s.filterRow}>
+                  <TouchableOpacity
+                    style={[s.filterChip, periodFilter !== 'all' && s.filterChipActive]}
+                    onPress={openPeriodFilter}
+                  >
+                    <Text style={[s.filterChipText, periodFilter !== 'all' && s.filterChipTextActive]}>
+                      {periodLabel} ▼
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.filterChip, statusFilter !== 'all' && s.filterChipActive]}
+                    onPress={openStatusFilter}
+                  >
+                    <Text style={[s.filterChipText, statusFilter !== 'all' && s.filterChipTextActive]}>
+                      {statusLabel} ▼
+                    </Text>
+                  </TouchableOpacity>
                 </View>
                 <View style={s.histCard}>
-                  {history.length === 0 && (
+                  {filteredHistory.length === 0 && (
                     <View style={{ padding: 24, alignItems: 'center' }}>
-                      <Text style={{ color: C.muted, fontWeight: '800' }}>Инкассаций пока нет</Text>
+                      <Text style={{ color: C.muted, fontWeight: '800' }}>
+                        {history.length === 0 ? 'Инкассаций пока нет' : 'Нет записей по фильтру'}
+                      </Text>
                     </View>
                   )}
-                  {history.map((h, i) => {
+                  {filteredHistory.map((h, i) => {
                     const isConfirmed = h.status === 'confirmed'
                     const isPending   = h.status === 'pending'
                     const isRejected  = h.status === 'rejected'
                     const statusColor = isConfirmed ? C.green : isRejected ? C.red : C.orange
-                    const statusLabel = isConfirmed ? 'Подтверждено ✅' : isPending ? 'Ожидает проверки ⏳' : isRejected ? 'Отклонено ❌' : h.status
+                    const sLabel = isConfirmed ? 'Подтверждено' : isPending ? 'Ожидает проверки' : isRejected ? 'Отклонено' : h.status
                     const amount = h.actual_returned ?? h.total_to_return ?? 0
-                    const date = h.created_at
                     const proof = fullUrl(h.proof_url)
                     return (
-                      <View key={h.id || i} style={[s.cashItem, i === history.length - 1 && { borderBottomWidth: 0 }]}>
+                      <View key={h.id || i} style={[s.cashItem, i === filteredHistory.length - 1 && { borderBottomWidth: 0 }]}>
                         {proof
                           ? <TouchableOpacity activeOpacity={0.85} onPress={() => setPreviewUri(proof)}>
                               <Image source={{ uri: proof }} style={s.receipt} />
                             </TouchableOpacity>
                           : <View style={s.receipt} />}
                         <View style={{ flex: 1 }}>
-                          <Text style={s.cashItemTime}>{date ? dayjs(date).format('HH:mm') : '—'}</Text>
+                          <Text style={s.cashItemTime}>{h.created_at ? dayjs(h.created_at).format('HH:mm') : '—'}</Text>
                           <Text style={s.cashItemTitle}>Сдано наличными</Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
                           <Text style={s.cashAmount}>{fmt(amount)} TJS</Text>
-                          <Text style={{ fontSize: 11, marginTop: 4, color: statusColor, fontWeight: '900' }}>{statusLabel}</Text>
+                          <Text style={{ fontSize: 11, marginTop: 4, color: statusColor, fontWeight: '900' }}>{sLabel}</Text>
                         </View>
                       </View>
                     )
@@ -254,34 +322,27 @@ export default function CashScreen() {
               </>
             )}
 
+            {/* Earnings tab */}
             {cashTab === 'earnings' && (
-              <>
-                <View style={s.listHead}>
-                  <Text style={s.listTitle}>ЗАРАБОТКИ</Text>
-                  <Text style={s.listTotal}>Всего: <Text style={{ color: C.green }}>{fmt(earningsTotal)} TJS</Text></Text>
-                </View>
-                <View style={s.histCard}>
-                  {earnings.length === 0 ? (
-                    <View style={{ padding: 24, alignItems: 'center' }}>
-                      <Text style={{ color: C.muted, fontWeight: '800' }}>Пока нет доставленных заказов</Text>
+              <View style={s.histCard}>
+                {earnings.length === 0 ? (
+                  <View style={{ padding: 24, alignItems: 'center' }}>
+                    <Text style={{ color: C.muted, fontWeight: '800' }}>Пока нет доставленных заказов</Text>
+                  </View>
+                ) : earnings.map((e, i) => (
+                  <View key={e.id || i} style={[s.cashItem, i === earnings.length - 1 && { borderBottomWidth: 0 }]}>
+                    <View style={s.earnIcon}><Text style={{ fontSize: 20 }}>💰</Text></View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.cashItemTitle}>Доставка {e.number}</Text>
+                      <Text style={s.cashItemTime}>{e.date ? dayjs(e.date).format('HH:mm') : '—'}</Text>
                     </View>
-                  ) : earnings.map((e, i) => (
-                    <View key={e.id || i} style={[s.cashItem, i === earnings.length - 1 && { borderBottomWidth: 0 }]}>
-                      <View style={s.earnIcon}><Text style={{ fontSize: 20 }}>💰</Text></View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.cashItemTitle}>{e.number}</Text>
-                        <Text style={s.cashItemTime} numberOfLines={1}>
-                          {e.date ? dayjs(e.date).format('DD.MM.YYYY') : '—'}{e.address ? ` · ${e.address}` : ''}
-                        </Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={[s.cashAmount, { color: C.green }]}>+{fmt(e.fee)} TJS</Text>
-                        <Text style={{ fontSize: 11, marginTop: 4, color: C.green, fontWeight: '900' }}>Доставлен</Text>
-                      </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={s.cashAmount}>{fmt(e.fee)} TJS</Text>
+                      <Text style={{ fontSize: 11, marginTop: 4, color: C.green, fontWeight: '900' }}>Получено</Text>
                     </View>
-                  ))}
-                </View>
-              </>
+                  </View>
+                ))}
+              </View>
             )}
           </>
         }
@@ -403,16 +464,19 @@ const s = StyleSheet.create({
   submitBtn: { width: '100%', marginTop: 16, borderRadius: 22, paddingVertical: 18, backgroundColor: C.violet, alignItems: 'center', shadowColor: C.violet, shadowOffset: { width: 0, height: 13 }, shadowOpacity: 0.22, shadowRadius: 26, elevation: 4 },
   submitBtnDisabled: { backgroundColor: '#c4c9d4', shadowOpacity: 0 },
   submitBtnText: { color: '#fff', fontWeight: '900', fontSize: 17 },
-  // Segmented
-  segmented: { marginHorizontal: 18, backgroundColor: '#eaf0f7', borderRadius: 24, padding: 5, flexDirection: 'row', marginBottom: 16 },
-  seg: { flex: 1, borderRadius: 20, paddingVertical: 14, alignItems: 'center' },
-  segActive: { backgroundColor: C.violet, shadowColor: C.violet, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.22, shadowRadius: 18, elevation: 3 },
-  segText: { fontSize: 14, fontWeight: '900', color: '#697385' },
-  segActiveText: { color: '#fff' },
-  // List
-  listHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginHorizontal: 18, marginBottom: 12 },
-  listTitle: { fontSize: 14, letterSpacing: 0.7, color: '#7f8796', textTransform: 'uppercase', fontWeight: '900' },
-  listTotal: { fontSize: 13, color: C.muted, fontWeight: '800' },
+  // KPI cards (tab switcher)
+  kpiRow:        { flexDirection: 'row', marginHorizontal: 18, gap: 12, marginBottom: 16 },
+  kpiCard:       { flex: 1, backgroundColor: C.card, borderRadius: 20, borderWidth: 1.5, borderColor: C.line, padding: 16 },
+  kpiCardActive: { borderColor: C.blue, shadowColor: C.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 3 },
+  kpiLabel:      { fontSize: 12, color: C.muted, fontWeight: '800', marginBottom: 6 },
+  kpiValue:      { fontSize: 28, fontWeight: '900', color: C.ink, letterSpacing: -1 },
+  kpiUnit:       { fontSize: 12, color: C.muted, fontWeight: '700', marginTop: 2 },
+  // Filter chips
+  filterRow:          { flexDirection: 'row', marginHorizontal: 18, gap: 10, marginBottom: 14 },
+  filterChip:         { backgroundColor: C.card, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: C.line },
+  filterChipActive:   { backgroundColor: '#eef3ff', borderColor: C.blue },
+  filterChipText:     { fontSize: 13, fontWeight: '800', color: C.muted },
+  filterChipTextActive: { color: C.blue },
   histCard: { marginHorizontal: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, borderRadius: 28, overflow: 'hidden', shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 18, elevation: 3 },
   cashItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderBottomWidth: 1, borderBottomColor: C.line },
   receipt: { width: 50, height: 62, borderRadius: 10, backgroundColor: '#f8f8f8' },

@@ -168,6 +168,17 @@ export async function updateCourierPayout(courierId, payload) {
   return unwrap(res)
 }
 
+// ── Avatar upload ─────────────────────────────────────────────────────────────
+
+export async function uploadUserAvatar(userId, file) {
+  const form = new FormData()
+  form.append('avatar', file)
+  const res = await client.post(`/users/${userId}/avatar`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return unwrap(res)
+}
+
 // ── Employee compensation (fixed salary) ──────────────────────────────────────
 
 export async function fetchEmployeeCompensation(userId) {

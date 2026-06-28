@@ -33,7 +33,7 @@ export default function SellerProfileInfoPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-6">
       {/* ── Read-only info ──────────────────────────────────────────────── */}
       <div className="card p-5 space-y-4">
         <InfoRow icon={<User2 size={15} className="text-slate-500" />} label="Имя" value={me?.full_name ?? '—'} />

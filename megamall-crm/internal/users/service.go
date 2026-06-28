@@ -41,6 +41,10 @@ func (s *Service) Create(ctx context.Context, req CreateUserRequest) (*User, err
 		FullName:     req.FullName,
 		Role:         req.Role,
 		IsActive:     true,
+		Status:       StatusOffline,
+		HireDate:     req.HireDate,
+		DateOfBirth:  req.DateOfBirth,
+		Address:      req.Address,
 	}
 
 	if err := s.repo.Create(ctx, u); err != nil {
@@ -120,6 +124,21 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateUserReques
 	}
 	if req.AvatarURL != nil {
 		u.AvatarURL = req.AvatarURL
+	}
+	if req.Status != nil {
+		if !req.Status.IsValid() {
+			return nil, apperrors.BadRequest(fmt.Sprintf("invalid status: %s", *req.Status))
+		}
+		u.Status = *req.Status
+	}
+	if req.HireDate != nil {
+		u.HireDate = req.HireDate
+	}
+	if req.DateOfBirth != nil {
+		u.DateOfBirth = req.DateOfBirth
+	}
+	if req.Address != nil {
+		u.Address = req.Address
 	}
 	u.UpdatedAt = time.Now().UTC()
 

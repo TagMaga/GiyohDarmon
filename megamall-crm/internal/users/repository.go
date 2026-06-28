@@ -71,6 +71,9 @@ func (r *Repository) List(ctx context.Context, filter ListUsersFilter, p paginat
 	if filter.IsActive != nil {
 		query = query.Where("is_active = ?", *filter.IsActive)
 	}
+	if filter.Status != nil {
+		query = query.Where("status = ?", *filter.Status)
+	}
 	if filter.Search != "" {
 		search := "%" + strings.ToLower(filter.Search) + "%"
 		query = query.Where("LOWER(full_name) LIKE ? OR phone LIKE ?", search, search)

@@ -1,32 +1,36 @@
 import { Minus, Plus, Trash2 } from 'lucide-react'
 import { fmtAmount } from '../../../shared/orderStatusConfig'
 
-/**
- * CartItemRow — one line in the cart.
- *
- * Props:
- *   item      { product_id, name, sku, quantity, unit_price, total_price }
- *   onChange  fn(updatedItem)  — call with updated item
- *   onRemove  fn()
- */
 export default function CartItemRow({ item, onChange, onRemove }) {
+  const originalTotal = item.unit_price * item.quantity
+  const discount = originalTotal - (item.total_price ?? originalTotal)
+
   const setQty = (qty) => {
     if (qty < 1) return
-    onChange({ ...item, quantity: qty, total_price: qty * item.unit_price })
+    // reset total_price to original when qty changes
+    onChange({ ...item, quantity: qty, total_price: item.unit_price * qty })
   }
 
-  const setUnitPrice = (val) => {
+  const setTotalPrice = (val) => {
     const price = val === '' ? 0 : Number(val)
-    onChange({ ...item, unit_price: price, total_price: price * item.quantity })
+    onChange({ ...item, total_price: price })
   }
 
   return (
     <div className="flex items-start gap-3 py-3 border-b border-slate-100 last:border-0">
-      {/* Product icon placeholder */}
-      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-        <span className="text-sm font-bold text-slate-400">
-          {item.name?.charAt(0)?.toUpperCase() ?? '?'}
-        </span>
+      {/* Thumbnail */}
+      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5 overflow-hidden">
+        {item.product_image_url ? (
+          <img
+            src={item.product_image_url}
+            alt={item.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <span className="text-sm font-bold text-slate-400">
+            {item.name?.charAt(0)?.toUpperCase() ?? '?'}
+          </span>
+        )}
       </div>
 
       {/* Info + controls */}
@@ -40,7 +44,6 @@ export default function CartItemRow({ item, onChange, onRemove }) {
               <p className="text-[10px] text-slate-400">{item.sku}</p>
             )}
           </div>
-          {/* Remove */}
           <button
             type="button"
             onClick={onRemove}
@@ -52,27 +55,14 @@ export default function CartItemRow({ item, onChange, onRemove }) {
           </button>
         </div>
 
-        {/* Price + qty row */}
+        {/* Qty + price row */}
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Unit price */}
+          {/* Read-only unit price */}
           <div className="flex items-center gap-1">
             <span className="text-[10px] text-slate-400 whitespace-nowrap">Цена:</span>
-            <div className="relative">
-              <input
-                type="number"
-                value={item.unit_price === 0 ? '' : item.unit_price}
-                onChange={(e) => setUnitPrice(e.target.value)}
-                placeholder="0"
-                min="0"
-                step="0.01"
-                className="w-20 h-8 px-2 pr-5 rounded-lg border border-slate-200 text-xs font-semibold
-                           text-slate-800 text-right focus:outline-none focus:ring-2 focus:ring-indigo-400/30
-                           focus:border-indigo-400 bg-white
-                           [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none
-                           [&::-webkit-outer-spin-button]:appearance-none"
-              />
-              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400">с</span>
-            </div>
+            <span className="text-xs font-semibold text-slate-500">
+              {fmtAmount(item.unit_price)}
+            </span>
           </div>
 
           {/* Quantity stepper */}
@@ -101,10 +91,30 @@ export default function CartItemRow({ item, onChange, onRemove }) {
             </button>
           </div>
 
-          {/* Line total */}
-          <span className="ml-auto text-sm font-bold text-indigo-600 whitespace-nowrap">
-            {fmtAmount(item.total_price)}
-          </span>
+          {/* Editable total price */}
+          <div className="flex items-center gap-1 ml-auto">
+            {discount > 0 && (
+              <span className="text-[10px] text-rose-500 font-semibold whitespace-nowrap">
+                −{fmtAmount(discount)}
+              </span>
+            )}
+            <div className="relative">
+              <input
+                type="number"
+                value={item.total_price === 0 ? '' : item.total_price}
+                onChange={(e) => setTotalPrice(e.target.value)}
+                placeholder="0"
+                min="0"
+                step="0.01"
+                className="w-24 h-8 px-2 pr-5 rounded-lg border border-slate-200 text-xs font-bold
+                           text-indigo-600 text-right focus:outline-none focus:ring-2 focus:ring-indigo-400/30
+                           focus:border-indigo-400 bg-white
+                           [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none
+                           [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-slate-400">с</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

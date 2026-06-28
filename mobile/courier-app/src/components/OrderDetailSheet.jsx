@@ -30,12 +30,11 @@ export const STATUS_COLOR = {
 }
 
 const PROBLEM_OPTIONS = [
-  { key: 'later',     label: 'Доставить позже',     icon: '🕐', desc: 'Перенести доставку' },
-  { key: 'address',   label: 'Клиент сменил адрес', icon: '📍', desc: 'Снять назначение курьера' },
-  { key: 'no_answer', label: 'Клиент не отвечает',  icon: '📵', desc: 'Зафиксировать попытку' },
-  { key: 'cancel',    label: 'Отмена заказа',       icon: '✕',  desc: 'Отменить заказ' },
+  { key: 'later',   label: 'Доставить позже',     icon: '🕐', desc: 'Перенести доставку' },
+  { key: 'address', label: 'Клиент сменил адрес', icon: '📍', desc: 'Снять назначение курьера' },
+  { key: 'cancel',  label: 'Отмена заказа',       icon: '✕',  desc: 'Отменить заказ' },
 ]
-const CANCEL_REASONS = ['Клиент отказался', 'Неверный адрес', 'Товар повреждён', 'Другое']
+const CANCEL_REASONS = ['Клиент не отвечает', 'Клиент отказался', 'Неверный адрес', 'Товар повреждён', 'Другое']
 const DEFER_OPTIONS = [
   { key: 'd1', label: 'Завтра',       days: 1 },
   { key: 'd2', label: '+2 дня',       days: 2 },
@@ -319,15 +318,7 @@ export function OrderDetailSheet({
               </TouchableOpacity>
             </>)}
 
-            {step === 'no_answer' && (<>
-              <Text style={ps.stepTitle}>Клиент не отвечает</Text>
-              <Text style={ps.stepSub}>Попытка будет зафиксирована. Диспетчер свяжется с клиентом.</Text>
-              <TouchableOpacity style={[ps.btnPrimary, stepLoading && ps.btnDisabled]} disabled={stepLoading} onPress={() => doStatus('issue', 'Клиент не отвечает')}>
-                {stepLoading ? <ActivityIndicator color="#fff" /> : <Text style={ps.btnText}>Зафиксировать попытку</Text>}
-              </TouchableOpacity>
-            </>)}
-
-            {step === 'cancel' && (<>
+{step === 'cancel' && (<>
               <Text style={ps.stepTitle}>Отмена заказа</Text>
               <Text style={ps.stepSub}>Выберите причину</Text>
               {CANCEL_REASONS.map(r => (
@@ -403,8 +394,8 @@ export function OrderDetailSheet({
                   key={item.product_id ?? item.id ?? i}
                   style={[d.productRow, i === order.items.length - 1 && { borderBottomWidth: 0 }]}
                 >
-                  {item.image_url
-                    ? <Image source={{ uri: item.image_url }} style={d.productThumb} />
+                  {item.product_image_url
+                    ? <Image source={{ uri: item.product_image_url }} style={d.productThumb} />
                     : <View style={d.productThumbPlaceholder}>
                         <Text style={d.productThumbInitial}>
                           {(item.product_name || item.name || '?')[0].toUpperCase()}

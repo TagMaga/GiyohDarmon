@@ -135,7 +135,7 @@ export default function SellerIncomePage() {
       {/* ═══════════════════════════════════════════════════════════
           DESKTOP LAYOUT
       ═══════════════════════════════════════════════════════════ */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block p-6">
         {/* Desktop header */}
         <div className="flex items-start justify-between mb-7">
           <div>
@@ -219,7 +219,7 @@ export default function SellerIncomePage() {
       {/* ═══════════════════════════════════════════════════════════
           MOBILE LAYOUT
       ═══════════════════════════════════════════════════════════ */}
-      <div className="lg:hidden min-h-screen" style={{ background: '#F2F4F7' }}>
+      <div className="lg:hidden min-h-screen p-6" style={{ background: '#F2F4F7' }}>
         {/* Mobile hero */}
         <div
           className="relative overflow-hidden px-5 pt-10 pb-8 mb-1"

@@ -42,7 +42,7 @@ export default function SellerProfilePage() {
       {/* ═══════════════════════════════════════════════════════════
           DESKTOP LAYOUT
       ═══════════════════════════════════════════════════════════ */}
-      <div className="hidden lg:flex gap-6 items-start">
+      <div className="hidden lg:flex gap-6 items-start p-6">
 
         {/* Left column — profile card + nav */}
         <div className="w-[240px] flex-shrink-0 space-y-4">
@@ -155,7 +155,7 @@ export default function SellerProfilePage() {
       {/* ═══════════════════════════════════════════════════════════
           MOBILE LAYOUT
       ═══════════════════════════════════════════════════════════ */}
-      <div className="lg:hidden min-h-screen" style={{ background: '#F2F4F7' }}>
+      <div className="lg:hidden min-h-screen p-6" style={{ background: '#F2F4F7' }}>
         {/* Profile header */}
         <div
           className="relative overflow-hidden px-5 pt-10 pb-8"

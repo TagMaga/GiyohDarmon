@@ -291,7 +291,7 @@ export default function EditOrder() {
           ))}
         </div>
       ) : (
-        <div className="max-w-xl mx-auto space-y-5">
+        <div className="space-y-5">
 
           {/* ── 1. Customer (read-only) ── */}
           <div className="card p-5 space-y-3">

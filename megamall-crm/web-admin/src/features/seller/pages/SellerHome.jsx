@@ -64,7 +64,7 @@ export default function SellerHome() {
       {/* ═══════════════════════════════════════════════════════════
           DESKTOP LAYOUT  (lg and up)
       ═══════════════════════════════════════════════════════════ */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block p-6">
 
         {/* Greeting header */}
         <div className="flex items-center justify-between mb-7">
@@ -139,7 +139,7 @@ export default function SellerHome() {
       {/* ═══════════════════════════════════════════════════════════
           MOBILE LAYOUT  (below lg)
       ═══════════════════════════════════════════════════════════ */}
-      <div className="lg:hidden min-h-screen" style={{ background: '#F2F4F7' }}>
+      <div className="lg:hidden min-h-screen p-6" style={{ background: '#F2F4F7' }}>
         {/* Hero */}
         <div
           className="relative overflow-hidden px-5 pt-10 pb-8"

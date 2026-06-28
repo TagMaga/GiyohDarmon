@@ -521,20 +521,6 @@ export default function CreateOrder() {
       <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm
                       border-t border-slate-200 px-4 py-3">
         <div className="max-w-xl mx-auto">
-          {totalOrderAmount > 0 && (
-            <div className="flex items-center gap-3 mb-2 text-xs text-slate-500 flex-wrap">
-              <span>Товары: <strong className="text-slate-700">{fmtAmount(productTotal)}</strong></span>
-              <span>+ Доставка: <strong className={deliveryFee > 0 ? 'text-amber-600' : 'text-emerald-600'}>
-                {formatDeliveryFee(deliveryFee)}
-              </strong></span>
-              {prepayAmt > 0 && (
-                <span>− Предоплата: <strong className="text-indigo-600">{fmtAmount(prepayAmt)}</strong></span>
-              )}
-              <span className="ml-auto font-bold text-sm text-slate-900">
-                Итого к оплате клиентом: {fmtAmount(amountToCollect)}
-              </span>
-            </div>
-          )}
           {!canSubmit && cartItems.length === 0 && (
             <p className="text-[10px] text-slate-400 mb-1 flex items-center gap-1">
               <AlertCircle size={10} /> Добавьте хотя бы один товар

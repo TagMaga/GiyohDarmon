@@ -6,6 +6,31 @@ import (
 	"github.com/google/uuid"
 )
 
+// Status constants matching the PostgreSQL user_status ENUM (migration 00055).
+type Status string
+
+const (
+	StatusOnline     Status = "online"
+	StatusAway       Status = "away"
+	StatusOffline    Status = "offline"
+	StatusVacation   Status = "vacation"
+	StatusSick       Status = "sick"
+	StatusTerminated Status = "terminated"
+)
+
+var AllStatuses = []Status{
+	StatusOnline, StatusAway, StatusOffline, StatusVacation, StatusSick, StatusTerminated,
+}
+
+func (s Status) IsValid() bool {
+	for _, v := range AllStatuses {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}
+
 // Role constants matching the PostgreSQL user_role ENUM.
 type Role string
 
@@ -37,17 +62,21 @@ func (r Role) IsValid() bool {
 
 // User is the domain model. Maps to the users table.
 type User struct {
-	ID                          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	Phone                       string    `gorm:"uniqueIndex;not null"`
-	Email                       *string   `gorm:"uniqueIndex"`
-	PasswordHash                string    `gorm:"not null"`
-	FullName                    string    `gorm:"not null"`
-	Surname                     *string   `gorm:"column:surname"`
-	TelegramChatID              *string   `gorm:"column:telegram_chat_id"`
-	Role                        Role      `gorm:"type:user_role;not null"`
-	IsActive                    bool      `gorm:"default:true;not null"`
+	ID                          uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	Phone                       string     `gorm:"uniqueIndex;not null"`
+	Email                       *string    `gorm:"uniqueIndex"`
+	PasswordHash                string     `gorm:"not null"`
+	FullName                    string     `gorm:"not null"`
+	Surname                     *string    `gorm:"column:surname"`
+	TelegramChatID              *string    `gorm:"column:telegram_chat_id"`
+	Role                        Role       `gorm:"type:user_role;not null"`
+	IsActive                    bool       `gorm:"default:true;not null"`
 	AvatarURL                   *string
-	CourierOrderIntakeEnabled   bool `gorm:"default:true;not null"`
+	Status                      Status     `gorm:"type:user_status;not null;default:'offline'"`
+	HireDate                    *time.Time `gorm:"column:hire_date;type:date"`
+	DateOfBirth                 *time.Time `gorm:"column:date_of_birth;type:date"`
+	Address                     *string    `gorm:"column:address"`
+	CourierOrderIntakeEnabled   bool       `gorm:"default:true;not null"`
 	CourierOrderIntakeReason    *string
 	CourierOrderIntakeUpdatedAt *time.Time
 	CourierOrderIntakeUpdatedBy *uuid.UUID

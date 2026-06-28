@@ -1,7 +1,11 @@
 package users
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -32,8 +36,8 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/:id", middleware.RequireAuth(), h.GetByID)
 	rg.PATCH("/:id", middleware.RequireRoles(string(RoleOwner)), h.Update)
 	rg.DELETE("/:id", middleware.RequireRoles(string(RoleOwner)), h.Delete)
-	// Any authenticated user can change their own password (RequireAuth enforced).
 	rg.PATCH("/:id/password", middleware.RequireAuth(), h.ChangePassword)
+	rg.POST("/:id/avatar", middleware.RequireRoles(string(RoleOwner)), h.UploadAvatar)
 }
 
 // Create handles POST /users
@@ -169,6 +173,54 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// UploadAvatar handles POST /users/:id/avatar — saves a photo and updates avatar_url.
+func (h *Handler) UploadAvatar(c *gin.Context) {
+	id, ok := parseUUID(c, "id")
+	if !ok {
+		return
+	}
+
+	file, err := c.FormFile("avatar")
+	if err != nil {
+		response.Error(c, apperrors.BadRequest("avatar file is required"))
+		return
+	}
+
+	// Validate content-type
+	ct := file.Header.Get("Content-Type")
+	if !strings.HasPrefix(ct, "image/") {
+		response.Error(c, apperrors.BadRequest("file must be an image"))
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if ext == "" {
+		ext = ".jpg"
+	}
+
+	dir := "./uploads/avatars"
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		response.Error(c, apperrors.Internal(fmt.Errorf("create avatars dir: %w", err)))
+		return
+	}
+
+	filename := fmt.Sprintf("%s%s", id.String(), ext)
+	dst := filepath.Join(dir, filename)
+
+	if err := c.SaveUploadedFile(file, dst); err != nil {
+		response.Error(c, apperrors.Internal(fmt.Errorf("save avatar: %w", err)))
+		return
+	}
+
+	avatarURL := "/uploads/avatars/" + filename
+	u, err := h.svc.Update(c.Request.Context(), id, UpdateUserRequest{AvatarURL: &avatarURL})
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, ToResponse(u))
 }
 
 // GetMe handles GET /users/me — returns the authenticated user's own profile.
