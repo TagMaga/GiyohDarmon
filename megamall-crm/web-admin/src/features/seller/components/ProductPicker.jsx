@@ -83,38 +83,36 @@ export default function ProductPicker({ products = [], loading = false, selected
           )}
 
           {!loading && filtered.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-60 overflow-y-auto scrollbar-none">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto scrollbar-none">
               {filtered.map((p) => (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => onSelect(p)}
-                  className="text-left p-3 rounded-xl border border-slate-200 hover:border-indigo-300
-                             hover:bg-indigo-50 transition-colors group"
+                  className="text-left rounded-xl border border-slate-200 hover:border-indigo-300
+                             hover:bg-indigo-50 transition-colors group overflow-hidden"
                 >
                   {(p.product_image_url || p.ProductImageURL || p.image_url || p.ImageURL) ? (
                     <img
                       src={p.product_image_url || p.ProductImageURL || p.image_url || p.ImageURL}
                       alt={p.name}
-                      className="w-full h-16 rounded-lg object-cover mb-2 flex-shrink-0"
+                      className="w-full h-24 object-cover"
                     />
                   ) : (
-                    <div className="w-7 h-7 rounded-lg bg-slate-100 group-hover:bg-indigo-100
-                                    flex items-center justify-center mb-2 transition-colors">
-                      <Package size={13} className="text-slate-400 group-hover:text-indigo-500" />
+                    <div className="w-full h-24 bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center transition-colors">
+                      <Package size={22} className="text-slate-300 group-hover:text-indigo-400" />
                     </div>
                   )}
-                  <p className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2">
-                    {p.name}
-                  </p>
-                  {p.sku && (
-                    <p className="text-[10px] text-slate-400 mt-0.5">{p.sku}</p>
-                  )}
-                  {p.base_price != null && (
-                    <p className="text-[11px] font-medium text-indigo-600 mt-1">
-                      {Number(p.base_price).toLocaleString('ru-RU')} с
+                  <div className="p-2">
+                    <p className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2">
+                      {p.name}
                     </p>
-                  )}
+                    {(p.sale_price ?? p.base_price) != null && (
+                      <p className="text-[11px] font-bold text-indigo-600 mt-0.5">
+                        {Number(p.sale_price ?? p.base_price).toLocaleString('ru-RU')} с
+                      </p>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
