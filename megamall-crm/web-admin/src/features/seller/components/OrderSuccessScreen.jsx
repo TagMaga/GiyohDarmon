@@ -1,4 +1,4 @@
-import { CheckCircle2, AlertTriangle, Plus, Package, User, MapPin, CreditCard, Copy, Phone, MessageCircle, Map } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Plus, Package, User, MapPin, CreditCard, Copy, Phone, MessageCircle } from 'lucide-react'
 import { fmtAmount } from '../../../shared/orderStatusConfig'
 import { DELIVERY_MODES } from './DeliveryModeSelector'
 import { calcCartOriginalTotal } from './CartTotalsBreakdown'
@@ -101,9 +101,6 @@ export default function OrderSuccessScreen({
             <div className="flex-1 min-w-0">
               <p className="text-[11px] text-slate-400 font-medium">Адрес доставки</p>
               <p className="text-sm font-semibold text-slate-800">{fullAddress}</p>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center">
-              <Map size={14} className="text-indigo-500" />
             </div>
           </div>
         )}

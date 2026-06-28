@@ -9,6 +9,7 @@ import useProducts from '../hooks/useProducts'
 import useDeliverySettings from '../hooks/useDeliverySettings'
 import useCities from '../hooks/useCities'
 import CartItemRow from '../components/CartItemRow'
+import CartTotalsBreakdown from '../components/CartTotalsBreakdown'
 import DeliveryModeSelector from '../components/DeliveryModeSelector'
 import Alert from '../../../shared/components/Alert'
 import { fmtAmount } from '../../../shared/orderStatusConfig'
@@ -59,10 +60,15 @@ function ProductSearch({ products, loading, onAdd }) {
             <button key={p.id} type="button" onClick={() => { onAdd(p); setQ('') }}
               className="text-left p-3 rounded-xl border border-slate-200 hover:border-indigo-300
                          hover:bg-indigo-50 active:scale-[0.97] transition-all group">
-              <div className="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-indigo-100
-                              flex items-center justify-center mb-1.5 transition-colors">
-                <Package size={11} className="text-slate-400 group-hover:text-indigo-500" />
-              </div>
+              {getProductImageUrl(p) ? (
+                <img src={getProductImageUrl(p)} alt={p.name}
+                  className="w-10 h-10 rounded-lg object-cover mb-1.5 flex-shrink-0" />
+              ) : (
+                <div className="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-indigo-100
+                                flex items-center justify-center mb-1.5 transition-colors">
+                  <Package size={11} className="text-slate-400 group-hover:text-indigo-500" />
+                </div>
+              )}
               <p className="text-[11px] font-semibold text-slate-800 leading-tight line-clamp-2">{p.name}</p>
               {(p.sale_price ?? p.base_price) != null && (
                 <p className="text-[10px] font-medium text-indigo-600 mt-0.5">
@@ -79,7 +85,20 @@ function ProductSearch({ products, loading, onAdd }) {
 
 // ── Helpers (same as CreateOrder) ─────────────────────────────────────────────
 function calcProductTotal(items) {
-  return items.reduce((acc, it) => acc + (Number(it.total_price) || 0), 0)
+  return items.reduce((acc, it) => acc + Math.max(0, Number(it.total_price) || 0), 0)
+}
+function calcPayloadUnitPrice(item) {
+  const quantity = Number(item.quantity) || 0
+  if (quantity <= 0) return 0
+  const fallbackTotal = (Number(item.unit_price) || 0) * quantity
+  const lineTotal = Number.isFinite(Number(item.total_price)) ? Number(item.total_price) : fallbackTotal
+  return Math.max(0, lineTotal) / quantity
+}
+function getProductImageUrl(product) {
+  if (!product) return ''
+  const images = Array.isArray(product.images) ? product.images : (Array.isArray(product.Images) ? product.Images : [])
+  const primary = images.find((img) => img.is_primary ?? img.IsPrimary) ?? images[0]
+  return product.product_image_url ?? product.ProductImageURL ?? product.image_url ?? product.ImageURL ?? primary?.image_url ?? primary?.ImageURL ?? ''
 }
 function formatDeliveryFee(fee) {
   return fee <= 0 ? 'Бесплатно' : `${fee.toLocaleString('ru-RU')} с`
@@ -100,9 +119,10 @@ function orderToForm(order) {
       product_id:  item.product_id,
       name:        item.product_name ?? item.name ?? '',
       sku:         item.sku ?? '',
+      product_image_url: item.product_image_url ?? item.ProductImageURL ?? '',
       quantity:    item.quantity,
       unit_price:  item.unit_price,
-      total_price: item.quantity * item.unit_price,
+      total_price: item.total_price ?? (item.quantity * item.unit_price),
     })),
   }
 }
@@ -160,8 +180,10 @@ export default function EditOrder() {
         )}
       }
       const unitPrice = Number(product.sale_price ?? product.base_price ?? 0)
+      const productImageUrl = getProductImageUrl(product)
       return { ...prev, cartItems: [...cart, {
         product_id: product.id, name: product.name, sku: product.sku ?? '',
+        product_image_url: productImageUrl,
         quantity: 1, unit_price: unitPrice, total_price: unitPrice,
       }]}
     })
@@ -181,6 +203,22 @@ export default function EditOrder() {
 
   // Calculations
   const cartItems = form ? safeCart(form) : []
+  useEffect(() => {
+    if (!form || products.length === 0 || cartItems.length === 0) return
+    setForm((prev) => {
+      const cart = safeCart(prev)
+      let changed = false
+      const nextCart = cart.map((item) => {
+        if (item.product_image_url) return item
+        const product = products.find((p) => p.id === item.product_id)
+        const productImageUrl = getProductImageUrl(product)
+        if (!productImageUrl) return item
+        changed = true
+        return { ...item, product_image_url: productImageUrl }
+      })
+      return changed ? { ...prev, cartItems: nextCart } : prev
+    })
+  }, [form, products, cartItems.length])
   const firstProductId = cartItems[0]?.product_id ?? null
   const firstProduct = useMemo(
     () => firstProductId ? products.find((p) => p.id === firstProductId) ?? null : null,
@@ -208,7 +246,7 @@ export default function EditOrder() {
         items: cartItems.map((it) => ({
           product_id: it.product_id,
           quantity:   it.quantity,
-          unit_price: it.unit_price,
+          unit_price: calcPayloadUnitPrice(it),
         })),
       })
     },
@@ -231,7 +269,7 @@ export default function EditOrder() {
     if (!form) return false
     if (isTerminal) return false
     if (cartItems.length === 0) return false
-    if (cartItems.some((i) => i.unit_price <= 0)) return false
+    if (cartItems.some((i) => calcPayloadUnitPrice(i) <= 0)) return false
     return true
   })()
 
@@ -367,10 +405,6 @@ export default function EditOrder() {
                     />
                   ))}
                 </div>
-                <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100 flex justify-between items-center">
-                  <span className="text-xs text-slate-500">Стоимость товаров</span>
-                  <span className="text-sm font-bold text-slate-800">{fmtAmount(productTotal)}</span>
-                </div>
               </div>
             )}
             {cartItems.length === 0 && (
@@ -408,6 +442,16 @@ export default function EditOrder() {
               disabled={isTerminal}
             />
           </div>
+
+          {cartItems.length > 0 && (
+            <CartTotalsBreakdown
+              items={cartItems}
+              productTotal={productTotal}
+              deliveryFee={deliveryFee}
+              prepaymentAmount={order?.prepayment_amount ?? order?.PrepaymentAmount ?? 0}
+              totalPayment={totalAmount}
+            />
+          )}
 
           {submitError && (
             <Alert variant="error" title="Ошибка">{submitError}</Alert>

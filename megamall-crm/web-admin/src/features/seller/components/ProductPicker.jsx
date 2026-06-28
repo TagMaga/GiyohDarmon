@@ -92,10 +92,18 @@ export default function ProductPicker({ products = [], loading = false, selected
                   className="text-left p-3 rounded-xl border border-slate-200 hover:border-indigo-300
                              hover:bg-indigo-50 transition-colors group"
                 >
-                  <div className="w-7 h-7 rounded-lg bg-slate-100 group-hover:bg-indigo-100
-                                  flex items-center justify-center mb-2 transition-colors">
-                    <Package size={13} className="text-slate-400 group-hover:text-indigo-500" />
-                  </div>
+                  {(p.product_image_url || p.ProductImageURL || p.image_url || p.ImageURL) ? (
+                    <img
+                      src={p.product_image_url || p.ProductImageURL || p.image_url || p.ImageURL}
+                      alt={p.name}
+                      className="w-full h-16 rounded-lg object-cover mb-2 flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-7 h-7 rounded-lg bg-slate-100 group-hover:bg-indigo-100
+                                    flex items-center justify-center mb-2 transition-colors">
+                      <Package size={13} className="text-slate-400 group-hover:text-indigo-500" />
+                    </div>
+                  )}
                   <p className="text-xs font-semibold text-slate-800 leading-tight line-clamp-2">
                     {p.name}
                   </p>

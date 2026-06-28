@@ -98,10 +98,15 @@ function ProductSearch({ products, loading, onAdd }) {
             <button key={p.id} type="button" onClick={() => { onAdd(p); setQ('') }}
               className="text-left p-3 rounded-xl border border-slate-200 hover:border-indigo-300
                          hover:bg-indigo-50 active:scale-[0.97] transition-all group">
-              <div className="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-indigo-100
-                              flex items-center justify-center mb-1.5 transition-colors">
-                <Package size={11} className="text-slate-400 group-hover:text-indigo-500" />
-              </div>
+              {getProductImageUrl(p) ? (
+                <img src={getProductImageUrl(p)} alt={p.name}
+                  className="w-10 h-10 rounded-lg object-cover mb-1.5 flex-shrink-0" />
+              ) : (
+                <div className="w-6 h-6 rounded-lg bg-slate-100 group-hover:bg-indigo-100
+                                flex items-center justify-center mb-1.5 transition-colors">
+                  <Package size={11} className="text-slate-400 group-hover:text-indigo-500" />
+                </div>
+              )}
               <p className="text-[11px] font-semibold text-slate-800 leading-tight line-clamp-2">{p.name}</p>
               {(p.sale_price ?? p.base_price) != null && (
                 <p className="text-[10px] font-medium text-indigo-600 mt-0.5">
