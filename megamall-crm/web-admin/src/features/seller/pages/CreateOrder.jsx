@@ -343,6 +343,10 @@ export default function CreateOrder() {
         amountToCollect,
         deliveryMode: form.deliveryMode,
         payMode: form.payMode,
+        fullName: form.fullName,
+        phone: form.phone,
+        city: form.city,
+        address: form.address,
       })
     },
     onError: (err) => {
@@ -405,6 +409,10 @@ export default function CreateOrder() {
           prepayAmount={success.prepayAmt}
           payMode={success.payMode}
           prepayWarning={false}
+          fullName={success.fullName}
+          phone={success.phone}
+          city={success.city}
+          address={success.address}
           onCreateAnother={handleCreateAnother}
         />
       </div>
