@@ -1,5 +1,4 @@
-import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, AlertTriangle, Plus, ClipboardList, Home, Package } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Plus, Package } from 'lucide-react'
 import { fmtAmount } from '../../../shared/orderStatusConfig'
 import { DELIVERY_MODES } from './DeliveryModeSelector'
 
@@ -30,7 +29,6 @@ export default function OrderSuccessScreen({
   prepayWarning = false,
   onCreateAnother,
 }) {
-  const navigate = useNavigate()
   const deliveryLabel = DELIVERY_MODES.find((m) => m.key === deliveryMode)?.label ?? deliveryMode
   const remaining = displayTotal - prepayAmount
 
@@ -69,9 +67,14 @@ export default function OrderSuccessScreen({
         </div>
         {cartItems.map((it, i) => (
           <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-slate-50 last:border-0">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
-              <Package size={13} className="text-indigo-400" />
-            </div>
+            {it.product_image_url ? (
+              <img src={it.product_image_url} alt={it.name}
+                className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                <Package size={13} className="text-indigo-400" />
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-slate-800 truncate">{it.name}</p>
               <p className="text-[10px] text-slate-400">{it.quantity} × {fmtAmount(it.unit_price)}</p>
@@ -125,22 +128,6 @@ export default function OrderSuccessScreen({
         >
           <Plus size={16} />
           Новый заказ
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate('/seller/orders')}
-          className="btn btn-secondary btn-md w-full flex items-center justify-center gap-2"
-        >
-          <ClipboardList size={16} />
-          Мои заказы
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate('/seller')}
-          className="btn btn-ghost btn-md w-full flex items-center justify-center gap-2"
-        >
-          <Home size={16} />
-          На главную
         </button>
       </div>
     </div>

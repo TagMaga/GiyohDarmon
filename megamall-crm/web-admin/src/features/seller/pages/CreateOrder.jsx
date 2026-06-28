@@ -12,6 +12,7 @@ import useDeliverySettings from '../hooks/useDeliverySettings'
 import useCities from '../hooks/useCities'
 import PhoneSearchField from '../components/PhoneSearchField'
 import CartItemRow from '../components/CartItemRow'
+import CartTotalsBreakdown from '../components/CartTotalsBreakdown'
 import DeliveryModeSelector from '../components/DeliveryModeSelector'
 import PaymentModeSelector from '../components/PaymentModeSelector'
 import OrderSuccessScreen from '../components/OrderSuccessScreen'
@@ -117,13 +118,26 @@ function ProductSearch({ products, loading, onAdd }) {
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 export function calcProductTotal(items) {
-  return items.reduce((acc, it) => acc + (Number(it.total_price) || 0), 0)
+  return items.reduce((acc, it) => acc + Math.max(0, Number(it.total_price) || 0), 0)
+}
+export function calcPayloadUnitPrice(item) {
+  const quantity = Number(item.quantity) || 0
+  if (quantity <= 0) return 0
+  const fallbackTotal = (Number(item.unit_price) || 0) * quantity
+  const lineTotal = Number.isFinite(Number(item.total_price)) ? Number(item.total_price) : fallbackTotal
+  return Math.max(0, lineTotal) / quantity
 }
 export function calcTotalOrderAmount(productTotal, deliveryFee) {
   return productTotal + deliveryFee
 }
 export function calcAmountToCollect(productTotal, deliveryFee, prepaymentAmount) {
   return Math.max(0, productTotal + deliveryFee - prepaymentAmount)
+}
+export function getProductImageUrl(product) {
+  if (!product) return ''
+  const images = Array.isArray(product.images) ? product.images : (Array.isArray(product.Images) ? product.Images : [])
+  const primary = images.find((img) => img.is_primary ?? img.IsPrimary) ?? images[0]
+  return product.product_image_url ?? product.ProductImageURL ?? product.image_url ?? product.ImageURL ?? primary?.image_url ?? primary?.ImageURL ?? ''
 }
 export function getPaymentLabel(prepaymentAmount, totalOrderAmount) {
   if (prepaymentAmount <= 0) return 'Оплата при получении'
@@ -190,8 +204,10 @@ export default function CreateOrder() {
         )}
       }
       const unitPrice = Number(product.sale_price ?? product.base_price ?? 0)
+      const productImageUrl = getProductImageUrl(product)
       return { ...prev, cartItems: [...cart, {
         product_id: product.id, name: product.name, sku: product.sku ?? '',
+        product_image_url: productImageUrl,
         quantity: 1, unit_price: unitPrice, total_price: unitPrice,
       }]}
     })
@@ -218,6 +234,22 @@ export default function CreateOrder() {
 
   // ── Calculations ─────────────────────────────────────────────────────────────
   const cartItems = Array.isArray(form.cartItems) ? form.cartItems : []
+  useEffect(() => {
+    if (products.length === 0 || cartItems.length === 0) return
+    setForm((prev) => {
+      const cart = safeCart(prev)
+      let changed = false
+      const nextCart = cart.map((item) => {
+        if (item.product_image_url) return item
+        const product = products.find((p) => p.id === item.product_id)
+        const productImageUrl = getProductImageUrl(product)
+        if (!productImageUrl) return item
+        changed = true
+        return { ...item, product_image_url: productImageUrl }
+      })
+      return changed ? { ...prev, cartItems: nextCart } : prev
+    })
+  }, [products, cartItems.length])
   const firstProductId    = cartItems[0]?.product_id ?? null
   const cartItems0Product = useMemo(
     () => firstProductId ? products.find((p) => p.id === firstProductId) ?? null : null,
@@ -280,7 +312,7 @@ export default function CreateOrder() {
         items: cartItems.map((it) => ({
           product_id: it.product_id,
           quantity:   it.quantity,
-          unit_price: it.unit_price,
+          unit_price: calcPayloadUnitPrice(it),
         })),
         city:             form.city || undefined,
         delivery_address: form.address.trim() || undefined,
@@ -338,15 +370,24 @@ export default function CreateOrder() {
     clearDraft()
   }
 
+  const handleClear = () => {
+    setForm(EMPTY_FORM)
+    setProofFile(null)
+    setSubmitError(null)
+    uploadedProofUrl.current = null
+    clearDraft()
+  }
+
   // ── Validation ───────────────────────────────────────────────────────────────
   const canSubmit = (() => {
     if (!form.phone.trim()) return false
     if (!form.fullName.trim()) return false
     if (!form.cityId) return false
     if (cartItems.length === 0) return false
-    if (cartItems.some((i) => i.unit_price <= 0)) return false
+    if (cartItems.some((i) => calcPayloadUnitPrice(i) <= 0)) return false
     if (form.payMode === 'prepayment') {
       if (prepayAmt <= 0) return false
+      if (prepayAmt > totalOrderAmount) return false
     }
     return true
   })()
@@ -373,7 +414,7 @@ export default function CreateOrder() {
   const noWarehouse = !whLoading && !autoWarehouse
 
   return (
-    <div className="page-container pb-32">
+    <div className="page-container pb-8">
       <PageHeader title="Новый заказ" subtitle="Быстрое оформление" />
 
       {whError && (
@@ -454,10 +495,6 @@ export default function CreateOrder() {
                     onRemove={() => removeCartItem(idx)} />
                 ))}
               </div>
-              <div className="px-4 py-3 bg-slate-50/80 border-t border-slate-100 flex justify-between items-center">
-                <span className="text-xs text-slate-500">Стоимость товаров</span>
-                <span className="text-sm font-bold text-slate-800">{fmtAmount(productTotal)}</span>
-              </div>
             </div>
           )}
           {cartItems.length === 0 && (
@@ -510,17 +547,24 @@ export default function CreateOrder() {
             rows={2} placeholder="Особые пожелания…" className="input resize-none" />
         </div>
 
+        {cartItems.length > 0 && (
+          <CartTotalsBreakdown
+            items={cartItems}
+            productTotal={productTotal}
+            deliveryFee={deliveryFee}
+            prepaymentAmount={prepayAmt}
+            totalPayment={totalOrderAmount}
+            amountToCollect={amountToCollect}
+          />
+        )}
+
         {submitError && (
           <div id="submit-error-anchor">
             <Alert variant="error" title="Ошибка">{submitError}</Alert>
           </div>
         )}
-      </div>
 
-      {/* ── Sticky bottom bar ── */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm
-                      border-t border-slate-200 px-4 py-3">
-        <div className="max-w-xl mx-auto">
+        <div>
           {!canSubmit && cartItems.length === 0 && (
             <p className="text-[10px] text-slate-400 mb-1 flex items-center gap-1">
               <AlertCircle size={10} /> Добавьте хотя бы один товар
@@ -531,11 +575,25 @@ export default function CreateOrder() {
               <AlertCircle size={10} /> Выберите город доставки
             </p>
           )}
+          {!canSubmit && cartItems.length > 0 && form.cityId && form.payMode === 'prepayment' && prepayAmt > totalOrderAmount && (
+            <p className="text-[10px] text-rose-500 mb-1 flex items-center gap-1">
+              <AlertCircle size={10} /> Предоплата не может быть больше итога заказа
+            </p>
+          )}
+          <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleClear}
+            className="btn btn-md flex items-center justify-center gap-2 border border-slate-300 text-slate-600 bg-white hover:bg-slate-50"
+          >
+            <X size={16} />
+            Очистить
+          </button>
           <button
             type="button"
             onClick={() => submitMut.mutate()}
             disabled={!canSubmit || submitMut.isPending || noWarehouse}
-            className="btn btn-primary btn-md w-full flex items-center justify-center gap-2
+            className="btn btn-primary btn-md flex-1 flex items-center justify-center gap-2
                        disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitMut.isPending ? (
@@ -546,10 +604,11 @@ export default function CreateOrder() {
             ) : (
               <>
                 <ShoppingCart size={16} />
-                {totalOrderAmount > 0 ? `Оформить · ${fmtAmount(totalOrderAmount)}` : 'Оформить заказ'}
+                Оформить заказ
               </>
             )}
           </button>
+          </div>
         </div>
       </div>
     </div>
