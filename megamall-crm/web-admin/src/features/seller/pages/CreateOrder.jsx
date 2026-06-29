@@ -394,7 +394,7 @@ export default function CreateOrder() {
   // ── Validation ───────────────────────────────────────────────────────────────
   const canSubmit = (() => {
     if (!form.phone.trim()) return false
-    if (!form.fullName.trim()) return false
+    if (!form.cityId) return false
     if (cartItems.length === 0) return false
     if (cartItems.some((i) => calcPayloadUnitPrice(i) <= 0)) return false
     if (form.payMode === 'prepayment') {
@@ -459,13 +459,13 @@ export default function CreateOrder() {
             onClearSelection={() => setField('customerId', null)}
           />
           <div className="space-y-2">
-            <label className="input-label">Имя клиента *</label>
+            <label className="input-label">Имя клиента</label>
             <input type="text" value={form.fullName} onChange={(e) => setField('fullName', e.target.value)}
               placeholder="Фамилия Имя" className="input" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <label className="input-label">Город доставки</label>
+              <label className="input-label">Город доставки *</label>
               <select
                 value={form.cityId}
                 onChange={(e) => {

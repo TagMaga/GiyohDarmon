@@ -138,7 +138,7 @@ export default function SellerHome() {
       <div className="lg:hidden min-h-screen" style={{ background: '#F2F4F7' }}>
         {/* Hero */}
         <div
-          className="relative overflow-hidden px-[10px] pb-8"
+          className="relative overflow-hidden px-6 pb-8"
           style={{
             background: 'linear-gradient(135deg, #4F46E5 0%, #6D28D9 100%)',
             borderRadius: '0 0 32px 32px',

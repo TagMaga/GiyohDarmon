@@ -158,7 +158,7 @@ export default function SellerProfilePage() {
       <div className="lg:hidden min-h-screen" style={{ background: '#F2F4F7' }}>
         {/* Profile header */}
         <div
-          className="relative overflow-hidden px-[10px] pb-8"
+          className="relative overflow-hidden px-[10px] pb-[10px]"
           style={{
             background: 'linear-gradient(135deg, #1E293B 0%, #334155 100%)',
             borderRadius: '0 0 32px 32px',

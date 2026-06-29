@@ -222,7 +222,7 @@ export default function SellerIncomePage() {
       <div className="lg:hidden min-h-screen" style={{ background: '#F2F4F7' }}>
         {/* Mobile hero */}
         <div
-          className="relative overflow-hidden px-[10px] pb-8 mb-1"
+          className="relative overflow-hidden px-[10px] pb-[10px] mb-[10px]"
           style={{
             background: 'linear-gradient(135deg, #059669 0%, #0D9488 100%)',
             borderRadius: '0 0 32px 32px',

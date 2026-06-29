@@ -2,9 +2,6 @@ import { Minus, Plus, Trash2 } from 'lucide-react'
 import { fmtAmount } from '../../../shared/orderStatusConfig'
 
 export default function CartItemRow({ item, onChange, onRemove }) {
-  const originalTotal = item.unit_price * item.quantity
-  const discount = originalTotal - (item.total_price ?? originalTotal)
-
   const setQty = (qty) => {
     if (qty < 1) return
     // reset total_price to original when qty changes
@@ -12,7 +9,8 @@ export default function CartItemRow({ item, onChange, onRemove }) {
   }
 
   const setTotalPrice = (val) => {
-    const price = val === '' ? 0 : Number(val)
+    const parsed = val === '' ? 0 : Number(val)
+    const price = Number.isFinite(parsed) ? Math.max(0, parsed) : 0
     onChange({ ...item, total_price: price })
   }
 
@@ -93,11 +91,6 @@ export default function CartItemRow({ item, onChange, onRemove }) {
 
           {/* Editable total price */}
           <div className="flex items-center gap-1 ml-auto">
-            {discount > 0 && (
-              <span className="text-[10px] text-rose-500 font-semibold whitespace-nowrap">
-                −{fmtAmount(discount)}
-              </span>
-            )}
             <div className="relative">
               <input
                 type="number"

@@ -9,7 +9,7 @@ import (
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 
 type CreateCustomerRequest struct {
-	FullName       string          `json:"full_name"        validate:"required,max=255"`
+	FullName       string          `json:"full_name"        validate:"omitempty,max=255"`
 	Phone          string          `json:"phone"            validate:"required,max=20"`
 	PhoneSecondary *string         `json:"phone_secondary"`
 	City           *string         `json:"city"`
