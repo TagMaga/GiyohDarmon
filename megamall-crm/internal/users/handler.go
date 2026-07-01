@@ -32,7 +32,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.PATCH("/me", middleware.RequireAuth(), h.PatchMe)
 
 	rg.POST("", middleware.RequireRoles(string(RoleOwner)), h.Create)
-	rg.GET("", middleware.RequireRoles(string(RoleOwner)), h.List)
+	rg.GET("", middleware.RequireRoles(string(RoleOwner), string(RoleManager), string(RoleSalesTeamLead)), h.List)
 	rg.GET("/:id", middleware.RequireAuth(), h.GetByID)
 	rg.PATCH("/:id", middleware.RequireRoles(string(RoleOwner)), h.Update)
 	rg.DELETE("/:id", middleware.RequireRoles(string(RoleOwner)), h.Delete)
@@ -68,8 +68,22 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 
+	if idStrs := c.QueryArray("ids[]"); len(idStrs) > 0 {
+		ids := make([]uuid.UUID, 0, len(idStrs))
+		for _, raw := range idStrs {
+			id, err := uuid.Parse(raw)
+			if err != nil {
+				response.Error(c, apperrors.BadRequest("invalid UUID in ids[]: "+raw))
+				return
+			}
+			ids = append(ids, id)
+		}
+		filter.IDs = ids
+	}
+
 	p := pagination.ParseFromQuery(c)
-	users, total, err := h.svc.List(c.Request.Context(), filter, p)
+	claims := middleware.ClaimsFromContext(c)
+	users, total, err := h.svc.List(c.Request.Context(), claims.UserID, claims.Role, filter, p)
 	if err != nil {
 		response.HandleError(c, err)
 		return

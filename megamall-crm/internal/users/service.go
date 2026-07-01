@@ -87,7 +87,20 @@ func (s *Service) CanViewUser(ctx context.Context, actorID uuid.UUID, actorRole 
 	return ok, nil
 }
 
-func (s *Service) List(ctx context.Context, filter ListUsersFilter, p pagination.Params) ([]User, int, error) {
+// List returns users matching filter. Non-owner callers (manager, sales_team_lead)
+// are scoped to their own hierarchy team — they can never list users outside it.
+func (s *Service) List(ctx context.Context, actorID uuid.UUID, actorRole string, filter ListUsersFilter, p pagination.Params) ([]User, int, error) {
+	if actorRole != string(RoleOwner) {
+		teamID, err := s.repo.GetTeamIDForUser(ctx, actorID)
+		if err != nil {
+			return nil, 0, apperrors.Internal(err)
+		}
+		if teamID == nil {
+			return []User{}, 0, nil
+		}
+		filter.TeamID = teamID
+	}
+
 	list, total, err := s.repo.List(ctx, filter, p)
 	if err != nil {
 		return nil, 0, apperrors.Internal(err)

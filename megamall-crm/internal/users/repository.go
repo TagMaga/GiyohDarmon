@@ -78,6 +78,12 @@ func (r *Repository) List(ctx context.Context, filter ListUsersFilter, p paginat
 		search := "%" + strings.ToLower(filter.Search) + "%"
 		query = query.Where("LOWER(full_name) LIKE ? OR phone LIKE ?", search, search)
 	}
+	if len(filter.IDs) > 0 {
+		query = query.Where("id IN ?", filter.IDs)
+	}
+	if filter.TeamID != nil {
+		query = query.Where("id IN (SELECT user_id FROM user_hierarchy WHERE team_id = ?)", *filter.TeamID)
+	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -151,6 +157,26 @@ func (r *Repository) ExistsByID(ctx context.Context, id uuid.UUID) (bool, error)
 		return false, fmt.Errorf("exists check: %w", err)
 	}
 	return count > 0, nil
+}
+
+// GetTeamIDForUser returns the hierarchy team_id for a user, or nil if the
+// user has no hierarchy entry or no team assigned.
+func (r *Repository) GetTeamIDForUser(ctx context.Context, userID uuid.UUID) (*uuid.UUID, error) {
+	var uh struct {
+		TeamID *uuid.UUID
+	}
+	err := r.db.WithContext(ctx).
+		Table("user_hierarchy").
+		Select("team_id").
+		Where("user_id = ?", userID).
+		Take(&uh).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get team id for user: %w", err)
+	}
+	return uh.TeamID, nil
 }
 
 // ShareTeam reports whether two active users belong to the same hierarchy team.

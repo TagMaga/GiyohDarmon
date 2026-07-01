@@ -39,10 +39,12 @@ type ChangePasswordRequest struct {
 
 // ListUsersFilter holds query-string filters for GET /users.
 type ListUsersFilter struct {
-	Role     *Role   `form:"role"`
-	IsActive *bool   `form:"is_active"`
-	Status   *Status `form:"status"`
-	Search   string  `form:"search"` // matches phone or full_name
+	Role     *Role       `form:"role"`
+	IsActive *bool       `form:"is_active"`
+	Status   *Status     `form:"status"`
+	Search   string      `form:"search"` // matches phone or full_name
+	IDs      []uuid.UUID `form:"-"`       // parsed manually from repeated ids[] query params
+	TeamID   *uuid.UUID  `form:"-"`       // set internally to scope non-owner callers to their own team
 }
 
 // UserResponse is the public-facing user representation (no password hash).
