@@ -24,7 +24,6 @@ import (
 	"github.com/megamall/crm/internal/products"
 	"github.com/megamall/crm/internal/teams"
 	"github.com/megamall/crm/internal/users"
-	"github.com/megamall/crm/internal/warehouse"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -106,20 +105,6 @@ func Run(ctx context.Context, db *gorm.DB, cfg *Config) (*Result, error) {
 		log.Println("--- Team + Hierarchy skipped (production mode) ---")
 	}
 
-	// ── Warehouse ─────────────────────────────────────────────────────────────
-	log.Println("--- Warehouse ---")
-	warehouseID, err := seedWarehouse(ctx, db, res)
-	if err != nil {
-		return res, fmt.Errorf("seed warehouse: %w", err)
-	}
-
-	// ── Category ──────────────────────────────────────────────────────────────
-	log.Println("--- Category ---")
-	categoryID, err := seedCategory(ctx, db, res)
-	if err != nil {
-		return res, fmt.Errorf("seed category: %w", err)
-	}
-
 	// ── Supplier ──────────────────────────────────────────────────────────────
 	log.Println("--- Supplier ---")
 	supplierID, err := seedSupplier(ctx, db, res)
@@ -129,7 +114,7 @@ func Run(ctx context.Context, db *gorm.DB, cfg *Config) (*Result, error) {
 
 	// ── Product ───────────────────────────────────────────────────────────────
 	log.Println("--- Product ---")
-	productID, err := seedProduct(ctx, db, res, categoryID, supplierID)
+	productID, err := seedProduct(ctx, db, res, supplierID)
 	if err != nil {
 		return res, fmt.Errorf("seed product: %w", err)
 	}
@@ -144,7 +129,7 @@ func Run(ctx context.Context, db *gorm.DB, cfg *Config) (*Result, error) {
 			ownerID = existing.ID
 		}
 	}
-	seedInventory(ctx, db, res, warehouseID, productID, ownerID)
+	seedInventory(ctx, db, res, productID, ownerID)
 
 	// ── Commission configs ─────────────────────────────────────────────────────
 	log.Println("--- Commission Configs ---")
@@ -289,56 +274,6 @@ func seedHierarchy(ctx context.Context, db *gorm.DB, res *Result, teamID uuid.UU
 	}
 }
 
-// ─── Warehouse ────────────────────────────────────────────────────────────────
-
-func seedWarehouse(ctx context.Context, db *gorm.DB, res *Result) (uuid.UUID, error) {
-	var existing warehouse.Warehouse
-	err := db.WithContext(ctx).Where("name = ?", DefaultWarehouseName).First(&existing).Error
-	if err == nil {
-		res.skipped("warehouse " + DefaultWarehouseName)
-		return existing.ID, nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return uuid.Nil, err
-	}
-
-	w := warehouse.Warehouse{
-		ID:       uuid.New(),
-		Name:     DefaultWarehouseName,
-		IsActive: true,
-	}
-	if err := db.WithContext(ctx).Create(&w).Error; err != nil {
-		return uuid.Nil, err
-	}
-	res.created("warehouse " + DefaultWarehouseName)
-	return w.ID, nil
-}
-
-// ─── Category ─────────────────────────────────────────────────────────────────
-
-func seedCategory(ctx context.Context, db *gorm.DB, res *Result) (uuid.UUID, error) {
-	var existing products.Category
-	err := db.WithContext(ctx).Where("name = ?", DefaultCategoryName).First(&existing).Error
-	if err == nil {
-		res.skipped("category " + DefaultCategoryName)
-		return existing.ID, nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return uuid.Nil, err
-	}
-
-	c := products.Category{
-		ID:       uuid.New(),
-		Name:     DefaultCategoryName,
-		IsActive: true,
-	}
-	if err := db.WithContext(ctx).Create(&c).Error; err != nil {
-		return uuid.Nil, err
-	}
-	res.created("category " + DefaultCategoryName)
-	return c.ID, nil
-}
-
 // ─── Supplier ─────────────────────────────────────────────────────────────────
 
 func seedSupplier(ctx context.Context, db *gorm.DB, res *Result) (uuid.UUID, error) {
@@ -366,7 +301,7 @@ func seedSupplier(ctx context.Context, db *gorm.DB, res *Result) (uuid.UUID, err
 
 // ─── Product ──────────────────────────────────────────────────────────────────
 
-func seedProduct(ctx context.Context, db *gorm.DB, res *Result, catID, supID uuid.UUID) (uuid.UUID, error) {
+func seedProduct(ctx context.Context, db *gorm.DB, res *Result, supID uuid.UUID) (uuid.UUID, error) {
 	var existing products.Product
 	err := db.WithContext(ctx).Where("sku = ? AND deleted_at IS NULL", DefaultProductSKU).First(&existing).Error
 	if err == nil {
@@ -386,7 +321,6 @@ func seedProduct(ctx context.Context, db *gorm.DB, res *Result, catID, supID uui
 		Name:          DefaultProductName,
 		SalePrice:     &sale,
 		PurchasePrice: &purchase,
-		CategoryID:    &catID,
 		SupplierID:    &supID,
 		IsActive:      true,
 	}

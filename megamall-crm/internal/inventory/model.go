@@ -19,10 +19,9 @@ const (
 	MovementWriteoff    MovementType = "writeoff"
 )
 
-// Inventory tracks the current stock level for one product in one warehouse.
+// Inventory tracks the current stock level for one product.
 type Inventory struct {
 	ID                 uuid.UUID `gorm:"type:uuid;primaryKey"`
-	WarehouseID        uuid.UUID `gorm:"type:uuid;not null;column:warehouse_id"`
 	ProductID          uuid.UUID `gorm:"type:uuid;not null;column:product_id"`
 	Quantity           int       `gorm:"not null;default:0"`
 	ReservedQuantity   int       `gorm:"not null;default:0;column:reserved_quantity"`
@@ -38,7 +37,6 @@ func (Inventory) TableName() string { return "inventory" }
 // Movement is an immutable record of every stock change. Never updated.
 type Movement struct {
 	ID               uuid.UUID    `gorm:"type:uuid;primaryKey"`
-	WarehouseID      uuid.UUID    `gorm:"type:uuid;not null;column:warehouse_id"`
 	ProductID        uuid.UUID    `gorm:"type:uuid;not null;column:product_id"`
 	MovementType     MovementType `gorm:"type:inventory_movement_type;not null;column:movement_type"`
 	// Quantity is always positive; movement_type determines direction.
@@ -57,7 +55,6 @@ func (Movement) TableName() string { return "inventory_movements" }
 // Writeoff records damaged or lost stock that is removed from inventory.
 type Writeoff struct {
 	ID          uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	WarehouseID uuid.UUID  `gorm:"type:uuid;not null;column:warehouse_id"`
 	ProductID   uuid.UUID  `gorm:"type:uuid;not null;column:product_id"`
 	Quantity    int        `gorm:"not null"`
 	Reason      string     `gorm:"not null"`
@@ -71,7 +68,6 @@ func (Writeoff) TableName() string { return "writeoffs" }
 // Adjustment records a manual correction to inventory quantity.
 type Adjustment struct {
 	ID               uuid.UUID `gorm:"type:uuid;primaryKey"`
-	WarehouseID      uuid.UUID `gorm:"type:uuid;not null;column:warehouse_id"`
 	ProductID        uuid.UUID `gorm:"type:uuid;not null;column:product_id"`
 	PreviousQuantity int       `gorm:"not null;column:previous_quantity"`
 	NewQuantity      int       `gorm:"not null;column:new_quantity"`
@@ -86,7 +82,6 @@ func (Adjustment) TableName() string { return "inventory_adjustments" }
 // remaining_quantity decreases as stock is consumed via FIFO.
 type Batch struct {
 	ID                uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	WarehouseID       uuid.UUID  `gorm:"type:uuid;not null;column:warehouse_id"`
 	ProductID         uuid.UUID  `gorm:"type:uuid;not null;column:product_id"`
 	ReceivedQuantity  int        `gorm:"not null;column:received_quantity"`
 	RemainingQuantity int        `gorm:"not null;column:remaining_quantity"`

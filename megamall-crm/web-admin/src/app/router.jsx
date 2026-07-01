@@ -71,7 +71,6 @@ const WarehouseProductsPage  = lazy(() => import('../features/warehouse/pages/Wa
 const WarehouseMovementsPage = lazy(() => import('../features/warehouse/pages/WarehouseMovementsPage'))
 const WarehouseReceivingPage = lazy(() => import('../features/warehouse/pages/WarehouseReceivingPage'))
 const WarehouseWriteoffsPage = lazy(() => import('../features/warehouse/pages/WarehouseWriteoffsPage'))
-const WarehouseTransfersPage = lazy(() => import('../features/warehouse/pages/WarehouseTransfersPage'))
 
 // Courier
 const CourierDashboard = lazy(() => import('../features/courier/pages/CourierDashboard'))
@@ -255,7 +254,6 @@ const router = createBrowserRouter([
         { path: 'movements',    element: <Lazy><WarehouseMovementsPage /></Lazy> },
         { path: 'receiving',    element: <Lazy><WarehouseReceivingPage /></Lazy> },
         { path: 'writeoffs',    element: <Lazy><WarehouseWriteoffsPage /></Lazy> },
-        { path: 'transfers',    element: <Lazy><WarehouseTransfersPage /></Lazy> },
         { path: '*',            element: <Navigate to="/warehouse" replace /> },
       ],
     }],

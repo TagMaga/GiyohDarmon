@@ -10,7 +10,6 @@ import (
 
 type InventoryResponse struct {
 	ID                uuid.UUID `json:"id"`
-	WarehouseID       uuid.UUID `json:"warehouse_id"`
 	ProductID         uuid.UUID `json:"product_id"`
 	Quantity          int       `json:"quantity"`
 	ReservedQuantity  int       `json:"reserved_quantity"`
@@ -23,7 +22,6 @@ type InventoryResponse struct {
 func ToInventoryResponse(inv *Inventory) InventoryResponse {
 	return InventoryResponse{
 		ID:                inv.ID,
-		WarehouseID:       inv.WarehouseID,
 		ProductID:         inv.ProductID,
 		Quantity:          inv.Quantity,
 		ReservedQuantity:  inv.ReservedQuantity,
@@ -37,12 +35,11 @@ func ToInventoryResponse(inv *Inventory) InventoryResponse {
 // ─── Receiving (FIFO batch receipt) ──────────────────────────────────────────
 
 type CreateReceivingRequest struct {
-	WarehouseID uuid.UUID `json:"warehouse_id" validate:"required"`
-	ProductID   uuid.UUID `json:"product_id"   validate:"required"`
-	Quantity    int       `json:"quantity"      validate:"required,min=1"`
-	UnitCost    float64   `json:"unit_cost"     validate:"min=0"`
-	InvoiceNo   *string   `json:"invoice_no"`
-	Notes       *string   `json:"notes"`
+	ProductID uuid.UUID `json:"product_id"   validate:"required"`
+	Quantity  int       `json:"quantity"      validate:"required,min=1"`
+	UnitCost  float64   `json:"unit_cost"     validate:"min=0"`
+	InvoiceNo *string   `json:"invoice_no"`
+	Notes     *string   `json:"notes"`
 }
 
 type ReceivingResponse struct {
@@ -54,7 +51,6 @@ type ReceivingResponse struct {
 
 type BatchResponse struct {
 	ID                uuid.UUID `json:"id"`
-	WarehouseID       uuid.UUID `json:"warehouse_id"`
 	ProductID         uuid.UUID `json:"product_id"`
 	ReceivedQuantity  int       `json:"received_quantity"`
 	RemainingQuantity int       `json:"remaining_quantity"`
@@ -66,7 +62,6 @@ type BatchResponse struct {
 func ToBatchResponse(b *Batch) BatchResponse {
 	return BatchResponse{
 		ID:                b.ID,
-		WarehouseID:       b.WarehouseID,
 		ProductID:         b.ProductID,
 		ReceivedQuantity:  b.ReceivedQuantity,
 		RemainingQuantity: b.RemainingQuantity,
@@ -77,15 +72,13 @@ func ToBatchResponse(b *Batch) BatchResponse {
 }
 
 type BatchListFilter struct {
-	WarehouseID string `form:"warehouse_id"`
-	ProductID   string `form:"product_id"`
+	ProductID string `form:"product_id"`
 }
 
 // ─── Integrity ────────────────────────────────────────────────────────────────
 
 type InventoryIntegrityDiscrepancy struct {
 	InventoryID       uuid.UUID `json:"inventory_id"`
-	WarehouseID       uuid.UUID `json:"warehouse_id"`
 	ProductID         uuid.UUID `json:"product_id"`
 	InventoryQuantity int       `json:"inventory_quantity"`
 	BatchQuantity     int       `json:"batch_quantity"`
@@ -95,7 +88,6 @@ type InventoryIntegrityDiscrepancy struct {
 // ─── Adjustment ───────────────────────────────────────────────────────────────
 
 type CreateAdjustmentRequest struct {
-	WarehouseID uuid.UUID `json:"warehouse_id" validate:"required"`
 	ProductID   uuid.UUID `json:"product_id"   validate:"required"`
 	NewQuantity int       `json:"new_quantity"  validate:"min=0"`
 	Reason      string    `json:"reason"        validate:"required,max=500"`
@@ -106,7 +98,6 @@ type CreateAdjustmentRequest struct {
 
 type AdjustmentResponse struct {
 	ID               uuid.UUID `json:"id"`
-	WarehouseID      uuid.UUID `json:"warehouse_id"`
 	ProductID        uuid.UUID `json:"product_id"`
 	PreviousQuantity int       `json:"previous_quantity"`
 	NewQuantity      int       `json:"new_quantity"`
@@ -118,7 +109,6 @@ type AdjustmentResponse struct {
 func ToAdjustmentResponse(a *Adjustment) AdjustmentResponse {
 	return AdjustmentResponse{
 		ID:               a.ID,
-		WarehouseID:      a.WarehouseID,
 		ProductID:        a.ProductID,
 		PreviousQuantity: a.PreviousQuantity,
 		NewQuantity:      a.NewQuantity,
@@ -131,61 +121,38 @@ func ToAdjustmentResponse(a *Adjustment) AdjustmentResponse {
 // ─── Writeoff ─────────────────────────────────────────────────────────────────
 
 type CreateWriteoffRequest struct {
-	WarehouseID uuid.UUID  `json:"warehouse_id" validate:"required"`
-	ProductID   uuid.UUID  `json:"product_id"   validate:"required"`
-	Quantity    int        `json:"quantity"      validate:"required,min=1"`
-	Reason      string     `json:"reason"        validate:"required,max=500"`
-	ApprovedBy  *uuid.UUID `json:"approved_by"`
+	ProductID  uuid.UUID  `json:"product_id"   validate:"required"`
+	Quantity   int        `json:"quantity"      validate:"required,min=1"`
+	Reason     string     `json:"reason"        validate:"required,max=500"`
+	ApprovedBy *uuid.UUID `json:"approved_by"`
 }
 
 type WriteoffResponse struct {
-	ID          uuid.UUID  `json:"id"`
-	WarehouseID uuid.UUID  `json:"warehouse_id"`
-	ProductID   uuid.UUID  `json:"product_id"`
-	Quantity    int        `json:"quantity"`
-	Reason      string     `json:"reason"`
-	ApprovedBy  *uuid.UUID `json:"approved_by"`
-	CreatedBy   uuid.UUID  `json:"created_by"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID         uuid.UUID  `json:"id"`
+	ProductID  uuid.UUID  `json:"product_id"`
+	Quantity   int        `json:"quantity"`
+	Reason     string     `json:"reason"`
+	ApprovedBy *uuid.UUID `json:"approved_by"`
+	CreatedBy  uuid.UUID  `json:"created_by"`
+	CreatedAt  time.Time  `json:"created_at"`
 }
 
 func ToWriteoffResponse(w *Writeoff) WriteoffResponse {
 	return WriteoffResponse{
-		ID:          w.ID,
-		WarehouseID: w.WarehouseID,
-		ProductID:   w.ProductID,
-		Quantity:    w.Quantity,
-		Reason:      w.Reason,
-		ApprovedBy:  w.ApprovedBy,
-		CreatedBy:   w.CreatedBy,
-		CreatedAt:   w.CreatedAt,
+		ID:         w.ID,
+		ProductID:  w.ProductID,
+		Quantity:   w.Quantity,
+		Reason:     w.Reason,
+		ApprovedBy: w.ApprovedBy,
+		CreatedBy:  w.CreatedBy,
+		CreatedAt:  w.CreatedAt,
 	}
-}
-
-// ─── Transfer ─────────────────────────────────────────────────────────────────
-
-type CreateTransferRequest struct {
-	FromWarehouseID uuid.UUID `json:"from_warehouse_id" validate:"required"`
-	ToWarehouseID   uuid.UUID `json:"to_warehouse_id"   validate:"required"`
-	ProductID       uuid.UUID `json:"product_id"        validate:"required"`
-	Quantity        int       `json:"quantity"           validate:"required,min=1"`
-	Reason          *string   `json:"reason"`
-}
-
-type TransferResponse struct {
-	TransferOutMovementID uuid.UUID `json:"transfer_out_movement_id"`
-	TransferInMovementID  uuid.UUID `json:"transfer_in_movement_id"`
-	FromWarehouseID       uuid.UUID `json:"from_warehouse_id"`
-	ToWarehouseID         uuid.UUID `json:"to_warehouse_id"`
-	ProductID             uuid.UUID `json:"product_id"`
-	Quantity              int       `json:"quantity"`
 }
 
 // ─── Movement ─────────────────────────────────────────────────────────────────
 
 type MovementResponse struct {
 	ID               uuid.UUID    `json:"id"`
-	WarehouseID      uuid.UUID    `json:"warehouse_id"`
 	ProductID        uuid.UUID    `json:"product_id"`
 	MovementType     MovementType `json:"movement_type"`
 	Quantity         int          `json:"quantity"`
@@ -196,12 +163,22 @@ type MovementResponse struct {
 	CreatedBy        uuid.UUID    `json:"created_by"`
 	CreatedByName    string       `json:"created_by_name"`
 	CreatedAt        time.Time    `json:"created_at"`
+
+	// Populated only for "sale" movements — the order this stock left for.
+	// Lets the Движения screen show order/customer/courier context without
+	// granting warehouse_manager access to /orders (see orders/routes.go).
+	OrderID         *uuid.UUID `json:"order_id,omitempty"`
+	OrderNumber     *string    `json:"order_number,omitempty"`
+	OrderStatus     *string    `json:"order_status,omitempty"`
+	CustomerName    *string    `json:"customer_name,omitempty"`
+	CustomerPhone   *string    `json:"customer_phone,omitempty"`
+	DeliveryAddress *string    `json:"delivery_address,omitempty"`
+	CourierName     *string    `json:"courier_name,omitempty"`
 }
 
 func ToMovementResponse(row *MovementRow) MovementResponse {
 	return MovementResponse{
 		ID:               row.ID,
-		WarehouseID:      row.WarehouseID,
 		ProductID:        row.ProductID,
 		MovementType:     row.MovementType,
 		Quantity:         row.Quantity,
@@ -212,17 +189,22 @@ func ToMovementResponse(row *MovementRow) MovementResponse {
 		CreatedBy:        row.CreatedBy,
 		CreatedByName:    row.CreatedByName,
 		CreatedAt:        row.CreatedAt,
+		OrderID:          row.OrderID,
+		OrderNumber:      row.OrderNumber,
+		OrderStatus:      row.OrderStatus,
+		CustomerName:     row.CustomerName,
+		CustomerPhone:    row.CustomerPhone,
+		DeliveryAddress:  row.DeliveryAddress,
+		CourierName:      row.CourierName,
 	}
 }
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
 
 type ListInventoryFilter struct {
-	WarehouseID string `form:"warehouse_id"`
 }
 
 type ListMovementsFilter struct {
-	WarehouseID  string `form:"warehouse_id"`
 	ProductID    string `form:"product_id"`
 	MovementType string `form:"movement_type"`
 	// DateFrom / DateTo accept YYYY-MM-DD and filter on created_at (inclusive).

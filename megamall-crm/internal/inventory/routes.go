@@ -17,11 +17,10 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 
 	// Inventory reads
 	rg.GET("", readRoles, h.ListInventory)
-	rg.GET("/warehouse/:id", readRoles, h.GetInventoryByWarehouse)
 	rg.GET("/product/:id", readRoles, h.GetInventoryByProduct)
 	rg.GET("/movements", readRoles, h.ListMovements)
 
-	// FIFO batch reads (?warehouse_id=&product_id=&only_active=true)
+	// FIFO batch reads (?product_id=&only_active=true)
 	rg.GET("/batches", readRoles, h.ListBatches)
 	rg.GET("/integrity", readRoles, h.InventoryIntegrityCheck)
 
@@ -29,5 +28,4 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/receiving", writeRoles, h.CreateReceiving)
 	rg.POST("/adjustments", writeRoles, h.CreateAdjustment)
 	rg.POST("/writeoffs", writeRoles, h.CreateWriteoff)
-	rg.POST("/transfers", writeRoles, h.CreateTransfer)
 }

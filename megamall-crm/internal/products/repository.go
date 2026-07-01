@@ -21,55 +21,6 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-// ─── Category ─────────────────────────────────────────────────────────────────
-
-func (r *Repository) ListCategories(ctx context.Context, p pagination.Params) ([]Category, int, error) {
-	var rows []Category
-	var total int64
-
-	q := r.db.WithContext(ctx).Model(&Category{})
-	if err := q.Count(&total).Error; err != nil {
-		return nil, 0, fmt.Errorf("count categories: %w", err)
-	}
-	if err := q.Order("name ASC").Limit(p.Limit).Offset(p.Offset()).Find(&rows).Error; err != nil {
-		return nil, 0, fmt.Errorf("list categories: %w", err)
-	}
-	return rows, int(total), nil
-}
-
-func (r *Repository) GetCategoryByID(ctx context.Context, id uuid.UUID) (*Category, error) {
-	var c Category
-	err := r.db.WithContext(ctx).First(&c, "id = ?", id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("get category: %w", err)
-	}
-	return &c, nil
-}
-
-func (r *Repository) CreateCategory(ctx context.Context, c *Category) error {
-	if err := r.db.WithContext(ctx).Create(c).Error; err != nil {
-		return fmt.Errorf("create category: %w", err)
-	}
-	return nil
-}
-
-func (r *Repository) UpdateCategory(ctx context.Context, c *Category) error {
-	if err := r.db.WithContext(ctx).Save(c).Error; err != nil {
-		return fmt.Errorf("update category: %w", err)
-	}
-	return nil
-}
-
-func (r *Repository) DeleteCategory(ctx context.Context, id uuid.UUID) error {
-	if err := r.db.WithContext(ctx).Delete(&Category{}, "id = ?", id).Error; err != nil {
-		return fmt.Errorf("delete category: %w", err)
-	}
-	return nil
-}
-
 // ─── Supplier ─────────────────────────────────────────────────────────────────
 
 func (r *Repository) ListSuppliers(ctx context.Context, p pagination.Params) ([]Supplier, int, error) {
@@ -130,9 +81,6 @@ func (r *Repository) ListProducts(ctx context.Context, f ListProductsFilter, p p
 	if f.Search != "" {
 		like := "%" + f.Search + "%"
 		q = q.Where("name ILIKE ? OR sku ILIKE ?", like, like)
-	}
-	if f.CategoryID != "" {
-		q = q.Where("category_id = ?", f.CategoryID)
 	}
 	if f.SupplierID != "" {
 		q = q.Where("supplier_id = ?", f.SupplierID)

@@ -8,21 +8,11 @@ import (
 // RegisterRoutes mounts all product-catalog routes onto the given group.
 //
 // RBAC summary:
-//   categories  RW: owner, warehouse_manager    R: dispatcher, seller, manager, sales_team_lead
 //   suppliers   RW: owner                       R: warehouse_manager
 //   products    RW: owner, warehouse_manager    R: dispatcher, seller, manager, sales_team_lead
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	writeRoles := middleware.RequireRoles("owner", "warehouse_manager")
 	readRoles := middleware.RequireRoles("owner", "warehouse_manager", "dispatcher", "seller", "manager", "sales_team_lead")
-
-	// ── Categories ────────────────────────────────────────────────────────────
-	cats := rg.Group("/categories")
-	{
-		cats.GET("", readRoles, h.ListCategories)
-		cats.POST("", writeRoles, h.CreateCategory)
-		cats.PATCH("/:id", writeRoles, h.UpdateCategory)
-		cats.DELETE("/:id", writeRoles, h.DeleteCategory)
-	}
 
 	// ── Suppliers ─────────────────────────────────────────────────────────────
 	ownerOnly := middleware.RequireRoles("owner")

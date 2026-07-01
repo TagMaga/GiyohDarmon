@@ -165,10 +165,9 @@ type Order struct {
 	ManagerTeamID  *uuid.UUID `gorm:"type:uuid;column:manager_team_id"`
 	TeamLeadTeamID *uuid.UUID `gorm:"type:uuid;column:team_lead_team_id"`
 
-	OrderType   OrderType   `gorm:"type:order_type;not null;column:order_type"`
-	Status      OrderStatus `gorm:"type:order_status;not null;default:new"`
-	WarehouseID uuid.UUID   `gorm:"type:uuid;not null;column:warehouse_id"`
-	SnapshotID  *uuid.UUID  `gorm:"type:uuid;column:snapshot_id"`
+	OrderType  OrderType   `gorm:"type:order_type;not null;column:order_type"`
+	Status     OrderStatus `gorm:"type:order_status;not null;default:new"`
+	SnapshotID *uuid.UUID  `gorm:"type:uuid;column:snapshot_id"`
 
 	// CityID is the delivery city (cities table). Required at creation; used by the
 	// courier app to filter available orders by the courier's assigned cities.

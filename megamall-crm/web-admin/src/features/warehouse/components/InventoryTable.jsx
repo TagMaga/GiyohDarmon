@@ -3,7 +3,7 @@ import EmptyState  from '../../../shared/components/EmptyState'
 import { TableRowSkeleton } from '../../../shared/components/Skeleton'
 import { Package } from 'lucide-react'
 import {
-  getProductName, getProductSku, getWarehouseName,
+  getProductName, getProductSku,
   getAvailableQty, getReservedQty, getQuantity,
   getStockStatus, STOCK_STATUS_LABEL, STOCK_STATUS_BADGE,
 } from '../utils/warehouseHelpers'
@@ -20,7 +20,7 @@ const ROW_BG = {
   in_stock:     '',
 }
 
-export default function InventoryTable({ inventory, productMap, warehouseMap, loading }) {
+export default function InventoryTable({ inventory, productMap, loading }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
       <table className="w-full text-sm">
@@ -28,7 +28,6 @@ export default function InventoryTable({ inventory, productMap, warehouseMap, lo
           <tr>
             <TH>Товар</TH>
             <TH>Артикул</TH>
-            <TH>Склад</TH>
             <TH right>На складе</TH>
             <TH right>Доступно</TH>
             <TH right>Резерв</TH>
@@ -37,11 +36,11 @@ export default function InventoryTable({ inventory, productMap, warehouseMap, lo
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {loading && [1,2,3,4,5].map(i => <TableRowSkeleton key={i} cols={8} />)}
+          {loading && [1,2,3,4,5].map(i => <TableRowSkeleton key={i} cols={7} />)}
 
           {!loading && inventory.length === 0 && (
             <tr>
-              <td colSpan={8} className="py-0">
+              <td colSpan={7} className="py-0">
                 <EmptyState icon={<Package size={22} />} title="Нет остатков" description="Добавьте приход товаров через вкладку «Приход»" />
               </td>
             </tr>
@@ -50,7 +49,6 @@ export default function InventoryTable({ inventory, productMap, warehouseMap, lo
           {!loading && inventory.map((inv, i) => {
             const id        = inv.id ?? inv.ID ?? i
             const product   = productMap[inv.product_id ?? inv.ProductID] ?? null
-            const warehouse = warehouseMap[inv.warehouse_id ?? inv.WarehouseID] ?? null
             const status    = getStockStatus(inv)
             const threshold = inv.low_stock_threshold ?? inv.LowStockThreshold ?? 0
 
@@ -60,7 +58,6 @@ export default function InventoryTable({ inventory, productMap, warehouseMap, lo
                   <span className="truncate block">{getProductName(product)}</span>
                 </td>
                 <td className="px-4 py-3 text-slate-500 font-mono text-xs">{getProductSku(product)}</td>
-                <td className="px-4 py-3 text-slate-600">{getWarehouseName(warehouse)}</td>
                 <td className={`px-4 py-3 text-right font-bold tabular-nums ${status === 'out_of_stock' ? 'text-rose-600' : 'text-slate-900'}`}>
                   {getQuantity(inv)}
                 </td>

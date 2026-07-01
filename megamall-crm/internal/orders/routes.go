@@ -15,11 +15,10 @@ import (
 //	Add prepayment proof:  seller, dispatcher, owner
 //
 // warehouse_manager is intentionally excluded from orderRoles (P0 fix — Phase 24).
-// The users table has no warehouse_id column and warehouses has no manager_id, so
-// there is no schema-backed user→warehouse relationship to scope queries against.
-// Warehouse managers access stock data via /inventory and /warehouses endpoints,
-// which are correctly scoped to warehouse objects.  They do not need order data.
-// Re-add warehouse_manager only after a warehouse_user_assignments table exists.
+// The role has no natural scope over orders — it exists to manage stock, not sales —
+// so there is no meaningful way to restrict order visibility for it. Warehouse
+// managers access stock data via /inventory, which is what their role needs.
+// Re-add warehouse_manager only if a concrete scoping need for orders emerges.
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	// Roles that may read orders. warehouse_manager excluded — no scope mapping exists.
 	orderRoles := middleware.RequireRoles(

@@ -22,125 +22,6 @@ func NewService(repo *Repository, logger *activity.Logger) *Service {
 	return &Service{repo: repo, logger: logger}
 }
 
-// ─── Categories ───────────────────────────────────────────────────────────────
-
-func (s *Service) ListCategories(ctx context.Context, p pagination.Params) ([]Category, int, error) {
-	return s.repo.ListCategories(ctx, p)
-}
-
-func (s *Service) GetCategoryByID(ctx context.Context, id uuid.UUID) (*Category, error) {
-	c, err := s.repo.GetCategoryByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if c == nil {
-		return nil, apperrors.NotFound("category")
-	}
-	return c, nil
-}
-
-func (s *Service) CreateCategory(ctx context.Context, actorID uuid.UUID, req CreateCategoryRequest) (*Category, error) {
-	c := &Category{
-		ID:          uuid.New(),
-		ParentID:    req.ParentID,
-		Name:        req.Name,
-		Description: req.Description,
-		IsActive:    true,
-	}
-	if req.IsActive != nil {
-		c.IsActive = *req.IsActive
-	}
-
-	// Validate parent exists if provided.
-	if c.ParentID != nil {
-		parent, err := s.repo.GetCategoryByID(ctx, *c.ParentID)
-		if err != nil {
-			return nil, err
-		}
-		if parent == nil {
-			return nil, apperrors.BadRequest("parent_id: category not found")
-		}
-	}
-
-	if err := s.repo.CreateCategory(ctx, c); err != nil {
-		return nil, err
-	}
-
-	s.logger.LogAsync(activity.Entry{
-		ActorID:    &actorID,
-		Action:     "create",
-		EntityType: "category",
-		EntityID:   &c.ID,
-		AfterState: c,
-	})
-	return c, nil
-}
-
-func (s *Service) UpdateCategory(ctx context.Context, actorID, id uuid.UUID, req UpdateCategoryRequest) (*Category, error) {
-	c, err := s.repo.GetCategoryByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if c == nil {
-		return nil, apperrors.NotFound("category")
-	}
-
-	before := *c
-
-	if req.Name != nil {
-		c.Name = *req.Name
-	}
-	if req.Description != nil {
-		c.Description = req.Description
-	}
-	if req.ParentID != nil {
-		if *req.ParentID == id {
-			return nil, apperrors.BadRequest("category cannot be its own parent")
-		}
-		c.ParentID = req.ParentID
-	}
-	if req.IsActive != nil {
-		c.IsActive = *req.IsActive
-	}
-
-	if err := s.repo.UpdateCategory(ctx, c); err != nil {
-		return nil, err
-	}
-
-	s.logger.LogAsync(activity.Entry{
-		ActorID:     &actorID,
-		Action:      "update",
-		EntityType:  "category",
-		EntityID:    &c.ID,
-		BeforeState: before,
-		AfterState:  c,
-	})
-	return c, nil
-}
-
-func (s *Service) DeleteCategory(ctx context.Context, actorID, id uuid.UUID) error {
-	c, err := s.repo.GetCategoryByID(ctx, id)
-	if err != nil {
-		return err
-	}
-	if c == nil {
-		return apperrors.NotFound("category")
-	}
-
-	if err := s.repo.DeleteCategory(ctx, id); err != nil {
-		return err
-	}
-
-	s.logger.LogAsync(activity.Entry{
-		ActorID:     &actorID,
-		Action:      "delete",
-		EntityType:  "category",
-		EntityID:    &id,
-		BeforeState: c,
-	})
-	return nil
-}
-
 // ─── Suppliers ────────────────────────────────────────────────────────────────
 
 func (s *Service) ListSuppliers(ctx context.Context, p pagination.Params) ([]Supplier, int, error) {
@@ -290,7 +171,6 @@ func (s *Service) CreateProduct(ctx context.Context, actorID uuid.UUID, req Crea
 		Barcode:            req.Barcode,
 		Name:               req.Name,
 		Description:        req.Description,
-		CategoryID:         req.CategoryID,
 		SupplierID:         req.SupplierID,
 		PurchasePrice:      req.PurchasePrice,
 		SalePrice:          req.SalePrice,
@@ -352,9 +232,6 @@ func (s *Service) UpdateProduct(ctx context.Context, actorID, id uuid.UUID, req 
 	}
 	if req.Description != nil {
 		p.Description = req.Description
-	}
-	if req.CategoryID != nil {
-		p.CategoryID = req.CategoryID
 	}
 	if req.SupplierID != nil {
 		p.SupplierID = req.SupplierID

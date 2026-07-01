@@ -40,24 +40,6 @@ func (h *Handler) ListInventory(c *gin.Context) {
 	response.OKWithMeta(c, out, pagination.BuildMeta(p, total))
 }
 
-func (h *Handler) GetInventoryByWarehouse(c *gin.Context) {
-	id, ok := parseUUID(c, "id")
-	if !ok {
-		return
-	}
-	p := pagination.ParseFromQuery(c)
-	rows, total, err := h.svc.GetByWarehouse(c.Request.Context(), id, p)
-	if err != nil {
-		response.HandleError(c, err)
-		return
-	}
-	out := make([]InventoryResponse, 0, len(rows))
-	for i := range rows {
-		out = append(out, ToInventoryResponse(&rows[i]))
-	}
-	response.OKWithMeta(c, out, pagination.BuildMeta(p, total))
-}
-
 func (h *Handler) GetInventoryByProduct(c *gin.Context) {
 	id, ok := parseUUID(c, "id")
 	if !ok {
@@ -184,25 +166,6 @@ func (h *Handler) CreateWriteoff(c *gin.Context) {
 		return
 	}
 	response.Created(c, ToWriteoffResponse(wo))
-}
-
-func (h *Handler) CreateTransfer(c *gin.Context) {
-	var req CreateTransferRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, apperrors.BadRequest(err.Error()))
-		return
-	}
-	if appErr := validator.Validate(req); appErr != nil {
-		response.Error(c, appErr)
-		return
-	}
-	claims := middleware.ClaimsFromContext(c)
-	result, err := h.svc.Transfer(c.Request.Context(), claims.UserID, req)
-	if err != nil {
-		response.HandleError(c, err)
-		return
-	}
-	response.Created(c, result)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

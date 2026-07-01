@@ -3,7 +3,7 @@ import EmptyState  from '../../../shared/components/EmptyState'
 import { CardSkeleton } from '../../../shared/components/Skeleton'
 import { Package } from 'lucide-react'
 import {
-  getProductName, getProductSku, getWarehouseName,
+  getProductName, getProductSku,
   getAvailableQty, getReservedQty, getQuantity,
   getStockStatus, STOCK_STATUS_LABEL, STOCK_STATUS_BADGE,
 } from '../utils/warehouseHelpers'
@@ -14,7 +14,7 @@ const BORDER_CLASS = {
   in_stock:     '',
 }
 
-export default function InventoryMobileCard({ inventory, productMap, warehouseMap, loading }) {
+export default function InventoryMobileCard({ inventory, productMap, loading }) {
   if (loading) return (
     <div className="space-y-3">{[1,2,3,4].map(i => <CardSkeleton key={i} />)}</div>
   )
@@ -28,7 +28,6 @@ export default function InventoryMobileCard({ inventory, productMap, warehouseMa
       {inventory.map((inv, i) => {
         const id        = inv.id ?? inv.ID ?? i
         const product   = productMap[inv.product_id ?? inv.ProductID] ?? null
-        const warehouse = warehouseMap[inv.warehouse_id ?? inv.WarehouseID] ?? null
         const status    = getStockStatus(inv)
 
         return (
@@ -44,8 +43,6 @@ export default function InventoryMobileCard({ inventory, productMap, warehouseMa
                 {STOCK_STATUS_LABEL[status]}
               </Badge>
             </div>
-
-            <p className="text-xs text-slate-500">{getWarehouseName(warehouse)}</p>
 
             <div className="flex items-center gap-4 flex-wrap pt-1">
               <Stat

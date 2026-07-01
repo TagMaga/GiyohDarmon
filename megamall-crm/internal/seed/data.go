@@ -44,8 +44,6 @@ var defaultCommissionRates = []defaultRate{
 // ─── Catalog constants ────────────────────────────────────────────────────────
 
 const (
-	DefaultWarehouseName  = "Main Warehouse"
-	DefaultCategoryName   = "General"
 	DefaultSupplierName   = "Default Supplier"
 	DefaultProductSKU     = "TEST-001"
 	DefaultProductName    = "Test Product"

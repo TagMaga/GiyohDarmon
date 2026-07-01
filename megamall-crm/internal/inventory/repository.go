@@ -13,10 +13,21 @@ import (
 )
 
 // MovementRow is returned by ListMovements and augments Movement with the
-// actor's display name resolved via a LEFT JOIN on the users table.
+// actor's display name resolved via a LEFT JOIN on the users table, plus —
+// for "sale" movements only — the linked order's number/status, customer,
+// and delivering courier. This lets the inventory Движения screen show full
+// order context without querying /orders directly (warehouse_manager is
+// intentionally excluded from that API — see orders/routes.go).
 type MovementRow struct {
 	Movement
-	CreatedByName string `gorm:"column:created_by_name"`
+	CreatedByName   string     `gorm:"column:created_by_name"`
+	OrderID         *uuid.UUID `gorm:"column:order_id"`
+	OrderNumber     *string    `gorm:"column:order_number"`
+	OrderStatus     *string    `gorm:"column:order_status"`
+	CustomerName    *string    `gorm:"column:customer_name"`
+	CustomerPhone   *string    `gorm:"column:customer_phone"`
+	DeliveryAddress *string    `gorm:"column:delivery_address"`
+	CourierName     *string    `gorm:"column:courier_name"`
 }
 
 // Repository handles all inventory persistence.
@@ -37,28 +48,11 @@ func (r *Repository) ListInventory(ctx context.Context, f ListInventoryFilter, p
 	var total int64
 
 	q := r.db.WithContext(ctx).Model(&Inventory{})
-	if f.WarehouseID != "" {
-		q = q.Where("warehouse_id = ?", f.WarehouseID)
-	}
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("count inventory: %w", err)
 	}
 	if err := q.Order("updated_at DESC").Limit(p.Limit).Offset(p.Offset()).Find(&rows).Error; err != nil {
 		return nil, 0, fmt.Errorf("list inventory: %w", err)
-	}
-	return rows, int(total), nil
-}
-
-func (r *Repository) GetByWarehouse(ctx context.Context, warehouseID uuid.UUID, p pagination.Params) ([]Inventory, int, error) {
-	var rows []Inventory
-	var total int64
-
-	q := r.db.WithContext(ctx).Model(&Inventory{}).Where("warehouse_id = ?", warehouseID)
-	if err := q.Count(&total).Error; err != nil {
-		return nil, 0, fmt.Errorf("count inventory by warehouse: %w", err)
-	}
-	if err := q.Order("updated_at DESC").Limit(p.Limit).Offset(p.Offset()).Find(&rows).Error; err != nil {
-		return nil, 0, fmt.Errorf("list inventory by warehouse: %w", err)
 	}
 	return rows, int(total), nil
 }
@@ -77,22 +71,21 @@ func (r *Repository) GetByProduct(ctx context.Context, productID uuid.UUID, p pa
 	return rows, int(total), nil
 }
 
-// GetOrCreateForUpdate fetches the inventory row for (warehouse, product)
-// with a SELECT FOR UPDATE lock and creates it (quantity=0) if it doesn't exist.
+// GetOrCreateForUpdate fetches the inventory row for a product with a
+// SELECT FOR UPDATE lock and creates it (quantity=0) if it doesn't exist.
 // Must be called inside a transaction.
-func (r *Repository) GetOrCreateForUpdate(tx *gorm.DB, ctx context.Context, warehouseID, productID uuid.UUID) (*Inventory, error) {
+func (r *Repository) GetOrCreateForUpdate(tx *gorm.DB, ctx context.Context, productID uuid.UUID) (*Inventory, error) {
 	var inv Inventory
 	err := tx.WithContext(ctx).
 		Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("warehouse_id = ? AND product_id = ?", warehouseID, productID).
+		Where("product_id = ?", productID).
 		First(&inv).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		inv = Inventory{
-			ID:          uuid.New(),
-			WarehouseID: warehouseID,
-			ProductID:   productID,
-			Quantity:    0,
+			ID:        uuid.New(),
+			ProductID: productID,
+			Quantity:  0,
 		}
 		if err := tx.WithContext(ctx).Create(&inv).Error; err != nil {
 			return nil, fmt.Errorf("create inventory row: %w", err)
@@ -155,14 +148,27 @@ func (r *Repository) InsertAdjustment(tx *gorm.DB, ctx context.Context, a *Adjus
 // ─── Movements ────────────────────────────────────────────────────────────────
 
 func (r *Repository) ListMovements(ctx context.Context, f ListMovementsFilter, p pagination.Params) ([]MovementRow, int, error) {
-	// Base query with LEFT JOIN to resolve the actor's display name.
+	// Base query with LEFT JOIN to resolve the actor's display name, and —
+	// for sale movements — the order they fulfilled. The order match prefers
+	// the structured reference_id; older rows (written before reference_id was
+	// populated) fall back to the UUID embedded in the free-text reason.
 	base := r.db.WithContext(ctx).
 		Table("inventory_movements").
-		Joins("LEFT JOIN users ON users.id = inventory_movements.created_by AND users.deleted_at IS NULL")
+		Joins("LEFT JOIN users ON users.id = inventory_movements.created_by AND users.deleted_at IS NULL").
+		Joins(`LEFT JOIN orders ON inventory_movements.movement_type = 'sale' AND orders.id = COALESCE(
+			inventory_movements.reference_id,
+			substring(inventory_movements.reason from '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')::uuid
+		)`).
+		Joins("LEFT JOIN customers ON customers.id = orders.customer_id").
+		Joins(`LEFT JOIN LATERAL (
+			SELECT u2.full_name AS name
+			FROM order_assignments oa
+			JOIN users u2 ON u2.id = oa.courier_id
+			WHERE oa.order_id = orders.id
+			ORDER BY oa.assigned_at DESC
+			LIMIT 1
+		) courier ON true`)
 
-	if f.WarehouseID != "" {
-		base = base.Where("inventory_movements.warehouse_id = ?", f.WarehouseID)
-	}
 	if f.ProductID != "" {
 		base = base.Where("inventory_movements.product_id = ?", f.ProductID)
 	}
@@ -188,7 +194,15 @@ func (r *Repository) ListMovements(ctx context.Context, f ListMovementsFilter, p
 
 	var rows []MovementRow
 	err := base.
-		Select("inventory_movements.*, COALESCE(users.full_name, '') AS created_by_name").
+		Select(`inventory_movements.*,
+			COALESCE(users.full_name, '') AS created_by_name,
+			orders.id AS order_id,
+			orders.order_number AS order_number,
+			orders.status AS order_status,
+			customers.full_name AS customer_name,
+			customers.phone AS customer_phone,
+			customers.address AS delivery_address,
+			courier.name AS courier_name`).
 		Order("inventory_movements.created_at DESC").
 		Limit(p.Limit).Offset(p.Offset()).
 		Find(&rows).Error
@@ -228,13 +242,13 @@ func (r *Repository) CreateBatch(tx *gorm.DB, ctx context.Context, b *Batch) err
 }
 
 // GetBatchesForFIFO loads all batches with remaining_quantity > 0 for a
-// warehouse+product, ordered oldest first, with row-level locks.
+// product, ordered oldest first, with row-level locks.
 // Must be called inside a transaction.
-func (r *Repository) GetBatchesForFIFO(tx *gorm.DB, ctx context.Context, warehouseID, productID uuid.UUID) ([]*Batch, error) {
+func (r *Repository) GetBatchesForFIFO(tx *gorm.DB, ctx context.Context, productID uuid.UUID) ([]*Batch, error) {
 	var batches []*Batch
 	err := tx.WithContext(ctx).
 		Clauses(clause.Locking{Strength: "UPDATE"}).
-		Where("warehouse_id = ? AND product_id = ? AND remaining_quantity > 0", warehouseID, productID).
+		Where("product_id = ? AND remaining_quantity > 0", productID).
 		Order("received_at ASC").
 		Find(&batches).Error
 	if err != nil {
@@ -268,12 +282,11 @@ func (r *Repository) InsertBatchConsumptions(tx *gorm.DB, ctx context.Context, c
 }
 
 // ConsumeFIFO deducts qty units from the oldest available batches for the given
-// warehouse+product. It locks the batch rows, updates remaining_quantity, inserts
-// BatchConsumption records, and returns them so callers can inspect per-batch costs
-// (useful for transfers that need to mirror source batches at destination).
+// product. It locks the batch rows, updates remaining_quantity, inserts
+// BatchConsumption records, and returns them so callers can inspect per-batch costs.
 // Must be called inside a transaction. The caller must already hold the inventory row lock.
-func (r *Repository) ConsumeFIFO(tx *gorm.DB, ctx context.Context, warehouseID, productID uuid.UUID, qty int, movementID uuid.UUID) ([]*BatchConsumption, error) {
-	batches, err := r.GetBatchesForFIFO(tx, ctx, warehouseID, productID)
+func (r *Repository) ConsumeFIFO(tx *gorm.DB, ctx context.Context, productID uuid.UUID, qty int, movementID uuid.UUID) ([]*BatchConsumption, error) {
+	batches, err := r.GetBatchesForFIFO(tx, ctx, productID)
 	if err != nil {
 		return nil, err
 	}
@@ -313,14 +326,11 @@ func (r *Repository) ConsumeFIFO(tx *gorm.DB, ctx context.Context, warehouseID, 
 	return consumptions, nil
 }
 
-// ListBatches returns batches optionally filtered by warehouse and/or product,
-// ordered newest received first (for display). Excludes fully consumed batches when
+// ListBatches returns batches optionally filtered by product, ordered newest
+// received first (for display). Excludes fully consumed batches when
 // onlyActive is true.
-func (r *Repository) ListBatches(ctx context.Context, warehouseID, productID string, onlyActive bool) ([]*Batch, error) {
+func (r *Repository) ListBatches(ctx context.Context, productID string, onlyActive bool) ([]*Batch, error) {
 	q := r.db.WithContext(ctx).Model(&Batch{})
-	if warehouseID != "" {
-		q = q.Where("warehouse_id = ?", warehouseID)
-	}
 	if productID != "" {
 		q = q.Where("product_id = ?", productID)
 	}
@@ -342,16 +352,14 @@ func (r *Repository) InventoryIntegrityCheck(ctx context.Context) ([]InventoryIn
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT
 			i.id AS inventory_id,
-			i.warehouse_id,
 			i.product_id,
 			i.quantity AS inventory_quantity,
 			COALESCE(SUM(b.remaining_quantity), 0)::int AS batch_quantity,
 			(i.quantity - COALESCE(SUM(b.remaining_quantity), 0))::int AS difference
 		FROM inventory i
 		LEFT JOIN inventory_batches b
-			ON b.warehouse_id = i.warehouse_id
-		   AND b.product_id = i.product_id
-		GROUP BY i.id, i.warehouse_id, i.product_id, i.quantity
+			ON b.product_id = i.product_id
+		GROUP BY i.id, i.product_id, i.quantity
 		HAVING i.quantity <> COALESCE(SUM(b.remaining_quantity), 0)
 		ORDER BY ABS(i.quantity - COALESCE(SUM(b.remaining_quantity), 0)) DESC,
 		         i.updated_at DESC

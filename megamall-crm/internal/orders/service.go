@@ -297,7 +297,6 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 			TeamLeadTeamID:   hier.teamLeadTeamID,
 			OrderType:        req.OrderType,
 			Status:           initialStatus,
-			WarehouseID:      req.WarehouseID,
 			CityID:           &req.CityID,
 			SnapshotID:       &snap.ID,
 			DeliveryMethod:   deliveryMethod,
@@ -338,7 +337,7 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 
 		// ── Reserve inventory ─────────────────────────────────────────────────
 		for _, it := range items {
-			inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, req.WarehouseID, it.ProductID)
+			inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, it.ProductID)
 			if err != nil {
 				return fmt.Errorf("reserve inventory: %w", err)
 			}
@@ -609,7 +608,7 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 
 			// 1. Release old inventory reservations.
 			for _, old := range o.Items {
-				inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, o.WarehouseID, old.ProductID)
+				inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, old.ProductID)
 				if err != nil {
 					return fmt.Errorf("release inventory: %w", err)
 				}
@@ -647,7 +646,7 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 
 			// 4. Reserve new inventory.
 			for _, it := range newItems {
-				inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, o.WarehouseID, it.ProductID)
+				inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, it.ProductID)
 				if err != nil {
 					return fmt.Errorf("reserve inventory: %w", err)
 				}
@@ -1377,7 +1376,7 @@ func (s *Service) AddAttachment(ctx context.Context, actorID uuid.UUID, orderID 
 // Called when order is cancelled or returned.
 func (s *Service) releaseInventory(ctx context.Context, tx *gorm.DB, o *Order) error {
 	for _, it := range o.Items {
-		inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, o.WarehouseID, it.ProductID)
+		inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, it.ProductID)
 		if err != nil {
 			return fmt.Errorf("release inventory lock: %w", err)
 		}
@@ -1401,7 +1400,7 @@ func (s *Service) releaseInventory(ctx context.Context, tx *gorm.DB, o *Order) e
 // batch consumption = FIFO
 func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, actorID uuid.UUID) error {
 	for _, it := range o.Items {
-		inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, o.WarehouseID, it.ProductID)
+		inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, it.ProductID)
 		if err != nil {
 			return fmt.Errorf("deduct inventory lock: %w", err)
 		}
@@ -1425,14 +1424,17 @@ func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, ac
 		}
 
 		// Insert sale movement (quantity always positive; direction = sale = subtract).
+		// ReferenceID links back to the order so the movements list can enrich the
+		// row (order number, customer, courier) without exposing /orders to roles
+		// that shouldn't browse orders directly (e.g. warehouse_manager).
 		m := &inventory.Movement{
 			ID:               uuid.New(),
-			WarehouseID:      o.WarehouseID,
 			ProductID:        it.ProductID,
 			MovementType:     inventory.MovementSale,
 			Quantity:         it.Quantity,
 			PreviousQuantity: prevQty,
 			NewQuantity:      newQty,
+			ReferenceID:      &o.ID,
 			CreatedBy:        actorID,
 		}
 		orderIDStr := o.ID.String()
@@ -1441,7 +1443,7 @@ func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, ac
 		if err := s.invRepo.InsertMovement(tx, ctx, m); err != nil {
 			return fmt.Errorf("insert sale movement: %w", err)
 		}
-		if _, err := s.invRepo.ConsumeFIFO(tx, ctx, o.WarehouseID, it.ProductID, it.Quantity, m.ID); err != nil {
+		if _, err := s.invRepo.ConsumeFIFO(tx, ctx, it.ProductID, it.Quantity, m.ID); err != nil {
 			return fmt.Errorf("sale FIFO consume: %w", err)
 		}
 	}

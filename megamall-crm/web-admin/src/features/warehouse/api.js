@@ -12,12 +12,8 @@ const unwrap = (res) => {
 const toArray = (data) => (Array.isArray(data) ? data : [])
 
 const UUID_PARAM_KEYS = new Set([
-  'warehouse_id',
   'product_id',
-  'category_id',
   'supplier_id',
-  'from_warehouse_id',
-  'to_warehouse_id',
 ])
 
 function cleanParams(params = {}) {
@@ -74,31 +70,14 @@ export async function importProducts(file, dryRun = false) {
   return unwrap(res)
 }
 
-export async function fetchCategories() {
-  const res = await client.get('/categories', { params: { limit: 500 } })
-  return toArray(unwrap(res))
-}
-
 export async function fetchSuppliers() {
   const res = await client.get('/suppliers', { params: { limit: 500 } })
-  return toArray(unwrap(res))
-}
-
-// ── Warehouses ────────────────────────────────────────────────────────────────
-export async function fetchWarehouses() {
-  const res = await client.get('/warehouses')
   return toArray(unwrap(res))
 }
 
 // ── Inventory ─────────────────────────────────────────────────────────────────
 export async function fetchInventory(params = {}) {
   const res = await client.get('/inventory', { params: { limit: 500, ...cleanParams(params) } })
-  return toArray(unwrap(res))
-}
-
-export async function fetchInventoryByWarehouse(warehouseId) {
-  if (!isUUID(warehouseId)) return []
-  const res = await client.get(`/inventory/warehouse/${warehouseId}`)
   return toArray(unwrap(res))
 }
 
@@ -138,10 +117,5 @@ export async function createReceipt(payload) {
 
 export async function createWriteoff(payload) {
   const res = await client.post('/inventory/writeoffs', cleanPayload(payload))
-  return unwrap(res)
-}
-
-export async function createTransfer(payload) {
-  const res = await client.post('/inventory/transfers', cleanPayload(payload))
   return unwrap(res)
 }

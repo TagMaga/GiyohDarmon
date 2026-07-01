@@ -4,7 +4,7 @@ import {
   UserCheck, BarChart2, ClipboardList, Wallet,
   LayoutDashboard, PlusCircle, LogOut, ShoppingBag,
   Truck, Settings,
-  Archive, Package, ArrowLeftRight, PackagePlus, Trash2, BarChart3,
+  Archive, Package, PackagePlus, Trash2, BarChart3,
   Building2, User, BookUser,
 } from 'lucide-react'
 import useAuthStore from '../store/authStore'
@@ -60,7 +60,6 @@ const NAV = {
     { label: 'Приёмка',      icon: PackagePlus,      path: '/warehouse/receiving' },
     { label: 'Товары',       icon: Package,          path: '/warehouse/products' },
     { label: 'Списания',     icon: Trash2,           path: '/warehouse/writeoffs' },
-    { label: 'Перемещения',  icon: ArrowLeftRight,   path: '/warehouse/transfers' },
     { label: 'Движения',     icon: BarChart3,        path: '/warehouse/movements' },
   ],
   courier: [],

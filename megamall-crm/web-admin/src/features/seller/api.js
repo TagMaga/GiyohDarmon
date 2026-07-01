@@ -80,20 +80,11 @@ export async function fetchCities() {
   return Array.isArray(parsed) ? parsed : []
 }
 
-// ── Warehouses ────────────────────────────────────────────────────────────────
-/** GET /warehouses */
-export async function fetchWarehouses() {
-  const res = await client.get('/warehouses')
-  const parsed = unwrap(res)
-  if (Array.isArray(parsed)) return parsed
-  return []
-}
-
 // ── Inventory ─────────────────────────────────────────────────────────────────
-/** GET /inventory?product_id=&warehouse_id= */
-export async function fetchInventory(productId, warehouseId) {
+/** GET /inventory?product_id= */
+export async function fetchInventory(productId) {
   const res = await client.get('/inventory', {
-    params: { product_id: productId, warehouse_id: warehouseId, limit: 1 },
+    params: { product_id: productId, limit: 1 },
   })
   const data = unwrap(res)
   return Array.isArray(data) ? data[0] ?? null : data

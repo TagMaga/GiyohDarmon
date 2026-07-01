@@ -6,44 +6,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// ─── Category ─────────────────────────────────────────────────────────────────
-
-type CreateCategoryRequest struct {
-	ParentID    *uuid.UUID `json:"parent_id"`
-	Name        string     `json:"name"        validate:"required,max=255"`
-	Description *string    `json:"description"`
-	IsActive    *bool      `json:"is_active"`
-}
-
-type UpdateCategoryRequest struct {
-	ParentID    *uuid.UUID `json:"parent_id"`
-	Name        *string    `json:"name"        validate:"omitempty,max=255"`
-	Description *string    `json:"description"`
-	IsActive    *bool      `json:"is_active"`
-}
-
-type CategoryResponse struct {
-	ID          uuid.UUID  `json:"id"`
-	ParentID    *uuid.UUID `json:"parent_id"`
-	Name        string     `json:"name"`
-	Description *string    `json:"description"`
-	IsActive    bool       `json:"is_active"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-}
-
-func ToCategoryResponse(c *Category) CategoryResponse {
-	return CategoryResponse{
-		ID:          c.ID,
-		ParentID:    c.ParentID,
-		Name:        c.Name,
-		Description: c.Description,
-		IsActive:    c.IsActive,
-		CreatedAt:   c.CreatedAt,
-		UpdatedAt:   c.UpdatedAt,
-	}
-}
-
 // ─── Supplier ─────────────────────────────────────────────────────────────────
 
 type CreateSupplierRequest struct {
@@ -97,7 +59,6 @@ type CreateProductRequest struct {
 	Barcode            *string    `json:"barcode"`
 	Name               string     `json:"name"                 validate:"required,max=500"`
 	Description        *string    `json:"description"`
-	CategoryID         *uuid.UUID `json:"category_id"`
 	SupplierID         *uuid.UUID `json:"supplier_id"`
 	PurchasePrice      *float64   `json:"purchase_price"       validate:"omitempty,min=0"`
 	SalePrice          *float64   `json:"sale_price"           validate:"omitempty,min=0"`
@@ -112,7 +73,6 @@ type UpdateProductRequest struct {
 	Barcode            *string    `json:"barcode"`
 	Name               *string    `json:"name"                 validate:"omitempty,max=500"`
 	Description        *string    `json:"description"`
-	CategoryID         *uuid.UUID `json:"category_id"`
 	SupplierID         *uuid.UUID `json:"supplier_id"`
 	PurchasePrice      *float64   `json:"purchase_price"       validate:"omitempty,min=0"`
 	SalePrice          *float64   `json:"sale_price"           validate:"omitempty,min=0"`
@@ -143,7 +103,6 @@ type ProductResponse struct {
 	Barcode            *string                `json:"barcode"`
 	Name               string                 `json:"name"`
 	Description        *string                `json:"description"`
-	CategoryID         *uuid.UUID             `json:"category_id"`
 	SupplierID         *uuid.UUID             `json:"supplier_id"`
 	PurchasePrice      *float64               `json:"purchase_price"`
 	SalePrice          *float64               `json:"sale_price"`
@@ -174,7 +133,6 @@ func ToProductResponse(p *Product) ProductResponse {
 		Barcode:            p.Barcode,
 		Name:               p.Name,
 		Description:        p.Description,
-		CategoryID:         p.CategoryID,
 		SupplierID:         p.SupplierID,
 		PurchasePrice:      p.PurchasePrice,
 		SalePrice:          p.SalePrice,
@@ -208,7 +166,6 @@ type ImportResult struct {
 
 type ListProductsFilter struct {
 	Search     string `form:"search"`
-	CategoryID string `form:"category_id"`
 	SupplierID string `form:"supplier_id"`
 	IsActive   *bool  `form:"is_active"`
 }

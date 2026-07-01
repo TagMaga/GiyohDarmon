@@ -29,7 +29,6 @@ type OrderItemResponse struct {
 type CreateOrderRequest struct {
 	CustomerID      uuid.UUID          `json:"customer_id"      validate:"required"`
 	OrderType       OrderType          `json:"order_type"       validate:"required"`
-	WarehouseID     uuid.UUID          `json:"warehouse_id"     validate:"required"`
 	CityID          uuid.UUID          `json:"city_id"          validate:"required"` // delivery city (must be active)
 	Items           []OrderItemRequest `json:"items"            validate:"required,min=1,dive"`
 	Notes           *string            `json:"notes"`
@@ -216,7 +215,6 @@ type OrderResponse struct {
 
 	OrderType      OrderType   `json:"order_type"`
 	Status         OrderStatus `json:"status"`
-	WarehouseID    uuid.UUID   `json:"warehouse_id"`
 	CityID         *uuid.UUID  `json:"city_id"`
 	SnapshotID     *uuid.UUID  `json:"snapshot_id"`
 	DeliveryMethod string      `json:"delivery_method"`
@@ -421,7 +419,6 @@ func ToOrderResponse(o *Order) OrderResponse {
 		TeamLeadTeamID:   o.TeamLeadTeamID,
 		OrderType:        o.OrderType,
 		Status:           o.Status,
-		WarehouseID:      o.WarehouseID,
 		CityID:           o.CityID,
 		SnapshotID:       o.SnapshotID,
 		DeliveryMethod:   o.DeliveryMethod,

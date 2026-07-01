@@ -29,10 +29,6 @@ func (s *Service) ListInventory(ctx context.Context, f ListInventoryFilter, p pa
 	return s.repo.ListInventory(ctx, f, p)
 }
 
-func (s *Service) GetByWarehouse(ctx context.Context, warehouseID uuid.UUID, p pagination.Params) ([]Inventory, int, error) {
-	return s.repo.GetByWarehouse(ctx, warehouseID, p)
-}
-
 func (s *Service) GetByProduct(ctx context.Context, productID uuid.UUID, p pagination.Params) ([]Inventory, int, error) {
 	return s.repo.GetByProduct(ctx, productID, p)
 }
@@ -56,7 +52,7 @@ func (s *Service) Receive(ctx context.Context, actorID uuid.UUID, req CreateRece
 	var resp *ReceivingResponse
 
 	txErr := s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		inv, err := s.repo.GetOrCreateForUpdate(tx, ctx, req.WarehouseID, req.ProductID)
+		inv, err := s.repo.GetOrCreateForUpdate(tx, ctx, req.ProductID)
 		if err != nil {
 			return err
 		}
@@ -78,7 +74,6 @@ func (s *Service) Receive(ctx context.Context, actorID uuid.UUID, req CreateRece
 
 		m := &Movement{
 			ID:               uuid.New(),
-			WarehouseID:      req.WarehouseID,
 			ProductID:        req.ProductID,
 			MovementType:     MovementPurchase,
 			Quantity:         req.Quantity,
@@ -93,7 +88,6 @@ func (s *Service) Receive(ctx context.Context, actorID uuid.UUID, req CreateRece
 
 		b := &Batch{
 			ID:                uuid.New(),
-			WarehouseID:       req.WarehouseID,
 			ProductID:         req.ProductID,
 			ReceivedQuantity:  req.Quantity,
 			RemainingQuantity: req.Quantity,
@@ -112,11 +106,10 @@ func (s *Service) Receive(ctx context.Context, actorID uuid.UUID, req CreateRece
 			EntityType: "inventory",
 			EntityID:   &inv.ID,
 			AfterState: map[string]interface{}{
-				"warehouse_id": req.WarehouseID,
-				"product_id":   req.ProductID,
-				"quantity":     newQty,
-				"unit_cost":    req.UnitCost,
-				"batch_id":     b.ID,
+				"product_id": req.ProductID,
+				"quantity":   newQty,
+				"unit_cost":  req.UnitCost,
+				"batch_id":   b.ID,
 			},
 			Reason: &reason,
 		}); err != nil {
@@ -157,7 +150,7 @@ func (s *Service) Adjust(ctx context.Context, actorID uuid.UUID, req CreateAdjus
 	var adj *Adjustment
 
 	txErr := s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		inv, err := s.repo.GetOrCreateForUpdate(tx, ctx, req.WarehouseID, req.ProductID)
+		inv, err := s.repo.GetOrCreateForUpdate(tx, ctx, req.ProductID)
 		if err != nil {
 			return err
 		}
@@ -175,7 +168,6 @@ func (s *Service) Adjust(ctx context.Context, actorID uuid.UUID, req CreateAdjus
 
 		adj = &Adjustment{
 			ID:               uuid.New(),
-			WarehouseID:      req.WarehouseID,
 			ProductID:        req.ProductID,
 			PreviousQuantity: prevQty,
 			NewQuantity:      newQty,
@@ -198,7 +190,6 @@ func (s *Service) Adjust(ctx context.Context, actorID uuid.UUID, req CreateAdjus
 
 		m := &Movement{
 			ID:               uuid.New(),
-			WarehouseID:      req.WarehouseID,
 			ProductID:        req.ProductID,
 			MovementType:     MovementAdjustment,
 			Quantity:         movQty,
@@ -219,7 +210,6 @@ func (s *Service) Adjust(ctx context.Context, actorID uuid.UUID, req CreateAdjus
 			}
 			b := &Batch{
 				ID:                uuid.New(),
-				WarehouseID:       req.WarehouseID,
 				ProductID:         req.ProductID,
 				ReceivedQuantity:  signedDelta,
 				RemainingQuantity: signedDelta,
@@ -232,7 +222,7 @@ func (s *Service) Adjust(ctx context.Context, actorID uuid.UUID, req CreateAdjus
 				return err
 			}
 		} else if signedDelta < 0 {
-			if _, err = s.repo.ConsumeFIFO(tx, ctx, req.WarehouseID, req.ProductID, absDelta, m.ID); err != nil {
+			if _, err = s.repo.ConsumeFIFO(tx, ctx, req.ProductID, absDelta, m.ID); err != nil {
 				return fmt.Errorf("adjustment FIFO consume: %w", err)
 			}
 		}
@@ -243,14 +233,12 @@ func (s *Service) Adjust(ctx context.Context, actorID uuid.UUID, req CreateAdjus
 			EntityType: "inventory",
 			EntityID:   &inv.ID,
 			BeforeState: map[string]interface{}{
-				"warehouse_id": req.WarehouseID,
-				"product_id":   req.ProductID,
-				"quantity":     prevQty,
+				"product_id": req.ProductID,
+				"quantity":   prevQty,
 			},
 			AfterState: map[string]interface{}{
-				"warehouse_id": req.WarehouseID,
-				"product_id":   req.ProductID,
-				"quantity":     newQty,
+				"product_id": req.ProductID,
+				"quantity":   newQty,
 			},
 			Reason: &req.Reason,
 		})
@@ -280,7 +268,7 @@ func (s *Service) Writeoff(ctx context.Context, actorID uuid.UUID, req CreateWri
 	var wo *Writeoff
 
 	txErr := s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		inv, err := s.repo.GetOrCreateForUpdate(tx, ctx, req.WarehouseID, req.ProductID)
+		inv, err := s.repo.GetOrCreateForUpdate(tx, ctx, req.ProductID)
 		if err != nil {
 			return err
 		}
@@ -300,13 +288,12 @@ func (s *Service) Writeoff(ctx context.Context, actorID uuid.UUID, req CreateWri
 		}
 
 		wo = &Writeoff{
-			ID:          uuid.New(),
-			WarehouseID: req.WarehouseID,
-			ProductID:   req.ProductID,
-			Quantity:    req.Quantity,
-			Reason:      req.Reason,
-			ApprovedBy:  req.ApprovedBy,
-			CreatedBy:   actorID,
+			ID:         uuid.New(),
+			ProductID:  req.ProductID,
+			Quantity:   req.Quantity,
+			Reason:     req.Reason,
+			ApprovedBy: req.ApprovedBy,
+			CreatedBy:  actorID,
 		}
 		if err := s.repo.InsertWriteoff(tx, ctx, wo); err != nil {
 			return err
@@ -314,7 +301,6 @@ func (s *Service) Writeoff(ctx context.Context, actorID uuid.UUID, req CreateWri
 
 		m := &Movement{
 			ID:               uuid.New(),
-			WarehouseID:      req.WarehouseID,
 			ProductID:        req.ProductID,
 			MovementType:     MovementWriteoff,
 			Quantity:         req.Quantity,
@@ -327,7 +313,7 @@ func (s *Service) Writeoff(ctx context.Context, actorID uuid.UUID, req CreateWri
 			return err
 		}
 
-		if _, err = s.repo.ConsumeFIFO(tx, ctx, req.WarehouseID, req.ProductID, req.Quantity, m.ID); err != nil {
+		if _, err = s.repo.ConsumeFIFO(tx, ctx, req.ProductID, req.Quantity, m.ID); err != nil {
 			return fmt.Errorf("writeoff FIFO consume: %w", err)
 		}
 
@@ -337,14 +323,12 @@ func (s *Service) Writeoff(ctx context.Context, actorID uuid.UUID, req CreateWri
 			EntityType: "inventory",
 			EntityID:   &inv.ID,
 			BeforeState: map[string]interface{}{
-				"warehouse_id": req.WarehouseID,
-				"product_id":   req.ProductID,
-				"quantity":     prevQty,
+				"product_id": req.ProductID,
+				"quantity":   prevQty,
 			},
 			AfterState: map[string]interface{}{
-				"warehouse_id": req.WarehouseID,
-				"product_id":   req.ProductID,
-				"quantity":     newQty,
+				"product_id": req.ProductID,
+				"quantity":   newQty,
 			},
 			Reason: &req.Reason,
 		})
@@ -356,171 +340,10 @@ func (s *Service) Writeoff(ctx context.Context, actorID uuid.UUID, req CreateWri
 	return wo, nil
 }
 
-// ─── Transfer ─────────────────────────────────────────────────────────────────
-
-// Transfer moves qty units from one warehouse to another in a single transaction.
-// FIFO batches are consumed from the source; equivalent batches (preserving cost)
-// are created in the destination so inventory valuation stays accurate across moves.
-// Transaction sequence:
-//  1. Validate from != to
-//  2. SELECT FOR UPDATE on source inventory row
-//  3. Validate available_quantity >= qty
-//  4. UPDATE source inventory.quantity -= qty
-//  5. INSERT transfer_out movement
-//  6. ConsumeFIFO source batches → get consumed [(qty, cost)] pairs
-//  7. SELECT FOR UPDATE (or create) destination inventory row
-//  8. UPDATE destination inventory.quantity += qty
-//  9. INSERT transfer_in movement (reference_id = transfer_out.ID)
-//
-// 10. Create destination batches mirroring consumed source batches (preserving cost)
-// 11. LogSync activity log
-// 12. Commit
-func (s *Service) Transfer(ctx context.Context, actorID uuid.UUID, req CreateTransferRequest) (*TransferResponse, error) {
-	if req.FromWarehouseID == req.ToWarehouseID {
-		return nil, apperrors.BadRequest("from_warehouse_id and to_warehouse_id must be different")
-	}
-
-	var resp *TransferResponse
-
-	txErr := s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// ── Source ────────────────────────────────────────────────────────────
-		src, err := s.repo.GetOrCreateForUpdate(tx, ctx, req.FromWarehouseID, req.ProductID)
-		if err != nil {
-			return err
-		}
-		if src.AvailableQuantity < req.Quantity {
-			return apperrors.BadRequest(fmt.Sprintf(
-				"insufficient available stock in source warehouse: have %d, need %d",
-				src.AvailableQuantity, req.Quantity,
-			))
-		}
-
-		srcPrev := src.Quantity
-		srcNew := srcPrev - req.Quantity
-
-		if err := s.repo.UpdateQuantity(tx, ctx, src.ID, srcNew); err != nil {
-			return err
-		}
-
-		outMovement := &Movement{
-			ID:               uuid.New(),
-			WarehouseID:      req.FromWarehouseID,
-			ProductID:        req.ProductID,
-			MovementType:     MovementTransferOut,
-			Quantity:         req.Quantity,
-			PreviousQuantity: srcPrev,
-			NewQuantity:      srcNew,
-			Reason:           req.Reason,
-			CreatedBy:        actorID,
-		}
-		if err := s.repo.InsertMovement(tx, ctx, outMovement); err != nil {
-			return err
-		}
-
-		// Consume source FIFO batches; ConsumeFIFO returns per-batch consumption records
-		// which we use to mirror equivalent batches at the destination (cost chain preserved).
-		consumptions, err := s.repo.ConsumeFIFO(tx, ctx, req.FromWarehouseID, req.ProductID, req.Quantity, outMovement.ID)
-		if err != nil {
-			return fmt.Errorf("transfer FIFO consume: %w", err)
-		}
-
-		// ── Destination ───────────────────────────────────────────────────────
-		dst, err := s.repo.GetOrCreateForUpdate(tx, ctx, req.ToWarehouseID, req.ProductID)
-		if err != nil {
-			return err
-		}
-
-		dstPrev := dst.Quantity
-		dstNew := dstPrev + req.Quantity
-
-		if err := s.repo.UpdateQuantity(tx, ctx, dst.ID, dstNew); err != nil {
-			return err
-		}
-
-		inMovement := &Movement{
-			ID:               uuid.New(),
-			WarehouseID:      req.ToWarehouseID,
-			ProductID:        req.ProductID,
-			MovementType:     MovementTransferIn,
-			Quantity:         req.Quantity,
-			PreviousQuantity: dstPrev,
-			NewQuantity:      dstNew,
-			Reason:           req.Reason,
-			ReferenceID:      &outMovement.ID,
-			CreatedBy:        actorID,
-		}
-		if err := s.repo.InsertMovement(tx, ctx, inMovement); err != nil {
-			return err
-		}
-
-		// Back-link the out movement to the in movement.
-		if err := tx.WithContext(ctx).
-			Model(&Movement{}).
-			Where("id = ?", outMovement.ID).
-			UpdateColumn("reference_id", inMovement.ID).Error; err != nil {
-			return fmt.Errorf("link transfer movements: %w", err)
-		}
-
-		// Mirror consumed source batch slices into destination, preserving unit cost.
-		for _, c := range consumptions {
-			b := &Batch{
-				ID:                uuid.New(),
-				WarehouseID:       req.ToWarehouseID,
-				ProductID:         req.ProductID,
-				ReceivedQuantity:  c.Quantity,
-				RemainingQuantity: c.Quantity,
-				UnitCost:          c.UnitCost,
-				ReceivedAt:        inMovement.CreatedAt,
-				MovementID:        &inMovement.ID,
-				CreatedBy:         &actorID,
-			}
-			if err := s.repo.CreateBatch(tx, ctx, b); err != nil {
-				return fmt.Errorf("create destination batch: %w", err)
-			}
-		}
-
-		reason := ""
-		if req.Reason != nil {
-			reason = *req.Reason
-		}
-		if err := s.logger.LogSync(tx, activity.Entry{
-			ActorID:    &actorID,
-			Action:     "transfer",
-			EntityType: "inventory",
-			AfterState: map[string]interface{}{
-				"from_warehouse_id":     req.FromWarehouseID,
-				"to_warehouse_id":       req.ToWarehouseID,
-				"product_id":            req.ProductID,
-				"quantity":              req.Quantity,
-				"transfer_out_movement": outMovement.ID,
-				"transfer_in_movement":  inMovement.ID,
-			},
-			Reason: &reason,
-		}); err != nil {
-			return err
-		}
-
-		resp = &TransferResponse{
-			TransferOutMovementID: outMovement.ID,
-			TransferInMovementID:  inMovement.ID,
-			FromWarehouseID:       req.FromWarehouseID,
-			ToWarehouseID:         req.ToWarehouseID,
-			ProductID:             req.ProductID,
-			Quantity:              req.Quantity,
-		}
-		return nil
-	})
-
-	if txErr != nil {
-		return nil, txErr
-	}
-	return resp, nil
-}
-
 // ─── Batch queries ────────────────────────────────────────────────────────────
 
 func (s *Service) ListBatches(ctx context.Context, f BatchListFilter, onlyActive bool) ([]*Batch, error) {
-	return s.repo.ListBatches(ctx, f.WarehouseID, f.ProductID, onlyActive)
+	return s.repo.ListBatches(ctx, f.ProductID, onlyActive)
 }
 
 func (s *Service) InventoryIntegrityCheck(ctx context.Context) ([]InventoryIntegrityDiscrepancy, error) {

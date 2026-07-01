@@ -33,7 +33,6 @@ import (
 	delivery_settings "github.com/megamall/crm/internal/delivery_settings"
 	"github.com/megamall/crm/internal/teams"
 	"github.com/megamall/crm/internal/users"
-	"github.com/megamall/crm/internal/warehouse"
 	"github.com/megamall/crm/pkg/database"
 	"github.com/megamall/crm/pkg/middleware"
 )
@@ -133,14 +132,10 @@ func main() {
 	compensationSvc := compensation.NewService(compensationRepo, activityLogger, db)
 	compensationHandler := compensation.NewHandler(compensationSvc)
 
-	// ── Phase 3: Products / Warehouse / Inventory ─────────────────────────────
+	// ── Phase 3: Products / Inventory ─────────────────────────────────────────
 	productsRepo := products.NewRepository(db)
 	productsSvc := products.NewService(productsRepo, activityLogger)
 	productsHandler := products.NewHandler(productsSvc)
-
-	warehouseRepo := warehouse.NewRepository(db)
-	warehouseSvc := warehouse.NewService(warehouseRepo, activityLogger)
-	warehouseHandler := warehouse.NewHandler(warehouseSvc)
 
 	inventoryRepo := inventory.NewRepository(db)
 	inventorySvc := inventory.NewService(inventoryRepo, activityLogger)
@@ -221,7 +216,6 @@ func main() {
 
 		// Phase 3
 		productsHandler.RegisterRoutes(v1)
-		warehouseHandler.RegisterRoutes(v1.Group("/warehouses"))
 		inventoryHandler.RegisterRoutes(v1.Group("/inventory"))
 
 		// Phase 4

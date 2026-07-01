@@ -3,12 +3,12 @@ import EmptyState  from '../../../shared/components/EmptyState'
 import { CardSkeleton } from '../../../shared/components/Skeleton'
 import { ArrowLeftRight } from 'lucide-react'
 import {
-  getProductName, getWarehouseName,
+  getProductName,
   getMovementType, MOVEMENT_LABEL, MOVEMENT_BADGE,
   getQuantity, fmtDate,
 } from '../utils/warehouseHelpers'
 
-export default function MovementMobileCard({ movements, productMap, warehouseMap, loading }) {
+export default function MovementMobileCard({ movements, productMap, loading }) {
   if (loading) return (
     <div className="space-y-3">{[1,2,3,4].map(i => <CardSkeleton key={i} />)}</div>
   )
@@ -23,16 +23,14 @@ export default function MovementMobileCard({ movements, productMap, warehouseMap
         const id        = m.id ?? m.ID ?? i
         const mtype     = getMovementType(m)
         const product   = productMap[m.product_id ?? m.ProductID] ?? null
-        const warehouse = warehouseMap[m.warehouse_id ?? m.WarehouseID] ?? null
         const qty       = getQuantity(m)
-        const isOut     = mtype === 'sale' || mtype === 'transfer_out' || mtype === 'writeoff'
+        const isOut     = mtype === 'sale' || mtype === 'writeoff'
 
         return (
           <div key={id} className="card p-4 space-y-2">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-900 truncate">{getProductName(product)}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{getWarehouseName(warehouse)}</p>
               </div>
               <Badge variant={MOVEMENT_BADGE[mtype] ?? 'slate'} size="sm">
                 {MOVEMENT_LABEL[mtype] ?? mtype ?? '—'}

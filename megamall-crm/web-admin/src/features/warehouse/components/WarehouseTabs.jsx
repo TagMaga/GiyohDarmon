@@ -4,7 +4,6 @@ const TABS = [
   { key: 'movements',   label: 'Движения' },
   { key: 'adjustments', label: 'Приход' },
   { key: 'writeoffs',   label: 'Списания' },
-  { key: 'transfers',   label: 'Перемещения' },
 ]
 
 export default function WarehouseTabs({ active, onChange }) {

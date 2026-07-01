@@ -3,7 +3,7 @@ import EmptyState  from '../../../shared/components/EmptyState'
 import { TableRowSkeleton } from '../../../shared/components/Skeleton'
 import { ArrowLeftRight } from 'lucide-react'
 import {
-  getProductName, getWarehouseName,
+  getProductName,
   getMovementType, MOVEMENT_LABEL, MOVEMENT_BADGE,
   getQuantity, fmtDate,
 } from '../utils/warehouseHelpers'
@@ -14,7 +14,7 @@ const TH = ({ children, right }) => (
   </th>
 )
 
-export default function MovementTable({ movements, productMap, warehouseMap, loading }) {
+export default function MovementTable({ movements, productMap, loading }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
       <table className="w-full text-sm">
@@ -22,7 +22,6 @@ export default function MovementTable({ movements, productMap, warehouseMap, loa
           <tr>
             <TH>Тип</TH>
             <TH>Товар</TH>
-            <TH>Склад</TH>
             <TH right>Кол-во</TH>
             <TH right>Было</TH>
             <TH right>Стало</TH>
@@ -32,10 +31,10 @@ export default function MovementTable({ movements, productMap, warehouseMap, loa
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {loading && [1,2,3,4,5].map(i => <TableRowSkeleton key={i} cols={9} />)}
+          {loading && [1,2,3,4,5].map(i => <TableRowSkeleton key={i} cols={8} />)}
 
           {!loading && movements.length === 0 && (
-            <tr><td colSpan={9} className="py-0">
+            <tr><td colSpan={8} className="py-0">
               <EmptyState icon={<ArrowLeftRight size={22} />} title="Нет движений" />
             </td></tr>
           )}
@@ -44,9 +43,8 @@ export default function MovementTable({ movements, productMap, warehouseMap, loa
             const id        = m.id ?? m.ID ?? i
             const mtype     = getMovementType(m)
             const product   = productMap[m.product_id ?? m.ProductID] ?? null
-            const warehouse = warehouseMap[m.warehouse_id ?? m.WarehouseID] ?? null
             const qty       = getQuantity(m)
-            const isOut     = mtype === 'sale' || mtype === 'transfer_out' || mtype === 'writeoff'
+            const isOut     = mtype === 'sale' || mtype === 'writeoff'
 
             return (
               <tr key={id} className="hover:bg-slate-50 transition-colors">
@@ -57,9 +55,6 @@ export default function MovementTable({ movements, productMap, warehouseMap, loa
                 </td>
                 <td className="px-4 py-3 font-medium text-slate-900 max-w-[180px]">
                   <span className="truncate block">{getProductName(product)}</span>
-                </td>
-                <td className="px-4 py-3 text-slate-600 max-w-[140px]">
-                  <span className="truncate block">{getWarehouseName(warehouse)}</span>
                 </td>
                 <td className={`px-4 py-3 text-right font-bold tabular-nums ${isOut ? 'text-rose-600' : 'text-emerald-700'}`}>
                   {isOut ? '−' : '+'}{qty}

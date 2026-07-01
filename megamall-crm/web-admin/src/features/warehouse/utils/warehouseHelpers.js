@@ -20,11 +20,6 @@ export function getProductId(obj) {
   return obj.product_id ?? obj.ProductID ?? null
 }
 
-export function getWarehouseId(obj) {
-  if (!obj) return null
-  return obj.warehouse_id ?? obj.WarehouseID ?? null
-}
-
 export function getQuantity(obj) {
   if (!obj) return 0
   return obj.quantity ?? obj.Quantity ?? 0
@@ -89,11 +84,6 @@ export function getProductBarcode(p) {
   return p.barcode ?? p.Barcode ?? '—'
 }
 
-export function getProductCategoryId(p) {
-  if (!p) return null
-  return p.category_id ?? p.CategoryID ?? null
-}
-
 export function getProductSupplierId(p) {
   if (!p) return null
   return p.supplier_id ?? p.SupplierID ?? null
@@ -104,11 +94,6 @@ export function getProductImage(p) {
   const primary = images.find((img) => img.is_primary ?? img.IsPrimary)
   const image = primary ?? images[0]
   return image?.image_url ?? image?.ImageURL ?? null
-}
-
-export function getCategoryName(category) {
-  if (!category) return '—'
-  return category.name ?? category.Name ?? '—'
 }
 
 export function getSupplierName(supplier) {
@@ -131,24 +116,11 @@ export function isProductActive(p) {
   return p.is_active ?? p.IsActive ?? false
 }
 
-export function getLastMovementForProduct(productId, warehouseId, movements = []) {
+export function getLastMovementForProduct(productId, movements = []) {
   return movements.find((m) => {
     const pid = m.product_id ?? m.ProductID
-    const wid = m.warehouse_id ?? m.WarehouseID
-    return pid === productId && (!warehouseId || wid === warehouseId)
+    return pid === productId
   }) ?? null
-}
-
-// ── Warehouse helpers ──────────────────────────────────────────────────────────
-
-export function getWarehouseName(w) {
-  if (!w) return '—'
-  return w.name ?? w.Name ?? '—'
-}
-
-export function isWarehouseActive(w) {
-  if (!w) return false
-  return w.is_active ?? w.IsActive ?? false
 }
 
 // ── Movement helpers ───────────────────────────────────────────────────────────
@@ -206,12 +178,3 @@ export function buildProductMap(products) {
   return map
 }
 
-/** Build { id → warehouse } map from warehouses array */
-export function buildWarehouseMap(warehouses) {
-  const map = {}
-  for (const w of (warehouses ?? [])) {
-    const id = getId(w)
-    if (id) map[id] = w
-  }
-  return map
-}

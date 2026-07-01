@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { X, Package, Download, ArrowLeftRight, Trash2, Pencil } from 'lucide-react'
+import { X, Package, Download, Trash2, Pencil } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
 import Button from '../../../shared/components/Button'
 import { KEYS } from '../../../shared/queryKeys'
@@ -12,11 +12,9 @@ import {
   fmtDate,
   fmtMoney,
   getAvailableQty,
-  getCategoryName,
   getId,
   getMovementType,
   getProductBarcode,
-  getProductCategoryId,
   getProductImage,
   getProductName,
   getProductSku,
@@ -29,19 +27,16 @@ export default function ProductDrawer({
   product,
   inventory,
   movements,
-  categoryMap,
-  warehouseMap,
   onClose,
   onReceive,
   onWriteoff,
-  onTransfer,
   onEdit,
 }) {
   const productId = product ? getId(product) : undefined
 
-  // Fetch active FIFO batches for this product across all warehouses.
+  // Fetch active FIFO batches for this product.
   const { data: batches = [] } = useQuery({
-    queryKey: KEYS.warehouse.batches(undefined, productId),
+    queryKey: KEYS.warehouse.batches(productId),
     queryFn: () => fetchBatches({ product_id: productId }),
     enabled: !!productId,
     staleTime: 30_000,
@@ -63,7 +58,6 @@ export default function ProductDrawer({
     .filter((m) => (m.product_id ?? m.ProductID) === productId)
     .slice(0, 6)
   const image = getProductImage(product)
-  const category = categoryMap[getProductCategoryId(product)]
 
   // Compute inventory value from batch remaining quantities × unit costs.
   const inventoryValue = batches.reduce(
@@ -78,6 +72,8 @@ export default function ProductDrawer({
         return at > new Date(latest.received_at ?? latest.ReceivedAt ?? 0).getTime() ? b : latest
       }, batches[0])?.unit_cost
     : null
+
+  const activeBatches = batches.filter((b) => (b.remaining_quantity ?? 0) > 0)
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -115,66 +111,28 @@ export default function ProductDrawer({
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Товар</p>
             <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
               <Info label="Штрихкод" value={getProductBarcode(product)} mono />
-              <Info label="Категория" value={getCategoryName(category)} />
               <Info label="Последняя закупка" value={lastPurchaseCost != null ? fmtMoney(lastPurchaseCost) : '—'} />
               <Info label="Мин. порог" value={threshold} />
               <Info label="Стоимость остатка (FIFO)" value={fmtMoney(inventoryValue)} tone="emerald" />
             </dl>
           </section>
 
-          <section className="mt-4">
-            <p className="text-sm font-semibold text-slate-900">Остатки по складам</p>
-            <div className="mt-3 space-y-2">
-              {stockRows.length === 0 && (
-                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-5 text-center text-sm text-slate-400">
-                  Остатков по товару пока нет.
-                </div>
-              )}
-              {stockRows.map((inv) => {
-                const wid = inv.warehouse_id ?? inv.WarehouseID
-                const warehouse = warehouseMap[wid]
-                const rowStatus = getStockStatus(inv)
-                // Batches for this specific warehouse.
-                const warehouseBatches = batches.filter(
-                  (b) => (b.warehouse_id ?? b.WarehouseID) === wid && (b.remaining_quantity ?? 0) > 0
-                )
-                const warehouseValue = warehouseBatches.reduce(
-                  (s, b) => s + (b.remaining_quantity ?? 0) * (b.unit_cost ?? 0),
-                  0
-                )
-                return (
-                  <div key={getId(inv)} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="truncate text-sm font-semibold text-slate-800">{warehouse?.name ?? warehouse?.Name ?? '—'}</p>
-                      <Badge variant={STOCK_STATUS_BADGE[rowStatus]}>{STOCK_STATUS_LABEL[rowStatus]}</Badge>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
-                      <span>На складе <b className="text-slate-900">{getQuantity(inv)}</b></span>
-                      <span>Доступно <b className="text-emerald-700">{getAvailableQty(inv)}</b></span>
-                      <span>Резерв <b className="text-amber-700">{getReservedQty(inv)}</b></span>
-                      {warehouseValue > 0 && (
-                        <span>Стоимость <b className="text-slate-900">{fmtMoney(warehouseValue)}</b></span>
-                      )}
-                    </div>
-                    {warehouseBatches.length > 0 && (
-                      <div className="mt-3 space-y-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Партии FIFO</p>
-                        {warehouseBatches.map((b, i) => (
-                          <div key={b.id ?? i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5 text-xs">
-                            <span className="text-slate-500">{fmtDate(b.received_at)}</span>
-                            <span className="tabular-nums text-slate-700">
-                              <b>{b.remaining_quantity}</b> × {fmtMoney(b.unit_cost)}
-                              <span className="ml-2 text-slate-400">= {fmtMoney((b.remaining_quantity ?? 0) * (b.unit_cost ?? 0))}</span>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+          {activeBatches.length > 0 && (
+            <section className="mt-4">
+              <p className="text-sm font-semibold text-slate-900">Партии FIFO</p>
+              <div className="mt-3 space-y-1">
+                {activeBatches.map((b, i) => (
+                  <div key={b.id ?? i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5 text-xs">
+                    <span className="text-slate-500">{fmtDate(b.received_at)}</span>
+                    <span className="tabular-nums text-slate-700">
+                      <b>{b.remaining_quantity}</b> × {fmtMoney(b.unit_cost)}
+                      <span className="ml-2 text-slate-400">= {fmtMoney((b.remaining_quantity ?? 0) * (b.unit_cost ?? 0))}</span>
+                    </span>
                   </div>
-                )
-              })}
-            </div>
-          </section>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="mt-4">
             <p className="text-sm font-semibold text-slate-900">Последние движения</p>
@@ -203,10 +161,9 @@ export default function ProductDrawer({
           </section>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 border-t border-slate-100 p-3 sm:grid-cols-4">
+        <div className="grid grid-cols-3 gap-2 border-t border-slate-100 p-3">
           <Button icon={<Download size={15} />} onClick={() => onReceive(product)}>Приход</Button>
           <Button icon={<Trash2 size={15} />} variant="danger" onClick={() => onWriteoff(product)}>Списать</Button>
-          <Button icon={<ArrowLeftRight size={15} />} onClick={() => onTransfer(product)}>Переместить</Button>
           <Button icon={<Pencil size={15} />} variant="secondary" onClick={() => onEdit(product)}>Изменить</Button>
         </div>
       </aside>

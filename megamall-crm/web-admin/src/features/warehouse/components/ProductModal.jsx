@@ -24,7 +24,7 @@ const emptyForm = {
   image_url: '',
 }
 
-export default function ProductModal({ open, onClose, product, categories = [], suppliers = [] }) {
+export default function ProductModal({ open, onClose, product, suppliers = [] }) {
   const qc = useQueryClient()
   const toast = useToast()
   const isEdit = Boolean(product)
