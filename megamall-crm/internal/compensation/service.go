@@ -486,20 +486,24 @@ type PreviewRequest struct {
 
 // ApplyCommissionRules computes the commission breakdown for one order.
 //
-// Business rules (revised):
-//   - company_revenue is always a fixed percentage of net_revenue.
-//   - seller_commission and manager commissions are fixed percentages.
-//   - team_lead_pool is RESIDUAL: net_revenue minus all other commissions.
-//     This guarantees company + seller + manager + pool == net_revenue exactly.
+// Business rules:
+//   - team_lead_pool_gross is always a fixed percentage of net_revenue
+//     (team_lead_pool_rate) — sellers and managers are paid OUT OF this pool.
+//   - seller_commission and manager commissions are fixed percentages of
+//     net_revenue, subtracted from the gross pool to leave the team lead's
+//     net take: team_lead_pool = team_lead_pool_gross − seller − manager.
+//   - company_revenue is RESIDUAL: net_revenue minus the gross pool.
+//     This guarantees company + pool_gross == net_revenue exactly, and
+//     therefore company + seller + manager + team_lead_pool == net_revenue.
 //
-// Rate-sum validation (fail-fast):
+// company_rate is kept in the snapshot for display/history but is NOT used in
+// the calculation — company's share is whatever remains after the team pool.
 //
-//	seller_order:              company_rate + seller_rate + manager_team_rate  <= 1.0
-//	manager_personal_order:   company_rate + manager_personal_rate            <= 1.0
-//	team_lead_personal_order: company_rate + manager_team_rate                <= 1.0
+// Rate-sum validation (fail-fast, prevents a negative team lead net):
 //
-// team_lead_pool_rate is kept in the snapshot for backward-compat/display but
-// is NOT used in the calculation — pool is derived residually.
+//	seller_order:              seller_rate + manager_team_rate      <= team_lead_pool_rate
+//	manager_personal_order:   manager_personal_rate                <= team_lead_pool_rate
+//	team_lead_personal_order: manager_team_rate                    <= team_lead_pool_rate
 func ApplyCommissionRules(
 	orderType OrderType,
 	netRevenue float64,
@@ -507,55 +511,54 @@ func ApplyCommissionRules(
 ) (CommissionBreakdown, error) {
 	var b CommissionBreakdown
 
+	poolGross := round2(netRevenue * snap.TeamLeadPoolRate)
+
 	switch orderType {
 	case OrderTypeSellerOrder:
-		total := snap.CompanyRate + snap.SellerRate + snap.ManagerTeamRate
-		if total > 1.0 {
+		total := snap.SellerRate + snap.ManagerTeamRate
+		if total > snap.TeamLeadPoolRate {
 			return b, fmt.Errorf(
 				"rate configuration error for seller_order: "+
-					"company_rate(%.5f) + seller_rate(%.5f) + manager_team_rate(%.5f) = %.5f exceeds 1.0 — "+
-					"adjust rates so they sum to at most 1.0",
-				snap.CompanyRate, snap.SellerRate, snap.ManagerTeamRate, total,
+					"seller_rate(%.5f) + manager_team_rate(%.5f) = %.5f exceeds team_lead_pool_rate(%.5f) — "+
+					"team lead pool cannot go negative",
+				snap.SellerRate, snap.ManagerTeamRate, total, snap.TeamLeadPoolRate,
 			)
 		}
-		b.CompanyRevenue = round2(netRevenue * snap.CompanyRate)
 		b.SellerCommission = round2(netRevenue * snap.SellerRate)
 		b.ManagerTeamCommission = round2(netRevenue * snap.ManagerTeamRate)
 		b.ManagerPersonalCommission = 0
-		// Residual: pool absorbs whatever is left after fixed commissions.
-		b.TeamLeadPool = round2(netRevenue - b.CompanyRevenue - b.SellerCommission - b.ManagerTeamCommission)
+		b.TeamLeadPool = round2(poolGross - b.SellerCommission - b.ManagerTeamCommission)
+		b.CompanyRevenue = round2(netRevenue - poolGross)
 
 	case OrderTypeManagerPersonalOrder:
-		total := snap.CompanyRate + snap.ManagerPersonalRate
-		if total > 1.0 {
+		if snap.ManagerPersonalRate > snap.TeamLeadPoolRate {
 			return b, fmt.Errorf(
 				"rate configuration error for manager_personal_order: "+
-					"company_rate(%.5f) + manager_personal_rate(%.5f) = %.5f exceeds 1.0",
-				snap.CompanyRate, snap.ManagerPersonalRate, total,
+					"manager_personal_rate(%.5f) exceeds team_lead_pool_rate(%.5f) — "+
+					"team lead pool cannot go negative",
+				snap.ManagerPersonalRate, snap.TeamLeadPoolRate,
 			)
 		}
 		b.SellerCommission = 0
 		b.ManagerTeamCommission = 0
-		b.CompanyRevenue = round2(netRevenue * snap.CompanyRate)
 		b.ManagerPersonalCommission = round2(netRevenue * snap.ManagerPersonalRate)
-		// Residual pool.
-		b.TeamLeadPool = round2(netRevenue - b.CompanyRevenue - b.ManagerPersonalCommission)
+		b.TeamLeadPool = round2(poolGross - b.ManagerPersonalCommission)
+		b.CompanyRevenue = round2(netRevenue - poolGross)
 
 	case OrderTypeTeamLeadPersonalOrder:
-		total := snap.CompanyRate + snap.ManagerTeamRate
-		if total > 1.0 {
+		if snap.ManagerTeamRate > snap.TeamLeadPoolRate {
 			return b, fmt.Errorf(
 				"rate configuration error for team_lead_personal_order: "+
-					"company_rate(%.5f) + manager_team_rate(%.5f) = %.5f exceeds 1.0",
-				snap.CompanyRate, snap.ManagerTeamRate, total,
+					"manager_team_rate(%.5f) exceeds team_lead_pool_rate(%.5f) — "+
+					"team lead pool cannot go negative",
+				snap.ManagerTeamRate, snap.TeamLeadPoolRate,
 			)
 		}
 		b.SellerCommission = 0
-		b.CompanyRevenue = round2(netRevenue * snap.CompanyRate)
 		b.ManagerTeamCommission = round2(netRevenue * snap.ManagerTeamRate)
 		b.ManagerPersonalCommission = 0
-		// Residual pool.
-		b.TeamLeadPool = round2(netRevenue - b.CompanyRevenue - b.ManagerTeamCommission)
+		b.TeamLeadPool = round2(poolGross - b.ManagerTeamCommission)
+		b.CompanyRevenue = round2(netRevenue - poolGross)
 
 	default:
 		return b, fmt.Errorf("ApplyCommissionRules: unknown order_type %q", orderType)

@@ -4,43 +4,46 @@ package orders
 //
 // Emits immutable FinancialEvent ledger entries when an order is delivered.
 //
-// Commission model (revised):
+// Commission model:
 //   All commissions derive from commission_base = total_amount - courier_payout.
 //
-//   company_revenue, seller_commission, and manager commissions are
-//   independent fixed percentages of commission_base.
+//   team_lead_pool_gross is a fixed percentage of commission_base
+//   (team_lead_pool_rate). Sellers and managers are paid OUT OF this pool —
+//   their commissions are subtracted from it to leave the team lead's net take.
 //
-//   team_lead_pool is RESIDUAL:
-//     pool = commission_base - company_revenue - seller_commission
-//                        - manager_team_commission
-//                        - manager_personal_commission
+//   company_revenue is RESIDUAL:
+//     company_revenue = commission_base - team_lead_pool_gross
 //
 //   This guarantees:
-//     company + seller + manager + pool == commission_base  (exactly, for every order)
+//     company + seller + manager + team_lead_pool == commission_base  (exactly, for every order)
 //
 // Per-order-type rules:
 //
 //   seller_order:
-//     company_revenue             = commission_base × company_rate
-//     seller_commission           = commission_base × seller_rate
-//     manager_team_commission     = commission_base × manager_team_rate
-//     manager_personal_commission = 0
-//     team_lead_pool (residual)   = commission_base - company - seller - manager_team
+//     team_lead_pool_gross         = commission_base × team_lead_pool_rate
+//     seller_commission            = commission_base × seller_rate
+//     manager_team_commission      = commission_base × manager_team_rate
+//     manager_personal_commission  = 0
+//     team_lead_pool (net)         = team_lead_pool_gross - seller - manager_team
+//     company_revenue (residual)   = commission_base - team_lead_pool_gross
 //
 //   manager_personal_order:
-//     company_revenue             = commission_base × company_rate
-//     seller_commission           = 0
-//     manager_team_commission     = 0  (manager cannot double-pay himself)
-//     manager_personal_commission = commission_base × manager_personal_rate
-//     team_lead_pool (residual)   = commission_base - company - manager_personal
+//     team_lead_pool_gross         = commission_base × team_lead_pool_rate
+//     seller_commission            = 0
+//     manager_team_commission      = 0  (manager cannot double-pay himself)
+//     manager_personal_commission  = commission_base × manager_personal_rate
+//     team_lead_pool (net)         = team_lead_pool_gross - manager_personal
+//     company_revenue (residual)   = commission_base - team_lead_pool_gross
 //
 //   team_lead_personal_order:
-//     company_revenue             = commission_base × company_rate
-//     seller_commission           = 0
-//     manager_team_commission     = commission_base × manager_team_rate
-//     manager_personal_commission = 0
-//     team_lead_pool (residual)   = commission_base - company - manager_team
+//     team_lead_pool_gross         = commission_base × team_lead_pool_rate
+//     seller_commission            = 0
+//     manager_team_commission      = commission_base × manager_team_rate
+//     manager_personal_commission  = 0
+//     team_lead_pool (net)         = team_lead_pool_gross - manager_team
+//     company_revenue (residual)   = commission_base - team_lead_pool_gross
 //
+// company_rate is stored for display/history but not used in the calculation.
 // Zero-amount events are never written to the ledger.
 
 import (

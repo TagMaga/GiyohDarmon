@@ -16,8 +16,8 @@ func snap(sellerRate, mgrTeam, mgrPersonal, tlPool, company float64) *OrderFinan
 		SellerRate:          sellerRate,
 		ManagerTeamRate:     mgrTeam,
 		ManagerPersonalRate: mgrPersonal,
-		TeamLeadPoolRate:    tlPool,   // stored but not used in calculation
-		CompanyRate:         company,
+		TeamLeadPoolRate:    tlPool,
+		CompanyRate:         company, // stored but not used in calculation (company is residual)
 	}
 }
 
@@ -52,9 +52,9 @@ func TestApply_SellerOrder_BasicMath(t *testing.T) {
 	if b.ManagerPersonalCommission != 0 {
 		t.Errorf("ManagerPersonalCommission: got %.2f, want 0", b.ManagerPersonalCommission)
 	}
-	// pool = 80 - 48 - 8 - 2.40 = 21.60
+	// pool_gross = 80*0.40 = 32; pool = 32 - 8 - 2.40 = 21.60
 	if !near2(b.TeamLeadPool, 21.60) {
-		t.Errorf("TeamLeadPool: got %.2f, want 21.60 (residual)", b.TeamLeadPool)
+		t.Errorf("TeamLeadPool: got %.2f, want 21.60 (pool_gross minus seller/manager)", b.TeamLeadPool)
 	}
 }
 
@@ -71,37 +71,42 @@ func TestApply_SellerOrder_SumEqualsNetRevenue(t *testing.T) {
 	}
 }
 
-func TestApply_SellerOrder_TeamLeadPoolRateIgnored(t *testing.T) {
-	// team_lead_pool_rate is in the snapshot but must NOT affect the pool amount.
-	// Two snapshots with different tlPool rates → same breakdown if other rates equal.
-	s1 := snap(0.10, 0.03, 0.20, 0.05, 0.60) // tlPool=0.05
-	s2 := snap(0.10, 0.03, 0.20, 0.90, 0.60) // tlPool=0.90 (different)
+func TestApply_SellerOrder_CompanyRateIgnored(t *testing.T) {
+	// company_rate is in the snapshot but must NOT affect seller/manager/pool amounts —
+	// company is the residual (net_revenue - pool_gross), computed after the fact.
+	s1 := snap(0.10, 0.03, 0.20, 0.40, 0.10) // company=0.10
+	s2 := snap(0.10, 0.03, 0.20, 0.40, 0.90) // company=0.90 (different)
 	b1, _ := ApplyCommissionRules(OrderTypeSellerOrder, 100.0, s1)
 	b2, _ := ApplyCommissionRules(OrderTypeSellerOrder, 100.0, s2)
-	if b1.TeamLeadPool != b2.TeamLeadPool {
-		t.Errorf("TeamLeadPool should be identical regardless of team_lead_pool_rate: %.2f vs %.2f",
-			b1.TeamLeadPool, b2.TeamLeadPool)
+	if b1.SellerCommission != b2.SellerCommission || b1.ManagerTeamCommission != b2.ManagerTeamCommission || b1.TeamLeadPool != b2.TeamLeadPool {
+		t.Errorf("seller/manager/pool should be identical regardless of company_rate")
+	}
+	if b1.CompanyRevenue != b2.CompanyRevenue {
+		// expected: both = net_revenue - pool_gross = 100 - 40 = 60, regardless of company_rate input
+		if !near2(b1.CompanyRevenue, 60.0) || !near2(b2.CompanyRevenue, 60.0) {
+			t.Errorf("CompanyRevenue should be net_revenue-pool_gross=60 regardless of company_rate: got %.2f, %.2f", b1.CompanyRevenue, b2.CompanyRevenue)
+		}
 	}
 }
 
 func TestApply_SellerOrder_ValidationError(t *testing.T) {
-	// company(0.60) + seller(0.30) + mgr_team(0.20) = 1.10 → must fail
+	// seller(0.30) + mgr_team(0.20) = 0.50 exceeds team_lead_pool_rate(0.40) → must fail
 	s := snap(0.30, 0.20, 0.20, 0.40, 0.60)
 	_, err := ApplyCommissionRules(OrderTypeSellerOrder, 100.0, s)
 	if err == nil {
-		t.Fatal("expected validation error for rate sum > 1.0, got nil")
+		t.Fatal("expected validation error for seller+manager > team_lead_pool_rate, got nil")
 	}
 }
 
 func TestApply_SellerOrder_ExactlyOne_AllowedNotFailed(t *testing.T) {
-	// company(0.60) + seller(0.20) + mgr_team(0.20) = 1.00 → pool = 0 → allowed
+	// seller(0.20) + mgr_team(0.20) = 0.40 == team_lead_pool_rate(0.40) → pool = 0 → allowed
 	s := snap(0.20, 0.20, 0.20, 0.40, 0.60)
 	b, err := ApplyCommissionRules(OrderTypeSellerOrder, 100.0, s)
 	if err != nil {
-		t.Fatalf("unexpected error at sum=1.0: %v", err)
+		t.Fatalf("unexpected error at sum=team_lead_pool_rate: %v", err)
 	}
 	if !near2(b.TeamLeadPool, 0.0) {
-		t.Errorf("pool should be 0 when rates sum to 1.0, got %.4f", b.TeamLeadPool)
+		t.Errorf("pool should be 0 when seller+manager equals team_lead_pool_rate, got %.4f", b.TeamLeadPool)
 	}
 }
 
@@ -126,9 +131,9 @@ func TestApply_ManagerPersonalOrder_BasicMath(t *testing.T) {
 	if !near2(b.ManagerPersonalCommission, 16.0) {
 		t.Errorf("ManagerPersonalCommission: got %.2f, want 16.00", b.ManagerPersonalCommission)
 	}
-	// pool = 80 - 48 - 16 = 16
+	// pool_gross = 80*0.40 = 32; pool = 32 - 16 = 16
 	if !near2(b.TeamLeadPool, 16.0) {
-		t.Errorf("TeamLeadPool: got %.2f, want 16.00 (residual)", b.TeamLeadPool)
+		t.Errorf("TeamLeadPool: got %.2f, want 16.00 (pool_gross minus manager)", b.TeamLeadPool)
 	}
 }
 
@@ -145,11 +150,11 @@ func TestApply_ManagerPersonalOrder_SumEqualsNetRevenue(t *testing.T) {
 }
 
 func TestApply_ManagerPersonalOrder_ValidationError(t *testing.T) {
-	// company(0.60) + personal(0.50) = 1.10 → fail
+	// personal(0.50) exceeds team_lead_pool_rate(0.40) → fail
 	s := snap(0.10, 0.03, 0.50, 0.40, 0.60)
 	_, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 100.0, s)
 	if err == nil {
-		t.Fatal("expected validation error for rate sum > 1.0, got nil")
+		t.Fatal("expected validation error for manager_personal_rate > team_lead_pool_rate, got nil")
 	}
 }
 
@@ -174,9 +179,9 @@ func TestApply_TeamLeadPersonalOrder_BasicMath(t *testing.T) {
 	if b.ManagerPersonalCommission != 0 {
 		t.Errorf("ManagerPersonalCommission: got %.2f, want 0", b.ManagerPersonalCommission)
 	}
-	// pool = 80 - 48 - 2.40 = 29.60
+	// pool_gross = 80*0.40 = 32; pool = 32 - 2.40 = 29.60
 	if !near2(b.TeamLeadPool, 29.60) {
-		t.Errorf("TeamLeadPool: got %.2f, want 29.60 (residual)", b.TeamLeadPool)
+		t.Errorf("TeamLeadPool: got %.2f, want 29.60 (pool_gross minus manager)", b.TeamLeadPool)
 	}
 }
 
@@ -193,11 +198,11 @@ func TestApply_TeamLeadPersonalOrder_SumEqualsNetRevenue(t *testing.T) {
 }
 
 func TestApply_TeamLeadPersonalOrder_ValidationError(t *testing.T) {
-	// company(0.60) + mgr_team(0.50) = 1.10 → fail
+	// mgr_team(0.50) exceeds team_lead_pool_rate(0.40) → fail
 	s := snap(0.10, 0.50, 0.20, 0.40, 0.60)
 	_, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, 100.0, s)
 	if err == nil {
-		t.Fatal("expected validation error for rate sum > 1.0, got nil")
+		t.Fatal("expected validation error for manager_team_rate > team_lead_pool_rate, got nil")
 	}
 }
 
