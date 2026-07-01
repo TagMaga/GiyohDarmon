@@ -16,6 +16,7 @@ import (
 	"github.com/megamall/crm/config"
 	"github.com/megamall/crm/internal/activity"
 	"github.com/megamall/crm/internal/auth"
+	"github.com/megamall/crm/internal/budget"
 	"github.com/megamall/crm/internal/compensation"
 	"github.com/megamall/crm/internal/courier"
 	"github.com/megamall/crm/internal/customers"
@@ -152,6 +153,15 @@ func main() {
 
 	loc := cfg.Server.Location()
 
+	// Finance is constructed before Budget: Budget's live balance formula reads
+	// Finance's accumulated net profit (internal/finance.Repository.GetNetProfit)
+	// instead of storing a per-order profit transfer.
+	financeRepo := finance.NewRepository(db)
+	financeHandler := finance.NewHandler(financeRepo, loc)
+
+	budgetRepo := budget.NewRepository(db, loc, financeRepo)
+	budgetHandler := budget.NewHandler(budgetRepo)
+
 	orderRepo := orders.NewRepository(db, loc)
 	orderSvc := orders.NewService(
 		orderRepo,
@@ -176,10 +186,6 @@ func main() {
 	// ── Phase 6: Health checks ────────────────────────────────────────────────
 	healthSvc := health.NewService(db)
 	healthHandler := health.NewHandler(healthSvc)
-
-	// ── Phase 15: Owner Finance Dashboard ─────────────────────────────────────
-	financeRepo := finance.NewRepository(db)
-	financeHandler := finance.NewHandler(financeRepo, loc)
 
 	// ── Phase 17: Owner Logistics ─────────────────────────────────────────────
 	logisticsRepo := logistics.NewRepository(db, loc)
@@ -235,6 +241,9 @@ func main() {
 
 		// Phase 15: Owner Finance Dashboard
 		financeHandler.RegisterRoutes(v1.Group("/finance"))
+
+		// Company Budget
+		budgetHandler.RegisterRoutes(v1.Group("/owner/budget"))
 
 		// Phase 17: Owner Logistics
 		logisticsHandler.RegisterRoutes(v1.Group("/owner/logistics"))

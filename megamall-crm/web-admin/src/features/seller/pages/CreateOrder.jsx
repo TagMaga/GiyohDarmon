@@ -38,7 +38,6 @@ function normalizeDraft(raw) {
     payMode:         typeof raw.payMode === 'string'         ? raw.payMode         : 'cod',
     prepayAmount:    raw.prepayAmount ?? '',
     prepayReceiver:  typeof raw.prepayReceiver === 'string'  ? raw.prepayReceiver  : '',
-    prepayChatUrl:   typeof raw.prepayChatUrl === 'string'   ? raw.prepayChatUrl   : '',
     comment:         typeof raw.comment === 'string'         ? raw.comment         : '',
   }
 }
@@ -54,7 +53,7 @@ const EMPTY_FORM = {
   cartItems: [],
   deliveryMode: 'normal',
   payMode: 'cod',
-  prepayAmount: '', prepayReceiver: '', prepayChatUrl: '', comment: '',
+  prepayAmount: '', prepayReceiver: '', comment: '',
 }
 
 // ── Product search ─────────────────────────────────────────────────────────────
@@ -101,9 +100,9 @@ function ProductSearch({ products, loading, onAdd }) {
                          hover:bg-indigo-50 active:scale-[0.97] transition-all group overflow-hidden">
               {getProductImageUrl(p) ? (
                 <img src={getProductImageUrl(p)} alt={p.name}
-                  className="w-full h-24 object-cover" />
+                  className="w-full aspect-square object-cover" />
               ) : (
-                <div className="w-full h-24 bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center transition-colors">
+                <div className="w-full aspect-square bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center transition-colors">
                   <Package size={22} className="text-slate-300 group-hover:text-indigo-400" />
                 </div>
               )}
@@ -330,7 +329,6 @@ export default function CreateOrder() {
         prepayment_receiver: prepayRequired && form.prepayReceiver ? form.prepayReceiver : undefined,
         prepayment_comment:  prepayRequired && form.comment.trim() ? form.comment.trim() : undefined,
         payment_proof_url:   proofUrl ?? undefined,
-        customer_chat_url:   prepayRequired && form.prepayChatUrl ? form.prepayChatUrl : undefined,
       })
 
       return { order }
@@ -551,8 +549,6 @@ export default function CreateOrder() {
             totalOrderAmount={totalOrderAmount}
             onFileChange={handleProofFileChange}
             proofFile={proofFile}
-            chatUrl={form.prepayChatUrl}
-            onChatUrlChange={(v) => setField('prepayChatUrl', v)}
           />
         </div>
 

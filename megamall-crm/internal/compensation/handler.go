@@ -225,10 +225,12 @@ func (h *Handler) Preview(c *gin.Context) {
 	}
 
 	req := PreviewRequest{
-		UserID:     userID,
-		TeamID:     teamID,
-		OrderTotal: params.OrderTotal,
-		OrderType:  params.OrderType,
+		UserID:        userID,
+		TeamID:        teamID,
+		OrderTotal:    params.OrderTotal,
+		OrderType:     params.OrderType,
+		DeliveryFee:   params.DeliveryFee,
+		CourierPayout: params.CourierPayout,
 	}
 
 	result, err := h.svc.Preview(c.Request.Context(), req)

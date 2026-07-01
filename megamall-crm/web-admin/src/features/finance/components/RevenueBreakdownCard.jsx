@@ -2,11 +2,11 @@
  * RevenueBreakdownCard — owner profit formula for delivered orders.
  *
  * Shows:
- *   - Total sales
+ *   - Product sales
+ *   - Client delivery charges
  *   - Courier delivery salary
  *   - Team payouts
- *   - Product cost
- *   - Gross profit
+ *   - Company income
  *   - Visual stacked bar
  *
  * Props:
@@ -14,7 +14,7 @@
  *   orders   {object}  FinanceOrdersSummary
  *   loading  {bool}
  */
-import { Package, Truck, Users2, Wallet } from 'lucide-react'
+import { Package, Receipt, Truck, Users2, Wallet } from 'lucide-react'
 import { fmtMoney }          from '../../hr/utils/hrHelpers'
 
 function pct(part, total) {
@@ -22,29 +22,44 @@ function pct(part, total) {
   return Math.min((part / total) * 100, 100)
 }
 
-function PctBar({ deliveryPct, employeePct, productPct, profitPct }) {
-  const rest = Math.max(0, 100 - deliveryPct - employeePct - productPct - profitPct)
+function fmtPct(v) {
+  const r = Math.round(v)
+  return Math.abs(v - r) < 0.05 ? `${r}` : v.toFixed(1)
+}
+
+function PctBar({ clientDeliveryPct, deliveryPct, employeePct, productPct, expensePct, profitPct }) {
+  const rest = Math.max(0, 100 - clientDeliveryPct - deliveryPct - employeePct - productPct - expensePct - profitPct)
   return (
     <div className="h-3 rounded-full overflow-hidden bg-slate-100 flex">
       <div
+        className="h-full bg-emerald-300 transition-all duration-500"
+        style={{ width: `${clientDeliveryPct}%` }}
+        title={`Доставка клиентов ${fmtPct(clientDeliveryPct)}%`}
+      />
+      <div
         className="h-full bg-sky-400 transition-all duration-500"
         style={{ width: `${deliveryPct}%` }}
-        title={`Доставка ${deliveryPct.toFixed(1)}%`}
+        title={`Доставка ${fmtPct(deliveryPct)}%`}
       />
       <div
         className="h-full bg-amber-400 transition-all duration-500"
         style={{ width: `${employeePct}%` }}
-        title={`Команды ${employeePct.toFixed(1)}%`}
+        title={`Команды ${fmtPct(employeePct)}%`}
       />
       <div
-        className="h-full bg-violet-500 transition-all duration-500"
+        className="h-full bg-teal-400 transition-all duration-500"
         style={{ width: `${productPct}%` }}
-        title={`Себестоимость ${productPct.toFixed(1)}%`}
+        title={`Себестоимость ${fmtPct(productPct)}%`}
+      />
+      <div
+        className="h-full bg-orange-400 transition-all duration-500"
+        style={{ width: `${expensePct}%` }}
+        title={`Прочие расходы ${fmtPct(expensePct)}%`}
       />
       <div
         className="h-full bg-emerald-500 transition-all duration-500"
         style={{ width: `${profitPct}%` }}
-        title={`Валовая прибыль ${profitPct.toFixed(1)}%`}
+        title={`Доход компании ${fmtPct(profitPct)}%`}
       />
       {rest > 0.5 && (
         <div
@@ -67,14 +82,14 @@ function BreakdownRow({ icon, dotClass, label, pctValue, value, strong = false }
         </div>
       </div>
       <div className="flex items-center gap-2">
-        {pctValue !== undefined && <span className="text-[11px] text-slate-400">{pctValue.toFixed(1)}%</span>}
+        {pctValue !== undefined && <span className="text-[11px] text-slate-400">{fmtPct(pctValue)}%</span>}
         <span className={`text-sm font-bold tabular-nums ${strong ? 'text-emerald-700' : 'text-slate-900'}`}>{fmtMoney(value)}</span>
       </div>
     </div>
   )
 }
 
-export default function RevenueBreakdownCard({ revenue, orders, loading = false }) {
+export default function RevenueBreakdownCard({ revenue, orders, expenses, loading = false }) {
   if (loading) {
     return (
       <div className="card p-5 space-y-4">
@@ -92,16 +107,21 @@ export default function RevenueBreakdownCard({ revenue, orders, loading = false 
     )
   }
 
-  const totalSales  = orders?.total_sales ?? 0
-  const delivery    = orders?.delivery_fees ?? 0
-  const netRevenue  = orders?.net_revenue ?? 0
-  const employees   = revenue?.total_employee_payouts ?? 0
+  const productSales = orders?.total_sales ?? 0
+  const clientDelivery = orders?.client_delivery_fees ?? 0
+  const clientTotal  = productSales + clientDelivery
+  const delivery    = orders?.courier_payout ?? 0
+  const commissionBase = orders?.commission_base ?? 0
+  const employees   = orders?.team_payouts ?? 0
   const productCost = orders?.product_cost ?? 0
-  const grossProfit = orders?.gross_profit ?? 0
-  const deliveryPct = pct(delivery, totalSales)
-  const employeePct = pct(employees, netRevenue)
-  const productPct  = pct(productCost, totalSales)
-  const profitPct   = pct(Math.max(grossProfit, 0), totalSales)
+  const otherExpenses = expenses?.total_business_expenses ?? 0
+  const netProfit = expenses?.net_profit ?? 0
+  const clientDeliveryPct = pct(clientDelivery, clientTotal)
+  const deliveryPct = pct(delivery, clientTotal)
+  const employeePct = pct(employees, commissionBase)
+  const productPct = pct(productCost, commissionBase)
+  const expensePct = pct(otherExpenses, commissionBase)
+  const profitPct   = pct(Math.max(netProfit, 0), commissionBase)
 
   return (
     <div className="card p-5 space-y-4">
@@ -111,14 +131,16 @@ export default function RevenueBreakdownCard({ revenue, orders, loading = false 
       </div>
 
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-bold text-slate-900 tabular-nums">{fmtMoney(totalSales)}</span>
-        <span className="text-xs text-slate-400">продажи</span>
+        <span className="text-2xl font-bold text-slate-900 tabular-nums">{fmtMoney(clientTotal)}</span>
+        <span className="text-xs text-slate-400">к оплате клиентов</span>
       </div>
 
       <PctBar
+        clientDeliveryPct={clientDeliveryPct}
         deliveryPct={deliveryPct}
-        employeePct={pct(employees, totalSales)}
+        employeePct={employeePct}
         productPct={productPct}
+        expensePct={expensePct}
         profitPct={profitPct}
       />
 
@@ -126,10 +148,19 @@ export default function RevenueBreakdownCard({ revenue, orders, loading = false 
         <BreakdownRow
           icon={<Truck size={12} className="text-slate-400" />}
           dotClass="bg-sky-400"
-          label="Доставка"
+          label="Доставка курьерам"
           pctValue={deliveryPct}
           value={delivery}
         />
+        <div className="border-t border-slate-100 pt-2.5">
+          <BreakdownRow
+            icon={<Wallet size={12} className="text-emerald-500" />}
+            dotClass="bg-emerald-500"
+            label="Комиссионная база"
+            value={commissionBase}
+            strong
+          />
+        </div>
         <BreakdownRow
           icon={<Users2 size={12} className="text-slate-400" />}
           dotClass="bg-amber-400"
@@ -139,18 +170,25 @@ export default function RevenueBreakdownCard({ revenue, orders, loading = false 
         />
         <BreakdownRow
           icon={<Package size={12} className="text-slate-400" />}
-          dotClass="bg-violet-500"
+          dotClass="bg-slate-300"
           label="Себестоимость"
           pctValue={productPct}
           value={productCost}
+        />
+        <BreakdownRow
+          icon={<Receipt size={12} className="text-slate-400" />}
+          dotClass="bg-orange-400"
+          label="Расходы бизнеса"
+          pctValue={expensePct}
+          value={otherExpenses}
         />
         <div className="border-t border-slate-100 pt-2.5">
           <BreakdownRow
             icon={<Wallet size={12} className="text-emerald-500" />}
             dotClass="bg-emerald-500"
-            label="Валовая прибыль"
+            label="Чистая прибыль"
             pctValue={profitPct}
-            value={grossProfit}
+            value={netProfit}
             strong
           />
         </div>

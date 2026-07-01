@@ -6,19 +6,19 @@
  *   2. Period filter
  *   3. 6 KPI tiles (from /finance/summary)
  *   4. Two-col on md+: RevenueBreakdownCard | CommissionsBreakdown
- *   5. CashFlowPanel (full width)
- *   6. FinanceEventsTable (paginated ledger)
+ *   5. FinanceEventsTable (paginated ledger)
  *
  * All monetary figures come from the backend — zero client-side aggregation.
  */
 import { useState }              from 'react'
-import { RefreshCw, TrendingUp } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Check, PlusCircle, RefreshCw, TrendingUp, X } from 'lucide-react'
 import Alert                     from '../../../shared/components/Alert'
 import IncomePeriodFilter        from '../../hr/components/IncomePeriodFilter'
+import { postFinanceExpense }    from '../api'
 import FinanceSummaryKpis        from '../components/FinanceSummaryKpis'
 import RevenueBreakdownCard      from '../components/RevenueBreakdownCard'
 import CommissionsBreakdown      from '../components/CommissionsBreakdown'
-import CashFlowPanel             from '../components/CashFlowPanel'
 import FinanceEventsTable        from '../components/FinanceEventsTable'
 import useFinanceSummary         from '../hooks/useFinanceSummary'
 
@@ -28,18 +28,148 @@ function toYMD(date) {
   return date.toISOString().slice(0, 10)
 }
 
-function currentMonthDefault() {
+function last30DaysDefault() {
   const now   = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth(), 1)
+  const start = new Date(now)
+  start.setDate(start.getDate() - 29)
   return { from: toYMD(start), to: toYMD(now) }
+}
+
+const EXPENSE_CATEGORIES = [
+  { value: 'salary', label: 'Зарплата' },
+  { value: 'rent', label: 'Аренда' },
+  { value: 'marketing', label: 'Маркетинг' },
+  { value: 'taxes', label: 'Налоги' },
+  { value: 'other', label: 'Другое' },
+]
+
+function AddExpenseModal({ open, onClose, onSubmit, loading, error }) {
+  const [category, setCategory] = useState('salary')
+  const [amount, setAmount] = useState('')
+  const [note, setNote] = useState('')
+  const [localError, setLocalError] = useState('')
+
+  function resetAndClose() {
+    setCategory('salary')
+    setAmount('')
+    setNote('')
+    setLocalError('')
+    onClose()
+  }
+
+  function handleSubmit() {
+    const parsedAmount = Number(amount)
+    if (!parsedAmount || parsedAmount <= 0) {
+      setLocalError('Введите сумму больше нуля')
+      return
+    }
+    setLocalError('')
+    onSubmit({
+      category,
+      amount: parsedAmount,
+      note: note.trim(),
+    })
+  }
+
+  if (!open) return null
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 backdrop-blur-sm"
+      onClick={(event) => { if (event.target === event.currentTarget) resetAndClose() }}
+    >
+      <div className="w-full max-w-[400px] rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Добавить расход</h2>
+            <p className="mt-1 text-xs text-slate-400">Прочие расходы для финансового периода</p>
+          </div>
+          <button
+            type="button"
+            onClick={resetAndClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200"
+            aria-label="Закрыть"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="mt-5 space-y-4">
+          <div>
+            <label className="mb-1.5 block text-[11.5px] font-semibold text-slate-500">Категория</label>
+            <select
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 outline-none transition-colors focus:border-indigo-300 focus:bg-white"
+            >
+              {EXPENSE_CATEGORIES.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[11.5px] font-semibold text-slate-500">Сумма (TJS)</label>
+            <input
+              type="number"
+              min="1"
+              step="0.01"
+              value={amount}
+              onChange={(event) => { setAmount(event.target.value); setLocalError('') }}
+              placeholder="10"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-900 outline-none transition-colors focus:border-indigo-300 focus:bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[11.5px] font-semibold text-slate-500">Заметка</label>
+            <input
+              type="text"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="Например: реклама за день"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 outline-none transition-colors focus:border-indigo-300 focus:bg-white"
+            />
+          </div>
+        </div>
+
+        {(localError || error) && (
+          <p className="mt-3 text-xs font-medium text-rose-600">
+            {localError || error?.response?.data?.error?.message || error?.message || 'Не удалось добавить расход'}
+          </p>
+        )}
+
+        <div className="mt-6 flex gap-2">
+          <button
+            type="button"
+            onClick={resetAndClose}
+            className="flex-1 rounded-full border border-slate-200 py-2.5 text-[12.5px] font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+          >
+            Отмена
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-orange-500 py-2.5 text-[12.5px] font-semibold text-white shadow-[0_4px_10px_rgba(249,115,22,.25)] transition-colors hover:bg-orange-600 disabled:opacity-60"
+          >
+            <Check size={14} />
+            Сохранить
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function OwnerFinancePage() {
-  const def = currentMonthDefault()
+  const queryClient = useQueryClient()
+  const def = last30DaysDefault()
   const [from, setFrom] = useState(def.from)
   const [to,   setTo]   = useState(def.to)
+  const [expenseOpen, setExpenseOpen] = useState(false)
 
   const summaryParams = { from, to }
   const {
@@ -50,6 +180,15 @@ export default function OwnerFinancePage() {
     refetch,
     isFetching,
   } = useFinanceSummary(summaryParams)
+
+  const expenseMut = useMutation({
+    mutationFn: postFinanceExpense,
+    onSuccess: () => {
+      setExpenseOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['finance'] })
+      queryClient.invalidateQueries({ queryKey: ['budget'] }) // Finance profit feeds Budget's live balance
+    },
+  })
 
   function handlePeriodChange(f, t) {
     setFrom(f)
@@ -110,6 +249,7 @@ export default function OwnerFinancePage() {
         <RevenueBreakdownCard
           revenue={summary?.revenue}
           orders={summary?.orders}
+          expenses={summary?.expenses}
           loading={summaryLoading}
         />
         <CommissionsBreakdown
@@ -118,16 +258,31 @@ export default function OwnerFinancePage() {
         />
       </div>
 
-      {/* ── Cash flow panel ─────────────────────────────────────────────────── */}
-      <CashFlowPanel
-        cash={summary?.cash}
-        loading={summaryLoading}
-      />
-
       {/* ── Financial events ledger ──────────────────────────────────────────── */}
       <div className="card p-5">
-        <FinanceEventsTable from={from} to={to} />
+        <FinanceEventsTable
+          from={from}
+          to={to}
+          action={
+            <button
+              type="button"
+              onClick={() => setExpenseOpen(true)}
+              className="inline-flex h-9 flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-orange-200 bg-orange-50 px-3.5 text-[12px] font-semibold text-orange-700 transition-colors hover:border-orange-300 hover:bg-orange-100"
+            >
+              <PlusCircle size={14} />
+              Добавить расход
+            </button>
+          }
+        />
       </div>
+
+      <AddExpenseModal
+        open={expenseOpen}
+        onClose={() => setExpenseOpen(false)}
+        onSubmit={(payload) => expenseMut.mutate(payload)}
+        loading={expenseMut.isPending}
+        error={expenseMut.error}
+      />
 
     </div>
   )

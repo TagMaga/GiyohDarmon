@@ -268,11 +268,11 @@ func (s *Service) GetGlobalRates(ctx context.Context) (*GlobalRatesResponse, err
 		}
 
 		entry := GlobalRateEntry{
-			ConfigID:      cfg.ID,
+			ConfigID:       cfg.ID,
 			CommissionType: cfg.CommissionType,
-			Rate:          cfg.Rate,
-			EffectiveFrom: cfg.EffectiveFrom,
-			Notes:         cfg.Notes,
+			Rate:           cfg.Rate,
+			EffectiveFrom:  cfg.EffectiveFrom,
+			Notes:          cfg.Notes,
 		}
 
 		switch ct {
@@ -346,26 +346,27 @@ func (s *Service) GetHistory(
 // using current active rates for the given user/team/order parameters.
 //
 // CORRECTED COMMISSION RULES (applied here):
-//   seller_order:
-//     seller_commission          = net_revenue × seller_rate
-//     manager_team_commission    = net_revenue × manager_team_rate
-//     manager_personal_commission = 0
-//     team_lead_pool             = net_revenue × team_lead_pool_rate
-//     company_revenue            = net_revenue × company_rate
 //
-//   manager_personal_order:
-//     seller_commission          = 0
-//     manager_team_commission    = 0     ← manager cannot double-pay himself
-//     manager_personal_commission = net_revenue × manager_personal_rate
-//     team_lead_pool             = net_revenue × team_lead_pool_rate
-//     company_revenue            = net_revenue × company_rate
+//	seller_order:
+//	  seller_commission          = net_revenue × seller_rate
+//	  manager_team_commission    = net_revenue × manager_team_rate
+//	  manager_personal_commission = 0
+//	  team_lead_pool             = net_revenue × team_lead_pool_rate
+//	  company_revenue            = net_revenue × company_rate
 //
-//   team_lead_personal_order:
-//     seller_commission          = 0
-//     manager_team_commission    = net_revenue × manager_team_rate
-//     manager_personal_commission = 0
-//     team_lead_pool             = net_revenue × team_lead_pool_rate
-//     company_revenue            = net_revenue × company_rate
+//	manager_personal_order:
+//	  seller_commission          = 0
+//	  manager_team_commission    = 0     ← manager cannot double-pay himself
+//	  manager_personal_commission = net_revenue × manager_personal_rate
+//	  team_lead_pool             = net_revenue × team_lead_pool_rate
+//	  company_revenue            = net_revenue × company_rate
+//
+//	team_lead_personal_order:
+//	  seller_commission          = 0
+//	  manager_team_commission    = net_revenue × manager_team_rate
+//	  manager_personal_commission = 0
+//	  team_lead_pool             = net_revenue × team_lead_pool_rate
+//	  company_revenue            = net_revenue × company_rate
 func (s *Service) Preview(ctx context.Context, req PreviewRequest) (*PreviewResponse, error) {
 	if !req.OrderType.IsValid() {
 		return nil, apperrors.BadRequest(fmt.Sprintf("invalid order_type: %s", req.OrderType))
@@ -378,14 +379,14 @@ func (s *Service) Preview(ctx context.Context, req PreviewRequest) (*PreviewResp
 
 	// Build snapshot input for preview (no OrderID, no persistence).
 	input := SnapshotInput{
-		SellerID:     req.UserID,
-		SellerTeamID: req.TeamID,
-		ManagerID:    req.UserID,
-		ManagerTeamID: req.TeamID,
-		TeamLeadID:   req.UserID,
+		SellerID:       req.UserID,
+		SellerTeamID:   req.TeamID,
+		ManagerID:      req.UserID,
+		ManagerTeamID:  req.TeamID,
+		TeamLeadID:     req.UserID,
 		TeamLeadTeamID: req.TeamID,
-		OrderTotal:   req.OrderTotal,
-		ResolvedAt:   now,
+		OrderTotal:     req.OrderTotal,
+		ResolvedAt:     now,
 	}
 
 	snap, err := s.snapshot.Build(ctx, input)
@@ -400,14 +401,23 @@ func (s *Service) Preview(ctx context.Context, req PreviewRequest) (*PreviewResp
 	}
 
 	deliveryFee := snap.TariffFee
+	if req.DeliveryFee != nil {
+		deliveryFee = *req.DeliveryFee
+	}
 	netRevenue := req.OrderTotal - deliveryFee
 
-	// Apply order-type commission rules (residual pool, with validation).
-	breakdown, err := ApplyCommissionRules(req.OrderType, netRevenue, snap)
+	courierPayout := req.CourierPayout
+	commissionBase := req.OrderTotal - courierPayout
+	if commissionBase < 0 {
+		return nil, apperrors.BadRequest("courier_payout exceeds order_total")
+	}
+
+	// Apply order-type commission rules to the amount left after courier payout.
+	breakdown, err := ApplyCommissionRules(req.OrderType, commissionBase, snap)
 	if err != nil {
 		return nil, apperrors.Unprocessable(err.Error())
 	}
-	breakdown.CourierFee = deliveryFee
+	breakdown.CourierFee = courierPayout
 
 	// Build rate info for response.
 	rates := ResolvedRatesInfo{
@@ -452,22 +462,26 @@ func (s *Service) Preview(ctx context.Context, req PreviewRequest) (*PreviewResp
 	}
 
 	return &PreviewResponse{
-		OrderType:   req.OrderType,
-		OrderTotal:  req.OrderTotal,
-		DeliveryFee: deliveryFee,
-		NetRevenue:  netRevenue,
-		Rates:       rates,
-		Breakdown:   breakdown,
+		OrderType:      req.OrderType,
+		OrderTotal:     req.OrderTotal,
+		DeliveryFee:    deliveryFee,
+		NetRevenue:     netRevenue,
+		CourierPayout:  courierPayout,
+		CommissionBase: commissionBase,
+		Rates:          rates,
+		Breakdown:      breakdown,
 	}, nil
 }
 
 // PreviewRequest holds the parameters for the Preview call.
 // (Kept here in service.go to avoid a separate file; used only by Preview.)
 type PreviewRequest struct {
-	UserID     *uuid.UUID
-	TeamID     *uuid.UUID
-	OrderTotal float64
-	OrderType  OrderType
+	UserID        *uuid.UUID
+	TeamID        *uuid.UUID
+	OrderTotal    float64
+	OrderType     OrderType
+	DeliveryFee   *float64
+	CourierPayout float64
 }
 
 // ApplyCommissionRules computes the commission breakdown for one order.
@@ -504,9 +518,9 @@ func ApplyCommissionRules(
 				snap.CompanyRate, snap.SellerRate, snap.ManagerTeamRate, total,
 			)
 		}
-		b.CompanyRevenue         = round2(netRevenue * snap.CompanyRate)
-		b.SellerCommission       = round2(netRevenue * snap.SellerRate)
-		b.ManagerTeamCommission  = round2(netRevenue * snap.ManagerTeamRate)
+		b.CompanyRevenue = round2(netRevenue * snap.CompanyRate)
+		b.SellerCommission = round2(netRevenue * snap.SellerRate)
+		b.ManagerTeamCommission = round2(netRevenue * snap.ManagerTeamRate)
 		b.ManagerPersonalCommission = 0
 		// Residual: pool absorbs whatever is left after fixed commissions.
 		b.TeamLeadPool = round2(netRevenue - b.CompanyRevenue - b.SellerCommission - b.ManagerTeamCommission)
@@ -520,9 +534,9 @@ func ApplyCommissionRules(
 				snap.CompanyRate, snap.ManagerPersonalRate, total,
 			)
 		}
-		b.SellerCommission          = 0
-		b.ManagerTeamCommission     = 0
-		b.CompanyRevenue            = round2(netRevenue * snap.CompanyRate)
+		b.SellerCommission = 0
+		b.ManagerTeamCommission = 0
+		b.CompanyRevenue = round2(netRevenue * snap.CompanyRate)
 		b.ManagerPersonalCommission = round2(netRevenue * snap.ManagerPersonalRate)
 		// Residual pool.
 		b.TeamLeadPool = round2(netRevenue - b.CompanyRevenue - b.ManagerPersonalCommission)
@@ -536,9 +550,9 @@ func ApplyCommissionRules(
 				snap.CompanyRate, snap.ManagerTeamRate, total,
 			)
 		}
-		b.SellerCommission          = 0
-		b.CompanyRevenue            = round2(netRevenue * snap.CompanyRate)
-		b.ManagerTeamCommission     = round2(netRevenue * snap.ManagerTeamRate)
+		b.SellerCommission = 0
+		b.CompanyRevenue = round2(netRevenue * snap.CompanyRate)
+		b.ManagerTeamCommission = round2(netRevenue * snap.ManagerTeamRate)
 		b.ManagerPersonalCommission = 0
 		// Residual pool.
 		b.TeamLeadPool = round2(netRevenue - b.CompanyRevenue - b.ManagerTeamCommission)

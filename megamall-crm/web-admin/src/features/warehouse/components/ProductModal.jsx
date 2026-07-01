@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { ImagePlus, X } from 'lucide-react'
 import Modal from '../../../shared/components/Modal'
 import Button from '../../../shared/components/Button'
 import Alert from '../../../shared/components/Alert'
@@ -8,28 +9,19 @@ import { KEYS } from '../../../shared/queryKeys'
 import { addProductImage, createProduct, updateProduct } from '../api'
 import {
   getId,
-  getProductBarcode,
-  getProductCategoryId,
   getProductImage,
   getProductName,
   getProductSku,
-  getProductSupplierId,
   getPurchasePrice,
   getSalePrice,
-  isUUID,
 } from '../utils/warehouseHelpers'
 
 const emptyForm = {
   name: '',
   sku: '',
-  barcode: '',
-  category_id: '',
-  supplier_id: '',
   purchase_price: '',
   sale_price: '',
   image_url: '',
-  normal_delivery_fee:  '',
-  express_delivery_fee: '',
 }
 
 export default function ProductModal({ open, onClose, product, categories = [], suppliers = [] }) {
@@ -37,43 +29,66 @@ export default function ProductModal({ open, onClose, product, categories = [], 
   const toast = useToast()
   const isEdit = Boolean(product)
   const [form, setForm] = useState(emptyForm)
+  const [imagePreview, setImagePreview] = useState(null) // local blob URL or existing URL
+  const [imageFile, setImageFile] = useState(null)       // File object for new uploads
+  const fileRef = useRef()
 
   useEffect(() => {
     if (!open) return
     if (!product) {
       setForm(emptyForm)
+      setImagePreview(null)
+      setImageFile(null)
       return
     }
+    const existingImage = getProductImage(product)
     setForm({
       name: getProductName(product) === '—' ? '' : getProductName(product),
       sku: getProductSku(product) === '—' ? '' : getProductSku(product),
-      barcode: getProductBarcode(product) === '—' ? '' : getProductBarcode(product),
-      category_id: getProductCategoryId(product) ?? '',
-      supplier_id: getProductSupplierId(product) ?? '',
       purchase_price: getPurchasePrice(product) ?? '',
       sale_price: getSalePrice(product) ?? '',
-      image_url: getProductImage(product) ?? '',
-      normal_delivery_fee:  product?.normal_delivery_fee  ?? product?.NormalDeliveryFee  ?? '',
-      express_delivery_fee: product?.express_delivery_fee ?? product?.ExpressDeliveryFee ?? '',
+      image_url: existingImage ?? '',
     })
+    setImagePreview(existingImage || null)
+    setImageFile(null)
   }, [open, product])
+
+  function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+    // reset input so same file can be re-selected
+    e.target.value = ''
+  }
+
+  function removeImage() {
+    setImageFile(null)
+    setImagePreview(null)
+    setForm(prev => ({ ...prev, image_url: '' }))
+  }
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const payload = normalizePayload(form, isEdit)
+      const payload = {
+        name: form.name.trim(),
+        sku: form.sku.trim(),
+      }
+      if (form.purchase_price !== '') payload.purchase_price = Number(form.purchase_price)
+      if (form.sale_price !== '')     payload.sale_price     = Number(form.sale_price)
+
       const saved = isEdit
         ? await updateProduct(getId(product), payload)
         : await createProduct(payload)
 
       const productId = getId(saved) ?? getId(product)
-      const existingImage = getProductImage(product)
-      if (productId && form.image_url.trim() && form.image_url.trim() !== existingImage) {
-        await addProductImage(productId, {
-          image_url: form.image_url.trim(),
-          is_primary: true,
-          sort_order: 0,
-        })
+
+      // Upload new image file as base64 data URL
+      if (productId && imageFile) {
+        const dataUrl = await fileToDataURL(imageFile)
+        await addProductImage(productId, { image_url: dataUrl, is_primary: true, sort_order: 0 })
       }
+
       return saved
     },
     onSuccess: () => {
@@ -84,7 +99,7 @@ export default function ProductModal({ open, onClose, product, categories = [], 
   })
 
   function setField(field, value) {
-    setForm((prev) => ({ ...prev, [field]: value }))
+    setForm(prev => ({ ...prev, [field]: value }))
   }
 
   const errMsg = mutation.error?.response?.data?.error?.message ?? mutation.error?.message
@@ -109,43 +124,57 @@ export default function ProductModal({ open, onClose, product, categories = [], 
       {errMsg && <Alert variant="error" title="Ошибка" className="mb-4">{errMsg}</Alert>}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Название *" value={form.name} onChange={(v) => setField('name', v)} placeholder="Например, iPhone 15 Pro" />
-        <Field label="SKU *" value={form.sku} onChange={(v) => setField('sku', v)} placeholder="SKU-001" />
-        <Field label="Штрихкод" value={form.barcode} onChange={(v) => setField('barcode', v)} placeholder="Штрихкод" />
-        <Field label="Ссылка на изображение" value={form.image_url} onChange={(v) => setField('image_url', v)} placeholder="https://..." />
-        <SelectField label="Категория" value={form.category_id} onChange={(v) => setField('category_id', v)} options={categories} />
-        <SelectField label="Поставщик" value={form.supplier_id} onChange={(v) => setField('supplier_id', v)} options={suppliers} />
-        <Field label="Закупочная цена" type="number" min="0" value={form.purchase_price} onChange={(v) => setField('purchase_price', v)} placeholder="0" />
-        <Field label="Цена продажи" type="number" min="0" value={form.sale_price} onChange={(v) => setField('sale_price', v)} placeholder="0" />
-        <Field label="Доставка (обычная)" type="number" min="0" value={form.normal_delivery_fee} onChange={(v) => setField('normal_delivery_fee', v)} placeholder="Глобальные настройки" />
-        <Field label="Доставка (экспресс)" type="number" min="0" value={form.express_delivery_fee} onChange={(v) => setField('express_delivery_fee', v)} placeholder="Глобальные настройки" />
+        <Field label="Название *" value={form.name} onChange={v => setField('name', v)} placeholder="Например, Пахлавон" />
+        <Field label="SKU *" value={form.sku} onChange={v => setField('sku', v)} placeholder="P-001" />
+        <Field label="Закупочная цена" type="number" min="0" value={form.purchase_price} onChange={v => setField('purchase_price', v)} placeholder="0" />
+        <Field label="Цена продажи" type="number" min="0" value={form.sale_price} onChange={v => setField('sale_price', v)} placeholder="0" />
       </div>
 
-      <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-        <p className="text-xs font-medium text-amber-800">Минимальный порог хранится в остатках, а не в карточке товара.</p>
-        <p className="text-xs text-amber-700 mt-0.5">Текущий backend не предоставляет endpoint для изменения порога из создания или редактирования товара.</p>
+      {/* Photo upload */}
+      <div className="mt-4">
+        <span className="input-label block mb-1.5">Фото товара</span>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+        {imagePreview ? (
+          <div className="relative w-32 h-32 rounded-2xl overflow-hidden border border-slate-200 group">
+            <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
+            <button
+              onClick={removeImage}
+              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="flex flex-col items-center justify-center gap-2 w-32 h-32 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 hover:border-indigo-400 hover:text-indigo-500 transition-colors"
+          >
+            <ImagePlus size={24} />
+            <span className="text-[11px] font-medium">Загрузить</span>
+          </button>
+        )}
+        {imagePreview && (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="mt-2 text-[11.5px] text-indigo-500 hover:underline"
+          >
+            Заменить фото
+          </button>
+        )}
       </div>
     </Modal>
   )
 }
 
-function normalizePayload(form, isEdit) {
-  const payload = {
-    name: form.name.trim(),
-    sku: form.sku.trim(),
-  }
-  if (form.barcode.trim()) payload.barcode = form.barcode.trim()
-  if (form.category_id) payload.category_id = form.category_id
-  if (form.supplier_id) payload.supplier_id = form.supplier_id
-  if (form.purchase_price !== '') payload.purchase_price = Number(form.purchase_price)
-  if (form.sale_price !== '') payload.sale_price = Number(form.sale_price)
-  if (form.normal_delivery_fee !== '')  payload.normal_delivery_fee  = Number(form.normal_delivery_fee)
-  if (form.express_delivery_fee !== '') payload.express_delivery_fee = Number(form.express_delivery_fee)
-
-  if (isEdit) {
-    return payload
-  }
-  return payload
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = e => resolve(e.target.result)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
 }
 
 function Field({ label, value, onChange, type = 'text', placeholder, min }) {
@@ -158,22 +187,8 @@ function Field({ label, value, onChange, type = 'text', placeholder, min }) {
         min={min}
         value={value}
         placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={e => onChange(e.target.value)}
       />
-    </label>
-  )
-}
-
-function SelectField({ label, value, onChange, options }) {
-  return (
-    <label>
-      <span className="input-label">{label}</span>
-      <select className="input" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Не выбрано</option>
-        {options.filter((o) => isUUID(getId(o))).map((o) => (
-          <option key={getId(o)} value={getId(o)}>{o.name ?? o.Name}</option>
-        ))}
-      </select>
     </label>
   )
 }

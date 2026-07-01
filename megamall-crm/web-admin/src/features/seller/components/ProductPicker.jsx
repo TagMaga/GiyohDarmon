@@ -96,10 +96,10 @@ export default function ProductPicker({ products = [], loading = false, selected
                     <img
                       src={p.product_image_url || p.ProductImageURL || p.image_url || p.ImageURL}
                       alt={p.name}
-                      className="w-full h-24 object-cover"
+                      className="w-full aspect-square object-cover"
                     />
                   ) : (
-                    <div className="w-full h-24 bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center transition-colors">
+                    <div className="w-full aspect-square bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center transition-colors">
                       <Package size={22} className="text-slate-300 group-hover:text-indigo-400" />
                     </div>
                   )}

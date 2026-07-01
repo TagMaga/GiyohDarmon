@@ -5,7 +5,7 @@ import {
   LayoutDashboard, PlusCircle, LogOut, ShoppingBag,
   Truck, Settings,
   Archive, Package, ArrowLeftRight, PackagePlus, Trash2, BarChart3,
-  Building2, UserCog, FileBarChart, User, BookUser,
+  Building2, FileBarChart, User, BookUser,
 } from 'lucide-react'
 import useAuthStore from '../store/authStore'
 import useProfile   from '../hooks/useProfile'
@@ -20,9 +20,9 @@ const NAV = {
     { label: 'Дашборд',    icon: Home,          path: '/owner' },
     { label: 'Заказы',     icon: ShoppingCart,  path: '/owner/orders' },
     { label: 'Логистика',  icon: Truck,         path: '/owner/logistics' },
-    { label: 'Курьеры',    icon: UserCog,       path: '/owner/couriers' },
-    { label: 'Финансы',    icon: TrendingUp,    path: '/owner/finance' },
-    { label: 'Команды',    icon: Users2,        path: '/owner/teams' },
+    { label: 'Финансы',         icon: TrendingUp, path: '/owner/finance' },
+    { label: 'Бюджет компании', icon: Wallet,     path: '/owner/budget' },
+    { label: 'Команды',         icon: Users2,     path: '/owner/teams' },
     { label: 'Сотрудники', icon: Users,         path: '/owner/employees' },
     { label: 'Склад',      icon: Building2,     path: '/owner/warehouse' },
     { label: 'Команда',    icon: BookUser,      path: '/owner/team-directory' },

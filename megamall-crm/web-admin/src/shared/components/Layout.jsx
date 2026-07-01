@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { Home, ShoppingCart, Plus, Wallet, User, Users } from 'lucide-react'
+import { Home, ShoppingCart, Plus, Wallet, User, Users, TrendingUp, Truck, MoreHorizontal } from 'lucide-react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import useAuthStore from '../store/authStore'
@@ -14,14 +14,23 @@ const MANAGER_TABS = [
   { label: 'Профиль',  icon: User,         path: '/manager/profile',      end: false },
 ]
 
+const OWNER_TABS = [
+  { label: 'Главная',  icon: Home,         path: '/owner',           end: true  },
+  { label: 'Заказы',   icon: ShoppingCart, path: '/owner/orders',    end: false },
+  { label: 'Финансы',  icon: TrendingUp,   path: '/owner/finance',   end: false },
+  { label: 'Логист.',  icon: Truck,        path: '/owner/logistics', end: false },
+  { label: 'Ещё',      icon: MoreHorizontal, path: '/owner/settings', end: false },
+]
+
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
   const { role } = useAuthStore()
   const isDispatcherBoard = location.pathname.startsWith('/dispatcher')
+  const isOwner   = role === 'owner'
   const isSeller  = role === 'seller'
   const isManager = role === 'manager'
-  const hasMobileNav = isSeller || isManager
+  const hasMobileNav = isOwner || isSeller || isManager
 
   if (isDispatcherBoard) {
     return <Outlet />
@@ -56,6 +65,7 @@ export default function Layout() {
       </div>
 
       {/* Mobile bottom navigation */}
+      {isOwner   && <BottomNav tabs={OWNER_TABS} />}
       {isSeller  && <BottomNav />}
       {isManager && <BottomNav tabs={MANAGER_TABS} />}
     </div>

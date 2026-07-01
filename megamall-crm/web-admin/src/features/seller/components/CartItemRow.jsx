@@ -1,14 +1,15 @@
 import { Minus, Plus, Trash2 } from 'lucide-react'
 import { fmtAmount } from '../../../shared/orderStatusConfig'
 
-export default function CartItemRow({ item, onChange, onRemove }) {
+export default function CartItemRow({ item, onChange, onRemove, readOnly = false }) {
   const setQty = (qty) => {
-    if (qty < 1) return
+    if (readOnly || qty < 1 || !onChange) return
     // reset total_price to original when qty changes
     onChange({ ...item, quantity: qty, total_price: item.unit_price * qty })
   }
 
   const setTotalPrice = (val) => {
+    if (readOnly || !onChange) return
     const parsed = val === '' ? 0 : Number(val)
     const price = Number.isFinite(parsed) ? Math.max(0, parsed) : 0
     onChange({ ...item, total_price: price })
@@ -42,15 +43,17 @@ export default function CartItemRow({ item, onChange, onRemove }) {
               <p className="text-[10px] text-slate-400">{item.sku}</p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onRemove}
-            className="min-w-[36px] min-h-[36px] flex items-center justify-center
-                       rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50
-                       transition-colors flex-shrink-0"
-          >
-            <Trash2 size={14} />
-          </button>
+          {!readOnly && onRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              className="min-w-[36px] min-h-[36px] flex items-center justify-center
+                         rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50
+                         transition-colors flex-shrink-0"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
         </div>
 
         {/* Qty + price row */}
@@ -68,7 +71,7 @@ export default function CartItemRow({ item, onChange, onRemove }) {
             <button
               type="button"
               onClick={() => setQty(item.quantity - 1)}
-              disabled={item.quantity <= 1}
+              disabled={readOnly || item.quantity <= 1}
               className="w-8 h-8 flex items-center justify-center rounded-l-lg border border-slate-200
                          bg-slate-50 text-slate-600 hover:bg-slate-100
                          disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
@@ -82,6 +85,7 @@ export default function CartItemRow({ item, onChange, onRemove }) {
             <button
               type="button"
               onClick={() => setQty(item.quantity + 1)}
+              disabled={readOnly}
               className="w-8 h-8 flex items-center justify-center rounded-r-lg border border-slate-200
                          bg-slate-50 text-slate-600 hover:bg-slate-100 transition-colors"
             >
@@ -99,6 +103,7 @@ export default function CartItemRow({ item, onChange, onRemove }) {
                 placeholder="0"
                 min="0"
                 step="0.01"
+                disabled={readOnly}
                 className="w-24 h-8 px-2 pr-5 rounded-lg border border-slate-200 text-xs font-bold
                            text-indigo-600 text-right focus:outline-none focus:ring-2 focus:ring-indigo-400/30
                            focus:border-indigo-400 bg-white

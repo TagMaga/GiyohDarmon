@@ -1,10 +1,13 @@
+import { useState }          from 'react'
 import { Menu, Bell, Activity } from 'lucide-react'
-import { useQuery }             from '@tanstack/react-query'
-import { getHealth }            from '../api/auth'
-import StatusBadge              from './StatusBadge'
-import AccountMenu              from './AccountMenu'
+import { useQuery }          from '@tanstack/react-query'
+import { getHealth }         from '../api/auth'
+import StatusBadge           from './StatusBadge'
+import NotificationsPanel    from './NotificationsPanel'
 
 export default function Topbar({ onMenuClick }) {
+  const [notifOpen, setNotifOpen] = useState(false)
+
   const { data: healthData, isError: healthError, isPending: healthPending } = useQuery({
     queryKey:        ['health'],
     queryFn:         getHealth,
@@ -34,7 +37,7 @@ export default function Topbar({ onMenuClick }) {
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuClick}
-          className="hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-500 hover:bg-white/80 transition-colors"
+          className="lg:hidden p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-500 hover:bg-white/80 transition-colors"
           aria-label="Открыть меню"
         >
           <Menu size={20} />
@@ -48,12 +51,18 @@ export default function Topbar({ onMenuClick }) {
 
       {/* Right: notifications + account */}
       <div className="flex items-center gap-2">
-        <button className="relative p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-slate-500 hover:bg-white/80 transition-colors">
-          <Bell size={18} />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full ring-2 ring-white/80" />
-        </button>
-
-        <AccountMenu />
+        <div className="relative">
+          <button
+            onClick={() => setNotifOpen(v => !v)}
+            className={`relative p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors ${
+              notifOpen ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-white/80'
+            }`}
+          >
+            <Bell size={18} />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full ring-2 ring-white/80" />
+          </button>
+          <NotificationsPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
+        </div>
       </div>
     </header>
   )

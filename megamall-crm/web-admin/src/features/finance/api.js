@@ -3,7 +3,7 @@
  *
  * Owner-only endpoints:
  *   GET /finance/summary?from=&to=
- *   GET /finance/events?from=&to=&event_type=&page=&limit=
+ *   GET /finance/events?from=&to=&event_type=&order_id=&user_id=&min_amount=&max_amount=&page=&limit=
  *   GET /finance/cash?from=&to=&page=&limit=
  *
  * /finance/summary returns a plain object → use unwrap (body.data).
@@ -50,7 +50,7 @@ export async function fetchFinanceSummary(params = {}) {
  * Fetch paginated financial events for the owner ledger view.
  * Returns { items: FinanceEventResponse[], meta: { page, limit, total, total_pages } }.
  *
- * @param {object} params  { from?, to?, event_type?, page?, limit? }
+ * @param {object} params  { from?, to?, event_type?, order_id?, user_id?, min_amount?, max_amount?, page?, limit? }
  */
 export async function fetchFinanceEvents(params = {}) {
   const res = await client.get('/finance/events', { params })
@@ -69,3 +69,14 @@ export async function fetchFinanceCash(params = {}) {
   const res = await client.get('/finance/cash', { params })
   return unwrapPaginated(res)
 }
+
+// ── Business expenses (salaries, rent, marketing, taxes, other) ──────────────
+
+export const postFinanceExpense = (body) =>
+  client.post('/finance/expenses', body).then(unwrap)
+
+export const patchFinanceExpense = ({ id, ...body }) =>
+  client.patch(`/finance/expenses/${id}`, body).then(unwrap)
+
+export const fetchFinanceExpenseHistory = (id) =>
+  client.get(`/finance/expenses/${id}/history`).then((res) => res.data?.data ?? [])

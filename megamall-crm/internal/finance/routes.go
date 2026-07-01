@@ -32,4 +32,10 @@ func (h *Handler) RegisterRoutes(finance *gin.RouterGroup) {
 	finance.GET("/daily",   ownerOnly, h.GetDailyTrend)         // daily revenue trend chart
 	finance.GET("/sellers", ownerOnly, h.GetSellersPerformance) // seller leaderboard
 	finance.GET("/teams",   ownerOnly, h.GetTeamsPerformance)   // team performance ranking
+
+	// Business expenses (salaries, rent, marketing, taxes, other) — part of Finance's P&L
+	finance.GET("/expenses",              ownerOnly, h.ListExpenses)
+	finance.POST("/expenses",             ownerOnly, h.CreateExpense)
+	finance.PATCH("/expenses/:id",        ownerOnly, h.UpdateExpense)
+	finance.GET("/expenses/:id/history",  ownerOnly, h.GetExpenseHistory)
 }

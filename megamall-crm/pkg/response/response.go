@@ -1,6 +1,7 @@
 package response
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -58,5 +59,6 @@ func HandleError(c *gin.Context, err error) {
 		return
 	}
 	// Unknown error — internal
+	log.Printf("[INTERNAL ERROR] %v", err)
 	Error(c, apperrors.Internal(err))
 }

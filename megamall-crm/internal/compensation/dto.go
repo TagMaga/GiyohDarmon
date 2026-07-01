@@ -110,20 +110,20 @@ func ToConfigResponseList(configs []CommissionConfig) []CommissionConfigResponse
 
 // GlobalRateEntry is a single entry in the GlobalRatesResponse.
 type GlobalRateEntry struct {
-	ConfigID      uuid.UUID      `json:"config_id"`
+	ConfigID       uuid.UUID      `json:"config_id"`
 	CommissionType CommissionType `json:"commission_type"`
-	Rate          float64        `json:"rate"`
-	EffectiveFrom time.Time      `json:"effective_from"`
-	Notes         string         `json:"notes"`
+	Rate           float64        `json:"rate"`
+	EffectiveFrom  time.Time      `json:"effective_from"`
+	Notes          string         `json:"notes"`
 }
 
 // GlobalRatesResponse is returned by GET /hr/compensation/global.
 type GlobalRatesResponse struct {
-	SellerRate            GlobalRateEntry `json:"seller_rate"`
-	ManagerTeamRate       GlobalRateEntry `json:"manager_team_rate"`
-	ManagerPersonalRate   GlobalRateEntry `json:"manager_personal_rate"`
-	TeamLeadPoolRate      GlobalRateEntry `json:"team_lead_pool_rate"`
-	CompanyRate           GlobalRateEntry `json:"company_rate"`
+	SellerRate          GlobalRateEntry `json:"seller_rate"`
+	ManagerTeamRate     GlobalRateEntry `json:"manager_team_rate"`
+	ManagerPersonalRate GlobalRateEntry `json:"manager_personal_rate"`
+	TeamLeadPoolRate    GlobalRateEntry `json:"team_lead_pool_rate"`
+	CompanyRate         GlobalRateEntry `json:"company_rate"`
 }
 
 // ─── Delivery tariff request DTOs ─────────────────────────────────────────────
@@ -235,8 +235,10 @@ func ToTariffResponseList(tariffs []DeliveryTariff) []DeliveryTariffResponse {
 
 // PreviewQueryParams is bound from GET /hr/compensation/preview query string.
 type PreviewQueryParams struct {
-	OrderTotal float64   `form:"order_total"`
-	OrderType  OrderType `form:"order_type"`
+	OrderTotal    float64   `form:"order_total"`
+	OrderType     OrderType `form:"order_type"`
+	DeliveryFee   *float64  `form:"delivery_fee"`
+	CourierPayout float64   `form:"courier_payout"`
 }
 
 // RateInfo holds one resolved rate and its tracing metadata.
@@ -267,10 +269,11 @@ type ResolvedRatesInfo struct {
 // CommissionBreakdown shows the calculated amounts per participant.
 //
 // Which amounts are non-zero depends on the order type:
-//   seller_order:           SellerCommission, ManagerTeamCommission, TeamLeadPool, CompanyRevenue
-//   manager_personal_order: ManagerPersonalCommission, TeamLeadPool, CompanyRevenue
-//                           (ManagerTeamCommission = 0: manager can't double-pay himself)
-//   team_lead_personal_order: ManagerTeamCommission, TeamLeadPool, CompanyRevenue
+//
+//	seller_order:           SellerCommission, ManagerTeamCommission, TeamLeadPool, CompanyRevenue
+//	manager_personal_order: ManagerPersonalCommission, TeamLeadPool, CompanyRevenue
+//	                        (ManagerTeamCommission = 0: manager can't double-pay himself)
+//	team_lead_personal_order: ManagerTeamCommission, TeamLeadPool, CompanyRevenue
 type CommissionBreakdown struct {
 	SellerCommission          float64 `json:"seller_commission"`
 	ManagerTeamCommission     float64 `json:"manager_team_commission"`
@@ -282,12 +285,14 @@ type CommissionBreakdown struct {
 
 // PreviewResponse is returned by GET /hr/compensation/preview.
 type PreviewResponse struct {
-	OrderType   OrderType         `json:"order_type"`
-	OrderTotal  float64           `json:"order_total"`
-	DeliveryFee float64           `json:"delivery_fee"`
-	NetRevenue  float64           `json:"net_revenue"`
-	Rates       ResolvedRatesInfo `json:"rates"`
-	Breakdown   CommissionBreakdown `json:"breakdown"`
+	OrderType      OrderType           `json:"order_type"`
+	OrderTotal     float64             `json:"order_total"`
+	DeliveryFee    float64             `json:"delivery_fee"`
+	NetRevenue     float64             `json:"net_revenue"`
+	CourierPayout  float64             `json:"courier_payout"`
+	CommissionBase float64             `json:"commission_base"`
+	Rates          ResolvedRatesInfo   `json:"rates"`
+	Breakdown      CommissionBreakdown `json:"breakdown"`
 }
 
 // ─── Employee compensation (fixed salary) DTOs ────────────────────────────────
@@ -295,8 +300,8 @@ type PreviewResponse struct {
 // SetCompensationRequest is the body for POST /hr/compensation/employees/:user_id/salary.
 type SetCompensationRequest struct {
 	CompensationType CompensationKind `json:"compensation_type" validate:"required"`
-	CommissionRate   *float64         `json:"commission_rate"`  // decimal 0-1
-	FixedSalary      *float64         `json:"fixed_salary"`     // monthly amount
+	CommissionRate   *float64         `json:"commission_rate"` // decimal 0-1
+	FixedSalary      *float64         `json:"fixed_salary"`    // monthly amount
 	Currency         string           `json:"currency"`
 	EffectiveFrom    time.Time        `json:"effective_from" validate:"required"`
 	Notes            string           `json:"notes" validate:"required,min=1"`

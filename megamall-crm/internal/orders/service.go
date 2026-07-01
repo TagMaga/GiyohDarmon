@@ -244,7 +244,7 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 			return err
 		}
 
-		// net_revenue = total_amount - delivery_fee  (commission base)
+		// Stored initial net_revenue; final commission events subtract courier_payout at delivery.
 		netRevenue := totalAmount - deliveryFee
 
 		// Fail-fast: validate rate sums before accepting the order.
@@ -1155,7 +1155,7 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 // ─── Prepayments ──────────────────────────────────────────────────────────────
 
 // AddPrepayment records a partial payment and updates orders.prepayment_amount.
-// Total prepayments cannot exceed order total_amount.
+// Total prepayments cannot exceed total_order_amount (products + client delivery).
 func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, req AddPrepaymentRequest) (*OrderPrepayment, error) {
 	var created *OrderPrepayment
 
@@ -1176,10 +1176,11 @@ func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID 
 		if err != nil {
 			return err
 		}
-		if existingTotal+req.Amount > o.TotalAmount {
+		totalOrderAmount := o.TotalAmount + o.DeliveryFee
+		if existingTotal+req.Amount > totalOrderAmount {
 			return apperrors.BadRequest(fmt.Sprintf(
 				"total prepayments (%.2f) would exceed order total (%.2f)",
-				existingTotal+req.Amount, o.TotalAmount,
+				existingTotal+req.Amount, totalOrderAmount,
 			))
 		}
 

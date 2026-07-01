@@ -43,8 +43,15 @@ export const EVENT_TYPE_LABEL = {
   team_lead_pool_earned:                 'Пул тимлида (начислено)',
   team_lead_pool_confirmed:              'Пул тимлида (подтверждено)',
   company_revenue_earned:                'Доход компании (начислено)',
+  company_revenue_confirmed:             'Доход компании (подтверждено)',
   delivery_fee_earned:                   'Доставка (начислено)',
+  courier_fee_earned:                    'Доставка курьеру (начислено)',
+  courier_fee_confirmed:                 'Доставка курьеру (подтверждено)',
   courier_fee_paid:                      'Выплата курьеру',
+  cash_collected:                         'Наличные собраны',
+  cash_handed_over:                       'Наличные сданы',
+  business_expense:                       'Расход',
+  manual_expense:                         'Расход', // legacy label, pre-Finance/Budget split
 }
 export const EVENT_TYPE_BADGE = {
   seller_commission_earned:              'indigo',
@@ -57,8 +64,15 @@ export const EVENT_TYPE_BADGE = {
   team_lead_pool_earned:                 'amber',
   team_lead_pool_confirmed:              'emerald',
   company_revenue_earned:                'slate',
+  company_revenue_confirmed:             'emerald',
   delivery_fee_earned:                   'orange',
+  courier_fee_earned:                    'orange',
+  courier_fee_confirmed:                 'emerald',
   courier_fee_paid:                      'slate',
+  cash_collected:                         'amber',
+  cash_handed_over:                       'emerald',
+  business_expense:                       'rose',
+  manual_expense:                         'rose', // legacy badge, pre-Finance/Budget split
 }
 
 // ── Rate source labels ────────────────────────────────────────────────────────

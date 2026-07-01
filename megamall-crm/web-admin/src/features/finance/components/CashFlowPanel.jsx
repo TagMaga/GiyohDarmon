@@ -122,19 +122,6 @@ export default function CashFlowPanel({ cash, loading = false }) {
         </div>
       )}
 
-      {/* Handover counts */}
-      <div className="border-t border-slate-100 pt-3 flex flex-wrap gap-2">
-        <div className="flex items-center gap-1.5">
-          <CheckCircle2 size={13} className="text-emerald-500" />
-          <Badge variant="emerald" size="sm">{confirmed} подтверждено</Badge>
-        </div>
-        {pending > 0 && (
-          <div className="flex items-center gap-1.5">
-            <Clock size={13} className="text-amber-500" />
-            <Badge variant="amber" size="sm">{pending} ожидает</Badge>
-          </div>
-        )}
-      </div>
     </div>
   )
 }

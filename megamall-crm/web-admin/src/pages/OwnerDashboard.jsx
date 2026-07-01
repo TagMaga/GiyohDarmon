@@ -70,6 +70,17 @@ const fmtMoney = (v) => Number(v || 0).toLocaleString('ru-RU', { maximumFraction
 const fmtNum   = (v) => Number(v || 0).toLocaleString('ru-RU')
 const fmtPct   = (v) => v != null ? `${v.toFixed(1)}%` : '—'
 
+// team_payouts/company_gross/net_profit all come straight from the backend —
+// summed from the real financial_events ledger and the business-expense
+// categories, never re-derived as a hardcoded percentage here.
+function ownerFinanceKpis(orders = {}, expenses = {}) {
+  return {
+    commissionBase: Number(orders.commission_base || 0),
+    teamPayouts:    Number(orders.team_payouts || 0),
+    companyIncome:  Number(expenses.net_profit || 0),
+  }
+}
+
 // ── Primitives ────────────────────────────────────────────────────────────────
 
 function SectionLabel({ children, icon: Icon }) {
@@ -112,20 +123,20 @@ function LinkBtn({ onClick, children }) {
 
 // ── BLOCK 1 — Finance formula strip ────────────────────────────────────────────
 
-function FinanceSummaryStrip({ orders, revenue, loading }) {
-  const grossProfit = Number(orders?.gross_profit || 0)
+function FinanceSummaryStrip({ orders, revenue, expenses, loading }) {
+  const { teamPayouts, companyIncome } = ownerFinanceKpis(orders, expenses)
   const metrics = [
     { label: 'Продажи товаров', value: `${fmtMoney(orders?.total_sales)} TJS`, dot: 'bg-sky-500', tone: 'text-sky-950', panel: 'from-sky-50 to-cyan-100' },
     { label: 'Доставлено заказов', value: fmtNum(orders?.delivered_count), dot: 'bg-indigo-500', tone: 'text-indigo-950', panel: 'from-indigo-50 to-violet-100' },
-    { label: 'Доставка курьерам', value: `${fmtMoney(orders?.delivery_fees)} TJS`, dot: 'bg-violet-500', tone: 'text-violet-950', panel: 'from-violet-50 to-fuchsia-100' },
-    { label: '40% Команды', value: `${fmtMoney(revenue?.total_employee_payouts)} TJS`, dot: 'bg-amber-500', tone: 'text-amber-950', panel: 'from-amber-50 to-yellow-100' },
+    { label: 'Доставка курьерам', value: `${fmtMoney(orders?.courier_payout)} TJS`, dot: 'bg-violet-500', tone: 'text-violet-950', panel: 'from-violet-50 to-fuchsia-100' },
+    { label: 'Выплаты команде', value: `${fmtMoney(teamPayouts)} TJS`, dot: 'bg-amber-500', tone: 'text-amber-950', panel: 'from-amber-50 to-yellow-100' },
     { label: 'Себестоимость товара', value: `${fmtMoney(orders?.product_cost)} TJS`, dot: 'bg-emerald-500', tone: 'text-emerald-950', panel: 'from-emerald-50 to-teal-100' },
-    { label: 'Валовая прибыль', value: `${fmtMoney(grossProfit)} TJS`, dot: 'bg-rose-500', tone: 'text-rose-950', panel: 'from-rose-50 to-orange-100', result: true },
+    { label: 'Доход компании', value: `${fmtMoney(companyIncome)} TJS`, dot: 'bg-rose-500', tone: 'text-rose-950', panel: 'from-rose-50 to-orange-100', result: true },
   ]
 
   if (loading) {
     return (
-      <section className="rounded-3xl border border-slate-100 bg-white shadow-sm p-5">
+      <section className="rounded-2xl md:rounded-3xl border border-slate-100 bg-white shadow-sm p-3 md:p-5">
         <div className="h-5 w-40 bg-slate-100 rounded-lg animate-pulse mb-4" />
         <div className="grid grid-cols-2 lg:grid-cols-6 divide-x divide-slate-100 overflow-hidden rounded-2xl border border-slate-100">
           {[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="h-20 bg-slate-50 animate-pulse" />)}
@@ -135,28 +146,12 @@ function FinanceSummaryStrip({ orders, revenue, loading }) {
   }
 
   return (
-    <section className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
-        {metrics.slice(0, 3).map((item) => (
+    <section className="rounded-2xl md:rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 md:gap-4 p-3 md:p-4">
+        {metrics.map((item) => (
           <div
             key={item.label}
-            className={`rounded-2xl border border-white/70 bg-gradient-to-br ${item.panel} px-7 py-7 min-h-[150px] shadow-sm`}
-          >
-            <div className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${item.dot}`} />
-              <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
-                {item.label}
-              </p>
-            </div>
-            <p className={`mt-5 text-[42px] font-bold leading-tight tabular-nums ${item.tone}`}>{item.value}</p>
-          </div>
-        ))}
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 pt-0">
-        {metrics.slice(3).map((item) => (
-          <div
-            key={item.label}
-            className={`rounded-2xl border bg-gradient-to-br ${item.panel} px-7 py-7 min-h-[150px] shadow-sm ${
+            className={`rounded-2xl border bg-gradient-to-br ${item.panel} px-3.5 py-4 md:px-7 md:py-7 min-h-[104px] md:min-h-[150px] shadow-sm ${
               item.result
                 ? 'border-rose-300 ring-4 ring-rose-100 shadow-lg shadow-rose-100'
                 : 'border-white/70'
@@ -164,11 +159,11 @@ function FinanceSummaryStrip({ orders, revenue, loading }) {
           >
             <div className="flex items-center gap-2">
               <span className={`w-2.5 h-2.5 rounded-full ${item.dot}`} />
-              <p className="text-[12px] font-semibold uppercase tracking-wide text-slate-500">
+              <p className="text-[10px] md:text-[12px] font-semibold uppercase tracking-wide text-slate-500 leading-tight">
                 {item.label}
               </p>
             </div>
-            <p className={`mt-5 font-bold leading-tight tabular-nums ${item.result ? 'text-[48px]' : 'text-[42px]'} ${item.tone}`}>{item.value}</p>
+            <p className={`mt-4 md:mt-5 font-bold leading-tight tabular-nums ${item.result ? 'text-[25px] md:text-[48px]' : 'text-[23px] md:text-[42px]'} ${item.tone}`}>{item.value}</p>
           </div>
         ))}
       </div>
@@ -500,29 +495,30 @@ function LogisticsOverview({ data, loading, onNav }) {
 // ── BLOCK 8 — Financial waterfall ─────────────────────────────────────────────
 
 function FinancialWaterfall({ summary, loading }) {
-	const o = summary?.orders  ?? {}
-	const r = summary?.revenue ?? {}
+		const o = summary?.orders  ?? {}
+		const r = summary?.revenue ?? {}
+		const e = summary?.expenses ?? {}
 
 	const totalSales  = Number(o.total_sales || 0)
-	const delivery    = Number(o.delivery_fees || 0)
-	const netRevenue  = Number(o.net_revenue || 0)
+	const clientDelivery = Number(o.client_delivery_fees || 0)
+	const customerTotal = totalSales + clientDelivery
+	const delivery    = Number(o.courier_payout || 0)
+	const commissionBase = Number(o.commission_base || 0)
 	const sellers     = Number(r.seller_commission_earned || 0)
 	const managers    = Number(r.manager_personal_commission_earned || 0) + Number(r.manager_team_commission_earned || 0)
 	const teamLeads   = Number(r.team_lead_pool_earned || 0)
-	const teams       = Number(r.total_employee_payouts || 0)
-	const productCost = Number(o.product_cost || 0)
-	const grossProfit = Number(o.gross_profit || 0)
+		const { teamPayouts: teams, companyIncome } = ownerFinanceKpis(o, e)
 
-	const maxBar = Math.max(totalSales, 1)
+	const maxBar = Math.max(customerTotal, totalSales, 1)
 	const barW = (v) => `${Math.max(4, (Math.abs(v) / maxBar) * 100).toFixed(1)}%`
 
 	const rows = [
 		{ label: 'Продажи товаров',         value: totalSales,  color: 'bg-indigo-500',  type: 'base' },
+		{ label: '+ Доставка клиентов',     value: clientDelivery, color: 'bg-emerald-300', type: 'base' },
 		{ label: '− Доставка курьерам',     value: delivery,    color: 'bg-sky-400',     type: 'sub'  },
-		{ label: '= Чистая выручка',        value: netRevenue,  color: 'bg-emerald-500', type: 'result'},
+			{ label: '= Комиссионная база',     value: commissionBase, color: 'bg-emerald-500', type: 'result'},
 		{ label: '− Команды',               value: teams,       color: 'bg-amber-400',   type: 'sub'  },
-		{ label: '− Себестоимость товара',  value: productCost, color: 'bg-violet-400',  type: 'sub'  },
-		{ label: '= Валовая прибыль',       value: grossProfit, color: grossProfit >= 0 ? 'bg-emerald-600' : 'bg-rose-600', type: 'final' },
+		{ label: '= Доход компании',        value: companyIncome, color: companyIncome >= 0 ? 'bg-emerald-600' : 'bg-rose-600', type: 'final' },
 	]
 
   if (loading) {
@@ -546,7 +542,7 @@ function FinancialWaterfall({ summary, loading }) {
               </span>
               <span className={`text-[13px] tabular-nums ${row.type === 'final' ? 'font-bold' : 'font-semibold'} ${
 								row.type === 'sub' ? 'text-rose-600'
-								: row.type === 'final' && grossProfit < 0 ? 'text-rose-600'
+									: row.type === 'final' && companyIncome < 0 ? 'text-rose-600'
 								: 'text-slate-900'
 							}`}>
                 {row.type === 'sub' ? '−' : ''}{fmtMoney(row.value)} с
@@ -712,21 +708,21 @@ export default function OwnerDashboard() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="animate-fade-in space-y-6 p-6 pb-12">
+    <div className="animate-fade-in space-y-4 md:space-y-6 px-3 pt-5 pb-28 md:p-6 md:pb-12">
 
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Панель владельца</h1>
+          <h1 className="text-lg md:text-xl font-bold text-slate-900">Панель владельца</h1>
           <p className="text-xs text-slate-400 mt-0.5">Командный центр компании</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-xl bg-slate-100 p-0.5">
+          <div className="inline-flex min-w-0 w-[calc(100vw-76px)] sm:w-auto overflow-x-auto scrollbar-none rounded-xl bg-slate-100 p-0.5">
             {PERIODS.map((p) => (
               <button
                 key={p.key}
                 onClick={() => setPeriod(p.key)}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   period === p.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
@@ -735,7 +731,7 @@ export default function OwnerDashboard() {
             ))}
           </div>
           {period === 'custom' && (
-            <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-0.5">
+            <div className="flex w-full sm:w-auto items-center gap-1 overflow-x-auto scrollbar-none rounded-xl bg-slate-100 p-0.5">
               <input
                 type="date"
                 value={customRange.from || ''}
@@ -755,7 +751,7 @@ export default function OwnerDashboard() {
           )}
           <button
             onClick={handleRefresh}
-            className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors flex-shrink-0"
+            className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors shrink-0"
             title="Обновить"
           >
             <RefreshCw size={14} className={sumFetching ? 'animate-spin' : ''} />
@@ -766,6 +762,7 @@ export default function OwnerDashboard() {
       <FinanceSummaryStrip
         orders={summary?.orders}
         revenue={summary?.revenue}
+        expenses={summary?.expenses}
         loading={sumLoading}
       />
 

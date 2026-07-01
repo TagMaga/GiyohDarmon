@@ -14,6 +14,7 @@ import LoadingSpinner  from '../shared/components/LoadingSpinner'
 // Owner
 const OwnerDashboard          = lazy(() => import('../pages/OwnerDashboard'))
 const OwnerFinancePage        = lazy(() => import('../features/finance/pages/OwnerFinancePage'))
+const BudgetCompanyPage       = lazy(() => import('../features/budget/pages/BudgetCompanyPage'))
 const OwnerOrdersPage         = lazy(() => import('../features/orders/pages/OwnerOrdersPage'))
 const LogisticsPage           = lazy(() => import('../features/logistics/pages/LogisticsPage'))
 const CourierProfilePage      = lazy(() => import('../features/logistics/pages/CourierProfilePage'))
@@ -121,6 +122,7 @@ const router = createBrowserRouter([
         { path: 'team-directory',    element: <Lazy><TeamDirectoryPage /></Lazy> },
 
         { path: 'finance', element: <Lazy><OwnerFinancePage /></Lazy> },
+        { path: 'budget',  element: <Lazy><BudgetCompanyPage /></Lazy> },
         { path: 'orders',         element: <Lazy><OwnerOrdersPage /></Lazy> },
         { path: 'orders/create',  element: <Lazy><CreateOrder /></Lazy> },
 

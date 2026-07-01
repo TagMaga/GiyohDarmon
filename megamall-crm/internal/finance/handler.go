@@ -6,12 +6,14 @@ package finance
 // Handler methods parse params, call repository, assemble the response DTO, and write.
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	apperrors "github.com/megamall/crm/pkg/errors"
+	"github.com/megamall/crm/pkg/middleware"
 	"github.com/megamall/crm/pkg/pagination"
 	"github.com/megamall/crm/pkg/response"
 )
@@ -54,7 +56,7 @@ func (h *Handler) GetSummary(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// Run all three aggregations in parallel using goroutines.
+	// Run all aggregations in parallel using goroutines.
 	type ordersResult struct {
 		row ordersSummaryRow
 		err error
@@ -67,10 +69,15 @@ func (h *Handler) GetSummary(c *gin.Context) {
 		row cashSummaryRow
 		err error
 	}
+	type expensesResult struct {
+		row expensesSummaryRow
+		err error
+	}
 
 	ordersCh := make(chan ordersResult, 1)
 	revenueCh := make(chan revenueResult, 1)
 	cashCh := make(chan cashResult, 1)
+	expensesCh := make(chan expensesResult, 1)
 
 	go func() {
 		r, e := h.repo.GetOrdersSummary(ctx, from, to)
@@ -84,10 +91,15 @@ func (h *Handler) GetSummary(c *gin.Context) {
 		r, e := h.repo.GetCashSummary(ctx, from, to)
 		cashCh <- cashResult{r, e}
 	}()
+	go func() {
+		r, e := h.repo.GetExpensesSummary(ctx, from, to)
+		expensesCh <- expensesResult{r, e}
+	}()
 
 	ordersRes := <-ordersCh
 	revenueRes := <-revenueCh
 	cashRes := <-cashCh
+	expensesRes := <-expensesCh
 
 	if ordersRes.err != nil {
 		response.HandleError(c, ordersRes.err)
@@ -101,15 +113,24 @@ func (h *Handler) GetSummary(c *gin.Context) {
 		response.HandleError(c, cashRes.err)
 		return
 	}
+	if expensesRes.err != nil {
+		response.HandleError(c, expensesRes.err)
+		return
+	}
 
-	// Build revenue breakdown from event_type rows.
+	// Build revenue breakdown from event_type rows. team_payouts/company_gross come
+	// straight from the immutable financial_events ledger (which already applies the
+	// correct, configurable commission_configs rates) — never re-derived as a
+	// hardcoded percentage of orders.total_sales - orders.delivery_fees.
 	rev := buildRevenueSummary(revenueRes.rows)
-	grossProfit := roundFloat(
-		ordersRes.row.TotalSales -
-			ordersRes.row.DeliveryFees -
-			rev.TotalEmployeePayouts -
-			ordersRes.row.ProductCost,
-	)
+
+	commissionBase := roundFloat(ordersRes.row.TotalSales - ordersRes.row.DeliveryFees)
+	if commissionBase < 0 {
+		commissionBase = 0
+	}
+	exp := expensesRes.row
+	totalBusinessExpenses := roundFloat(exp.Salaries + exp.Rent + exp.Marketing + exp.Taxes + exp.OtherBusinessExpenses)
+	netProfit := computeNetProfit(rev.CompanyRevenueEarned, ordersRes.row.ProductCost, totalBusinessExpenses)
 
 	// Build cash summary.
 	cs := cashRes.row
@@ -126,13 +147,24 @@ func (h *Handler) GetSummary(c *gin.Context) {
 			TotalCount:         ordersRes.row.TotalCount,
 			DeliveredCount:     ordersRes.row.TotalCount, // all delivered
 			TotalSales:         ordersRes.row.TotalSales,
-			DeliveryFees:       ordersRes.row.DeliveryFees,
+			CourierPayout:      ordersRes.row.DeliveryFees,
 			ClientDeliveryFees: ordersRes.row.ClientDeliveryFees,
 			NetRevenue:         ordersRes.row.NetRevenue,
 			ProductCost:        ordersRes.row.ProductCost,
-			GrossProfit:        grossProfit,
+			CommissionBase:     commissionBase,
+			TeamPayouts:        rev.TotalEmployeePayouts,
+			CompanyGross:       rev.CompanyRevenueEarned,
 		},
 		Revenue: rev,
+		Expenses: FinanceExpensesSummary{
+			Salaries:              exp.Salaries,
+			Rent:                  exp.Rent,
+			Marketing:             exp.Marketing,
+			Taxes:                 exp.Taxes,
+			OtherBusinessExpenses: exp.OtherBusinessExpenses,
+			TotalBusinessExpenses: totalBusinessExpenses,
+			NetProfit:             netProfit,
+		},
 		Cash: FinanceCashSummary{
 			HandoversConfirmed: cs.ConfirmedCount,
 			HandoversPending:   cs.PendingCount,
@@ -146,7 +178,7 @@ func (h *Handler) GetSummary(c *gin.Context) {
 	response.OK(c, resp)
 }
 
-// ListEvents handles GET /finance/events?from=&to=&event_type=&page=&limit=
+// ListEvents handles GET /finance/events?from=&to=&event_type=&order_id=&user_id=&min_amount=&max_amount=&page=&limit=
 //
 // Returns paginated financial_events rows.  All event types are included by
 // default (including company_revenue_earned rows with user_id=NULL).
@@ -173,6 +205,29 @@ func (h *Handler) ListEvents(c *gin.Context) {
 		orderID = &parsed
 	}
 
+	var userID *uuid.UUID
+	if params.UserID != "" {
+		parsed, parseErr := uuid.Parse(params.UserID)
+		if parseErr != nil {
+			response.Error(c, apperrors.BadRequest("invalid user_id: "+parseErr.Error()))
+			return
+		}
+		userID = &parsed
+	}
+
+	if params.MinAmount != nil && *params.MinAmount < 0 {
+		response.Error(c, apperrors.BadRequest("min_amount must be >= 0"))
+		return
+	}
+	if params.MaxAmount != nil && *params.MaxAmount < 0 {
+		response.Error(c, apperrors.BadRequest("max_amount must be >= 0"))
+		return
+	}
+	if params.MinAmount != nil && params.MaxAmount != nil && *params.MinAmount > *params.MaxAmount {
+		response.Error(c, apperrors.BadRequest("min_amount must be <= max_amount"))
+		return
+	}
+
 	p := pagination.ParseFromQuery(c)
 
 	events, total, err := h.repo.ListFinancialEvents(
@@ -180,6 +235,9 @@ func (h *Handler) ListEvents(c *gin.Context) {
 		from, to,
 		params.EventType,
 		orderID,
+		userID,
+		params.MinAmount,
+		params.MaxAmount,
 		p,
 	)
 	if err != nil {
@@ -234,6 +292,116 @@ func (h *Handler) ListCash(c *gin.Context) {
 	}
 
 	response.OKWithMeta(c, out, pagination.BuildMeta(p, total))
+}
+
+// ─── Business expenses ─────────────────────────────────────────────────────────
+
+// ListExpenses handles GET /finance/expenses?category=&from=&to=&page=&limit=
+func (h *Handler) ListExpenses(c *gin.Context) {
+	var q ExpenseListQueryParams
+	if err := c.ShouldBindQuery(&q); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	if q.Category != "" && !IsValidExpenseCategory(ExpenseCategory(q.Category)) {
+		response.Error(c, apperrors.BadRequest("invalid expense category"))
+		return
+	}
+
+	p := pagination.ParseFromQuery(c)
+	params := ExpenseListParams{Category: q.Category, Page: p.Page, Limit: p.Limit}
+	if q.From != "" {
+		t, err := parseLocalDate(q.From, h.loc)
+		if err != nil {
+			response.Error(c, apperrors.BadRequest("invalid from date"))
+			return
+		}
+		params.From = &t
+	}
+	if q.To != "" {
+		t, err := parseLocalDate(q.To, h.loc)
+		if err != nil {
+			response.Error(c, apperrors.BadRequest("invalid to date"))
+			return
+		}
+		params.To = &t
+	}
+
+	rows, total, err := h.repo.ListExpenses(c.Request.Context(), params)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OKWithMeta(c, rows, pagination.BuildMeta(p, int(total)))
+}
+
+// CreateExpense handles POST /finance/expenses
+func (h *Handler) CreateExpense(c *gin.Context) {
+	var req ExpenseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	category := ExpenseCategory(req.Category)
+	if !IsValidExpenseCategory(category) {
+		response.Error(c, apperrors.BadRequest("invalid expense category"))
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	if claims == nil {
+		response.Error(c, apperrors.Unauthorized("not authenticated"))
+		return
+	}
+	row, err := h.repo.AddExpense(c.Request.Context(), claims.UserID, req.Amount, req.Note, category)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.Created(c, row)
+}
+
+// UpdateExpense handles PATCH /finance/expenses/:id
+// Only amount and note are editable — category is fixed at creation.
+func (h *Handler) UpdateExpense(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperrors.BadRequest("invalid expense id"))
+		return
+	}
+	var req ExpenseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	if claims == nil {
+		response.Error(c, apperrors.Unauthorized("not authenticated"))
+		return
+	}
+	if err := h.repo.UpdateExpense(c.Request.Context(), id, claims.UserID, req.Amount, req.Note); err != nil {
+		if errors.Is(err, ErrExpenseNotFound) {
+			response.Error(c, apperrors.NotFound("expense not found"))
+			return
+		}
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, gin.H{"updated": true})
+}
+
+// GetExpenseHistory handles GET /finance/expenses/:id/history
+func (h *Handler) GetExpenseHistory(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperrors.BadRequest("invalid expense id"))
+		return
+	}
+	rows, err := h.repo.ListExpenseHistory(c.Request.Context(), id)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, rows)
 }
 
 // ─── Phase 5D handlers ───────────────────────────────────────────────────────

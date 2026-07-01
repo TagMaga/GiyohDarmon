@@ -1,7 +1,8 @@
 /**
  * CommissionsBreakdown — per-type employee payout bars.
  *
- * Shows the four commission types that make up total_employee_payouts:
+ * Shows actual ledger event details. This is separate from the Owner gross team
+ * pool KPI, which is calculated from the approved owner finance model.
  *   seller_commission_earned
  *   manager_personal_commission_earned
  *   manager_team_commission_earned
@@ -13,6 +14,11 @@
  */
 import Badge    from '../../../shared/components/Badge'
 import { fmtMoney } from '../../hr/utils/hrHelpers'
+
+const fmtPct = (v) => {
+  const r = Math.round(v)
+  return Math.abs(v - r) < 0.05 ? `${r}` : v.toFixed(1)
+}
 
 const ROWS = [
   {
@@ -72,7 +78,7 @@ export default function CommissionsBreakdown({ revenue, loading = false }) {
   return (
     <div className="card p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-700">Выплаты сотрудникам</h3>
+        <h3 className="text-sm font-semibold text-slate-700">Фактические начисления по событиям</h3>
         <span className="text-sm font-bold text-slate-900 tabular-nums">{fmtMoney(total)}</span>
       </div>
 
@@ -87,7 +93,7 @@ export default function CommissionsBreakdown({ revenue, loading = false }) {
               <div className="flex items-center justify-between mb-1.5 gap-2">
                 <Badge variant={r.badge} size="sm">{r.label}</Badge>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-[11px] text-slate-400">{r.pct.toFixed(1)}%</span>
+                  <span className="text-[11px] text-slate-400">{fmtPct(r.pct)}%</span>
                   <span className="text-sm font-bold text-slate-900 tabular-nums">{fmtMoney(r.amount)}</span>
                 </div>
               </div>

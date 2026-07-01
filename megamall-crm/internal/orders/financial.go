@@ -5,41 +5,41 @@ package orders
 // Emits immutable FinancialEvent ledger entries when an order is delivered.
 //
 // Commission model (revised):
-//   All commissions derive from net_revenue = total_amount - delivery_fee.
+//   All commissions derive from commission_base = total_amount - courier_payout.
 //
 //   company_revenue, seller_commission, and manager commissions are
-//   independent fixed percentages of net_revenue.
+//   independent fixed percentages of commission_base.
 //
 //   team_lead_pool is RESIDUAL:
-//     pool = net_revenue - company_revenue - seller_commission
+//     pool = commission_base - company_revenue - seller_commission
 //                        - manager_team_commission
 //                        - manager_personal_commission
 //
 //   This guarantees:
-//     company + seller + manager + pool == net_revenue  (exactly, for every order)
+//     company + seller + manager + pool == commission_base  (exactly, for every order)
 //
 // Per-order-type rules:
 //
 //   seller_order:
-//     company_revenue             = net_revenue × company_rate
-//     seller_commission           = net_revenue × seller_rate
-//     manager_team_commission     = net_revenue × manager_team_rate
+//     company_revenue             = commission_base × company_rate
+//     seller_commission           = commission_base × seller_rate
+//     manager_team_commission     = commission_base × manager_team_rate
 //     manager_personal_commission = 0
-//     team_lead_pool (residual)   = net_revenue - company - seller - manager_team
+//     team_lead_pool (residual)   = commission_base - company - seller - manager_team
 //
 //   manager_personal_order:
-//     company_revenue             = net_revenue × company_rate
+//     company_revenue             = commission_base × company_rate
 //     seller_commission           = 0
 //     manager_team_commission     = 0  (manager cannot double-pay himself)
-//     manager_personal_commission = net_revenue × manager_personal_rate
-//     team_lead_pool (residual)   = net_revenue - company - manager_personal
+//     manager_personal_commission = commission_base × manager_personal_rate
+//     team_lead_pool (residual)   = commission_base - company - manager_personal
 //
 //   team_lead_personal_order:
-//     company_revenue             = net_revenue × company_rate
+//     company_revenue             = commission_base × company_rate
 //     seller_commission           = 0
-//     manager_team_commission     = net_revenue × manager_team_rate
+//     manager_team_commission     = commission_base × manager_team_rate
 //     manager_personal_commission = 0
-//     team_lead_pool (residual)   = net_revenue - company - manager_team
+//     team_lead_pool (residual)   = commission_base - company - manager_team
 //
 // Zero-amount events are never written to the ledger.
 
@@ -74,12 +74,35 @@ func (s *Service) emitFinancialEvents(
 	order *Order,
 	snap *compensation.OrderFinancialSnapshot,
 ) error {
-	nr := order.NetRevenue // base for ALL commission calculations
+	// Business rule: courier is paid first; commissions are split from the remainder.
+	// Resolve and freeze courier_payout before commission calculation so the base is
+	// correct even when the payout was not frozen at order-creation time.
+	if order.CourierID != nil && order.CourierPayout == 0 {
+		resolved, err := logistics_settings.ResolveCourierPayout(
+			tx, *order.CourierID, order.DeliveryMethod, order.TotalAmount,
+		)
+		if err != nil {
+			return fmt.Errorf("resolve courier payout: %w", err)
+		}
+		if resolved > 0 {
+			if err := tx.WithContext(ctx).Model(&Order{}).
+				Where("id = ?", order.ID).
+				UpdateColumn("courier_payout", resolved).Error; err != nil {
+				return fmt.Errorf("freeze courier payout: %w", err)
+			}
+			order.CourierPayout = resolved
+		}
+	}
+
+	commissionBase := order.TotalAmount - order.CourierPayout
+	if commissionBase < 0 {
+		return fmt.Errorf("financial engine: courier_payout %.2f exceeds total_amount %.2f", order.CourierPayout, order.TotalAmount)
+	}
 
 	// Compute the full breakdown using the canonical business-rule function.
 	// This is the same function used by the Preview endpoint — single source of truth.
 	breakdown, err := compensation.ApplyCommissionRules(
-		compensation.OrderType(order.OrderType), nr, snap,
+		compensation.OrderType(order.OrderType), commissionBase, snap,
 	)
 	if err != nil {
 		return fmt.Errorf("financial engine: %w", err)
@@ -127,17 +150,19 @@ func (s *Service) emitFinancialEvents(
 
 	// Build shared metadata once (attached to every event for audit traceability).
 	metaBytes, _ := json.Marshal(map[string]interface{}{
-		"order_id":     order.ID,
-		"order_type":   order.OrderType,
-		"net_revenue":  nr,
-		"total_amount": order.TotalAmount,
-		"delivery_fee": order.DeliveryFee,
+		"order_id":        order.ID,
+		"order_type":      order.OrderType,
+		"total_amount":    order.TotalAmount,
+		"delivery_fee":    order.DeliveryFee,
+		"net_revenue":     order.NetRevenue,
+		"courier_payout":  order.CourierPayout,
+		"commission_base": commissionBase,
 		"breakdown": map[string]interface{}{
-			"company_revenue":              breakdown.CompanyRevenue,
-			"seller_commission":            breakdown.SellerCommission,
-			"manager_team_commission":      breakdown.ManagerTeamCommission,
-			"manager_personal_commission":  breakdown.ManagerPersonalCommission,
-			"team_lead_pool":               breakdown.TeamLeadPool,
+			"company_revenue":             breakdown.CompanyRevenue,
+			"seller_commission":           breakdown.SellerCommission,
+			"manager_team_commission":     breakdown.ManagerTeamCommission,
+			"manager_personal_commission": breakdown.ManagerPersonalCommission,
+			"team_lead_pool":              breakdown.TeamLeadPool,
 		},
 	})
 
@@ -168,6 +193,11 @@ func (s *Service) emitFinancialEvents(
 	if err := s.emitCourierFeeEvent(ctx, tx, order); err != nil {
 		return err
 	}
+
+	// Company Budget's balance is computed live from financial_events + Finance's
+	// business expenses (internal/finance.Repository.GetNetProfit) — it is never
+	// written here per-order, since true net profit depends on product cost and
+	// business expenses that aren't known at the time any single order is delivered.
 
 	return nil
 }

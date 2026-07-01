@@ -75,7 +75,7 @@ export default function CartTotalsBreakdown({
         value={prepayment > 0 ? `− ${money(prepayment)}` : money(0)}
         valueClassName={prepayment > 0 ? 'text-emerald-600' : 'text-slate-800'}
       />
-<TotalRow
+      <TotalRow
         label="Остаток к оплате"
         value={money(remaining)}
         valueClassName={remaining <= 0 ? 'text-emerald-600' : 'text-slate-900'}

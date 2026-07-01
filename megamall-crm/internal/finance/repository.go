@@ -13,6 +13,7 @@ package finance
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -70,7 +71,7 @@ func (r *Repository) GetOrdersSummary(
 				COALESCE(SUM(d.total_amount), 0)                     AS total_sales,
 				COALESCE(SUM(d.courier_payout), 0)                   AS delivery_fees,
 				COALESCE(SUM(d.delivery_fee), 0)                     AS client_delivery_fees,
-				COALESCE(SUM(d.total_amount - d.courier_payout), 0)  AS net_revenue,
+				COALESCE(SUM(d.total_amount + d.delivery_fee - d.courier_payout), 0) AS net_revenue,
 				COALESCE(SUM(pc.product_cost), 0)                    AS product_cost
 			FROM delivered_orders d
 			LEFT JOIN product_costs pc ON pc.order_id = d.id
@@ -147,52 +148,398 @@ func (r *Repository) GetCashSummary(
 	return row, nil
 }
 
+// GetExpensesSummary returns business expenses in [from, to], broken down by category.
+func (r *Repository) GetExpensesSummary(
+	ctx context.Context,
+	from, to time.Time,
+) (expensesSummaryRow, error) {
+	var row expensesSummaryRow
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT
+			COALESCE(SUM(amount) FILTER (WHERE category = 'salary'),    0) AS salaries,
+			COALESCE(SUM(amount) FILTER (WHERE category = 'rent'),      0) AS rent,
+			COALESCE(SUM(amount) FILTER (WHERE category = 'marketing'), 0) AS marketing,
+			COALESCE(SUM(amount) FILTER (WHERE category = 'taxes'),     0) AS taxes,
+			COALESCE(SUM(amount) FILTER (WHERE category = 'other'),     0) AS other_business_expenses
+		FROM finance_business_expenses
+		WHERE created_at >= ?
+		  AND created_at <= ?
+	`, from, to).Scan(&row).Error
+	if err != nil {
+		return expensesSummaryRow{}, fmt.Errorf("get expenses summary: %w", err)
+	}
+	return row, nil
+}
+
+// ─── Net profit (single source of truth, shared with internal/budget) ────────
+
+// GetNetProfit computes company net profit for [from, to], or all-time if both
+// bounds are nil. Formula: company_gross (company_revenue_earned events)
+// minus product_cost (delivered orders) minus business expenses.
+func (r *Repository) GetNetProfit(ctx context.Context, from, to *time.Time) (float64, error) {
+	companyGross, err := r.getCompanyGross(ctx, from, to)
+	if err != nil {
+		return 0, fmt.Errorf("get company gross: %w", err)
+	}
+	productCost, err := r.getProductCostForPeriod(ctx, from, to)
+	if err != nil {
+		return 0, fmt.Errorf("get product cost: %w", err)
+	}
+	businessExpenses, err := r.getBusinessExpensesTotal(ctx, from, to)
+	if err != nil {
+		return 0, fmt.Errorf("get business expenses total: %w", err)
+	}
+	return computeNetProfit(companyGross, productCost, businessExpenses), nil
+}
+
+func (r *Repository) getCompanyGross(ctx context.Context, from, to *time.Time) (float64, error) {
+	query := `SELECT COALESCE(SUM(amount), 0) FROM financial_events WHERE event_type = 'company_revenue_earned'`
+	args := []interface{}{}
+	if from != nil {
+		query += " AND created_at >= ?"
+		args = append(args, *from)
+	}
+	if to != nil {
+		query += " AND created_at <= ?"
+		args = append(args, *to)
+	}
+	var total float64
+	err := r.db.WithContext(ctx).Raw(query, args...).Scan(&total).Error
+	return total, err
+}
+
+func (r *Repository) getProductCostForPeriod(ctx context.Context, from, to *time.Time) (float64, error) {
+	query := `
+		WITH delivered_orders AS (
+			SELECT DISTINCT o.id
+			FROM orders o
+			JOIN order_timeline tl ON tl.order_id = o.id
+			WHERE o.deleted_at IS NULL
+			  AND tl.to_status = 'delivered'`
+	args := []interface{}{}
+	if from != nil {
+		query += " AND tl.created_at >= ?"
+		args = append(args, *from)
+	}
+	if to != nil {
+		query += " AND tl.created_at <= ?"
+		args = append(args, *to)
+	}
+	query += `
+		)
+		SELECT COALESCE(SUM(oi.quantity * COALESCE(p.purchase_price, 0)), 0)
+		FROM order_items oi
+		JOIN products p ON p.id = oi.product_id
+		WHERE oi.order_id IN (SELECT id FROM delivered_orders)`
+	var total float64
+	err := r.db.WithContext(ctx).Raw(query, args...).Scan(&total).Error
+	return total, err
+}
+
+func (r *Repository) getBusinessExpensesTotal(ctx context.Context, from, to *time.Time) (float64, error) {
+	query := `SELECT COALESCE(SUM(amount), 0) FROM finance_business_expenses WHERE 1=1`
+	args := []interface{}{}
+	if from != nil {
+		query += " AND created_at >= ?"
+		args = append(args, *from)
+	}
+	if to != nil {
+		query += " AND created_at <= ?"
+		args = append(args, *to)
+	}
+	var total float64
+	err := r.db.WithContext(ctx).Raw(query, args...).Scan(&total).Error
+	return total, err
+}
+
+// computeNetProfit is the single pure formula shared by GetSummary (which already
+// has company_gross/product_cost/business_expenses from parallel queries in the
+// same period) and GetNetProfit (used by internal/budget for the live balance).
+func computeNetProfit(companyGross, productCost, businessExpenses float64) float64 {
+	return roundFloat(companyGross - productCost - businessExpenses)
+}
+
+// ─── Business expenses CRUD ────────────────────────────────────────────────────
+
+// ErrExpenseNotFound is returned when an expense id does not exist.
+var ErrExpenseNotFound = errors.New("expense not found")
+
+// AddExpense inserts a new business expense.
+func (r *Repository) AddExpense(ctx context.Context, userID uuid.UUID, amount float64, note string, category ExpenseCategory) (BusinessExpense, error) {
+	row := BusinessExpense{
+		ID:        uuid.New(),
+		Category:  category,
+		Amount:    amount,
+		Note:      note,
+		CreatedBy: &userID,
+	}
+	err := r.db.WithContext(ctx).Create(&row).Error
+	return row, err
+}
+
+// GetExpense returns a single business expense by id.
+func (r *Repository) GetExpense(ctx context.Context, id uuid.UUID) (*BusinessExpense, error) {
+	var row BusinessExpense
+	err := r.db.WithContext(ctx).Where("id = ?", id).First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrExpenseNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+// UpdateExpense updates amount/note on a business expense and writes an audit
+// entry. Category is intentionally not editable.
+func (r *Repository) UpdateExpense(ctx context.Context, id uuid.UUID, editorID uuid.UUID, newAmount float64, newNote string) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var row BusinessExpense
+		if err := tx.Where("id = ?", id).First(&row).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrExpenseNotFound
+			}
+			return err
+		}
+
+		edit := RecordEdit{
+			ID:          uuid.New(),
+			SubjectType: recordSubjectFinanceExpense,
+			SubjectID:   id,
+			EditedBy:    editorID,
+			OldAmount:   row.Amount,
+			NewAmount:   newAmount,
+			OldNote:     row.Note,
+			NewNote:     newNote,
+		}
+		if err := tx.Create(&edit).Error; err != nil {
+			return err
+		}
+
+		return tx.Exec(
+			`UPDATE finance_business_expenses SET amount = ?, note = ? WHERE id = ?`,
+			newAmount, newNote, id,
+		).Error
+	})
+}
+
+// ListExpenseHistory returns the edit log for one expense, newest first.
+// UNIONs legacy expense_edits rows (migrated pre-cutover) so the "Изменено N"
+// badge count survives the move from company_budget_transactions.
+func (r *Repository) ListExpenseHistory(ctx context.Context, expenseID uuid.UUID) ([]RecordEditRow, error) {
+	var rows []RecordEditRow
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT id, subject_id, edited_by, editor_name, old_amount, new_amount, old_note, new_note, edited_at
+		FROM (
+			SELECT
+				e.id, e.subject_id, e.edited_by,
+				COALESCE(u.full_name, '') AS editor_name,
+				e.old_amount, e.new_amount, e.old_note, e.new_note, e.edited_at
+			FROM record_edits e
+			LEFT JOIN users u ON u.id = e.edited_by
+			WHERE e.subject_type = 'finance_expense' AND e.subject_id = ?
+			UNION ALL
+			SELECT
+				ee.id, ee.expense_id, ee.edited_by,
+				COALESCE(u.full_name, '') AS editor_name,
+				ee.old_amount, ee.new_amount, ee.old_note, ee.new_note, ee.edited_at
+			FROM expense_edits ee
+			LEFT JOIN users u ON u.id = ee.edited_by
+			WHERE ee.expense_id = ?
+		) history
+		ORDER BY edited_at DESC
+	`, expenseID, expenseID).Scan(&rows).Error
+	return rows, err
+}
+
+// ExpenseListParams filters the paginated business-expense list.
+type ExpenseListParams struct {
+	Category string
+	From     *time.Time
+	To       *time.Time
+	Page     int
+	Limit    int
+}
+
+// ListExpenses returns paginated business expenses, newest first.
+func (r *Repository) ListExpenses(ctx context.Context, p ExpenseListParams) ([]BusinessExpenseRow, int64, error) {
+	q := r.db.WithContext(ctx).Table("finance_business_expenses t").
+		Select(`t.id, t.category::text AS category, t.amount, t.note, u.full_name AS created_by_name,
+			COALESCE(ed.edit_count, 0) > 0 AS is_edited,
+			COALESCE(ed.edit_count, 0) AS edit_count,
+			ed.last_edited_at,
+			t.created_at`).
+		Joins("LEFT JOIN users u ON u.id = t.created_by").
+		Joins(`LEFT JOIN (
+			SELECT subject_id, COUNT(*)::int AS edit_count, MAX(edited_at) AS last_edited_at
+			FROM record_edits WHERE subject_type = 'finance_expense'
+			GROUP BY subject_id
+		) ed ON ed.subject_id = t.id`)
+
+	if p.Category != "" {
+		q = q.Where("t.category = ?", p.Category)
+	}
+	if p.From != nil {
+		q = q.Where("t.created_at >= ?", p.From)
+	}
+	if p.To != nil {
+		end := p.To.Add(24*time.Hour - time.Second)
+		q = q.Where("t.created_at <= ?", end)
+	}
+
+	var total int64
+	if err := q.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	page := p.Page
+	if page < 1 {
+		page = 1
+	}
+	limit := p.Limit
+	if limit < 1 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	var rows []BusinessExpenseRow
+	err := q.Order("t.created_at DESC").
+		Offset((page - 1) * limit).
+		Limit(limit).
+		Scan(&rows).Error
+	return rows, total, err
+}
+
 // ─── Events list ──────────────────────────────────────────────────────────────
 
-// ListFinancialEvents returns paginated financial_events rows for owner view.
-// All event types are included (including company_revenue_earned with user_id=NULL).
-// eventType="" and orderID=nil mean no filter on those fields.
+// ListFinancialEvents returns paginated rows combining financial_events and
+// manual_expense rows from company_budget_transactions.
+// Empty/nil filter values mean no filter on those fields.
 func (r *Repository) ListFinancialEvents(
 	ctx context.Context,
 	from, to time.Time,
 	eventType string,
 	orderID *uuid.UUID,
+	userID *uuid.UUID,
+	minAmount *float64,
+	maxAmount *float64,
 	p pagination.Params,
 ) ([]FinanceEventResponse, int, error) {
-	// Count
-	cq := r.db.WithContext(ctx).Table("financial_events").
-		Where("created_at >= ? AND created_at <= ?", from, to)
-	if eventType != "" {
-		cq = cq.Where("event_type = ?", eventType)
-	}
+	db := r.db.WithContext(ctx)
+
+	// When filtering by event_type, include expenses only if filter matches or is empty.
+	includeExpenses := eventType == "" || eventType == "business_expense"
+	includeEvents := eventType == "" || eventType != "business_expense"
+	// When filtering by order_id, expenses have no order — exclude them.
 	if orderID != nil {
-		cq = cq.Where("order_id = ?", *orderID)
-	}
-	var total int64
-	if err := cq.Count(&total).Error; err != nil {
-		return nil, 0, fmt.Errorf("count finance events: %w", err)
+		includeExpenses = false
 	}
 
-	// Fetch rows
-	q := r.db.WithContext(ctx).Raw(`
+	args := []interface{}{from, to}
+	eventsWhere := "created_at >= ? AND created_at <= ?"
+	if eventType != "" && includeEvents {
+		eventsWhere += " AND event_type::text = ?"
+		args = append(args, eventType)
+	}
+	if orderID != nil {
+		eventsWhere += " AND order_id = ?"
+		args = append(args, *orderID)
+	}
+	if userID != nil {
+		eventsWhere += " AND user_id = ?"
+		args = append(args, *userID)
+	}
+	if minAmount != nil {
+		eventsWhere += " AND amount >= ?"
+		args = append(args, *minAmount)
+	}
+	if maxAmount != nil {
+		eventsWhere += " AND amount <= ?"
+		args = append(args, *maxAmount)
+	}
+
+	expArgs := []interface{}{from, to}
+	expWhere := "t.created_at >= ? AND t.created_at <= ?"
+	if userID != nil {
+		expWhere += " AND t.created_by = ?"
+		expArgs = append(expArgs, *userID)
+	}
+	if minAmount != nil {
+		expWhere += " AND t.amount >= ?"
+		expArgs = append(expArgs, *minAmount)
+	}
+	if maxAmount != nil {
+		expWhere += " AND t.amount <= ?"
+		expArgs = append(expArgs, *maxAmount)
+	}
+
+	eventsSQL := fmt.Sprintf(`
 		SELECT
 			id,
 			order_id,
 			user_id,
 			event_type::text AS event_type,
 			amount,
+			NULL::text AS note,
+			NULL::text AS expense_category,
+			FALSE AS is_edited,
+			0 AS edit_count,
+			NULL::timestamptz AS last_edited_at,
 			created_at
-		FROM financial_events
-		WHERE created_at >= ?
-		  AND created_at <= ?
-		`+eventTypeClause(eventType)+`
-		`+orderIDClause(orderID)+`
-		ORDER BY created_at DESC
-		LIMIT ? OFFSET ?
-	`, eventArgs(from, to, eventType, orderID, p.Limit, p.Offset())...)
+		FROM financial_events WHERE %s`, eventsWhere)
+
+	expensesSQL := fmt.Sprintf(`
+		SELECT
+			t.id,
+			NULL::uuid AS order_id,
+			t.created_by AS user_id,
+			'business_expense' AS event_type,
+			t.amount,
+			t.note,
+			t.category::text AS expense_category,
+			COALESCE(ed.edit_count, 0) > 0 AS is_edited,
+			COALESCE(ed.edit_count, 0) AS edit_count,
+			ed.last_edited_at,
+			t.created_at
+		FROM finance_business_expenses t
+		LEFT JOIN (
+			SELECT subject_id, COUNT(*)::int AS edit_count, MAX(edited_at) AS last_edited_at
+			FROM record_edits WHERE subject_type = 'finance_expense'
+			GROUP BY subject_id
+		) ed ON ed.subject_id = t.id
+		WHERE %s`, expWhere)
+
+	var unionSQL, countSQL string
+	var unionArgs []interface{}
+
+	switch {
+	case includeEvents && includeExpenses:
+		unionSQL = fmt.Sprintf("SELECT * FROM (%s UNION ALL %s) u ORDER BY created_at DESC LIMIT ? OFFSET ?", eventsSQL, expensesSQL)
+		countSQL = fmt.Sprintf("SELECT COUNT(*) FROM (%s UNION ALL %s) u", eventsSQL, expensesSQL)
+		unionArgs = append(args, expArgs...)
+	case includeEvents:
+		unionSQL = eventsSQL + " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+		countSQL = fmt.Sprintf("SELECT COUNT(*) FROM (%s) u", eventsSQL)
+		unionArgs = args
+	default:
+		unionSQL = expensesSQL + " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+		countSQL = fmt.Sprintf("SELECT COUNT(*) FROM (%s) u", expensesSQL)
+		unionArgs = expArgs
+	}
+
+	var total int64
+	countArgs := unionArgs
+	if includeEvents && includeExpenses {
+		countArgs = append(args, expArgs...)
+	}
+	if err := db.Raw(countSQL, countArgs...).Scan(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("count finance events: %w", err)
+	}
 
 	var rows []FinanceEventResponse
-	if err := q.Scan(&rows).Error; err != nil {
+	queryArgs := append(unionArgs, p.Limit, p.Offset())
+	if err := db.Raw(unionSQL, queryArgs...).Scan(&rows).Error; err != nil {
 		return nil, 0, fmt.Errorf("list finance events: %w", err)
 	}
 	return rows, int(total), nil
@@ -342,40 +689,6 @@ func (r *Repository) GetTeamPerformance(
 		return nil, fmt.Errorf("get team performance: %w", err)
 	}
 	return rows, nil
-}
-
-// ─── Private helpers ──────────────────────────────────────────────────────────
-
-// eventTypeClause returns a safe SQL fragment for the optional event_type filter.
-// Using string concat is fine here because eventType is validated against known
-// enum values before this function is called.  The value is still passed as a
-// bound parameter via eventArgs, not interpolated.
-func eventTypeClause(eventType string) string {
-	if eventType == "" {
-		return ""
-	}
-	return "AND event_type = ?"
-}
-
-// orderIDClause returns a SQL fragment for the optional order_id filter.
-func orderIDClause(orderID *uuid.UUID) string {
-	if orderID == nil {
-		return ""
-	}
-	return "AND order_id = ?"
-}
-
-// eventArgs builds the args slice for ListFinancialEvents raw SQL.
-func eventArgs(from, to time.Time, eventType string, orderID *uuid.UUID, limit, offset int) []interface{} {
-	args := []interface{}{from, to}
-	if eventType != "" {
-		args = append(args, eventType)
-	}
-	if orderID != nil {
-		args = append(args, *orderID)
-	}
-	args = append(args, limit, offset)
-	return args
 }
 
 // ─── UUID helper for testing ──────────────────────────────────────────────────

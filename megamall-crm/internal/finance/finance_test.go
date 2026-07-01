@@ -139,6 +139,39 @@ func TestCashOutstanding_FloatPrecision(t *testing.T) {
 	}
 }
 
+// ─── Net profit calculation ──────────────────────────────────────────────────
+//
+// Team payouts and company gross are no longer re-derived as a hardcoded
+// percentage of orders.total_sales - orders.delivery_fees (that duplicated,
+// and could drift from, the real per-order commission engine in
+// internal/compensation). They now come straight from summed financial_events
+// (rev.TotalEmployeePayouts / rev.CompanyRevenueEarned) — see buildRevenueSummary
+// tests above for that arithmetic. computeNetProfit is the one remaining pure
+// formula: company_gross - product_cost - business_expenses.
+
+func TestComputeNetProfit_SubtractsProductCostAndExpenses(t *testing.T) {
+	got := computeNetProfit(720, 90, 150)
+	want := 480.0
+	if !near2(got, want) {
+		t.Errorf("net_profit: got %.2f, want %.2f", got, want)
+	}
+}
+
+func TestComputeNetProfit_CanGoNegative(t *testing.T) {
+	got := computeNetProfit(100, 90, 150)
+	want := -140.0
+	if !near2(got, want) {
+		t.Errorf("net_profit: got %.2f, want %.2f", got, want)
+	}
+}
+
+func TestComputeNetProfit_ZeroExpenses(t *testing.T) {
+	got := computeNetProfit(600, 0, 0)
+	if !near2(got, 600) {
+		t.Errorf("net_profit: got %.2f, want 600", got)
+	}
+}
+
 // ─── parsePeriod ──────────────────────────────────────────────────────────────
 
 // TestParsePeriod_YYYYMMDDFormat verifies basic date parsing.

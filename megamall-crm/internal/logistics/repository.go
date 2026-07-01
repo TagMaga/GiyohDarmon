@@ -103,7 +103,7 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status = 'confirmed'
-				) THEN o.total_amount - COALESCE(o.prepayment_amount,0) ELSE 0 END
+				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
 			), 0) AS cash_expected,
 			-- cash actually in circulation (not in pending OR confirmed)
 			COALESCE(SUM(
@@ -111,7 +111,7 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status IN ('pending','confirmed')
-				) THEN o.total_amount - COALESCE(o.prepayment_amount,0) ELSE 0 END
+				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
 			), 0) AS cash_in_circulation
 		FROM orders o
 		WHERE o.status = 'delivered'
@@ -266,7 +266,7 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status IN ('pending','confirmed')
-				) THEN o.total_amount - COALESCE(o.prepayment_amount,0) ELSE 0 END
+				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
 			), 0) AS cash_debt
 		FROM users u
 		LEFT JOIN orders o ON o.courier_id = u.id AND o.deleted_at IS NULL
@@ -338,7 +338,7 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status IN ('pending','confirmed')
-				) THEN o.total_amount - COALESCE(o.prepayment_amount,0) ELSE 0 END
+				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
 			), 0) AS cash_debt
 		FROM users u
 		LEFT JOIN orders o ON o.courier_id = u.id AND o.deleted_at IS NULL
@@ -437,7 +437,7 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 		debt_cte AS (
 			SELECT
 				o.courier_id,
-				COALESCE(SUM(o.total_amount - COALESCE(o.prepayment_amount,0)), 0) AS cash_debt
+				COALESCE(SUM(GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0))), 0) AS cash_debt
 			FROM orders o
 			WHERE o.courier_id IS NOT NULL AND o.status = 'delivered' AND o.deleted_at IS NULL
 			  AND o.id NOT IN (
@@ -562,7 +562,7 @@ func (r *Repository) GetCourier(ctx context.Context, courierID uuid.UUID) (*Cour
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status IN ('pending','confirmed')
-				) THEN o.total_amount - COALESCE(o.prepayment_amount,0) ELSE 0 END
+				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
 			), 0) AS cash_debt,
 			COALESCE((
 				SELECT SUM(COALESCE(actual_returned, total_to_return))
@@ -671,20 +671,20 @@ func (r *Repository) ListCourierOrders(
 	}
 
 	type rawRow struct {
-		OrderID         uuid.UUID  `gorm:"column:order_id"`
-		OrderNumber     string     `gorm:"column:order_number"`
-		CustomerName    string     `gorm:"column:customer_name"`
-		CustomerPhone   *string    `gorm:"column:customer_phone"`
-		DeliveryAddress *string    `gorm:"column:delivery_address"`
-		TotalAmount     float64    `gorm:"column:total_amount"`
-		DeliveryFee     float64    `gorm:"column:delivery_fee"`
-		PrepaymentAmount float64   `gorm:"column:prepayment_amount"`
-		Status          string     `gorm:"column:status"`
-		AssignedAt      *time.Time `gorm:"column:assigned_at"`
-		DeliveredAt     *time.Time `gorm:"column:delivered_at"`
-		DeliveryMinutes *float64   `gorm:"column:delivery_minutes"`
-		Notes           *string    `gorm:"column:notes"`
-		CreatedAt       time.Time  `gorm:"column:created_at"`
+		OrderID          uuid.UUID  `gorm:"column:order_id"`
+		OrderNumber      string     `gorm:"column:order_number"`
+		CustomerName     string     `gorm:"column:customer_name"`
+		CustomerPhone    *string    `gorm:"column:customer_phone"`
+		DeliveryAddress  *string    `gorm:"column:delivery_address"`
+		TotalAmount      float64    `gorm:"column:total_amount"`
+		DeliveryFee      float64    `gorm:"column:delivery_fee"`
+		PrepaymentAmount float64    `gorm:"column:prepayment_amount"`
+		Status           string     `gorm:"column:status"`
+		AssignedAt       *time.Time `gorm:"column:assigned_at"`
+		DeliveredAt      *time.Time `gorm:"column:delivered_at"`
+		DeliveryMinutes  *float64   `gorm:"column:delivery_minutes"`
+		Notes            *string    `gorm:"column:notes"`
+		CreatedAt        time.Time  `gorm:"column:created_at"`
 	}
 	var rows []rawRow
 	if err := q.Order("o.created_at DESC").Limit(p.Limit).Offset(p.Offset()).Scan(&rows).Error; err != nil {
@@ -735,7 +735,7 @@ func (r *Repository) GetCourierPerformance(
 			COUNT(*) FILTER (WHERE o.status IN ('returned','cancelled')) AS failed,
 			COALESCE(SUM(
 				CASE WHEN o.status = 'delivered'
-				THEN o.total_amount - COALESCE(o.prepayment_amount,0) ELSE 0 END
+				THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
 			), 0) AS cash_collected,
 			COALESCE(AVG(
 				EXTRACT(EPOCH FROM (tl_del.created_at - oa_first.assigned_at)) / 60.0

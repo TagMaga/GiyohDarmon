@@ -23,12 +23,15 @@ type PeriodQueryParams struct {
 	To   string `form:"to"`
 }
 
-// EventsQueryParams extends the period filter with an optional event_type and order_id.
+// EventsQueryParams extends the period filter with optional ledger filters.
 type EventsQueryParams struct {
-	From      string `form:"from"`
-	To        string `form:"to"`
-	EventType string `form:"event_type"`
-	OrderID   string `form:"order_id"` // raw string; parsed to *uuid.UUID in handler
+	From      string   `form:"from"`
+	To        string   `form:"to"`
+	EventType string   `form:"event_type"`
+	OrderID   string   `form:"order_id"` // raw string; parsed to *uuid.UUID in handler
+	UserID    string   `form:"user_id"`  // raw string; parsed to *uuid.UUID in handler
+	MinAmount *float64 `form:"min_amount"`
+	MaxAmount *float64 `form:"max_amount"`
 }
 
 // ─── Finance summary response ──────────────────────────────────────────────────
@@ -36,10 +39,11 @@ type EventsQueryParams struct {
 // FinanceSummaryResponse is returned by GET /finance/summary.
 // All monetary values are in the local currency unit (two-decimal precision).
 type FinanceSummaryResponse struct {
-	Period  FinancePeriod         `json:"period"`
-	Orders  FinanceOrdersSummary  `json:"orders"`
-	Revenue FinanceRevenueSummary `json:"revenue"`
-	Cash    FinanceCashSummary    `json:"cash"`
+	Period   FinancePeriod          `json:"period"`
+	Orders   FinanceOrdersSummary   `json:"orders"`
+	Revenue  FinanceRevenueSummary  `json:"revenue"`
+	Expenses FinanceExpensesSummary `json:"expenses"`
+	Cash     FinanceCashSummary     `json:"cash"`
 }
 
 // FinancePeriod echoes the effective date range used for the query.
@@ -54,12 +58,14 @@ type FinancePeriod struct {
 type FinanceOrdersSummary struct {
 	TotalCount         int     `json:"total_count"`          // delivered orders in period
 	DeliveredCount     int     `json:"delivered_count"`      // same as total_count (all delivered)
-	TotalSales         float64 `json:"total_sales"`          // SUM(total_amount)
-	DeliveryFees       float64 `json:"delivery_fees"`        // SUM(courier_payout) kept by couriers
-	ClientDeliveryFees float64 `json:"client_delivery_fees"` // SUM(delivery_fee) charged to clients
-	NetRevenue         float64 `json:"net_revenue"`          // total_sales - delivery_fees
+	TotalSales         float64 `json:"total_sales"`          // SUM(total_amount); product price only, client delivery fee NOT included
+	CourierPayout      float64 `json:"courier_payout"`       // SUM(courier_payout) paid to couriers (company cost)
+	ClientDeliveryFees float64 `json:"client_delivery_fees"` // SUM(delivery_fee) charged to clients — informational, not part of any formula below
+	NetRevenue         float64 `json:"net_revenue"`          // total_sales + client_delivery_fees - courier_payout
 	ProductCost        float64 `json:"product_cost"`         // SUM(quantity * purchase_price)
-	GrossProfit        float64 `json:"gross_profit"`         // total_sales - delivery_fees - payouts - product_cost
+	CommissionBase     float64 `json:"commission_base"`      // total_sales - courier_payout
+	TeamPayouts        float64 `json:"team_payouts"`         // sum of seller/manager/team-lead-pool financial_events (= commission_base × 40% under default rates)
+	CompanyGross       float64 `json:"company_gross"`        // company_revenue_earned financial_events (= commission_base × 60% under default rates)
 }
 
 // FinanceRevenueSummary covers financial_events aggregates grouped by event_type.
@@ -74,6 +80,18 @@ type FinanceRevenueSummary struct {
 	// CourierPayouts is the delivery salary earned by couriers (courier_fee_earned).
 	// In cash handovers this amount is kept by the courier from collected cash.
 	CourierPayouts float64 `json:"courier_payouts"`
+}
+
+// FinanceExpensesSummary covers business expenses in the period, by category,
+// plus the resulting net profit.
+type FinanceExpensesSummary struct {
+	Salaries              float64 `json:"salaries"`
+	Rent                  float64 `json:"rent"`
+	Marketing             float64 `json:"marketing"`
+	Taxes                 float64 `json:"taxes"`
+	OtherBusinessExpenses float64 `json:"other_business_expenses"`
+	TotalBusinessExpenses float64 `json:"total_business_expenses"`
+	NetProfit             float64 `json:"net_profit"` // company_gross - product_cost - total_business_expenses
 }
 
 // FinanceCashSummary covers cash_handovers aggregates.
@@ -92,12 +110,17 @@ type FinanceCashSummary struct {
 // FinanceEventResponse is a single financial event row for GET /finance/events.
 // Includes company_revenue_earned rows (user_id = NULL).
 type FinanceEventResponse struct {
-	ID        uuid.UUID  `json:"id"`
-	OrderID   *uuid.UUID `json:"order_id"`
-	UserID    *uuid.UUID `json:"user_id"`
-	EventType string     `json:"event_type"`
-	Amount    float64    `json:"amount"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID              uuid.UUID  `json:"id"`
+	OrderID         *uuid.UUID `json:"order_id"`
+	UserID          *uuid.UUID `json:"user_id"`
+	EventType       string     `json:"event_type"`
+	Amount          float64    `json:"amount"`
+	Note            *string    `json:"note,omitempty"`
+	ExpenseCategory *string    `json:"expense_category,omitempty"`
+	IsEdited        bool       `json:"is_edited"`
+	EditCount       int        `json:"edit_count"`
+	LastEditedAt    *time.Time `json:"last_edited_at,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
 // ─── Finance cash response ─────────────────────────────────────────────────────
@@ -143,6 +166,30 @@ type cashSummaryRow struct {
 	CashCollected     float64 `gorm:"column:cash_collected"`
 	CashReturned      float64 `gorm:"column:cash_returned"`
 	CourierPayoutKept float64 `gorm:"column:courier_payout_kept"`
+}
+
+type expensesSummaryRow struct {
+	Salaries              float64 `gorm:"column:salaries"`
+	Rent                  float64 `gorm:"column:rent"`
+	Marketing             float64 `gorm:"column:marketing"`
+	Taxes                 float64 `gorm:"column:taxes"`
+	OtherBusinessExpenses float64 `gorm:"column:other_business_expenses"`
+}
+
+// ─── Business expenses request/response ───────────────────────────────────────
+
+// ExpenseRequest is the request body for POST/PATCH /finance/expenses.
+type ExpenseRequest struct {
+	Amount   float64 `json:"amount" binding:"required,gt=0"`
+	Note     string  `json:"note"`
+	Category string  `json:"category"` // required on create, ignored on update (not editable)
+}
+
+// ExpenseListQueryParams filters GET /finance/expenses.
+type ExpenseListQueryParams struct {
+	Category string `form:"category"`
+	From     string `form:"from"`
+	To       string `form:"to"`
 }
 
 // handoverRow is scanned for paginated cash handover rows.
