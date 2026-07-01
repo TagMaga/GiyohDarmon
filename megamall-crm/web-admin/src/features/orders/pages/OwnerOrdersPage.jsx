@@ -26,7 +26,6 @@ import OrdersKpiBar                from '../components/OrdersKpiBar'
 import OrdersFilters               from '../components/OrdersFilters'
 import OrdersTable                 from '../components/OrdersTable'
 import OrderDetailsDrawer          from '../components/OrderDetailsDrawer'
-import OrdersAnalytics             from '../components/OrdersAnalytics'
 
 import useEmployees  from '../../people/hooks/useEmployees'
 import useTeams      from '../../people/hooks/useTeams'
@@ -174,19 +173,6 @@ export default function OwnerOrdersPage() {
         teamMap={teamMap}
         onView={setSelectedOrder}
       />
-
-      {/* ── Analytics ───────────────────────────────────────────────────── */}
-      {!allLoading && allOrders.length > 0 && (
-        <div className="pt-2">
-          <div className="flex items-center gap-2 mb-4">
-            <h2 className="text-sm font-bold text-slate-800">Аналитика</h2>
-            <span className="text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-              за выбранный период
-            </span>
-          </div>
-          <OrdersAnalytics orders={allOrders} userMap={userMap} />
-        </div>
-      )}
 
       {/* ── Detail drawer ───────────────────────────────────────────────── */}
       <OrderDetailsDrawer

@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom'
-import { Truck, MapPin, Settings, Users, ChevronRight, CheckCircle, XCircle } from 'lucide-react'
+import { Truck, Settings, Users, ChevronRight } from 'lucide-react'
 import useDeliverySettings from '../../seller/hooks/useDeliverySettings'
-import useCities           from '../../seller/hooks/useCities'
 
 const fmtMoney = (n) => (n == null ? '—' : `${(+n || 0).toLocaleString('ru-RU')} с`)
 
@@ -35,7 +34,6 @@ export default function OwnerSettingsPage() {
   const navigate = useNavigate()
 
   const { data: settings, isLoading: settingsLoading } = useDeliverySettings()
-  const { data: cities   = [], isLoading: citiesLoading }  = useCities()
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -76,39 +74,6 @@ export default function OwnerSettingsPage() {
               </p>
               <p className="text-[11px] text-slate-400">для клиента</p>
             </div>
-          </div>
-        )}
-      </SettingsCard>
-
-      {/* Cities */}
-      <SettingsCard
-        icon={MapPin}
-        title="Города доставки"
-        description="Города, в которые работает доставка"
-        action={null}
-        onClick={() => {}}
-      >
-        {citiesLoading ? (
-          <p className="text-sm text-slate-400">Загрузка...</p>
-        ) : cities.length === 0 ? (
-          <p className="text-sm text-slate-400">Нет городов</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {cities.map(c => (
-              <span
-                key={c.id}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium border ${
-                  c.is_active
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                    : 'bg-slate-50 border-slate-200 text-slate-400'
-                }`}
-              >
-                {c.is_active
-                  ? <CheckCircle size={13} className="text-emerald-500" />
-                  : <XCircle size={13} className="text-slate-400" />}
-                {c.name}
-              </span>
-            ))}
           </div>
         )}
       </SettingsCard>
