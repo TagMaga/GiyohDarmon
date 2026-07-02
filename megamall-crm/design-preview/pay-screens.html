@@ -97,7 +97,6 @@
   .check svg{width:13px; height:13px; color:#fff; opacity:0;}
   .check.checked svg{opacity:1;}
   .pay-stats{display:flex; gap:14px; margin-top:8px; font-size:11px;}
-  .pay-stats + .pay-stats{margin-top:10px; padding-top:10px; border-top:1px dashed var(--slate-100);}
   .pay-stats div{color:var(--slate-400); font-weight:700;}
   .pay-stats b{display:block; color:var(--slate-900); font-size:12.5px; font-weight:900; margin-top:1px;}
   .amt-input{width:100%; text-align:right; border:1.5px solid #E2E8F0; border-radius:10px; padding:8px 9px; font-weight:800; font-size:13px; color:var(--indigo); background:#F8FAFF; margin-top:9px;}
@@ -517,10 +516,6 @@
                   <div>Сумма заказов<b>48 200 сомони</b></div>
                   <div>Доход<b>4 820 сомони</b></div>
                 </div>
-                <div class="pay-stats">
-                  <div>Выплачено<b>3 000 сомони</b></div>
-                  <div>Осталось<b style="color:var(--indigo)">1 820 сомони</b></div>
-                </div>
                 <input class="amt-input" data-amt value="1 820" inputmode="numeric">
               </div>
             </div>
@@ -537,10 +532,6 @@
                   <div>Заказов<b>58</b></div>
                   <div>Сумма заказов<b>31 500 сомони</b></div>
                   <div>Доход<b>3 150 сомони</b></div>
-                </div>
-                <div class="pay-stats">
-                  <div>Выплачено<b>3 150 сомони</b></div>
-                  <div>Осталось<b style="color:var(--emerald)">0 сомони</b></div>
                 </div>
                 <span class="badge badge-emerald" style="margin-top:9px;">Выплачено полностью</span>
               </div>
@@ -559,10 +550,6 @@
                   <div>Сумма заказов<b>26 400 сомони</b></div>
                   <div>Доход<b>2 640 сомони</b></div>
                 </div>
-                <div class="pay-stats">
-                  <div>Выплачено<b>1 200 сомони</b></div>
-                  <div>Осталось<b style="color:var(--indigo)">1 440 сомони</b></div>
-                </div>
                 <input class="amt-input" data-amt value="1 440" inputmode="numeric">
               </div>
             </div>
@@ -579,10 +566,6 @@
                   <div>Заказов<b>37</b></div>
                   <div>Сумма заказов<b>22 100 сомони</b></div>
                   <div>Доход<b>2 210 сомони</b></div>
-                </div>
-                <div class="pay-stats">
-                  <div>Выплачено<b>0 сомони</b></div>
-                  <div>Осталось<b style="color:var(--indigo)">2 210 сомони</b></div>
                 </div>
                 <input class="amt-input" data-amt value="2 210" inputmode="numeric" disabled>
               </div>
@@ -601,10 +584,6 @@
                   <div>Сумма заказов<b>6 400 сомони</b></div>
                   <div>Доход<b>640 сомони</b></div>
                 </div>
-                <div class="pay-stats">
-                  <div>Выплачено<b>640 сомони</b></div>
-                  <div>Осталось<b style="color:var(--emerald)">0 сомони</b></div>
-                </div>
                 <span class="badge badge-emerald" style="margin-top:9px;">Выплачено полностью</span>
               </div>
             </div>
@@ -621,10 +600,6 @@
                   <div>Заказов<b>21</b></div>
                   <div>Сумма заказов<b>31 400 сомони</b></div>
                   <div>Доход<b>3 140 сомони</b></div>
-                </div>
-                <div class="pay-stats">
-                  <div>Выплачено<b>2 000 сомони</b></div>
-                  <div>Осталось<b style="color:var(--indigo)">1 140 сомони</b></div>
                 </div>
                 <input class="amt-input" data-amt value="1 140" inputmode="numeric" disabled>
               </div>
@@ -684,7 +659,7 @@
     <div class="note-card"><b>Единый леджер выплат:</b> модель <code>SellerPayout</code> сейчас жёстко привязана к <code>seller_id</code> (<code>internal/seller_payouts/model.go</code>) — выплатить менеджеру или тимлиду физически некуда записать. Нужна замена/расширение на <code>payouts(payee_id, payee_role, payer_id, payer_role, amount, method, period_start, period_end, status)</code>. Выплата Тимлид→Менеджер и Менеджер→Продавец — одна и та же форма записи, разница только в ролях.</div>
     <div class="note-card"><b>Итог:</b> раз структура общая, Owner Finance просто фильтрует леджер по <code>payer_role IN (team_lead, manager)</code> и показывает как авто-расход — без отдельной формы «добавить расход вручную» (экран 5).</div>
     <div class="note-card">Массовый выбор: чекбокс + сумма по умолчанию = «Осталось», редактируемая. Полностью выплаченные — задизейблены и отмечены зелёным бейджем.</div>
-    <div class="note-card">Каждая строка теперь — две стат-строки, а не подпись+3 поля: строка 1 «Заказов / Сумма заказов / Доход» (объём и валовая сумма, тот же источник, что <code>data-orders</code>/<code>data-value</code> в шторке экрана 2 — лейбл сознательно «Доход», не «Заработано», чтобы термин совпадал с шторкой), строка 2 «Выплачено / Осталось» — механика самой выплаты, разделены тонкой пунктирной линией. Тимлид видит объём работы и итог выплаты в одном месте, не открывая шторку.</div>
+    <div class="note-card">Строка сведена к одному стат-ряду «Заказов / Сумма заказов / Доход» (объём и валовая сумма — тот же источник, что <code>data-orders</code>/<code>data-value</code> в шторке экрана 2). «Выплачено/Осталось» убраны как отдельные поля — сумма к выплате уже видна в самом поле ввода под стат-рядом (по умолчанию = остаток), а полностью погашенные строки отмечены зелёным бейджем «Выплачено полностью», так что дублирующие цифры не нужны.</div>
   </div>
 </section>
 
