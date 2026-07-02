@@ -7,6 +7,7 @@ import { resolveCreator } from '../../src/lib/creator'
 import { C } from '../../src/components/OrderDetailSheet'
 import Avatar from '../../src/components/Avatar'
 import { FadeSlideIn, PressScale, OrderCardSkeleton, animateLayout } from '../../src/components/motion'
+import { GlassBackdrop } from '../../src/components/glass'
 
 // Canonical DB value is "fast"; "express" kept as legacy fallback.
 // Defensive check across all possible field-name shapes from the API.
@@ -53,6 +54,7 @@ export default function ClaimableScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
+      <GlassBackdrop />
       <View style={s.header}>
         <Text style={s.headTitle}>Общий заказ</Text>
         <Text style={s.headSub}>{orders.length} заказов рядом</Text>
@@ -157,19 +159,19 @@ export default function ClaimableScreen() {
 const s = StyleSheet.create({
   safe:        { flex: 1, backgroundColor: C.bg },
   header:      { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 16 },
-  headTitle:   { fontSize: 28, fontWeight: '900', color: C.ink, letterSpacing: -0.8 },
-  headSub:     { fontSize: 13, color: C.muted, fontWeight: '800', marginTop: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  listContent: { paddingHorizontal: 18, paddingBottom: 32, gap: 13 },
+  headTitle:   { fontSize: 28, fontWeight: '700', color: C.ink, letterSpacing: -0.8 },
+  headSub:     { fontSize: 13, color: C.muted, fontWeight: '600', marginTop: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+  listContent: { paddingHorizontal: 18, paddingBottom: 130, gap: 13 },
   empty:       { alignItems: 'center', paddingTop: 80 },
   emptyIcon:   { fontSize: 40, marginBottom: 12, opacity: 0.4 },
   emptyTitle:  { fontSize: 16, fontWeight: '700', color: C.muted, marginBottom: 4 },
   emptySub:    { fontSize: 13, color: C.muted },
 
   card: {
-    backgroundColor: C.card, borderRadius: 24, borderWidth: 1, borderColor: C.line,
+    backgroundColor: C.card, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)',
     padding: 16, gap: 12,
     shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06, shadowRadius: 14, elevation: 3,
+    shadowOpacity: 0.05, shadowRadius: 14, elevation: 2,
   },
   cardUrgent: {
     borderColor: C.orange, borderWidth: 2,
@@ -178,26 +180,26 @@ const s = StyleSheet.create({
   },
   cardTop:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   topBadges:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  expressBadge: { backgroundColor: '#fff7e6', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: '#ffe0a0' },
-  expressText:  { fontSize: 11, fontWeight: '900', color: C.orange },
-  orderNum:     { fontSize: 15, fontWeight: '900', color: C.ink, letterSpacing: -0.2 },
-  newBadge:     { backgroundColor: '#e8f8f0', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999 },
-  newBadgeText: { color: '#098a50', fontWeight: '900', fontSize: 11 },
+  expressBadge: { backgroundColor: 'rgba(255,149,0,0.15)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: 'rgba(255,149,0,0.35)' },
+  expressText:  { fontSize: 11, fontWeight: '700', color: C.orange },
+  orderNum:     { fontSize: 15, fontWeight: '700', color: C.ink, letterSpacing: -0.2 },
+  newBadge:     { backgroundColor: 'rgba(52,199,89,0.16)', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999 },
+  newBadgeText: { color: '#1d9a45', fontWeight: '700', fontSize: 11 },
   infoBlock:    { gap: 4 },
-  clientName:   { fontSize: 17, fontWeight: '900', color: C.ink, letterSpacing: -0.3 },
+  clientName:   { fontSize: 17, fontWeight: '700', color: C.ink, letterSpacing: -0.3 },
   address:      { fontSize: 13, color: C.muted, fontWeight: '600', lineHeight: 18 },
   amountRow:    { gap: 2 },
-  amountLabel:  { fontSize: 10, fontWeight: '800', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
-  amountVal:    { fontSize: 18, fontWeight: '900', color: C.violet, letterSpacing: -0.5 },
+  amountLabel:  { fontSize: 10, fontWeight: '600', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
+  amountVal:    { fontSize: 18, fontWeight: '700', color: C.violet, letterSpacing: -0.5 },
   creatorStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line },
-  creatorName:  { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '800', color: C.ink },
+  creatorName:  { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '600', color: C.ink },
   rolePill:     { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0 },
-  rolePillText: { fontSize: 11, fontWeight: '900' },
+  rolePillText: { fontSize: 11, fontWeight: '700' },
   claimBtn:     {
-    borderRadius: 18, paddingVertical: 16, alignItems: 'center',
-    backgroundColor: C.violet,
-    shadowColor: C.violet, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 16, elevation: 3,
+    borderRadius: 999, paddingVertical: 16, alignItems: 'center',
+    backgroundColor: C.blue,
+    shadowColor: C.blue, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 16, elevation: 3,
   },
   claimBtnDisabled: { opacity: 0.45 },
-  claimBtnText:     { color: '#fff', fontWeight: '900', fontSize: 16 },
+  claimBtnText:     { color: '#fff', fontWeight: '700', fontSize: 16 },
 })

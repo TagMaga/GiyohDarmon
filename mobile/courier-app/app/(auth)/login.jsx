@@ -8,13 +8,14 @@ import { login, getMe } from '../../src/api/auth'
 import { API_URL } from '../../src/api/client'
 import useAuthStore from '../../src/store/authStore'
 import { FadeSlideIn, PressScale } from '../../src/components/motion'
+import { GlassBackdrop } from '../../src/components/glass'
 
 const C = {
-  bg: '#0d0f14', bg2: '#13161e', surface: '#1e2130',
-  border: 'rgba(255,255,255,0.07)', border2: 'rgba(255,255,255,0.18)',
-  text: '#f0f2f8', text2: '#9095a8',
-  accent: '#6366f1', glow: 'rgba(99,102,241,0.3)',
-  red: '#ef4444',
+  bg: '#0b101e', bg2: 'rgba(255,255,255,0.08)', surface: 'rgba(28,34,56,0.55)',
+  border: 'rgba(255,255,255,0.12)', border2: 'rgba(255,255,255,0.20)',
+  text: '#f0f2f8', text2: '#9aa2b8',
+  accent: '#0a84ff', glow: 'rgba(10,132,255,0.3)',
+  red: '#ff453a',
 }
 
 export default function LoginScreen() {
@@ -57,6 +58,7 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView style={s.wrap} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <GlassBackdrop dark />
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
         <FadeSlideIn from={22} style={{ width: '100%', alignItems: 'center' }}>
         <View style={s.card}>
@@ -101,12 +103,12 @@ const s = StyleSheet.create({
   scroll: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   card: {
     width: '100%', maxWidth: 380, backgroundColor: C.surface,
-    borderRadius: 20, padding: 32, borderWidth: 1, borderColor: C.border2,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.6, shadowRadius: 24, elevation: 12,
+    borderRadius: 28, padding: 32, borderWidth: 1, borderColor: C.border2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.45, shadowRadius: 32, elevation: 12,
     alignItems: 'center',
   },
   iconBox: {
-    width: 64, height: 64, borderRadius: 18, backgroundColor: C.accent,
+    width: 64, height: 64, borderRadius: 20, backgroundColor: C.accent,
     justifyContent: 'center', alignItems: 'center', marginBottom: 14,
     shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 12, elevation: 8,
   },
@@ -117,12 +119,12 @@ const s = StyleSheet.create({
   label: { fontSize: 11, fontWeight: '700', color: C.text2, letterSpacing: 0.8, marginBottom: 6 },
   input: {
     width: '100%', height: 48, backgroundColor: C.bg2,
-    borderWidth: 1.5, borderColor: C.border, borderRadius: 10,
+    borderWidth: 1.5, borderColor: C.border, borderRadius: 16,
     paddingHorizontal: 14, fontSize: 16, color: C.text, fontWeight: '500',
   },
   btn: {
     width: '100%', height: 50, backgroundColor: C.accent,
-    borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginTop: 8,
+    borderRadius: 999, justifyContent: 'center', alignItems: 'center', marginTop: 8,
     shadowColor: C.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 6,
   },
   btnDisabled: { opacity: 0.6 },

@@ -5,6 +5,7 @@ import { getMyOrders, updateOrderStatus } from '../../src/api/orders'
 import { OrderDetailSheet, C } from '../../src/components/OrderDetailSheet'
 import { OrderCard } from '../../src/components/OrderCard'
 import { FadeSlideIn, PulseDot, OrderCardSkeleton, animateLayout } from '../../src/components/motion'
+import { GlassBackdrop } from '../../src/components/glass'
 
 const FILTERS = [
   { key: 'all',         label: 'Все' },
@@ -71,6 +72,7 @@ export default function DeliveriesScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
+      <GlassBackdrop />
       {/* Header */}
       <View style={s.header}>
         <View>
@@ -156,18 +158,18 @@ export default function DeliveriesScreen() {
 const s = StyleSheet.create({
   safe:        { flex: 1, backgroundColor: C.bg },
   header:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10 },
-  headTitle:   { fontSize: 28, fontWeight: '900', color: C.ink, letterSpacing: -0.8 },
-  headSub:     { fontSize: 13, color: C.muted, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 6 },
-  onlinePill:  { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: '#e8f8f0' },
+  headTitle:   { fontSize: 28, fontWeight: '700', color: C.ink, letterSpacing: -0.8 },
+  headSub:     { fontSize: 13, color: C.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 6 },
+  onlinePill:  { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999, backgroundColor: 'rgba(52,199,89,0.16)', borderWidth: 1, borderColor: 'rgba(52,199,89,0.28)' },
   dot:         { width: 8, height: 8, borderRadius: 4, backgroundColor: C.green },
-  onlineText:  { fontSize: 14, fontWeight: '900', color: '#07884e' },
+  onlineText:  { fontSize: 14, fontWeight: '700', color: '#1d9a45' },
   filterScroll: { flexGrow: 0, flexShrink: 0, width: '100%' },
   filterRow:   { paddingHorizontal: 18, paddingVertical: 10, columnGap: 8, flexDirection: 'row', alignItems: 'center' },
-  chip:        { minHeight: 40, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 15, borderWidth: 1, borderColor: C.line, backgroundColor: C.card, flexGrow: 0, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
-  chipActive:  { backgroundColor: C.violet, borderColor: C.violet },
-  chipText:    { fontSize: 14, lineHeight: 18, fontWeight: '900', color: C.ink, flexGrow: 0, flexShrink: 0 },
+  chip:        { minHeight: 40, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', backgroundColor: 'rgba(255,255,255,0.45)', flexGrow: 0, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
+  chipActive:  { backgroundColor: C.blue, borderColor: C.blue },
+  chipText:    { fontSize: 14, lineHeight: 18, fontWeight: '700', color: C.ink, flexGrow: 0, flexShrink: 0 },
   chipTextActive: { color: '#fff' },
-  listContent: { paddingHorizontal: 18, paddingBottom: 32, gap: 12 },
+  listContent: { paddingHorizontal: 18, paddingBottom: 130, gap: 12 },
   empty:       { alignItems: 'center', paddingTop: 80 },
   emptyIcon:   { fontSize: 40, marginBottom: 12, opacity: 0.4 },
   emptyTitle:  { fontSize: 16, fontWeight: '700', color: C.muted, marginBottom: 4 },

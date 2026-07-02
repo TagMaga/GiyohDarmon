@@ -165,9 +165,9 @@ export function OrderCardSkeleton() {
 }
 
 const sk = StyleSheet.create({
-  base: { backgroundColor: '#e3e9f2' },
+  base: { backgroundColor: 'rgba(130,152,186,0.28)' },
   card: {
-    backgroundColor: '#ffffff', borderRadius: 24, borderWidth: 1, borderColor: '#e6ecf3',
+    backgroundColor: 'rgba(255,255,255,0.50)', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.65)',
     padding: 16,
   },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

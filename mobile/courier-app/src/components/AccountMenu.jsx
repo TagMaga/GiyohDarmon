@@ -5,13 +5,13 @@ import Avatar from './Avatar'
 import { animateLayout } from './motion'
 
 const C = {
-  panel: '#0d1a2d',
-  line: 'rgba(255,255,255,0.08)',
+  panel: 'rgba(16,28,48,0.90)',
+  line: 'rgba(255,255,255,0.10)',
   text: '#f6f8ff',
-  muted: '#7f8aa0',
-  violet: '#6366f1',
-  green: '#10b981',
-  red: '#ff5f6c',
+  muted: '#8b96ac',
+  violet: '#5e5ce6',
+  green: '#34c759',
+  red: '#ff453a',
 }
 
 export function AccountMenu({
@@ -163,24 +163,24 @@ function getInitials(user) {
 
 const s = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-start', alignItems: 'center', paddingTop: 62, paddingHorizontal: 12, backgroundColor: 'rgba(6,12,22,0.42)' },
-  menu: { width: '100%', maxWidth: 440, borderRadius: 24, backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 18 }, shadowOpacity: 0.24, shadowRadius: 30, elevation: 18 },
+  menu: { width: '100%', maxWidth: 440, borderRadius: 28, backgroundColor: C.panel, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 18 }, shadowOpacity: 0.24, shadowRadius: 30, elevation: 18 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 24, paddingVertical: 22 },
   headerText: { flex: 1, minWidth: 0 },
-  name: { color: C.text, fontSize: 22, fontWeight: '900', lineHeight: 27 },
+  name: { color: C.text, fontSize: 22, fontWeight: '700', lineHeight: 27 },
   role: { color: C.muted, fontSize: 16, fontWeight: '700', marginTop: 6 },
   divider: { height: 1, backgroundColor: C.line },
   row: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 15, paddingHorizontal: 24, paddingVertical: 9 },
   rowIcon: { width: 22, color: '#d7dfef', fontSize: 21, textAlign: 'center' },
   rowText: { flex: 1, minWidth: 0 },
-  rowLabel: { color: C.text, fontSize: 18, fontWeight: '800' },
+  rowLabel: { color: C.text, fontSize: 18, fontWeight: '600' },
   rowValue: { color: C.muted, fontSize: 12, fontWeight: '700', marginTop: 2 },
   chevron: { color: '#475569', fontSize: 30, fontWeight: '300', lineHeight: 32 },
-  settingsPanel: { marginHorizontal: 18, marginBottom: 8, borderRadius: 16, backgroundColor: '#152238', borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
+  settingsPanel: { marginHorizontal: 18, marginBottom: 8, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.06)', borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
   settingLine: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 14 },
   settingLineBorder: { borderBottomWidth: 1, borderBottomColor: C.line },
-  settingLabel: { color: C.muted, fontSize: 13, fontWeight: '800' },
-  settingValue: { color: C.text, fontSize: 13, fontWeight: '900' },
+  settingLabel: { color: C.muted, fontSize: 13, fontWeight: '600' },
+  settingValue: { color: C.text, fontSize: 13, fontWeight: '700' },
   logout: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 25 },
-  logoutIcon: { color: C.red, fontSize: 22, fontWeight: '800' },
-  logoutText: { color: C.red, fontSize: 18, fontWeight: '900' },
+  logoutIcon: { color: C.red, fontSize: 22, fontWeight: '600' },
+  logoutText: { color: C.red, fontSize: 18, fontWeight: '700' },
 })

@@ -6,13 +6,14 @@ import * as ImagePicker from 'expo-image-picker'
 import useAuthStore from '../../src/store/authStore'
 import { logout as apiLogout, getMe, uploadAvatar } from '../../src/api/auth'
 import { API_URL } from '../../src/api/client'
+import { GlassBackdrop } from '../../src/components/glass'
 
 const C = {
-  bg: '#0d0f14', surface: '#1e2130', surface2: '#252838',
-  border: 'rgba(255,255,255,0.07)', border2: 'rgba(255,255,255,0.13)',
-  text: '#f0f2f8', text2: '#9095a8', text3: '#5e6478',
-  accent: '#6366f1', green: '#10b981', red: '#ef4444',
-  accentDim: 'rgba(99,102,241,0.15)', redDim: 'rgba(239,68,68,0.1)',
+  bg: '#0b101e', surface: 'rgba(30,36,58,0.55)', surface2: 'rgba(255,255,255,0.06)',
+  border: 'rgba(255,255,255,0.12)', border2: 'rgba(255,255,255,0.20)',
+  text: '#f0f2f8', text2: '#9aa2b8', text3: '#68718a',
+  accent: '#0a84ff', green: '#34c759', red: '#ff453a',
+  accentDim: 'rgba(10,132,255,0.16)', redDim: 'rgba(255,69,58,0.12)',
 }
 
 export default function ProfileScreen() {
@@ -58,6 +59,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
+      <GlassBackdrop dark />
       <ScrollView contentContainerStyle={s.content}>
         {/* Avatar block */}
         <View style={s.avatarBlock}>
@@ -143,7 +145,7 @@ function TariffRules({ rules }) {
                 {r.amount_from} – {r.amount_to != null ? r.amount_to : '∞'} сом
               </Text>
               <View style={[s.tariffBadge, { backgroundColor: C.accentDim }]}>
-                <Text style={{ color: C.accent, fontSize: 13, fontWeight: '800' }}>
+                <Text style={{ color: C.accent, fontSize: 13, fontWeight: '600' }}>
                   {r.tariff_type === 'percent' ? `${r.tariff_value}%` : `${r.tariff_value} TJS`}
                 </Text>
               </View>
@@ -157,7 +159,7 @@ function TariffRules({ rules }) {
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
-  content: { padding: 16, gap: 14, paddingBottom: 32 },
+  content: { padding: 16, gap: 14, paddingBottom: 130 },
   avatarBlock: { alignItems: 'center', paddingVertical: 24, gap: 8 },
   avatarRing: {
     width: 88, height: 88, borderRadius: 44, borderWidth: 2, borderColor: C.accent,
@@ -167,7 +169,7 @@ const s = StyleSheet.create({
   },
   avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: C.accent, justifyContent: 'center', alignItems: 'center' },
   avatarImage: { width: 76, height: 76, borderRadius: 38 },
-  avatarText: { fontSize: 28, fontWeight: '800', color: '#fff' },
+  avatarText: { fontSize: 28, fontWeight: '600', color: '#fff' },
   avatarEditBadge: {
     position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: 13,
     backgroundColor: C.accent, borderWidth: 2, borderColor: C.bg,
@@ -177,7 +179,7 @@ const s = StyleSheet.create({
   name: { fontSize: 20, fontWeight: '700', color: C.text },
   roleBadge: { backgroundColor: C.accentDim, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 },
   roleText: { fontSize: 11, fontWeight: '700', color: C.accent, letterSpacing: 0.6 },
-  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(16,185,129,0.12)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99 },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(52,199,89,0.14)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99 },
   statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
   statusText: { fontSize: 11, color: C.green, fontWeight: '600' },
   card: {

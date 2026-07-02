@@ -9,13 +9,14 @@ import * as ImagePicker from 'expo-image-picker'
 import { getCashSummary, submitHandover, getHandoverHistory, getMyOrders } from '../../src/api/orders'
 import client, { API_URL } from '../../src/api/client'
 import { FadeSlideIn, PressScale, CountUp, Skeleton, animateLayout } from '../../src/components/motion'
+import { GlassBackdrop } from '../../src/components/glass'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 dayjs.locale('ru')
 
 const C = {
-  bg: '#f6f8fb', card: '#ffffff', ink: '#071122', muted: '#7d8797', line: '#e6ecf3',
-  blue: '#1683ff', violet: '#665cff', green: '#12b76a', orange: '#ff9f0a', red: '#ff453a',
+  bg: '#eef2fa', card: 'rgba(255,255,255,0.66)', ink: '#0a1528', muted: '#5f6e88', line: 'rgba(120,144,180,0.30)',
+  blue: '#0a84ff', violet: '#5e5ce6', green: '#34c759', orange: '#ff9500', red: '#ff3b30',
 }
 
 const MAX_ATTACHMENTS = 5
@@ -198,6 +199,7 @@ export default function CashScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
+      <GlassBackdrop />
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData() }} tintColor={C.blue} />}
         contentContainerStyle={s.content}
@@ -305,7 +307,7 @@ export default function CashScreen() {
                 <View style={s.histCard}>
                   {filteredHistory.length === 0 && (
                     <View style={{ padding: 24, alignItems: 'center' }}>
-                      <Text style={{ color: C.muted, fontWeight: '800' }}>
+                      <Text style={{ color: C.muted, fontWeight: '600' }}>
                         {history.length === 0 ? 'Инкассаций пока нет' : 'Нет записей по фильтру'}
                       </Text>
                     </View>
@@ -331,7 +333,7 @@ export default function CashScreen() {
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
                           <Text style={s.cashAmount}>{fmt(amount)} TJS</Text>
-                          <Text style={{ fontSize: 11, marginTop: 4, color: statusColor, fontWeight: '900' }}>{sLabel}</Text>
+                          <Text style={{ fontSize: 11, marginTop: 4, color: statusColor, fontWeight: '700' }}>{sLabel}</Text>
                         </View>
                       </View>
                     )
@@ -346,7 +348,7 @@ export default function CashScreen() {
               <View style={s.histCard}>
                 {earnings.length === 0 ? (
                   <View style={{ padding: 24, alignItems: 'center' }}>
-                    <Text style={{ color: C.muted, fontWeight: '800' }}>Пока нет доставленных заказов</Text>
+                    <Text style={{ color: C.muted, fontWeight: '600' }}>Пока нет доставленных заказов</Text>
                   </View>
                 ) : earnings.map((e, i) => (
                   <View key={e.id || i} style={[s.cashItem, i === earnings.length - 1 && { borderBottomWidth: 0 }]}>
@@ -357,7 +359,7 @@ export default function CashScreen() {
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={s.cashAmount}>{fmt(e.fee)} TJS</Text>
-                      <Text style={{ fontSize: 11, marginTop: 4, color: C.green, fontWeight: '900' }}>Получено</Text>
+                      <Text style={{ fontSize: 11, marginTop: 4, color: C.green, fontWeight: '700' }}>Получено</Text>
                     </View>
                   </View>
                 ))}
@@ -464,72 +466,72 @@ export default function CashScreen() {
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
-  content: { paddingBottom: 32 },
+  content: { paddingBottom: 130 },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 18 },
-  headTitle: { fontSize: 28, fontWeight: '900', color: C.ink, letterSpacing: -0.8 },
-  headSub: { fontSize: 13, color: C.muted, fontWeight: '800', marginTop: 6 },
+  headTitle: { fontSize: 28, fontWeight: '700', color: C.ink, letterSpacing: -0.8 },
+  headSub: { fontSize: 13, color: C.muted, fontWeight: '600', marginTop: 6 },
   // Cash hero
-  cashHero: { marginHorizontal: 18, backgroundColor: C.card, borderWidth: 1, borderColor: '#ffdaa0', borderRadius: 32, padding: 24, marginBottom: 16, shadowColor: C.orange, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.1, shadowRadius: 34, elevation: 4, overflow: 'hidden' },
-  cashLabel: { fontSize: 13, color: '#d88900', fontWeight: '900', textTransform: 'uppercase', letterSpacing: 1 },
-  cashSum: { fontSize: 52, fontWeight: '900', letterSpacing: -2, color: C.orange, marginTop: 14, marginBottom: 16, lineHeight: 58 },
-  formula: { backgroundColor: '#f6f8fb', borderRadius: 22, padding: 15, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
-  formulaVal: { fontSize: 18, fontWeight: '900', color: C.ink },
-  formulaMuted: { fontSize: 18, fontWeight: '900', color: C.muted },
-  formulaGreen: { fontSize: 18, fontWeight: '900', color: C.green },
-  formulaOrange: { fontSize: 18, fontWeight: '900', color: C.orange },
+  cashHero: { marginHorizontal: 18, backgroundColor: 'rgba(255,255,255,0.60)', borderWidth: 1, borderColor: 'rgba(255,149,0,0.30)', borderRadius: 32, padding: 24, marginBottom: 16, shadowColor: C.orange, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.08, shadowRadius: 34, elevation: 3, overflow: 'hidden' },
+  cashLabel: { fontSize: 13, color: '#c47c00', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+  cashSum: { fontSize: 52, fontWeight: '700', letterSpacing: -2, color: C.orange, marginTop: 14, marginBottom: 16, lineHeight: 58 },
+  formula: { backgroundColor: 'rgba(255,255,255,0.50)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', borderRadius: 22, padding: 15, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
+  formulaVal: { fontSize: 18, fontWeight: '700', color: C.ink },
+  formulaMuted: { fontSize: 18, fontWeight: '700', color: C.muted },
+  formulaGreen: { fontSize: 18, fontWeight: '700', color: C.green },
+  formulaOrange: { fontSize: 18, fontWeight: '700', color: C.orange },
   caption: { textAlign: 'center', color: C.muted, fontWeight: '700', marginTop: 12, fontSize: 13 },
-  pendingRow: { marginTop: 14, paddingVertical: 14, paddingHorizontal: 15, borderRadius: 20, backgroundColor: '#fff5df', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pendingText: { color: '#b87500', fontWeight: '900', fontSize: 13 },
-  pendingVal: { color: '#b87500', fontWeight: '900', fontSize: 14 },
-  submitBtn: { width: '100%', marginTop: 16, borderRadius: 22, paddingVertical: 18, backgroundColor: C.violet, alignItems: 'center', shadowColor: C.violet, shadowOffset: { width: 0, height: 13 }, shadowOpacity: 0.22, shadowRadius: 26, elevation: 4 },
-  submitBtnDisabled: { backgroundColor: '#c4c9d4', shadowOpacity: 0 },
-  submitBtnText: { color: '#fff', fontWeight: '900', fontSize: 17 },
+  pendingRow: { marginTop: 14, paddingVertical: 14, paddingHorizontal: 15, borderRadius: 20, backgroundColor: 'rgba(255,149,0,0.14)', borderWidth: 1, borderColor: 'rgba(255,149,0,0.26)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pendingText: { color: '#b87500', fontWeight: '700', fontSize: 13 },
+  pendingVal: { color: '#b87500', fontWeight: '700', fontSize: 14 },
+  submitBtn: { width: '100%', marginTop: 16, borderRadius: 999, paddingVertical: 18, backgroundColor: C.blue, alignItems: 'center', shadowColor: C.blue, shadowOffset: { width: 0, height: 13 }, shadowOpacity: 0.25, shadowRadius: 26, elevation: 4 },
+  submitBtnDisabled: { backgroundColor: 'rgba(140,152,172,0.55)', shadowOpacity: 0 },
+  submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 17 },
   // KPI cards (tab switcher)
   kpiRow:        { flexDirection: 'row', marginHorizontal: 18, gap: 12, marginBottom: 16 },
-  kpiCard:       { flex: 1, backgroundColor: C.card, borderRadius: 20, borderWidth: 1.5, borderColor: C.line, padding: 16 },
-  kpiCardActive: { borderColor: C.blue, shadowColor: C.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 3 },
-  kpiLabel:      { fontSize: 12, color: C.muted, fontWeight: '800', marginBottom: 6 },
-  kpiValue:      { fontSize: 28, fontWeight: '900', color: C.ink, letterSpacing: -1 },
+  kpiCard:       { flex: 1, backgroundColor: 'rgba(255,255,255,0.50)', borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.62)', padding: 16 },
+  kpiCardActive: { backgroundColor: 'rgba(255,255,255,0.72)', borderColor: C.blue, shadowColor: C.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: 3 },
+  kpiLabel:      { fontSize: 12, color: C.muted, fontWeight: '600', marginBottom: 6 },
+  kpiValue:      { fontSize: 28, fontWeight: '700', color: C.ink, letterSpacing: -1 },
   kpiUnit:       { fontSize: 12, color: C.muted, fontWeight: '700', marginTop: 2 },
   // Filter chips
   filterRow:          { flexDirection: 'row', marginHorizontal: 18, gap: 10, marginBottom: 14 },
-  filterChip:         { backgroundColor: C.card, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: C.line },
-  filterChipActive:   { backgroundColor: '#eef3ff', borderColor: C.blue },
-  filterChipText:     { fontSize: 13, fontWeight: '800', color: C.muted },
+  filterChip:         { backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)' },
+  filterChipActive:   { backgroundColor: 'rgba(10,132,255,0.14)', borderColor: C.blue },
+  filterChipText:     { fontSize: 13, fontWeight: '600', color: C.muted },
   filterChipTextActive: { color: C.blue },
-  histCard: { marginHorizontal: 18, backgroundColor: C.card, borderWidth: 1, borderColor: C.line, borderRadius: 28, overflow: 'hidden', shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 18, elevation: 3 },
+  histCard: { marginHorizontal: 18, backgroundColor: C.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)', borderRadius: 28, overflow: 'hidden', shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 18, elevation: 2 },
   cashItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderBottomWidth: 1, borderBottomColor: C.line },
   receipt: { width: 50, height: 62, borderRadius: 10, backgroundColor: '#f8f8f8' },
-  cashItemTime: { fontSize: 12, color: C.muted, fontWeight: '800', marginBottom: 6 },
-  cashItemTitle: { fontSize: 14, fontWeight: '900', color: C.ink },
-  cashAmount: { fontSize: 16, fontWeight: '900', color: C.orange },
+  cashItemTime: { fontSize: 12, color: C.muted, fontWeight: '600', marginBottom: 6 },
+  cashItemTitle: { fontSize: 14, fontWeight: '700', color: C.ink },
+  cashAmount: { fontSize: 16, fontWeight: '700', color: C.orange },
   // Sheet
   overlay: { flex: 1, backgroundColor: 'rgba(7,17,34,0.55)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: C.card, borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '92%' },
+  sheet: { backgroundColor: '#f2f5fc', borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '92%' },
   sheetHandle: { width: 74, height: 6, borderRadius: 99, backgroundColor: '#d9deea', alignSelf: 'center', marginTop: 14 },
   sheetContent: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40, gap: 16 },
-  sheetTitle: { fontSize: 28, fontWeight: '900', color: C.ink },
+  sheetTitle: { fontSize: 28, fontWeight: '700', color: C.ink },
   sheetRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: C.line, borderRadius: 22, paddingHorizontal: 18, paddingVertical: 15 },
-  sheetRowLabel: { color: C.muted, fontWeight: '800', fontSize: 14 },
-  sheetRowVal: { fontSize: 22, fontWeight: '900', color: C.orange },
+  sheetRowLabel: { color: C.muted, fontWeight: '600', fontSize: 14 },
+  sheetRowVal: { fontSize: 22, fontWeight: '700', color: C.orange },
   field: {},
-  fieldLabel: { fontSize: 14, color: C.muted, fontWeight: '900', marginBottom: 10 },
-  amountInput: { borderWidth: 1.5, borderColor: '#dfe5ef', backgroundColor: '#f8fafc', borderRadius: 22, paddingVertical: 18, fontSize: 28, fontWeight: '900', textAlign: 'center', color: C.ink },
+  fieldLabel: { fontSize: 14, color: C.muted, fontWeight: '700', marginBottom: 10 },
+  amountInput: { borderWidth: 1.5, borderColor: '#dfe5ef', backgroundColor: '#f8fafc', borderRadius: 22, paddingVertical: 18, fontSize: 28, fontWeight: '700', textAlign: 'center', color: C.ink },
   diffRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1 },
   diffLabel: { fontSize: 13, fontWeight: '700', color: C.muted },
-  diffVal: { fontSize: 15, fontWeight: '900' },
+  diffVal: { fontSize: 15, fontWeight: '700' },
   uploadArea: { borderWidth: 1.5, borderColor: '#dfe5ef', borderStyle: 'dashed', borderRadius: 22, paddingVertical: 24, alignItems: 'center', backgroundColor: '#f8fafc' },
-  uploadPlus: { fontSize: 34, fontWeight: '900', color: C.ink, marginBottom: 8 },
-  uploadText: { fontSize: 16, fontWeight: '900', color: C.muted },
+  uploadPlus: { fontSize: 34, fontWeight: '700', color: C.ink, marginBottom: 8 },
+  uploadText: { fontSize: 16, fontWeight: '700', color: C.muted },
   uploadSub: { fontSize: 12, color: C.muted, marginTop: 4 },
   textarea: { borderWidth: 1.5, borderColor: '#dfe5ef', backgroundColor: '#f8fafc', borderRadius: 22, padding: 18, fontSize: 15, fontWeight: '700', color: C.ink, minHeight: 88, textAlignVertical: 'top' },
-  submitBigBtn: { backgroundColor: C.violet, borderRadius: 22, paddingVertical: 18, alignItems: 'center', shadowColor: C.violet, shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.22, shadowRadius: 28, elevation: 4 },
-  submitBigBtnText: { color: '#fff', fontWeight: '900', fontSize: 17 },
+  submitBigBtn: { backgroundColor: C.blue, borderRadius: 999, paddingVertical: 18, alignItems: 'center', shadowColor: C.blue, shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.25, shadowRadius: 28, elevation: 4 },
+  submitBigBtnText: { color: '#fff', fontWeight: '700', fontSize: 17 },
   // Earnings
-  earnIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: '#e8f8f0', justifyContent: 'center', alignItems: 'center' },
+  earnIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: 'rgba(52,199,89,0.16)', justifyContent: 'center', alignItems: 'center' },
   // Image preview
   previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' },
   previewImage: { width: '92%', height: '80%' },
   previewClose: { position: 'absolute', top: 52, right: 22, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', zIndex: 2 },
-  previewCloseText: { color: '#fff', fontSize: 20, fontWeight: '900' },
+  previewCloseText: { color: '#fff', fontSize: 20, fontWeight: '700' },
 })

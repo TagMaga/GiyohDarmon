@@ -15,10 +15,13 @@ const { height: SCREEN_H } = Dimensions.get('window')
 export const SHEET_H = SCREEN_H * 0.90
 const DRAG_CLOSE_THRESHOLD = 120
 
+// Apple Liquid Glass palette: iOS system accents, translucent card surfaces.
+// C.bg stays opaque — it is also the bottom-sheet background and needs full
+// readability over the dimmed backdrop.
 export const C = {
-  bg: '#f6f8fb', card: '#ffffff', ink: '#071122', muted: '#7d8797', line: '#e6ecf3',
-  blue: '#1683ff', violet: '#665cff', green: '#12b76a', orange: '#ff9f0a', red: '#ff453a',
-  tag: '#f0f4ff',
+  bg: '#eef2fa', card: 'rgba(255,255,255,0.66)', ink: '#0a1528', muted: '#5f6e88', line: 'rgba(120,144,180,0.30)',
+  blue: '#0a84ff', violet: '#5e5ce6', green: '#34c759', orange: '#ff9500', red: '#ff3b30',
+  tag: 'rgba(10,132,255,0.10)',
 }
 
 export const STATUS_LABEL = {
@@ -298,7 +301,7 @@ export function OrderDetailSheet({
                 return (
                   <TouchableOpacity key={opt.key} style={[ps.reasonRow, laterDate === opt.key && ps.reasonRowActive]} onPress={() => setLaterDate(opt.key)}>
                     <View style={[ps.radio, laterDate === opt.key && ps.radioActive]} />
-                    <Text style={[ps.reasonText, laterDate === opt.key && { color: C.ink, fontWeight: '800' }]}>
+                    <Text style={[ps.reasonText, laterDate === opt.key && { color: C.ink, fontWeight: '600' }]}>
                       {opt.label} · {dateLabel}
                     </Text>
                   </TouchableOpacity>
@@ -327,7 +330,7 @@ export function OrderDetailSheet({
               {CANCEL_REASONS.map(r => (
                 <TouchableOpacity key={r} style={[ps.reasonRow, cancelReason === r && ps.reasonRowActive]} onPress={() => setCancelReason(r)}>
                   <View style={[ps.radio, cancelReason === r && ps.radioActive]} />
-                  <Text style={[ps.reasonText, cancelReason === r && { color: C.ink, fontWeight: '800' }]}>{r}</Text>
+                  <Text style={[ps.reasonText, cancelReason === r && { color: C.ink, fontWeight: '600' }]}>{r}</Text>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity style={[ps.btnPrimary, { backgroundColor: C.red }, (!cancelReason || stepLoading) && ps.btnDisabled]} disabled={!cancelReason || stepLoading} onPress={() => doStatus('returned', cancelReason)}>
@@ -640,30 +643,30 @@ const bs = StyleSheet.create({
 const d = StyleSheet.create({
   // Header
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 4, paddingBottom: 14, gap: 10 },
-  orderNum:     { fontSize: 20, fontWeight: '900', color: C.ink, letterSpacing: -0.5 },
+  orderNum:     { fontSize: 20, fontWeight: '700', color: C.ink, letterSpacing: -0.5 },
   statusChip:   { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999 },
-  statusChipText: { fontSize: 12, fontWeight: '900' },
+  statusChipText: { fontSize: 12, fontWeight: '700' },
   closeBtn:     { width: 36, height: 36, borderRadius: 18, backgroundColor: C.line, justifyContent: 'center', alignItems: 'center' },
-  closeBtnText: { fontSize: 14, color: C.muted, fontWeight: '900' },
+  closeBtnText: { fontSize: 14, color: C.muted, fontWeight: '700' },
 
   scroll: { paddingHorizontal: 16, paddingBottom: 8, gap: 10 },
 
   // Section card
   sectionCard:  { backgroundColor: C.card, borderRadius: 20, borderWidth: 1, borderColor: C.line, padding: 16 },
-  sectionLabel: { fontSize: 10, fontWeight: '900', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 },
+  sectionLabel: { fontSize: 10, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 },
 
   // Client
   clientRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
   avatar:       { width: 50, height: 50, borderRadius: 17, backgroundColor: '#eef3ff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line },
-  avatarInitial: { fontSize: 20, fontWeight: '900', color: C.violet },
-  clientName:   { fontSize: 18, fontWeight: '900', color: C.ink, letterSpacing: -0.3 },
+  avatarInitial: { fontSize: 20, fontWeight: '700', color: C.violet },
+  clientName:   { fontSize: 18, fontWeight: '700', color: C.ink, letterSpacing: -0.3 },
   clientPhone:  { fontSize: 13, color: C.muted, fontWeight: '600', marginTop: 2 },
   infoRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 10 },
   infoText:     { flex: 1, fontSize: 13, color: C.ink, fontWeight: '600', lineHeight: 19 },
 
   // Client comment
   commentBox:   { backgroundColor: '#f8f4ff', borderRadius: 13, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#ece6ff' },
-  commentLabel: { fontSize: 10, fontWeight: '900', color: C.violet, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 },
+  commentLabel: { fontSize: 10, fontWeight: '700', color: C.violet, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 5 },
   commentText:  { fontSize: 13, color: C.ink, lineHeight: 19 },
 
   // Contact buttons
@@ -672,7 +675,7 @@ const d = StyleSheet.create({
   contactBtnCall:   { backgroundColor: '#f0f7ff', borderColor: '#d0e4ff' },
   contactBtnWa:     { backgroundColor: '#f0fff6', borderColor: '#c3f0d5' },
   contactBtnTg:     { backgroundColor: '#f0f8ff', borderColor: '#c5dff5' },
-  contactLabel:     { fontSize: 11, fontWeight: '800' },
+  contactLabel:     { fontSize: 11, fontWeight: '600' },
 
   // Comments (thread)
   commentsLoading:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
@@ -680,11 +683,11 @@ const d = StyleSheet.create({
   emptyComments:       { fontSize: 13, color: C.muted, fontWeight: '700', textAlign: 'center', paddingVertical: 12 },
   commentThreadItem:   { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 14, padding: 12, marginBottom: 8 },
   commentThreadHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  commentAuthor:       { flex: 1, fontSize: 12, color: C.ink, fontWeight: '900' },
+  commentAuthor:       { flex: 1, fontSize: 12, color: C.ink, fontWeight: '700' },
   commentRoleBadge:    { backgroundColor: '#eef3ff', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-  commentRoleText:     { fontSize: 10, color: C.violet, fontWeight: '900' },
+  commentRoleText:     { fontSize: 10, color: C.violet, fontWeight: '700' },
   commentBody:         { fontSize: 13, color: C.ink, lineHeight: 19, fontWeight: '600' },
-  showMoreText:        { fontSize: 12, color: C.violet, fontWeight: '800', marginTop: 4 },
+  showMoreText:        { fontSize: 12, color: C.violet, fontWeight: '600', marginTop: 4 },
   commentTime:         { fontSize: 10, color: C.muted, fontWeight: '700', marginTop: 6 },
   commentInputRow:     { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 4 },
   commentInput:        { flex: 1, minHeight: 42, maxHeight: 86, borderWidth: 1, borderColor: C.line, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: C.bg, color: C.ink, fontSize: 13, fontWeight: '700' },
@@ -693,56 +696,56 @@ const d = StyleSheet.create({
   // Person row (creator merged)
   personRow:         { flexDirection: 'row', alignItems: 'center', gap: 12 },
   personAvatarRing:  { borderRadius: 13, borderWidth: 1, borderColor: C.line, flexShrink: 0, overflow: 'hidden' },
-  personName:        { fontSize: 15, fontWeight: '900', color: C.ink, marginBottom: 3 },
+  personName:        { fontSize: 15, fontWeight: '700', color: C.ink, marginBottom: 3 },
   personPhone:       { fontSize: 13, color: C.blue, fontWeight: '700' },
   personPhoneMuted:  { fontSize: 13, color: C.muted, fontWeight: '600' },
   rolePill:          { backgroundColor: `${C.violet}18`, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0 },
-  rolePillText:      { fontSize: 11, fontWeight: '900', color: C.violet },
+  rolePillText:      { fontSize: 11, fontWeight: '700', color: C.violet },
 
   // Payment
   payRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 },
   payLabel:     { fontSize: 13, color: C.muted },
-  payVal:       { fontSize: 13, fontWeight: '800', color: C.ink },
+  payVal:       { fontSize: 13, fontWeight: '600', color: C.ink },
   collectRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: C.line, paddingTop: 11, marginTop: 4 },
-  collectLabel: { fontSize: 15, fontWeight: '900', color: C.ink },
-  collectVal:   { fontSize: 22, fontWeight: '900', color: C.violet, letterSpacing: -0.5 },
+  collectLabel: { fontSize: 15, fontWeight: '700', color: C.ink },
+  collectVal:   { fontSize: 22, fontWeight: '700', color: C.violet, letterSpacing: -0.5 },
   prepayRow:    { marginTop: 10 },
   prepayPill:   { borderRadius: 10, padding: 10 },
-  prepayPillText: { fontSize: 13, fontWeight: '800' },
+  prepayPillText: { fontSize: 13, fontWeight: '600' },
 
   // Products
   productRow:          { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.line },
   productThumb:        { width: 48, height: 48, borderRadius: 12, borderWidth: 1, borderColor: C.line },
   productThumbPlaceholder: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#eef5ff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#dbe8fb' },
-  productThumbInitial: { fontSize: 18, fontWeight: '900', color: C.blue },
-  productName:         { fontSize: 14, fontWeight: '800', color: C.ink, marginBottom: 2 },
+  productThumbInitial: { fontSize: 18, fontWeight: '700', color: C.blue },
+  productName:         { fontSize: 14, fontWeight: '600', color: C.ink, marginBottom: 2 },
   productQty:          { fontSize: 12, color: C.muted, fontWeight: '600' },
-  productPrice:        { fontSize: 14, fontWeight: '900', color: C.ink },
+  productPrice:        { fontSize: 14, fontWeight: '700', color: C.ink },
 
   // Issue box
   issueBox:   { backgroundColor: '#fff4f4', borderRadius: 14, padding: 13, borderWidth: 1, borderColor: '#ffd5d5' },
-  issueLabel: { fontSize: 11, fontWeight: '900', color: C.red, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5 },
+  issueLabel: { fontSize: 11, fontWeight: '700', color: C.red, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5 },
   issueText:  { fontSize: 13, color: C.ink, lineHeight: 19 },
 
   // Action bar
   actionBar:      { gap: 10, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.line },
   primaryBtn:     { borderRadius: 18, paddingVertical: 16, alignItems: 'center' },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '900' },
+  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   secondaryBtn:   { borderRadius: 18, paddingVertical: 13, alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.line },
-  secondaryBtnText: { fontSize: 15, fontWeight: '800', color: C.ink },
+  secondaryBtnText: { fontSize: 15, fontWeight: '600', color: C.ink },
   btnDisabled:    { opacity: 0.45 },
 })
 
 const ps = StyleSheet.create({
-  stepTitle: { fontSize: 20, fontWeight: '900', color: C.ink, marginBottom: 8 },
+  stepTitle: { fontSize: 20, fontWeight: '700', color: C.ink, marginBottom: 8 },
   stepSub:   { fontSize: 14, color: C.muted, marginBottom: 20, lineHeight: 20 },
   optRow:    { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.line },
   optIcon:   { width: 44, height: 44, borderRadius: 14, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line },
-  optLabel:  { fontSize: 15, fontWeight: '800', color: C.ink, marginBottom: 2 },
+  optLabel:  { fontSize: 15, fontWeight: '600', color: C.ink, marginBottom: 2 },
   optDesc:   { fontSize: 12, color: C.muted, fontWeight: '600' },
   chevron:   { fontSize: 22, color: C.muted },
   btnPrimary:  { backgroundColor: C.blue, borderRadius: 18, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
-  btnText:     { color: '#fff', fontSize: 16, fontWeight: '900' },
+  btnText:     { color: '#fff', fontSize: 16, fontWeight: '700' },
   btnDisabled: { opacity: 0.45 },
   reasonRow:       { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.line },
   reasonRowActive: { backgroundColor: '#f0f4ff', borderRadius: 12, paddingHorizontal: 10, marginHorizontal: -10 },

@@ -34,5 +34,5 @@ export default function Avatar({ uri, name, fallback, size = 44, radius, color =
 const s = StyleSheet.create({
   image: { backgroundColor: '#e2e8f0' },
   fallback: { justifyContent: 'center', alignItems: 'center' },
-  text: { fontWeight: '800' },
+  text: { fontWeight: '600' },
 })

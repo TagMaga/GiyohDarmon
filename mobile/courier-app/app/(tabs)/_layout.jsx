@@ -1,10 +1,11 @@
 import { Tabs } from 'expo-router'
 import { useEffect, useRef } from 'react'
 import { Animated, StyleSheet } from 'react-native'
+import { BlurView } from 'expo-blur'
 import { Home, Package, MapPin, Wallet } from 'lucide-react-native'
 
-const BLUE = '#1683ff'
-const INACTIVE = '#b0bac8'
+const BLUE = '#0a84ff'
+const INACTIVE = 'rgba(72,88,112,0.62)'
 
 function TabIcon({ Icon, focused }) {
   // Active pill springs in behind the icon; icon gives a small pop on focus.
@@ -51,7 +52,9 @@ const styles = StyleSheet.create({
   pillActive: {
     ...StyleSheet.absoluteFillObject,
     borderRadius: 17,
-    backgroundColor: '#deeaff',
+    backgroundColor: 'rgba(10,132,255,0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(10,132,255,0.20)',
   },
 })
 
@@ -62,18 +65,37 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: BLUE,
         tabBarInactiveTintColor: INACTIVE,
+        // Floating liquid-glass pill: real blur over the content scrolling under it
         tabBarStyle: {
-          backgroundColor: '#ffffff',
+          position: 'absolute',
+          left: 16,
+          right: 16,
+          bottom: 24,
+          height: 68,
+          borderRadius: 34,
+          backgroundColor: 'transparent',
           borderTopWidth: 0,
-          shadowColor: '#0a1f44',
-          shadowOffset: { width: 0, height: -6 },
-          shadowOpacity: 0.07,
-          shadowRadius: 20,
-          elevation: 16,
-          height: 84,
-          paddingBottom: 18,
-          paddingTop: 10,
+          elevation: 0,
+          paddingBottom: 10,
+          paddingTop: 8,
         },
+        tabBarBackground: () => (
+          <BlurView
+            intensity={42}
+            tint="light"
+            experimentalBlurMethod="dimezisBlurView"
+            style={[
+              StyleSheet.absoluteFillObject,
+              {
+                borderRadius: 34,
+                overflow: 'hidden',
+                backgroundColor: 'rgba(255,255,255,0.48)',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.65)',
+              },
+            ]}
+          />
+        ),
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',
