@@ -60,11 +60,13 @@ func (r *Repository) GetOrdersSummary(
 			),
 			product_costs AS (
 				SELECT
-					oi.order_id,
-					COALESCE(SUM(oi.quantity * COALESCE(p.purchase_price, 0)), 0) AS product_cost
-				FROM order_items oi
-				JOIN products p ON p.id = oi.product_id
-				GROUP BY oi.order_id
+					m.reference_id AS order_id,
+					COALESCE(SUM(bc.quantity * bc.unit_cost), 0) AS product_cost
+				FROM inventory_movements m
+				JOIN inventory_batch_consumptions bc ON bc.movement_id = m.id
+				WHERE m.movement_type = 'sale'
+				  AND m.reference_id IS NOT NULL
+				GROUP BY m.reference_id
 			)
 			SELECT
 				COUNT(*)                                             AS total_count,
@@ -227,10 +229,11 @@ func (r *Repository) getProductCostForPeriod(ctx context.Context, from, to *time
 	}
 	query += `
 		)
-		SELECT COALESCE(SUM(oi.quantity * COALESCE(p.purchase_price, 0)), 0)
-		FROM order_items oi
-		JOIN products p ON p.id = oi.product_id
-		WHERE oi.order_id IN (SELECT id FROM delivered_orders)`
+		SELECT COALESCE(SUM(bc.quantity * bc.unit_cost), 0)
+		FROM inventory_movements m
+		JOIN inventory_batch_consumptions bc ON bc.movement_id = m.id
+		WHERE m.movement_type = 'sale'
+		  AND m.reference_id IN (SELECT id FROM delivered_orders)`
 	var total float64
 	err := r.db.WithContext(ctx).Raw(query, args...).Scan(&total).Error
 	return total, err

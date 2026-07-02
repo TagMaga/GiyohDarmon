@@ -62,7 +62,7 @@ type FinanceOrdersSummary struct {
 	CourierPayout      float64 `json:"courier_payout"`       // SUM(courier_payout) paid to couriers (company cost)
 	ClientDeliveryFees float64 `json:"client_delivery_fees"` // SUM(delivery_fee) charged to clients — informational, not part of any formula below
 	NetRevenue         float64 `json:"net_revenue"`          // total_sales + client_delivery_fees - courier_payout
-	ProductCost        float64 `json:"product_cost"`         // SUM(quantity * purchase_price)
+	ProductCost        float64 `json:"product_cost"`         // SUM(batch_consumption.quantity * batch_consumption.unit_cost) — actual FIFO cost
 	CommissionBase     float64 `json:"commission_base"`      // total_sales - courier_payout
 	TeamPayouts        float64 `json:"team_payouts"`         // sum of seller/manager/team-lead-pool financial_events (= commission_base × 40% under default rates)
 	CompanyGross       float64 `json:"company_gross"`        // company_revenue_earned financial_events (= commission_base × 60% under default rates)
