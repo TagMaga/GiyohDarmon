@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MegaMall CRM · Pay screens · превью</title>
+<style>
+  :root{
+    --indigo:#4F46E5; --violet:#6D28D9; --indigo-light:#EEF2FF; --indigo-light2:#E0E7FF;
+    --violet-light:#F5F3FF; --hero-border:#E3DBFF; --bg-app:#F2F4F7;
+    --slate-900:#0F172A; --slate-700:#334155; --slate-500:#64748B; --slate-400:#94A3B8;
+    --slate-300:#CBD5E1; --slate-100:#F1F5F9; --slate-50:#F8FAFC;
+    --emerald:#059669; --emerald-light:#ECFDF5; --amber:#B45309; --amber-light:#FFFBEB;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:#0B0F1A; color:#E2E8F0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+
+  /* ---------- meta chrome (review UI, not app UI) ---------- */
+  .meta-header{position:sticky; top:0; z-index:100; background:#0B0F1A; border-bottom:1px solid #1E293B; padding:20px 20px 0;}
+  .meta-title{font-size:19px; font-weight:800; margin:0 0 3px; color:#fff;}
+  .meta-sub{font-size:12.5px; color:#8b93a7; margin:0 0 14px; max-width:820px; line-height:1.5;}
+  .tabs{display:flex; gap:8px; overflow-x:auto; padding-bottom:14px;}
+  .tab-btn{white-space:nowrap; padding:10px 16px; border-radius:12px; border:1px solid #1E293B; background:#131A2A; color:#94A3B8; font-size:12.5px; font-weight:700; cursor:pointer;}
+  .tab-btn.active{background:linear-gradient(135deg,#4F46E5,#6D28D9); color:#fff; border-color:transparent;}
+  .stage{padding:32px 20px 90px;}
+  .panel{display:none; gap:28px; flex-wrap:wrap; justify-content:center; align-items:flex-start;}
+  .panel.active{display:flex;}
+  .notes{width:360px; max-width:92vw;}
+  .notes h3{font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:#818CF8; margin:0 0 10px; font-weight:800;}
+  .note-card{background:#131A2A; border:1px solid #1E293B; border-radius:16px; padding:15px 16px; margin-bottom:12px; font-size:12.8px; line-height:1.6; color:#B8C0D4;}
+  .note-card b{color:#fff;}
+  .note-card code{background:#0B0F1A; padding:1.5px 6px; border-radius:5px; font-size:11.5px; color:#A5B4FC;}
+  .state-toggle{display:flex; gap:6px; margin-bottom:12px;}
+  .state-toggle button{flex:1; padding:9px; border-radius:10px; border:1px solid #E2E8F0; background:#fff; font-size:12px; font-weight:700; color:var(--slate-500); cursor:pointer;}
+  .state-toggle button.active{background:var(--indigo-light); color:var(--indigo); border-color:#C7D2FE;}
+
+  /* ---------- device frame ---------- */
+  .device-frame{width:398px; max-width:92vw; padding:14px 11px; border-radius:46px; background:linear-gradient(160deg,#1a1f2e,#0a0d14); box-shadow:0 40px 90px -20px rgba(0,0,0,.65), inset 0 0 0 2px rgba(255,255,255,.05); flex-shrink:0;}
+  .device-screen{position:relative; width:100%; height:824px; background:var(--bg-app); border-radius:34px; overflow:hidden;}
+  .device-notch{position:absolute; top:8px; left:50%; transform:translateX(-50%); width:86px; height:20px; background:#0a0d14; border-radius:14px; z-index:60;}
+  .statusbar{height:46px; display:flex; align-items:center; justify-content:space-between; padding:0 26px; font-size:14px; font-weight:700; color:var(--slate-900);}
+  .statusbar .icons{display:flex; align-items:center; gap:5px;}
+  .device-content{height:calc(100% - 46px); overflow-y:auto; -webkit-overflow-scrolling:touch;}
+  .scr-pad{padding:4px 14px 120px;}
+
+  /* ---------- generic UI atoms ---------- */
+  h1.pg{font-size:23px; font-weight:900; margin:8px 0 2px; color:var(--slate-900); letter-spacing:-.4px;}
+  p.pg-sub{margin:0 0 14px; color:var(--slate-400); font-weight:700; font-size:12.5px; text-transform:uppercase; letter-spacing:.4px;}
+  .rbac-chip{display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--slate-500); background:#fff; border:1px solid var(--slate-100); padding:6px 11px; border-radius:999px; margin-bottom:14px;}
+  .card{background:#fff; border:1px solid #E6ECF3; border-radius:20px; box-shadow:0 7px 20px rgba(15,31,55,.06);}
+  .badge{display:inline-flex; align-items:center; gap:4px; padding:3.5px 9px; border-radius:999px; font-size:10.5px; font-weight:800; white-space:nowrap;}
+  .badge-indigo{background:var(--indigo-light); color:var(--indigo);}
+  .badge-violet{background:var(--violet-light); color:#7C3AED;}
+  .badge-emerald{background:var(--emerald-light); color:var(--emerald);}
+  .badge-amber{background:var(--amber-light); color:var(--amber);}
+  .badge-slate{background:var(--slate-100); color:var(--slate-700);}
+  .avatar{width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:14px; flex-shrink:0; background:linear-gradient(135deg,#4F46E5,#7C3AED);}
+  .avatar.sm{width:36px; height:36px; border-radius:11px; font-size:12px;}
+
+  .hero{background:#fff; border:1px solid var(--hero-border); border-radius:28px; padding:22px 20px; box-shadow:0 16px 34px rgba(79,70,229,.15); position:relative; overflow:hidden; margin-bottom:16px;}
+  .hero-label{color:#7C3AED; font-weight:900; text-transform:uppercase; font-size:11px; letter-spacing:1px;}
+  .hero-sum{font-size:42px; font-weight:900; letter-spacing:-1.5px; margin:10px 0 12px; line-height:1; background:linear-gradient(135deg,#4F46E5,#7C3AED); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .formula{background:#F6F5FF; border-radius:18px; padding:13px 10px; display:flex; justify-content:center; gap:9px; align-items:center; font-size:16px; font-weight:900; flex-wrap:wrap;}
+  .hero-caption{text-align:center; color:#9096ab; font-weight:700; margin-top:11px; font-size:12px;}
+  .hero-chip{margin-top:14px; display:flex; justify-content:space-between; align-items:center; background:var(--violet-light); border-radius:16px; padding:11px 14px; font-size:12.5px; font-weight:700; color:#6D28D9;}
+
+  .segmented{background:#EAF0F7; border-radius:20px; padding:4px; display:grid; gap:4px; margin-bottom:16px;}
+  .seg-btn{border:none; background:transparent; border-radius:16px; padding:11px 6px; font-weight:800; font-size:13px; color:#697385; cursor:pointer; transition:all .15s;}
+  .seg-btn.active{background:linear-gradient(135deg,#4F46E5,#6D28D9); color:#fff; box-shadow:0 7px 16px rgba(79,70,229,.28);}
+
+  .btn-primary{border:none; border-radius:18px; padding:15px; background:linear-gradient(135deg,#4F46E5,#6D28D9); color:#fff; font-size:15px; font-weight:900; box-shadow:0 12px 24px rgba(79,70,229,.3); width:100%; cursor:pointer;}
+  .btn-primary:disabled{opacity:.35; box-shadow:none; cursor:not-allowed;}
+  .btn-ghost{border:1.5px solid var(--slate-100); background:#fff; border-radius:16px; padding:13px; color:var(--slate-700); font-weight:800; font-size:14px; width:100%; cursor:pointer;}
+
+  .list-head{display:flex; justify-content:space-between; align-items:center; margin:18px 2px 10px; gap:10px;}
+  .list-h2{margin:0; font-size:12.5px; letter-spacing:.6px; color:#7f8796; text-transform:uppercase; font-weight:900;}
+  .row-total{color:var(--slate-400); font-weight:700; font-size:12px; text-align:right;}
+
+  .team-row{display:flex; align-items:center; gap:12px; padding:14px 14px; border-bottom:1px solid #EEF1F5; cursor:pointer;}
+  .team-row:last-child{border-bottom:none;}
+  .team-row .info{flex:1; min-width:0;}
+  .team-row .name-line{display:flex; align-items:center; gap:7px; margin-bottom:4px; min-width:0;}
+  .team-row .name{font-size:14px; font-weight:800; color:var(--slate-900); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1 1 auto;}
+  .team-row .stats{font-size:11.5px; color:var(--slate-400); font-weight:700;}
+  .team-row .stats b{color:var(--slate-700); font-weight:800;}
+  .chev{color:var(--slate-300); flex-shrink:0;}
+
+  .pay-row{padding:14px; border-bottom:1px solid #EEF1F5; display:flex; gap:11px; align-items:flex-start;}
+  .pay-row:last-child{border-bottom:none;}
+  .pay-row.disabled{opacity:.5;}
+  .check{width:22px; height:22px; border-radius:7px; border:2px solid var(--slate-300); display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer; background:#fff; margin-top:2px;}
+  .check.checked{background:linear-gradient(135deg,#4F46E5,#6D28D9); border-color:var(--indigo);}
+  .check svg{width:13px; height:13px; color:#fff; opacity:0;}
+  .check.checked svg{opacity:1;}
+  .pay-caption{font-size:11px; color:var(--slate-400); font-weight:700; margin-bottom:7px;}
+  .pay-stats{display:flex; gap:14px; margin-top:8px; font-size:11px;}
+  .pay-stats div{color:var(--slate-400); font-weight:700;}
+  .pay-stats b{display:block; color:var(--slate-900); font-size:12.5px; font-weight:900; margin-top:1px;}
+  .amt-input{width:100%; text-align:right; border:1.5px solid #E2E8F0; border-radius:10px; padding:8px 9px; font-weight:800; font-size:13px; color:var(--indigo); background:#F8FAFF; margin-top:9px;}
+  .amt-input:focus{outline:none; border-color:var(--indigo);}
+  .amt-input:disabled{background:var(--slate-50); color:var(--slate-400); border-color:var(--slate-100);}
+
+  .sticky-bar{position:absolute; left:10px; right:10px; bottom:96px; background:#fff; border-radius:20px; padding:12px 14px; box-shadow:0 12px 28px rgba(15,31,55,.16); border:1px solid var(--slate-100); display:flex; align-items:center; gap:12px; z-index:30;}
+  .sticky-bar .sum{flex:1;}
+  .sticky-bar .sum .lbl{font-size:10.5px; color:var(--slate-400); font-weight:700; text-transform:uppercase;}
+  .sticky-bar .sum .val{font-size:16px; font-weight:900; color:var(--slate-900);}
+  .sticky-bar button{border:none; border-radius:14px; padding:12px 18px; background:linear-gradient(135deg,#4F46E5,#6D28D9); color:#fff; font-weight:900; font-size:13.5px; box-shadow:0 8px 18px rgba(79,70,229,.3); cursor:pointer; white-space:nowrap;}
+
+  .pill-nav{position:absolute; left:10px; right:10px; bottom:10px; background:rgba(255,255,255,.96); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border-radius:28px; border:1px solid rgba(226,232,240,.85); box-shadow:-8px -8px 16px rgba(255,255,255,.7),8px 8px 24px rgba(16,24,40,.12); display:flex; align-items:center; justify-content:space-around; padding:6px 4px; z-index:20;}
+  .nav-tab{display:flex; flex-direction:column; align-items:center; gap:3px; padding:8px 4px; border-radius:16px; flex:1; color:var(--slate-400);}
+  .nav-tab.active{background:linear-gradient(135deg,#EEF2FF,#E0E7FF); color:var(--indigo);}
+  .nav-tab span{font-size:9.5px; font-weight:700;}
+
+  .sheet-backdrop{position:absolute; inset:0; background:rgba(15,23,42,.45); opacity:0; pointer-events:none; transition:opacity .25s; z-index:70;}
+  .sheet-backdrop.open{opacity:1; pointer-events:auto;}
+  .sheet{position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:26px 26px 0 0; padding:14px 18px 24px; transform:translateY(105%); transition:transform .32s cubic-bezier(.32,.72,0,1); z-index:71; max-height:82%; overflow-y:auto;}
+  .sheet.open{transform:translateY(0);}
+  .sheet-handle{width:38px; height:4px; background:#E2E8F0; border-radius:2px; margin:0 auto 16px;}
+  .sheet-close{position:absolute; top:14px; right:16px; width:30px; height:30px; border-radius:10px; background:var(--slate-50); display:flex; align-items:center; justify-content:center; color:var(--slate-500); cursor:pointer; z-index:72;}
+
+  .stat3{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:16px 0;}
+  .stat3 .tile{background:var(--slate-50); border-radius:14px; padding:11px 8px; text-align:center;}
+  .stat3 .tile .v{font-size:15px; font-weight:900; color:var(--slate-900);}
+  .stat3 .tile .l{font-size:9.5px; color:var(--slate-400); font-weight:700; text-transform:uppercase; margin-top:2px;}
+
+  .method-seg{display:flex; gap:7px; margin:14px 0;}
+  .method-seg button{flex:1; padding:10px 4px; border-radius:12px; border:1.5px solid var(--slate-100); background:#fff; font-size:12px; font-weight:800; color:var(--slate-500); cursor:pointer;}
+  .method-seg button.active{border-color:var(--indigo); background:var(--indigo-light); color:var(--indigo);}
+
+  .payout-row{display:flex; align-items:center; justify-content:space-between; padding:15px 14px; border-bottom:1px solid #EEF1F5; gap:12px;}
+  .payout-row:last-child{border-bottom:none;}
+  .payout-row .amt{font-size:16px; font-weight:900; color:var(--slate-900);}
+  .payout-row .meta{font-size:11px; color:var(--slate-400); font-weight:700; margin-top:2px;}
+  .payout-row .right{display:flex; flex-direction:column; align-items:flex-end; gap:5px;}
+
+  .ledger-row{padding:14px; border-bottom:1px solid #EEF1F5;}
+  .ledger-row:last-child{border-bottom:none;}
+  .ledger-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:6px;}
+  .ledger-who{font-size:13px; font-weight:800; color:var(--slate-900);}
+  .ledger-sum{font-size:15px; font-weight:900; color:var(--slate-900); white-space:nowrap;}
+  .ledger-bottom{display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--slate-400); font-weight:700;}
+  .tag-auto{display:inline-flex; align-items:center; gap:4px; font-size:9.5px; font-weight:800; color:var(--indigo); background:var(--indigo-light); padding:2.5px 7px; border-radius:8px;}
+  .tag-manual{display:inline-flex; align-items:center; gap:4px; font-size:9.5px; font-weight:800; color:var(--slate-500); background:var(--slate-100); padding:2.5px 7px; border-radius:8px;}
+  .edit-btn{width:26px; height:26px; border-radius:9px; background:var(--slate-50); display:flex; align-items:center; justify-content:center; color:var(--slate-400);}
+
+  .empty{padding:48px 20px; text-align:center; color:var(--slate-400);}
+  .empty svg{width:34px; height:34px; margin:0 auto 12px; color:var(--slate-300);}
+  .empty p.t{font-weight:800; color:var(--slate-500); font-size:14px; margin:0 0 4px;}
+  .empty p.s{font-size:12px; margin:0; line-height:1.5;}
+
+  .quickgrid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;}
+  .quicktile{background:#fff; border:1px solid #E6ECF3; border-radius:18px; padding:14px; box-shadow:0 7px 20px rgba(15,31,55,.05);}
+  .quicktile .lbl{font-size:10.5px; color:var(--slate-400); font-weight:700; text-transform:uppercase; margin-bottom:5px;}
+  .quicktile .val{font-size:19px; font-weight:900; color:var(--slate-900);}
+
+  .cta{background:linear-gradient(135deg,#4F46E5,#6D28D9); border-radius:20px; padding:16px 18px; color:#fff; display:flex; align-items:center; justify-content:space-between; box-shadow:0 12px 26px rgba(79,70,229,.3); margin-bottom:16px;}
+  .cta .t{font-weight:900; font-size:14px; margin-bottom:2px;}
+  .cta .s{font-size:11.5px; opacity:.85;}
+
+  .toast{position:absolute; left:16px; right:16px; bottom:172px; background:var(--slate-900); color:#fff; border-radius:16px; padding:13px 16px; font-size:12.5px; font-weight:700; display:flex; align-items:center; gap:9px; opacity:0; transform:translateY(10px); transition:all .3s; z-index:85; pointer-events:none; box-shadow:0 12px 28px rgba(0,0,0,.35);}
+  .toast.show{opacity:1; transform:translateY(0);}
+
+  .icon{width:20px; height:20px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round;}
+
+  /* quicktile extras (screen 1) */
+  .quicktile .sub{font-size:10.5px; color:var(--slate-400); font-weight:700; margin-top:3px;}
+  .quicktile.accent{background:var(--indigo-light); border-color:#DDD6FE;}
+  .quicktile .lbl-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; gap:6px;}
+  .period-chip{font-size:10px; font-weight:800; color:var(--indigo); background:#fff; border:1px solid #DDD6FE; padding:3px 8px; border-radius:999px; white-space:nowrap; flex-shrink:0;}
+
+  /* formula box (screen 2 drawer) */
+  .formula-box{background:#F6F5FF; border-radius:16px; padding:12px 14px; font-size:12px; font-weight:700; color:#6D28D9; text-align:center; margin-bottom:18px; line-height:1.5;}
+
+  /* mono/dark reference style (screen 4, matches real SellerIncomePage screenshot) */
+  .mono-seg{background:#F1F1F3; border-radius:999px; padding:4px; display:flex; gap:4px; margin-bottom:14px;}
+  .mono-seg button{flex:1; border:none; background:transparent; padding:10px; border-radius:999px; font-weight:800; font-size:13px; color:#8A8A93; cursor:pointer;}
+  .mono-seg button.active{background:#fff; color:#111114; box-shadow:0 3px 10px rgba(0,0,0,.08);}
+  .period-row{display:flex; gap:8px; margin-bottom:14px;}
+  .period-row button{flex:1; padding:9px 4px; border-radius:12px; border:1.5px solid #ECECEF; background:#fff; font-size:12px; font-weight:800; color:#9096A3; cursor:pointer;}
+  .period-row button.active{background:#111114; color:#fff; border-color:#111114;}
+  .dark-hero{background:#17171B; border-radius:28px; padding:22px 20px; margin:0 0 16px; position:relative; overflow:hidden;}
+  .dark-hero .lbl{color:#9CA3AF; font-size:13px; font-weight:600; display:flex; align-items:center;}
+  .dark-hero .val{color:#fff; font-size:36px; font-weight:900; letter-spacing:-1px; margin:8px 0 10px; line-height:1;}
+  .dark-hero .delta{display:inline-flex; align-items:center; gap:5px; background:rgba(34,197,94,.15); color:#4ADE80; font-size:12px; font-weight:800; padding:5px 10px; border-radius:999px;}
+  .dark-hero .capt{color:#9CA3AF; font-size:11.5px; margin-top:10px;}
+  .dark-hero .dot{width:7px; height:7px; border-radius:50%; background:#F59E0B; display:inline-block; margin-right:7px;}
+  .mono-stat3{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:14px 0;}
+  .mono-stat3 .tile{background:#F5F5F7; border-radius:14px; padding:11px 8px; text-align:center;}
+  .mono-stat3 .tile .v{font-size:15px; font-weight:900; color:#111114;}
+  .mono-stat3 .tile .l{font-size:9.5px; color:#9096A3; font-weight:700; text-transform:uppercase; margin-top:2px;}
+  .accrual-row{display:flex; align-items:center; gap:12px; padding:13px 4px; border-bottom:1px solid #F1F1F3;}
+  .accrual-row:last-child{border-bottom:none;}
+  .accrual-icon{width:40px; height:40px; border-radius:12px; background:#F5F5F7; display:flex; align-items:center; justify-content:center; color:#111114; flex-shrink:0;}
+  .accrual-row .info{flex:1;}
+  .accrual-row .t{font-weight:800; font-size:13.5px; color:#111114;}
+  .accrual-row .s{font-size:11px; color:#9096A3; margin-top:2px;}
+  .accrual-row .plus{color:#22C55E; font-weight:900; font-size:14px; white-space:nowrap;}
+  .mono-payout-row{padding:14px 2px; border-bottom:1px solid #F1F1F3; display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .mono-payout-row:last-child{border-bottom:none;}
+  .mono-payout-row .amt{font-size:16px; font-weight:900; color:#111114;}
+  .mono-payout-row .meta{font-size:11.5px; color:#9096A3; margin-top:3px;}
+  .mono-pill{display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:800; padding:4px 10px; border-radius:999px; white-space:nowrap;}
+  .mono-pill.wait{background:#FFF7ED; color:#EA580C;}
+  .mono-pill.wait .dot2{width:6px; height:6px; border-radius:50%; background:#F59E0B;}
+  .mono-pill.paid{background:#ECFDF5; color:#16A34A;}
+  .mono-payout-row .paid-date{font-size:10px; color:#B0B4BE; margin-top:4px; text-align:right;}
+</style>
+</head>
+<body>
+
+<!-- icon symbols -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1Z"/><path d="M9 11h6M9 15h4"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M15.3 14.2c2.6.5 4.4 2.6 4.4 5.3"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18"/><circle cx="16.4" cy="14.2" r="1.2" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5L19 7"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-bank" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="2"/><circle cx="12" cy="12" r="2.4"/><path d="M6 9v.01M18 15v.01"/></symbol>
+    <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8.3 15.5l2 2 4.7-4.7"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 8v.01"/></symbol>
+  </defs>
+</svg>
+
+<div class="meta-header">
+  <p class="meta-title">MegaMall CRM · экраны выплат (Pay screens) · превью</p>
+  <p class="meta-sub">Мобильный первый экран, 375–420px. Индиго/фиолетовая перекраска hero-карточек курьерского модуля (было оранжевое) для Тимлида, Менеджера и Владельца. Нажмите на вкладку ниже, чтобы переключить экран — часть карточек интерактивна (чекбоксы, суммы, шторки).</p>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="t1">1 · Тимлид — нижняя навигация</button>
+    <button class="tab-btn" data-tab="t2">2 · Моя команда</button>
+    <button class="tab-btn" data-tab="t3">3 · Финансы (Тимлид)</button>
+    <button class="tab-btn" data-tab="t4">4 · Менеджер — Выплаты</button>
+    <button class="tab-btn" data-tab="t5">5 · Owner — сверка выплат</button>
+  </div>
+</div>
+
+<div class="stage">
+
+<!-- ============================================================ -->
+<!-- SCREEN 1 — Team Lead bottom nav -->
+<!-- ============================================================ -->
+<section class="panel active" id="t1">
+  <div class="device-frame">
+    <div class="device-screen">
+      <div class="device-notch"></div>
+      <div class="statusbar"><span>9:41</span><span class="icons">📶 🔋</span></div>
+      <div class="device-content">
+        <div class="scr-pad">
+          <h1 class="pg">Здравствуйте, Шариф</h1>
+          <p class="pg-sub">тимлид · сегодня</p>
+          <div class="rbac-chip"><svg class="icon" style="width:14px;height:14px"><use href="#i-users"/></svg>Команда «Восток» · 6 человек</div>
+
+          <div class="cta">
+            <div>
+              <div class="t">Осталось выплатить: 6 610 сомони</div>
+              <div class="s">2 сотрудника ждут выплаты</div>
+            </div>
+            <svg class="icon" style="color:#fff"><use href="#i-chevron"/></svg>
+          </div>
+
+          <div class="quickgrid">
+            <div class="quicktile">
+              <div class="lbl">Сумма заказов</div>
+              <div class="val">1 000 сомони</div>
+              <div class="sub">10 заказов</div>
+            </div>
+            <div class="quicktile">
+              <div class="lbl">Доставка (курьер)</div>
+              <div class="val">200 сомони</div>
+              <div class="sub">20 сомони × 10 заказов</div>
+            </div>
+            <div class="quicktile">
+              <div class="lbl">Пул команды · 40%</div>
+              <div class="val">320 сомони</div>
+              <div class="sub">от базы 800 сомони</div>
+            </div>
+            <div class="quicktile accent">
+              <div class="lbl-row"><span class="lbl" style="margin:0;">Мой доход</span><span class="period-chip">Июль ▾</span></div>
+              <div class="val" style="color:var(--indigo)">218,4 сомони</div>
+              <div class="sub">после выплат команде</div>
+            </div>
+          </div>
+
+          <div class="list-head"><h2 class="list-h2">Последние заказы команды</h2></div>
+          <div class="card" style="padding:4px 0 4px;">
+            <div class="team-row" style="cursor:default;">
+              <div class="avatar sm">МЮ</div>
+              <div class="info">
+                <div class="name-line"><span class="name">Заказ #10482</span></div>
+                <div class="stats">Мадина Юсупова · доставлен</div>
+              </div>
+              <div style="font-weight:800; font-size:13px; color:var(--slate-900)">420 сомони</div>
+            </div>
+            <div class="team-row" style="cursor:default;">
+              <div class="avatar sm">ФР</div>
+              <div class="info">
+                <div class="name-line"><span class="name">Заказ #10481</span></div>
+                <div class="stats">Фарход Раҳимов · в пути</div>
+              </div>
+              <div style="font-weight:800; font-size:13px; color:var(--slate-900)">180 сомони</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NEW: 5-tab bottom nav for Team Lead -->
+      <div class="pill-nav">
+        <div class="nav-tab active"><svg class="icon"><use href="#i-home"/></svg><span>Главная</span></div>
+        <div class="nav-tab"><svg class="icon"><use href="#i-cart"/></svg><span>Заказы</span></div>
+        <div class="nav-tab"><svg class="icon"><use href="#i-users"/></svg><span>Моя команда</span></div>
+        <div class="nav-tab"><svg class="icon"><use href="#i-wallet"/></svg><span>Финансы</span></div>
+        <div class="nav-tab"><svg class="icon"><use href="#i-more"/></svg><span>Ещё</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>Что меняется</h3>
+    <div class="note-card"><b>Проблема сейчас:</b> в <code>Layout.jsx</code> BottomNav рендерится только при <code>isOwner || isSeller || isManager</code>. Роль <code>team_lead</code> нигде не проверяется → на мобильном тимлид видит только desktop-сайдбар без нижней навигации и без <code>pb-20</code> отступа контента.</div>
+    <div class="note-card"><b>Фикс:</b> добавить <code>isTeamLead</code> + <code>{isTeamLead && &lt;BottomNav tabs={TEAM_LEAD_TABS} /&gt;}</code>, отдельный массив вкладок (без FAB — у тимлида нет личного создания заказов как у продавца/менеджера).</div>
+    <div class="note-card"><b>5 вкладок:</b> Главная (<code>/team-lead</code>), Заказы (<code>/team-lead/orders</code>), Моя команда (объединяет <code>/team-lead/managers</code> + <code>/team-lead/sellers</code>), Финансы (новая, замещает разрозненный <code>/team-lead/income</code>), Ещё (профиль/отчёты/настройки).</div>
+    <div class="note-card">Визуально — 1:1 копия стеклянной пилюли из <code>seller/components/BottomNav.jsx</code>: белый blur-фон, активная вкладка — светло-индиго капсула, indigo-600 иконка/текст.</div>
+    <div class="note-card"><b>Плитки под CTA — комиссионная воронка, не сводка платежей:</b> Сумма заказов → Доставка (курьеру) → Пул команды 40% → Мой доход. Пример на 10 заказов по 100: 1000 − 200 (курьер) = 800 база; 480 (60%) компании, 320 (40%) пул тимлида; из пула вычитаются выплаты продавцам (64) и менеджеру (37,6) → 218,4 личный доход. Последняя плитка — акцентная (светло-индиго) с чипом периода («Июль ▾»), т.к. это единственное число, которое реально принадлежит тимлиду лично.</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SCREEN 2 — Моя команда -->
+<!-- ============================================================ -->
+<section class="panel" id="t2">
+  <div class="device-frame">
+    <div class="device-screen">
+      <div class="device-notch"></div>
+      <div class="statusbar"><span>9:41</span><span class="icons">📶 🔋</span></div>
+      <div class="device-content">
+        <div class="scr-pad">
+          <h1 class="pg">Моя команда</h1>
+          <p class="pg-sub">июль 2026</p>
+          <div class="rbac-chip"><svg class="icon" style="width:14px;height:14px"><use href="#i-users"/></svg>Видно: только ваша команда «Восток»</div>
+
+          <div class="state-toggle">
+            <button class="active" data-state="populated" data-group="team">Заполнено</button>
+            <button data-state="empty" data-group="team">Пусто</button>
+          </div>
+
+          <div class="segmented" style="grid-template-columns:1fr 1fr;">
+            <button class="seg-btn active" data-sub="managers">Менеджеры · 2</button>
+            <button class="seg-btn" data-sub="sellers">Продавцы · 4</button>
+          </div>
+
+          <!-- Managers sub-tab -->
+          <div data-sub-panel="managers">
+            <div class="card team-populated">
+              <div class="team-row" data-name="Фарход Раҳимов" data-role="Менеджер" data-orders="34" data-income="4 820" data-paid="3 000" data-value="48 200" data-init="ФР">
+                <div class="avatar">ФР</div>
+                <div class="info">
+                  <div class="name-line"><span class="name">Фарход Раҳимов</span><span class="badge badge-indigo">Менеджер</span></div>
+                  <div class="stats">Заказов: <b>34</b> · Доход за период: <b>4 820 сомони</b></div>
+                </div>
+                <svg class="icon chev"><use href="#i-chevron"/></svg>
+              </div>
+              <div class="team-row" data-name="Саидахон Назарова" data-role="Менеджер" data-orders="21" data-income="3 140" data-paid="2 000" data-value="31 400" data-init="СН">
+                <div class="avatar">СН</div>
+                <div class="info">
+                  <div class="name-line"><span class="name">Саидахон Назарова</span><span class="badge badge-indigo">Менеджер</span></div>
+                  <div class="stats">Заказов: <b>21</b> · Доход за период: <b>3 140 сомони</b></div>
+                </div>
+                <svg class="icon chev"><use href="#i-chevron"/></svg>
+              </div>
+            </div>
+            <div class="card team-empty" style="display:none;">
+              <div class="empty"><svg><use href="#i-users"/></svg><p class="t">Нет менеджеров в команде</p><p class="s">Добавьте менеджера через HR-панель,<br>чтобы он появился здесь</p></div>
+            </div>
+          </div>
+
+          <!-- Sellers sub-tab -->
+          <div data-sub-panel="sellers" style="display:none;">
+            <div class="card team-populated">
+              <div class="team-row" data-name="Мадина Юсупова" data-role="Продавец" data-orders="58" data-income="3 150" data-paid="3 150" data-value="31 500" data-init="МЮ">
+                <div class="avatar">МЮ</div>
+                <div class="info">
+                  <div class="name-line"><span class="name">Мадина Юсупова</span><span class="badge badge-violet">Продавец</span></div>
+                  <div class="stats">Заказов: <b>58</b> · Доход за период: <b>3 150 сомони</b></div>
+                </div>
+                <svg class="icon chev"><use href="#i-chevron"/></svg>
+              </div>
+              <div class="team-row" data-name="Далер Каримов" data-role="Продавец" data-orders="41" data-income="2 640" data-paid="1 200" data-value="26 400" data-init="ДК">
+                <div class="avatar">ДК</div>
+                <div class="info">
+                  <div class="name-line"><span class="name">Далер Каримов</span><span class="badge badge-violet">Продавец</span></div>
+                  <div class="stats">Заказов: <b>41</b> · Доход за период: <b>2 640 сомони</b></div>
+                </div>
+                <svg class="icon chev"><use href="#i-chevron"/></svg>
+              </div>
+              <div class="team-row" data-name="Нилуфар Толибова" data-role="Продавец" data-orders="37" data-income="2 210" data-paid="0" data-value="22 100" data-init="НТ">
+                <div class="avatar">НТ</div>
+                <div class="info">
+                  <div class="name-line"><span class="name">Нилуфар Толибова</span><span class="badge badge-violet">Продавец</span></div>
+                  <div class="stats">Заказов: <b>37</b> · Доход за период: <b>2 210 сомони</b></div>
+                </div>
+                <svg class="icon chev"><use href="#i-chevron"/></svg>
+              </div>
+              <div class="team-row" data-name="Рустам Сафаров" data-role="Продавец" data-orders="12" data-income="640" data-paid="640" data-value="6 400" data-init="РС">
+                <div class="avatar">РС</div>
+                <div class="info">
+                  <div class="name-line"><span class="name">Рустам Сафаров</span><span class="badge badge-violet">Продавец</span></div>
+                  <div class="stats">Заказов: <b>12</b> · Доход за период: <b>640 сомони</b></div>
+                </div>
+                <svg class="icon chev"><use href="#i-chevron"/></svg>
+              </div>
+            </div>
+            <div class="card team-empty" style="display:none;">
+              <div class="empty"><svg><use href="#i-users"/></svg><p class="t">Нет продавцов в команде</p><p class="s">Добавьте продавцов через HR-панель,<br>чтобы они появились здесь</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pill-nav">
+        <div class="nav-tab"><svg class="icon"><use href="#i-home"/></svg><span>Главная</span></div>
+        <div class="nav-tab"><svg class="icon"><use href="#i-cart"/></svg><span>Заказы</span></div>
+        <div class="nav-tab active"><svg class="icon"><use href="#i-users"/></svg><span>Моя команда</span></div>
+        <div class="nav-tab"><svg class="icon"><use href="#i-wallet"/></svg><span>Финансы</span></div>
+        <div class="nav-tab"><svg class="icon"><use href="#i-more"/></svg><span>Ещё</span></div>
+      </div>
+
+      <!-- detail drawer -->
+      <div class="sheet-backdrop" data-sheet="team"></div>
+      <div class="sheet" data-sheet-panel="team">
+        <div class="sheet-close" data-close="team"><svg class="icon" style="width:16px;height:16px"><use href="#i-x"/></svg></div>
+        <div class="sheet-handle"></div>
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:6px;">
+          <div class="avatar" id="drawer-init">ФР</div>
+          <div>
+            <div style="font-weight:900; font-size:16px; color:var(--slate-900)" id="drawer-name">Фарход Раҳимов</div>
+            <span class="badge badge-indigo" id="drawer-role">Менеджер</span>
+          </div>
+        </div>
+        <div class="stat3">
+          <div class="tile"><div class="v" id="drawer-value">48 200</div><div class="l">Сумма заказов</div></div>
+          <div class="tile"><div class="v" id="drawer-income">4 820</div><div class="l">Доход, сомони</div></div>
+          <div class="tile"><div class="v" id="drawer-need">1 820</div><div class="l">Нужно выплатить</div></div>
+        </div>
+        <div class="formula-box" id="drawer-formula">Свой заказ × 20% + остальные заказы × 3% = Доход</div>
+        <div class="list-head"><h2 class="list-h2">Недавние заказы</h2></div>
+        <div class="card" style="margin-bottom:8px;">
+          <div class="payout-row"><div><div class="ledger-who" style="font-size:13px;">Заказ #10481</div><div class="meta">01.07.2026</div></div><span class="badge badge-emerald">Доставлен</span></div>
+          <div class="payout-row"><div><div class="ledger-who" style="font-size:13px;">Заказ #10465</div><div class="meta">29.06.2026</div></div><span class="badge badge-emerald">Доставлен</span></div>
+          <div class="payout-row"><div><div class="ledger-who" style="font-size:13px;">Заказ #10440</div><div class="meta">26.06.2026</div></div><span class="badge badge-amber">В пути</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>Что меняется</h3>
+    <div class="note-card"><b>Объединение:</b> раньше отдельные страницы Менеджеров и Продавцов (роутов не было — только карточки на <code>OwnerHRPage</code>/<code>ManagerSellersPage</code>). Здесь один экран с саб-табами «Менеджеры / Продавцы», паттерн карточки взят из <code>SellerCard</code> (<code>ManagerSellersPage.jsx</code>) — аватар-инициалы, ролевой бейдж, статистика.</div>
+    <div class="note-card"><b>Источник данных:</b> <code>TeamIncomeResponse.members[]</code> (<code>useTeamIncome</code> → <code>GET /hr/income/teams/:teamLeadId</code>) — поля <code>UserID</code>, <code>TotalIncome</code>, <code>OrdersCount</code>. Роль для бейджа и группировки по саб-табам берётся из профиля пользователя (менеджер/продавец), не из этого DTO.</div>
+    <div class="note-card"><b>Тап по строке</b> открывает шторку снизу: 3 плитки — Сумма заказов (валовая, для контекста) / Доход (комиссия) / Нужно выплатить (= <code>Доход − Выплачено</code>, та же цифра, что «Осталось» в списке выплат на экране 3), плюс строка-формула под ними: для продавца «(Сумма заказов − Доставка) × 10% = Доход», для менеджера «Свой заказ × 20% + остальные заказы × 3% = Доход». Ниже — недавние заказы.</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SCREEN 3 — Финансы (Team Lead) -->
+<!-- ============================================================ -->
+<section class="panel" id="t3">
+  <div class="device-frame">
+    <div class="device-screen">
+      <div class="device-notch"></div>
+      <div class="statusbar"><span>9:41</span><span class="icons">📶 🔋</span></div>
+      <div class="device-content">
+        <div class="scr-pad">
+          <h1 class="pg">Финансы команды</h1>
+          <p class="pg-sub">июль 2026</p>
+          <div class="rbac-chip"><svg class="icon" style="width:14px;height:14px"><use href="#i-users"/></svg>Выплаты — только участникам вашей команды</div>
+
+          <!-- hero: Team Lead's personal net income (pool share minus staff payouts) -->
+          <div class="hero">
+            <div class="hero-label">Ваш личный доход за период</div>
+            <div class="hero-sum">218,4 сомони</div>
+            <div class="formula">
+              <span style="color:var(--slate-900)">320</span>
+              <span style="color:var(--slate-400)">−</span>
+              <span style="color:var(--amber)">101,6</span>
+              <span style="color:var(--slate-400)">=</span>
+              <span style="color:var(--indigo)">218,4</span>
+            </div>
+            <div class="hero-caption">Доход команды (40%) − Выплаты сотрудникам</div>
+            <div class="hero-chip"><span>Осталось выплатить команде</span><b>6 610 сомони</b></div>
+          </div>
+
+          <div class="list-head">
+            <h2 class="list-h2">Кому выплатить</h2>
+            <div class="row-total">Выбрано: <b id="sel-count" style="color:var(--indigo)">2</b> из 6</div>
+          </div>
+
+          <div class="card" id="pay-list">
+            <div class="pay-row" data-remaining="1820" data-name="Фарход Раҳимов">
+              <div class="check checked" data-check><svg><use href="#i-check"/></svg></div>
+              <div style="flex:1;">
+                <div class="name-line" style="display:flex; align-items:center; gap:7px; margin-bottom:2px;">
+                  <div class="avatar sm">ФР</div>
+                  <span style="font-weight:800; font-size:13.5px; color:var(--slate-900)">Фарход Раҳимов</span>
+                  <span class="badge badge-indigo">Менеджер</span>
+                </div>
+                <div class="pay-caption">34 заказа · сумма 48 200 сомони</div>
+                <div class="pay-stats">
+                  <div>Заработано<b>4 820 сомони</b></div>
+                  <div>Выплачено<b>3 000 сомони</b></div>
+                  <div>Осталось<b style="color:var(--indigo)">1 820 сомони</b></div>
+                </div>
+                <input class="amt-input" data-amt value="1 820" inputmode="numeric">
+              </div>
+            </div>
+
+            <div class="pay-row disabled" data-remaining="0" data-disabled="true">
+              <div class="check" data-check style="border-color:var(--slate-100); cursor:default;"></div>
+              <div style="flex:1;">
+                <div class="name-line" style="display:flex; align-items:center; gap:7px; margin-bottom:2px;">
+                  <div class="avatar sm">МЮ</div>
+                  <span style="font-weight:800; font-size:13.5px; color:var(--slate-900)">Мадина Юсупова</span>
+                  <span class="badge badge-violet">Продавец</span>
+                </div>
+                <div class="pay-caption">58 заказов · сумма 31 500 сомони</div>
+                <div class="pay-stats">
+                  <div>Заработано<b>3 150 сомони</b></div>
+                  <div>Выплачено<b>3 150 сомони</b></div>
+                  <div>Осталось<b style="color:var(--emerald)">0 сомони</b></div>
+                </div>
+                <span class="badge badge-emerald" style="margin-top:9px;">Выплачено полностью</span>
+              </div>
+            </div>
+
+            <div class="pay-row" data-remaining="1440" data-name="Далер Каримов">
+              <div class="check checked" data-check><svg><use href="#i-check"/></svg></div>
+              <div style="flex:1;">
+                <div class="name-line" style="display:flex; align-items:center; gap:7px; margin-bottom:2px;">
+                  <div class="avatar sm">ДК</div>
+                  <span style="font-weight:800; font-size:13.5px; color:var(--slate-900)">Далер Каримов</span>
+                  <span class="badge badge-violet">Продавец</span>
+                </div>
+                <div class="pay-caption">41 заказ · сумма 26 400 сомони</div>
+                <div class="pay-stats">
+                  <div>Заработано<b>2 640 сомони</b></div>
+                  <div>Выплачено<b>1 200 сомони</b></div>
+                  <div>Осталось<b style="color:var(--indigo)">1 440 сомони</b></div>
+                </div>
+                <input class="amt-input" data-amt value="1 440" inputmode="numeric">
+              </div>
+            </div>
+
+            <div class="pay-row" data-remaining="2210" data-name="Нилуфар Толибова">
+              <div class="check" data-check></div>
+              <div style="flex:1;">
+                <div class="name-line" style="display:flex; align-items:center; gap:7px; margin-bottom:2px;">
+                  <div class="avatar sm">НТ</div>
+                  <span style="font-weight:800; font-size:13.5px; color:var(--slate-900)">Нилуфар Толибова</span>
+                  <span class="badge badge-violet">Продавец</span>
+                </div>
+                <div class="pay-caption">37 заказов · сумма 22 100 сомони</div>
+                <div class="pay-stats">
+                  <div>Заработано<b>2 210 сомони</b></div>
+                  <div>Выплачено<b>0 сомони</b></div>
+                  <div>Осталось<b style="color:var(--indigo)">2 210 сомони</b></div>
+                </div>
+                <input class="amt-input" data-amt value="2 210" inputmode="numeric" disabled>
+              </div>
+            </div>
+
+            <div class="pay-row disabled" data-remaining="0" data-disabled="true">
+              <div class="check" data-check style="border-color:var(--slate-100); cursor:default;"></div>
+              <div style="flex:1;">
+                <div class="name-line" style="display:flex; align-items:center; gap:7px; margin-bottom:2px;">
+                  <div class="avatar sm">РС</div>
+                  <span style="font-weight:800; font-size:13.5px; color:var(--slate-900)">Рустам Сафаров</span>
+                  <span class="badge badge-violet">Продавец</span>
+                </div>
+                <div class="pay-caption">12 заказов · сумма 6 400 сомони</div>
+                <div class="pay-stats">
+                  <div>Заработано<b>640 сомони</b></div>
+                  <div>Выплачено<b>640 сомони</b></div>
+                  <div>Осталось<b style="color:var(--emerald)">0 сомони</b></div>
+                </div>
+                <span class="badge badge-emerald" style="margin-top:9px;">Выплачено полностью</span>
+              </div>
+            </div>
+
+            <div class="pay-row" data-remaining="1140" data-name="Саидахон Назарова">
+              <div class="check" data-check></div>
+              <div style="flex:1;">
+                <div class="name-line" style="display:flex; align-items:center; gap:7px; margin-bottom:2px;">
+                  <div class="avatar sm">СН</div>
+                  <span style="font-weight:800; font-size:13.5px; color:var(--slate-900)">Саидахон Назарова</span>
+                  <span class="badge badge-indigo">Менеджер</span>
+                </div>
+                <div class="pay-caption">21 заказ · сумма 31 400 сомони</div>
+                <div class="pay-stats">
+                  <div>Заработано<b>3 140 сомони</b></div>
+                  <div>Выплачено<b>2 000 сомони</b></div>
+                  <div>Осталось<b style="color:var(--indigo)">1 140 сомони</b></div>
+                </div>
+                <input class="amt-input" data-amt value="1 140" inputmode="numeric" disabled>
+              </div>
+            </div>
+          </div>
+          <div style="height:80px;"></div>
+        </div>
+      </div>
+
+      <div class="sticky-bar">
+        <div class="sum">
+          <div class="lbl">Выбрано: <span id="sel-count-2">2</span></div>
+          <div class="val" id="sel-total">Итого: 3 260 сомони</div>
+        </div>
+        <button id="open-confirm">Выплатить</button>
+      </div>
+
+      <div class="pill-nav">
+        <div class="nav-tab"><svg class="icon"><use href="#i-home"/></svg><span>Главная</span></div>
+        <div class="nav-tab"><svg class="icon"><use href="#i-cart"/></svg><span>Заказы</span></div>
+        <div class="nav-tab"><svg class="icon"><use href="#i-users"/></svg><span>Моя команда</span></div>
+        <div class="nav-tab active"><svg class="icon"><use href="#i-wallet"/></svg><span>Финансы</span></div>
+        <div class="nav-tab"><svg class="icon"><use href="#i-more"/></svg><span>Ещё</span></div>
+      </div>
+
+      <!-- confirm sheet -->
+      <div class="sheet-backdrop" data-sheet="confirm"></div>
+      <div class="sheet" data-sheet-panel="confirm">
+        <div class="sheet-close" data-close="confirm"><svg class="icon" style="width:16px;height:16px"><use href="#i-x"/></svg></div>
+        <div class="sheet-handle"></div>
+        <h2 style="margin:0 0 4px; font-size:17px; font-weight:900; color:var(--slate-900)">Подтвердите выплату</h2>
+        <p style="margin:0 0 16px; font-size:12.5px; color:var(--slate-400); font-weight:600;">Запись попадёт в единый леджер <code style="background:var(--slate-50); padding:1px 5px; border-radius:5px;">payouts</code> и автоматически появится расходом в Финансах владельца</p>
+        <div class="card" style="margin-bottom:14px;">
+          <div class="payout-row"><div><div class="ledger-who" style="font-size:13px;">Фарход Раҳимов · Менеджер</div></div><div class="amt" style="font-size:14px;">1 820 сомони</div></div>
+          <div class="payout-row"><div><div class="ledger-who" style="font-size:13px;">Далер Каримов · Продавец</div></div><div class="amt" style="font-size:14px;">1 440 сомони</div></div>
+        </div>
+        <p style="margin:0 0 6px; font-size:11px; color:var(--slate-400); font-weight:800; text-transform:uppercase; letter-spacing:.4px;">Способ выплаты</p>
+        <div class="method-seg">
+          <button class="active">Наличные</button>
+          <button>Перевод</button>
+          <button>Карта</button>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 4px; border-top:1px solid var(--slate-100); margin-top:4px; margin-bottom:14px;">
+          <span style="font-weight:800; color:var(--slate-500); font-size:13px;">Итого к выплате</span>
+          <span style="font-weight:900; color:var(--indigo); font-size:19px;">3 260 сомони</span>
+        </div>
+        <button class="btn-primary" id="confirm-pay">Подтвердить выплату</button>
+      </div>
+
+      <div class="toast" id="pay-toast"><svg class="icon" style="width:16px;height:16px; color:#34D399"><use href="#i-check"/></svg>Выплата проведена · появится в Финансах владельца</div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>Что меняется</h3>
+    <div class="note-card"><b>Hero = личный доход тимлида:</b> большое число — то, что тимлид реально заработал за период: 40%-й пул команды минус выплаты сотрудникам (<code>320 − 101,6 = 218,4</code>), где 101,6 = 64 (продавцам, 10%) + 37,6 (менеджеру, 20% со своего + 3% с остальных). Это личные деньги тимлида — момент «мне заплатили», как и задумано hero-карточкой. Непогашенный остаток команде («Осталось выплатить», 6 610) — отдельная метрика, вынесена в чип под формулой, а не в hero, чтобы не путать «сколько заработал» с «сколько ещё должен выплатить».</div>
+    <div class="note-card"><b>Единый леджер выплат:</b> модель <code>SellerPayout</code> сейчас жёстко привязана к <code>seller_id</code> (<code>internal/seller_payouts/model.go</code>) — выплатить менеджеру или тимлиду физически некуда записать. Нужна замена/расширение на <code>payouts(payee_id, payee_role, payer_id, payer_role, amount, method, period_start, period_end, status)</code>. Выплата Тимлид→Менеджер и Менеджер→Продавец — одна и та же форма записи, разница только в ролях.</div>
+    <div class="note-card"><b>Итог:</b> раз структура общая, Owner Finance просто фильтрует леджер по <code>payer_role IN (team_lead, manager)</code> и показывает как авто-расход — без отдельной формы «добавить расход вручную» (экран 5).</div>
+    <div class="note-card">Массовый выбор: чекбокс + сумма по умолчанию = «Осталось», редактируемая. Полностью выплаченные — задизейблены и отмечены зелёным бейджем.</div>
+    <div class="note-card">Каждая строка списка теперь начинается с контекстной подписи «34 заказа · сумма 48 200 сомони» (объём + валовая сумма, тот же источник, что <code>data-orders</code>/<code>data-value</code> в шторке экрана 2) — до трёх стат-полей «Заработано/Выплачено/Осталось» тимлид сразу видит, из какого объёма работы взялась комиссия, не открывая шторку.</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SCREEN 4 — Manager Выплаты tab -->
+<!-- ============================================================ -->
+<section class="panel" id="t4">
+  <div class="device-frame">
+    <div class="device-screen">
+      <div class="device-notch"></div>
+      <div class="statusbar"><span>9:41</span><span class="icons">📶 🔋</span></div>
+      <div class="device-content">
+        <div class="scr-pad" style="padding-top:calc(env(safe-area-inset-top,0px) + 16px);">
+          <h1 class="pg" style="font-size:21px; margin-top:0;">Мои доходы</h1>
+          <div class="rbac-chip"><svg class="icon" style="width:14px;height:14px"><use href="#i-info"/></svg>Видно только: ваши личные данные</div>
+
+          <div class="mono-seg">
+            <button class="active" data-mono-tab="earn">Заработок</button>
+            <button data-mono-tab="payouts">Выплаты</button>
+          </div>
+
+          <!-- Заработок -->
+          <div data-mono-panel="earn">
+            <div class="period-row">
+              <button>Сегодня</button>
+              <button>Неделя</button>
+              <button class="active">Месяц</button>
+            </div>
+
+            <div class="dark-hero">
+              <div class="lbl">Продажа за месяц</div>
+              <div class="val">284 600 сомони</div>
+              <span class="delta">↗ +18%</span>
+              <span style="color:#9CA3AF; font-size:11.5px; margin-left:6px;">к прошлому месяцу</span>
+            </div>
+
+            <div class="mono-stat3">
+              <div class="tile"><div class="v">1 000</div><div class="l">Доставка</div></div>
+              <div class="tile"><div class="v">10%</div><div class="l">Комиссия</div></div>
+              <div class="tile"><div class="v" style="color:#EA580C;">28 360</div><div class="l">К выплате</div></div>
+            </div>
+
+            <div class="list-head"><h2 class="list-h2">История начислений</h2></div>
+            <div class="card" style="padding:2px 14px 2px;">
+              <div class="accrual-row">
+                <div class="accrual-icon"><svg class="icon" style="width:18px;height:18px"><use href="#i-cart"/></svg></div>
+                <div class="info"><div class="t">Заказ #MM-2041</div><div class="s">сегодня, 14:20 · комиссия 7%</div></div>
+                <div class="plus">+87 сомони</div>
+              </div>
+              <div class="accrual-row">
+                <div class="accrual-icon"><svg class="icon" style="width:18px;height:18px"><use href="#i-cart"/></svg></div>
+                <div class="info"><div class="t">Заказ #MM-2035</div><div class="s">вчера, 16:40 · комиссия 7%</div></div>
+                <div class="plus">+150 сомони</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Выплаты -->
+          <div data-mono-panel="payouts" style="display:none;">
+            <div class="dark-hero">
+              <div class="lbl"><span class="dot"></span>Ожидает выплаты</div>
+              <div class="val">28 360 сомони</div>
+              <div class="capt">Следующая выплата · 1 июля</div>
+            </div>
+
+            <div class="rbac-chip"><svg class="icon" style="width:14px;height:14px"><use href="#i-info"/></svg>Видно только: ваши личные выплаты (payee_id = вы)</div>
+
+            <div class="state-toggle">
+              <button class="active" data-state="populated" data-group="mgr">Заполнено</button>
+              <button data-state="empty" data-group="mgr">Пусто</button>
+            </div>
+
+            <div class="list-head"><h2 class="list-h2">История выплат</h2></div>
+            <div class="card mgr-populated" style="padding:2px 14px 2px;">
+              <div class="mono-payout-row">
+                <div><div class="amt">28 360 сомони</div><div class="meta">16 июн — 30 июн</div></div>
+                <span class="mono-pill wait"><span class="dot2"></span>Ожидает</span>
+              </div>
+              <div class="mono-payout-row">
+                <div><div class="amt">68 400 сомони</div><div class="meta">1 июн — 15 июн</div></div>
+                <div style="text-align:right;"><span class="mono-pill paid">✓ Выплачено</span><div class="paid-date">Выплачено 16 июн</div></div>
+              </div>
+              <div class="mono-payout-row">
+                <div><div class="amt">55 200 сомони</div><div class="meta">16 май — 31 май</div></div>
+                <div style="text-align:right;"><span class="mono-pill paid">✓ Выплачено</span><div class="paid-date">Выплачено 1 июн</div></div>
+              </div>
+              <div class="mono-payout-row">
+                <div><div class="amt">61 800 сомони</div><div class="meta">1 май — 15 май</div></div>
+                <div style="text-align:right;"><span class="mono-pill paid">✓ Выплачено</span><div class="paid-date">Выплачено 16 май</div></div>
+              </div>
+            </div>
+            <div class="card mgr-empty" style="display:none;">
+              <div class="empty"><svg><use href="#i-cal"/></svg><p class="t">Выплат пока нет</p><p class="s">Появятся здесь после первой выплаты<br>от вашего тимлида</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pill-nav">
+        <div class="nav-tab"><svg class="icon"><use href="#i-home"/></svg><span>Главная</span></div>
+        <div class="nav-tab"><svg class="icon"><use href="#i-users"/></svg><span>Команда</span></div>
+        <div class="nav-tab" style="background:linear-gradient(135deg,#4F46E5,#6D28D9); border-radius:999px; margin-top:-22px; width:52px; height:52px; flex:0 0 52px; box-shadow:0 6px 20px rgba(79,70,229,.5);"><svg class="icon" style="color:#fff; width:22px; height:22px;"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg></div>
+        <div class="nav-tab active"><svg class="icon"><use href="#i-wallet"/></svg><span>Доходы</span></div>
+        <div class="nav-tab"><svg class="icon"><use href="#i-users"/></svg><span>Профиль</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>Что меняется</h3>
+    <div class="note-card"><b>Пробел сейчас:</b> у Менеджера (<code>features/manager</code>) нет ни маршрута, ни компонента для истории выплат — <code>grep "payout"</code> по каталогу даёт 0 совпадений. У Продавца этот таб уже есть и работает (<code>SellerIncomePage.jsx</code>, таб «Выплаты»).</div>
+    <div class="note-card"><b>Решение:</b> не пересобирать — переиспользовать тот же <code>payoutsContent</code>/компонент 1:1 (карточки со статус-пиллами, суммой, периодом, методом), просто сменить источник данных на <code>payee_id = текущий менеджер</code> вместо <code>seller_id</code>. Бэкенд уже гейтит <code>GET /seller-payouts/me</code> ролью <code>sales_team_lead</code>/<code>manager</code>, но сейчас достаёт строки по <code>seller_id = claims.UserID</code> — с менеджером как payee вернёт пусто. После перехода на единый леджер (см. экран 3) фильтр меняется на <code>payee_id + payee_role='manager'</code>, и данные потекут сами.</div>
+    <div class="note-card">Добавлен в существующий Manager BottomNav (<code>Layout.jsx → MANAGER_TABS</code>) как вкладка «Доходы» — таб-переключатель «Заработок/Выплаты» внутри страницы, как у продавца, а не отдельный пункт в нижней навигации.</div>
+    <div class="note-card"><b>Стиль сверен со скриншотом реального экрана</b> «Мои доходы» (текущий продакшн, не код): тёмная карточка-hero (почти чёрная, не индиго/зелёный градиент), монохромный сегмент-переключатель Заработок/Выплаты, тумблер периода Сегодня/Неделя/Месяц, 3 плитки (Доставка/Комиссия/К выплате), «История начислений» со значком заказа и зелёным «+», статус-пиллы в «Истории выплат» (оранжевая точка «Ожидает» / зелёная галка «Выплачено» + дата). Это буквально тот же компонент — просто отфильтрован по менеджеру.</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SCREEN 5 — Owner Finance reconciliation -->
+<!-- ============================================================ -->
+<section class="panel" id="t5">
+  <div class="device-frame">
+    <div class="device-screen">
+      <div class="device-notch"></div>
+      <div class="statusbar"><span>9:41</span><span class="icons">📶 🔋</span></div>
+      <div class="device-content">
+        <div class="scr-pad">
+          <h1 class="pg">Финансы · Леджер</h1>
+          <p class="pg-sub">июль 2026</p>
+          <div class="rbac-chip"><svg class="icon" style="width:14px;height:14px"><use href="#i-info"/></svg>Владелец видит все выплаты по компании</div>
+
+          <div class="list-head">
+            <h2 class="list-h2">Лента событий</h2>
+            <div class="row-total">за период: <b style="color:var(--slate-700)">6 570 сомони</b></div>
+          </div>
+
+          <div class="card" style="margin-bottom:14px;">
+            <div class="ledger-row">
+              <div class="ledger-top">
+                <div>
+                  <span class="badge badge-indigo">Выплата · Тимлид → Менеджер</span>
+                  <div class="ledger-who" style="margin-top:6px;">Фарход Раҳимов</div>
+                </div>
+                <div class="ledger-sum">1 200 сомони</div>
+              </div>
+              <div class="ledger-bottom">
+                <span>от Шариф Одинаев (тимлид) · 01.07.2026</span>
+                <span class="tag-auto"><svg class="icon" style="width:11px;height:11px"><use href="#i-zap"/></svg>Авто</span>
+              </div>
+            </div>
+
+            <div class="ledger-row">
+              <div class="ledger-top">
+                <div>
+                  <span class="badge badge-violet">Выплата · Менеджер → Продавец</span>
+                  <div class="ledger-who" style="margin-top:6px;">Мадина Юсупова</div>
+                </div>
+                <div class="ledger-sum">3 150 сомони</div>
+              </div>
+              <div class="ledger-bottom">
+                <span>от Фарход Раҳимов (менеджер) · 28.06.2026</span>
+                <span class="tag-auto"><svg class="icon" style="width:11px;height:11px"><use href="#i-zap"/></svg>Авто</span>
+              </div>
+            </div>
+
+            <div class="ledger-row">
+              <div class="ledger-top">
+                <div>
+                  <span class="badge badge-slate">Комиссия продавца</span>
+                  <div class="ledger-who" style="margin-top:6px;">Далер Каримов</div>
+                </div>
+                <div class="ledger-sum">640 сомони</div>
+              </div>
+              <div class="ledger-bottom">
+                <span>заказ #10440 · 30.06.2026</span>
+              </div>
+            </div>
+
+            <div class="ledger-row">
+              <div class="ledger-top">
+                <div>
+                  <span class="badge badge-amber">Расход</span>
+                  <div class="ledger-who" style="margin-top:6px;">Аренда офиса</div>
+                </div>
+                <div class="ledger-sum">1 580 сомони</div>
+              </div>
+              <div class="ledger-bottom">
+                <span>добавлено вручную · 01.07.2026</span>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span class="tag-manual"><svg class="icon" style="width:11px;height:11px"><use href="#i-edit"/></svg>Вручную</span>
+                  <div class="edit-btn"><svg class="icon" style="width:14px;height:14px"><use href="#i-edit"/></svg></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding:15px 16px; display:flex; gap:11px; align-items:flex-start; margin-bottom:20px; border-color:#DDD6FE;">
+            <svg class="icon" style="color:var(--indigo); flex-shrink:0; margin-top:1px;"><use href="#i-zap"/></svg>
+            <p style="margin:0; font-size:12px; line-height:1.6; color:var(--slate-500);"><b style="color:var(--slate-900)">Автосверка выплат.</b> Выплаты, сделанные Тимлидами и Менеджерами своим командам, попадают сюда автоматически (по <code style="background:var(--slate-50); padding:1px 5px; border-radius:5px;">payer_role</code> в едином леджере <code style="background:var(--slate-50); padding:1px 5px; border-radius:5px;">payouts</code>) — отдельно от ручного «Добавить расход». Повторно вносить их не нужно.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>Что меняется</h3>
+    <div class="note-card"><b>Сейчас:</b> <code>FinanceEventsTable.jsx</code> различает типы событий только цветом бейджа (<code>EVENT_TYPE_BADGE</code>), выплат Тимлидов/Менеджеров как отдельной сущности не существует — их физически негде хранить (см. заметку на экране 3 про <code>seller_id</code>-only модель).</div>
+    <div class="note-card"><b>Добавка:</b> два новых типа бейджей «Выплата · Тимлид → Менеджер» / «Выплата · Менеджер → Продавец» (индиго/фиолет, отличны от существующих типов) + маленький тег <b>Авто</b> vs <b>Вручную</b> рядом с датой. Кнопка редактирования (карандаш) остаётся только у ручных расходов — как сейчас у <code>business_expense</code>.</div>
+    <div class="note-card">Это не новый ручной ввод — Owner ничего не создаёт сам, строки появляются автоматически при выплате на экранах 3/4, что и было целью: убрать двойной учёт.</div>
+  </div>
+</section>
+
+</div>
+
+<script>
+  // top meta tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  // screen2: sub-tabs (managers/sellers)
+  document.querySelectorAll('#t2 .seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#t2 .seg-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('#t2 [data-sub-panel]').forEach(p => p.style.display = 'none');
+      document.querySelector(`#t2 [data-sub-panel="${btn.dataset.sub}"]`).style.display = '';
+    });
+  });
+
+  // generic empty/populated state toggles
+  document.querySelectorAll('.state-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const group = btn.dataset.group;
+      const state = btn.dataset.state;
+      const scope = btn.closest('.panel');
+      scope.querySelectorAll(`.state-toggle button`).forEach(b => { if (b.closest('.state-toggle') === btn.closest('.state-toggle')) b.classList.remove('active'); });
+      btn.classList.add('active');
+      if (group === 'team') {
+        scope.querySelectorAll('.team-populated').forEach(el => el.style.display = state === 'populated' ? '' : 'none');
+        scope.querySelectorAll('.team-empty').forEach(el => el.style.display = state === 'empty' ? '' : 'none');
+      }
+      if (group === 'mgr') {
+        scope.querySelectorAll('.mgr-populated').forEach(el => el.style.display = state === 'populated' ? '' : 'none');
+        scope.querySelectorAll('.mgr-empty').forEach(el => el.style.display = state === 'empty' ? '' : 'none');
+      }
+    });
+  });
+
+  // screen2: row click opens detail drawer
+  document.querySelectorAll('#t2 .team-row[data-name]').forEach(row => {
+    row.addEventListener('click', () => {
+      document.getElementById('drawer-init').textContent = row.dataset.init;
+      document.getElementById('drawer-name').textContent = row.dataset.name;
+      const roleBadge = document.getElementById('drawer-role');
+      const isManager = row.dataset.role === 'Менеджер';
+      roleBadge.textContent = row.dataset.role;
+      roleBadge.className = 'badge ' + (isManager ? 'badge-indigo' : 'badge-violet');
+      document.getElementById('drawer-value').textContent = row.dataset.value;
+      document.getElementById('drawer-income').textContent = row.dataset.income;
+      const income = parseInt((row.dataset.income || '0').replace(/\s/g, ''), 10) || 0;
+      const paid = parseInt((row.dataset.paid || '0').replace(/\s/g, ''), 10) || 0;
+      document.getElementById('drawer-need').textContent = Math.max(0, income - paid).toLocaleString('ru-RU');
+      document.getElementById('drawer-formula').textContent = isManager
+        ? 'Свой заказ × 20% + остальные заказы × 3% = Доход'
+        : '(Сумма заказов − Доставка) × 10% = Доход';
+      openSheet('team');
+    });
+  });
+
+  function openSheet(name) {
+    document.querySelector(`[data-sheet="${name}"]`).classList.add('open');
+    document.querySelector(`[data-sheet-panel="${name}"]`).classList.add('open');
+  }
+  function closeSheet(name) {
+    document.querySelector(`[data-sheet="${name}"]`).classList.remove('open');
+    document.querySelector(`[data-sheet-panel="${name}"]`).classList.remove('open');
+  }
+  document.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', () => closeSheet(el.dataset.close)));
+  document.querySelectorAll('[data-sheet]').forEach(el => el.addEventListener('click', () => closeSheet(el.dataset.sheet)));
+
+  // screen3: checkbox + amount interactivity, recompute total
+  function recomputeTotal() {
+    let count = 0, total = 0;
+    document.querySelectorAll('#pay-list .pay-row:not([data-disabled])').forEach(row => {
+      const check = row.querySelector('[data-check]');
+      if (check.classList.contains('checked')) {
+        count++;
+        const input = row.querySelector('[data-amt]');
+        const val = parseInt((input.value || '0').replace(/\s/g, ''), 10) || 0;
+        total += val;
+      }
+    });
+    document.getElementById('sel-count').textContent = count;
+    document.getElementById('sel-count-2').textContent = count;
+    document.getElementById('sel-total').textContent = 'Итого: ' + total.toLocaleString('ru-RU') + ' сомони';
+    const btn = document.getElementById('open-confirm');
+    btn.disabled = count === 0;
+  }
+  document.querySelectorAll('#pay-list .pay-row:not([data-disabled]) [data-check]').forEach(check => {
+    check.addEventListener('click', () => {
+      const checked = check.classList.toggle('checked');
+      check.innerHTML = checked ? '<svg><use href="#i-check"/></svg>' : '';
+      const input = check.closest('.pay-row').querySelector('[data-amt]');
+      if (input) input.disabled = !checked;
+      recomputeTotal();
+    });
+  });
+  document.querySelectorAll('#pay-list [data-amt]').forEach(input => {
+    input.addEventListener('input', recomputeTotal);
+  });
+  recomputeTotal();
+
+  document.getElementById('open-confirm').addEventListener('click', () => openSheet('confirm'));
+  document.getElementById('confirm-pay').addEventListener('click', () => {
+    closeSheet('confirm');
+    const toast = document.getElementById('pay-toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2600);
+  });
+  document.querySelectorAll('#t3 .method-seg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#t3 .method-seg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  // screen4: Заработок/Выплаты mono-seg switch
+  document.querySelectorAll('#t4 .mono-seg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#t4 .mono-seg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('#t4 [data-mono-panel]').forEach(p => p.style.display = 'none');
+      document.querySelector(`#t4 [data-mono-panel="${btn.dataset.monoTab}"]`).style.display = '';
+    });
+  });
+  // screen4: period toggle (visual only)
+  document.querySelectorAll('#t4 .period-row button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#t4 .period-row button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
