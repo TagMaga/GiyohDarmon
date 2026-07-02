@@ -20,7 +20,7 @@ export default function WarehouseWriteoffsPage() {
         action={<Button variant="danger" icon={<Plus size={15} />} onClick={() => setOpen(true)}>Новое списание</Button>}
       />
       <MovementList rows={rows} data={data} emptyTitle="Списаний пока нет" />
-      <WriteoffModal open={open} onClose={() => setOpen(false)} products={data.products} warehouses={data.warehouses} inventory={data.inventory} />
+      <WriteoffModal open={open} onClose={() => setOpen(false)} products={data.products} inventory={data.inventory} />
     </div>
   )
 }

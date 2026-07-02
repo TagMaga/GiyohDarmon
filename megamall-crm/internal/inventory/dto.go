@@ -163,17 +163,6 @@ type MovementResponse struct {
 	CreatedBy        uuid.UUID    `json:"created_by"`
 	CreatedByName    string       `json:"created_by_name"`
 	CreatedAt        time.Time    `json:"created_at"`
-
-	// Populated only for "sale" movements — the order this stock left for.
-	// Lets the Движения screen show order/customer/courier context without
-	// granting warehouse_manager access to /orders (see orders/routes.go).
-	OrderID         *uuid.UUID `json:"order_id,omitempty"`
-	OrderNumber     *string    `json:"order_number,omitempty"`
-	OrderStatus     *string    `json:"order_status,omitempty"`
-	CustomerName    *string    `json:"customer_name,omitempty"`
-	CustomerPhone   *string    `json:"customer_phone,omitempty"`
-	DeliveryAddress *string    `json:"delivery_address,omitempty"`
-	CourierName     *string    `json:"courier_name,omitempty"`
 }
 
 func ToMovementResponse(row *MovementRow) MovementResponse {
@@ -189,20 +178,12 @@ func ToMovementResponse(row *MovementRow) MovementResponse {
 		CreatedBy:        row.CreatedBy,
 		CreatedByName:    row.CreatedByName,
 		CreatedAt:        row.CreatedAt,
-		OrderID:          row.OrderID,
-		OrderNumber:      row.OrderNumber,
-		OrderStatus:      row.OrderStatus,
-		CustomerName:     row.CustomerName,
-		CustomerPhone:    row.CustomerPhone,
-		DeliveryAddress:  row.DeliveryAddress,
-		CourierName:      row.CourierName,
 	}
 }
 
 // ─── Filters ──────────────────────────────────────────────────────────────────
 
-type ListInventoryFilter struct {
-}
+type ListInventoryFilter struct{}
 
 type ListMovementsFilter struct {
 	ProductID    string `form:"product_id"`

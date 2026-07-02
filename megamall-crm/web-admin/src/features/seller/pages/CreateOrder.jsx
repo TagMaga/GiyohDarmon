@@ -8,7 +8,6 @@ import { createOrder, createCustomer } from '../api'
 import client from '../../../shared/api/client'
 import useCustomers from '../hooks/useCustomers'
 import useProducts from '../hooks/useProducts'
-import useWarehouses from '../hooks/useWarehouses'
 import useDeliverySettings from '../hooks/useDeliverySettings'
 import useCities from '../hooks/useCities'
 import PhoneSearchField from '../components/PhoneSearchField'
@@ -173,21 +172,14 @@ export default function CreateOrder() {
 
   const { data: customersRaw = [] } = useCustomers()
   const { data: productsRaw = [], isLoading: prodLoading } = useProducts()
-  const { data: warehousesRaw = [], isLoading: whLoading, error: whError } = useWarehouses()
   const { data: deliverySettings } = useDeliverySettings()
   const { data: cities = [] } = useCities()
 
   const customers  = Array.isArray(customersRaw)  ? customersRaw  : []
   const products   = Array.isArray(productsRaw)   ? productsRaw   : []
-  const warehouses = Array.isArray(warehousesRaw) ? warehousesRaw : []
 
   const globalNormalFee = deliverySettings?.normal_fee ?? 0
   const globalFastFee   = deliverySettings?.fast_fee   ?? 0
-
-  const autoWarehouse = useMemo(
-    () => warehouses.find((w) => w.is_active === true) ?? warehouses[0] ?? null,
-    [warehouses]
-  )
 
   useEffect(() => { saveDraft(form) }, [form])
   useEffect(() => {
@@ -276,8 +268,6 @@ export default function CreateOrder() {
   const submitMut = useMutation({
     onMutate: () => { setSubmitError(null) },
     mutationFn: async () => {
-      if (!autoWarehouse) throw new Error('Склад не найден. Обратитесь к администратору.')
-
       let cid = form.customerId
       if (!cid) {
         const newCust = await createCustomer({
@@ -312,7 +302,6 @@ export default function CreateOrder() {
 
       const order = await createOrder({
         customer_id:   cid,
-        warehouse_id:  autoWarehouse.id,
         city_id:       form.cityId,
         order_type:    'seller_order',
         delivery_method: form.deliveryMode,
@@ -425,20 +414,9 @@ export default function CreateOrder() {
     )
   }
 
-  const noWarehouse = !whLoading && !autoWarehouse
-
   return (
     <div className="page-container pb-8">
       <PageHeader title="Новый заказ" subtitle="Быстрое оформление" />
-
-      {whError && (
-        <Alert variant="error" title="Ошибка загрузки склада"
-          description={whError?.response?.data?.error ?? whError?.message ?? String(whError)} />
-      )}
-      {noWarehouse && !whError && (
-        <Alert variant="error" title="Склад не найден"
-          description="Обратитесь к администратору — активный склад не настроен." />
-      )}
 
       <div className="max-w-xl mx-auto space-y-5">
 
@@ -599,7 +577,7 @@ export default function CreateOrder() {
           <button
             type="button"
             onClick={() => submitMut.mutate()}
-            disabled={!canSubmit || submitMut.isPending || noWarehouse}
+            disabled={!canSubmit || submitMut.isPending}
             className="btn btn-primary btn-md flex-1 flex items-center justify-center gap-2
                        disabled:opacity-50 disabled:cursor-not-allowed"
           >

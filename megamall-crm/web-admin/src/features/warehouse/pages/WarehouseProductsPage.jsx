@@ -9,39 +9,31 @@ import ProductModal from '../components/ProductModal'
 import ProductDrawer from '../components/ProductDrawer'
 import ReceivingModal from '../components/ReceivingModal'
 import WriteoffModal from '../components/WriteoffModal'
-import TransferModal from '../components/TransferModal'
 import useWarehouseData from '../hooks/useWarehouseData'
 import {
   fmtMoney,
-  getCategoryName,
   getId,
   getProductBarcode,
-  getProductCategoryId,
   getProductImage,
   getProductName,
   getProductSku,
   getPurchasePrice,
   getSalePrice,
-  isUUID,
   isProductActive,
 } from '../utils/warehouseHelpers'
 
 export default function WarehouseProductsPage() {
   const data = useWarehouseData()
   const [search, setSearch] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
   const [editingProduct, setEditingProduct] = useState(null)
   const [drawerProduct, setDrawerProduct] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
   const [receiveProduct, setReceiveProduct] = useState(undefined)
   const [writeoffProduct, setWriteoffProduct] = useState(null)
-  const [transferProduct, setTransferProduct] = useState(null)
-  const validCategories = data.categories.filter((c) => isUUID(getId(c)))
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return data.products.filter((p) => {
-      if (categoryFilter && getProductCategoryId(p) !== categoryFilter) return false
       if (!q) return true
       return (
         getProductName(p).toLowerCase().includes(q) ||
@@ -49,13 +41,13 @@ export default function WarehouseProductsPage() {
         getProductBarcode(p).toLowerCase().includes(q)
       )
     })
-  }, [categoryFilter, data.products, search])
+  }, [data.products, search])
 
   return (
     <div className="animate-fade-in p-6">
       <PageHeader
         title="Товары"
-        subtitle="Карточки товаров, SKU, штрихкоды, категории, цены и изображения."
+        subtitle="Карточки товаров, SKU, штрихкоды, цены и изображения."
         icon={<Package size={20} />}
         action={<Button variant="primary" icon={<PackagePlus size={15} />} onClick={() => setShowCreate(true)}>Добавить товар</Button>}
       />
@@ -66,15 +58,11 @@ export default function WarehouseProductsPage() {
         </Alert>
       )}
 
-      <section className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] md:grid-cols-[1fr_220px]">
+      <section className="mb-4 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
         <label className="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
           <Search size={17} className="text-slate-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по названию, SKU или штрихкоду…" className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400" />
         </label>
-        <select className="input py-2" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-          <option value="">Все категории</option>
-          {validCategories.map((c) => <option key={getId(c)} value={getId(c)}>{getCategoryName(c)}</option>)}
-        </select>
       </section>
 
       {filtered.length === 0 ? (
@@ -82,12 +70,11 @@ export default function WarehouseProductsPage() {
       ) : (
         <>
           <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] lg:block">
-            <table className="w-full min-w-[920px] text-sm">
+            <table className="w-full min-w-[820px] text-sm">
               <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-3 py-2.5 text-left">Товар</th>
                   <th className="px-3 py-2.5 text-left">Штрихкод</th>
-                  <th className="px-3 py-2.5 text-left">Категория</th>
                   <th className="px-3 py-2.5 text-right">Закупка</th>
                   <th className="px-3 py-2.5 text-right">Продажа</th>
                   <th className="px-3 py-2.5 text-left">Статус</th>
@@ -107,7 +94,6 @@ export default function WarehouseProductsPage() {
                       </button>
                     </td>
                     <td className="px-3 py-2.5 font-mono text-xs text-slate-500">{getProductBarcode(p)}</td>
-                    <td className="px-3 py-2.5 text-slate-500">{getCategoryName(data.categoryMap[getProductCategoryId(p)])}</td>
                     <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-600">{fmtMoney(getPurchasePrice(p))}</td>
                     <td className="px-3 py-2.5 text-right font-bold tabular-nums text-indigo-700">{fmtMoney(getSalePrice(p))}</td>
                     <td className="px-3 py-2.5"><Badge variant={isProductActive(p) ? 'emerald' : 'slate'}>{isProductActive(p) ? 'Активен' : 'Неактивен'}</Badge></td>
@@ -136,7 +122,7 @@ export default function WarehouseProductsPage() {
                       </div>
                       <Badge variant={isProductActive(p) ? 'emerald' : 'slate'}>{isProductActive(p) ? 'Активен' : 'Неактивен'}</Badge>
                     </div>
-                    <p className="mt-2 text-xs text-slate-500">{getCategoryName(data.categoryMap[getProductCategoryId(p)])} · {getProductBarcode(p)}</p>
+                    <p className="mt-2 text-xs text-slate-500">{getProductBarcode(p)}</p>
                   </div>
                 </button>
                 <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-2.5">
@@ -153,23 +139,19 @@ export default function WarehouseProductsPage() {
         </>
       )}
 
-      <ProductModal open={showCreate} onClose={() => setShowCreate(false)} categories={data.categories} suppliers={data.suppliers} />
-      <ProductModal open={Boolean(editingProduct)} onClose={() => setEditingProduct(null)} product={editingProduct} categories={data.categories} suppliers={data.suppliers} />
+      <ProductModal open={showCreate} onClose={() => setShowCreate(false)} suppliers={data.suppliers} />
+      <ProductModal open={Boolean(editingProduct)} onClose={() => setEditingProduct(null)} product={editingProduct} suppliers={data.suppliers} />
       <ProductDrawer
         product={drawerProduct}
         inventory={data.inventory}
         movements={data.movements}
-        categoryMap={data.categoryMap}
-        warehouseMap={data.warehouseMap}
         onClose={() => setDrawerProduct(null)}
         onReceive={setReceiveProduct}
         onWriteoff={setWriteoffProduct}
-        onTransfer={setTransferProduct}
         onEdit={setEditingProduct}
       />
-      <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={data.products} warehouses={data.warehouses} inventory={data.inventory} />
-      <WriteoffModal open={Boolean(writeoffProduct)} onClose={() => setWriteoffProduct(null)} products={writeoffProduct ? [writeoffProduct] : data.products} warehouses={data.warehouses} inventory={data.inventory} />
-      <TransferModal open={Boolean(transferProduct)} onClose={() => setTransferProduct(null)} products={transferProduct ? [transferProduct] : data.products} warehouses={data.warehouses} inventory={data.inventory} />
+      <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={data.products} inventory={data.inventory} />
+      <WriteoffModal open={Boolean(writeoffProduct)} onClose={() => setWriteoffProduct(null)} products={writeoffProduct ? [writeoffProduct] : data.products} inventory={data.inventory} />
     </div>
   )
 }

@@ -1,15 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ArrowLeftRight, ClipboardCheck, Download, Package, PackagePlus, RefreshCw, Search, Trash2, Warehouse } from 'lucide-react'
 import PageHeader from '../../../shared/components/PageHeader'
 import Button from '../../../shared/components/Button'
 import Alert from '../../../shared/components/Alert'
 import Badge from '../../../shared/components/Badge'
-import EmptyState from '../../../shared/components/EmptyState'
 import ProductModal from '../components/ProductModal'
 import ReceivingModal from '../components/ReceivingModal'
 import WriteoffModal from '../components/WriteoffModal'
-import TransferModal from '../components/TransferModal'
 import useWarehouseData from '../hooks/useWarehouseData'
 import {
   MOVEMENT_BADGE,
@@ -26,46 +24,22 @@ import {
   getProductSku,
   getQuantity,
   getStockStatus,
-  getWarehouseName,
-  isUUID,
 } from '../utils/warehouseHelpers'
 
 export default function WarehouseDashboard() {
   const navigate = useNavigate()
-  const [selectedWarehouseId, setSelectedWarehouseId] = useState('')
-  const data = useWarehouseData({
-    warehouseId: selectedWarehouseId,
-    scopeToWarehouse: Boolean(selectedWarehouseId),
-  })
+  const data = useWarehouseData()
   const [query, setQuery] = useState('')
   const [showProduct, setShowProduct] = useState(false)
   const [receiveProduct, setReceiveProduct] = useState(undefined)
   const [showWriteoff, setShowWriteoff] = useState(false)
-  const [showTransfer, setShowTransfer] = useState(false)
-
-  const validWarehouses = useMemo(
-    () => data.warehouses.filter((w) => isUUID(getId(w))),
-    [data.warehouses]
-  )
-  const selectedWarehouse = validWarehouses.find((w) => getId(w) === selectedWarehouseId) ?? validWarehouses[0] ?? null
-
-  useEffect(() => {
-    if (data.warehousesLoading) return
-    if (validWarehouses.length === 0) {
-      if (selectedWarehouseId) setSelectedWarehouseId('')
-      return
-    }
-    const stillExists = validWarehouses.some((w) => getId(w) === selectedWarehouseId)
-    if (!stillExists) setSelectedWarehouseId(getId(validWarehouses[0]))
-  }, [data.warehousesLoading, selectedWarehouseId, validWarehouses])
 
   const stockAlerts = useMemo(() => data.inventory
     .filter((inv) => {
       const status = getStockStatus(inv)
       return status === 'low_stock' || status === 'out_of_stock'
     })
-    .filter((inv) => !selectedWarehouseId || (inv.warehouse_id ?? inv.WarehouseID) === selectedWarehouseId)
-    .slice(0, 6), [data.inventory, selectedWarehouseId])
+    .slice(0, 6), [data.inventory])
 
   const visibleMovements = data.movements.slice(0, 10)
 
@@ -74,43 +48,14 @@ export default function WarehouseDashboard() {
     navigate(query.trim() ? `/warehouse/inventory?q=${encodeURIComponent(query.trim())}` : '/warehouse/inventory')
   }
 
-  if (data.warehousesLoading) {
-    return (
-      <div className="animate-fade-in p-6">
-        <PageHeader title="Склад" subtitle="Загрузка складов…" icon={<Warehouse size={20} />} />
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => <div key={i} className="h-32 rounded-2xl border border-slate-200 bg-white skeleton" />)}
-        </div>
-      </div>
-    )
-  }
-
-  if (!validWarehouses.length) {
-    return (
-      <div className="animate-fade-in p-6">
-        <PageHeader title="Склад" subtitle="Склады не найдены" icon={<Warehouse size={20} />} />
-        <EmptyState
-          icon={<Warehouse size={22} />}
-          title="Нет складов"
-          description="Добавьте склад через API или административную часть, чтобы начать работу с остатками."
-        />
-      </div>
-    )
-  }
-
   return (
     <div className="animate-fade-in p-6">
       <PageHeader
         title="Склад"
-        subtitle={selectedWarehouse ? getWarehouseName(selectedWarehouse) : 'Выберите склад'}
+        subtitle="Остатки, приход и списания"
         icon={<Warehouse size={20} />}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {validWarehouses.length > 1 && (
-              <select value={selectedWarehouseId} onChange={(e) => setSelectedWarehouseId(e.target.value)} className="input h-10 w-52 py-2">
-                {validWarehouses.map((w) => <option key={getId(w)} value={getId(w)}>{getWarehouseName(w)}</option>)}
-              </select>
-            )}
             <button
               onClick={data.refetchAll}
               className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50"
@@ -145,7 +90,6 @@ export default function WarehouseDashboard() {
           <ActionToolbar
             onReceive={() => setReceiveProduct(null)}
             onWriteoff={() => setShowWriteoff(true)}
-            onTransfer={() => setShowTransfer(true)}
             onProduct={() => setShowProduct(true)}
             onCount={() => navigate('/warehouse/inventory?status=low_stock')}
           />
@@ -156,7 +100,7 @@ export default function WarehouseDashboard() {
 
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-4">
-          <Panel title="Требует внимания" subtitle="Товары с низким остатком и отсутствующие позиции по выбранному складу.">
+          <Panel title="Требует внимания" subtitle="Товары с низким остатком и отсутствующие позиции.">
             {stockAlerts.length === 0 ? (
               <CompactEmpty icon={<Package size={18} />} title="Критичных остатков нет" description="Низкие остатки появятся здесь." />
             ) : (
@@ -166,7 +110,6 @@ export default function WarehouseDashboard() {
                     key={getId(inv)}
                     inventory={inv}
                     product={data.productMap[inv.product_id ?? inv.ProductID]}
-                    warehouse={data.warehouseMap[inv.warehouse_id ?? inv.WarehouseID]}
                     onOpen={() => navigate(`/warehouse/inventory?q=${encodeURIComponent(getProductSku(data.productMap[inv.product_id ?? inv.ProductID]))}`)}
                     onReceive={() => setReceiveProduct(data.productMap[inv.product_id ?? inv.ProductID] ?? null)}
                   />
@@ -176,15 +119,14 @@ export default function WarehouseDashboard() {
           </Panel>
         </div>
 
-        <Panel title="Лента операций" subtitle="Последние складские события по выбранному складу.">
+        <Panel title="Лента операций" subtitle="Последние складские события.">
           <OperationFeed movements={visibleMovements} data={data} />
         </Panel>
       </section>
 
-      <ProductModal open={showProduct} onClose={() => setShowProduct(false)} categories={data.categories} suppliers={data.suppliers} />
-      <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={data.products} warehouses={data.warehouses} inventory={data.inventory} />
-      <WriteoffModal open={showWriteoff} onClose={() => setShowWriteoff(false)} products={data.products} warehouses={data.warehouses} inventory={data.inventory} />
-      <TransferModal open={showTransfer} onClose={() => setShowTransfer(false)} products={data.products} warehouses={data.warehouses} inventory={data.inventory} />
+      <ProductModal open={showProduct} onClose={() => setShowProduct(false)} suppliers={data.suppliers} />
+      <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={data.products} inventory={data.inventory} />
+      <WriteoffModal open={showWriteoff} onClose={() => setShowWriteoff(false)} products={data.products} inventory={data.inventory} />
     </div>
   )
 }
@@ -203,12 +145,11 @@ function Panel({ title, subtitle, children }) {
   )
 }
 
-function ActionToolbar({ onReceive, onWriteoff, onTransfer, onProduct, onCount }) {
+function ActionToolbar({ onReceive, onWriteoff, onProduct, onCount }) {
   return (
     <div className="flex flex-wrap gap-2">
       <Button size="sm" variant="primary" icon={<Download size={14} />} onClick={onReceive}>Новый приход</Button>
       <Button size="sm" icon={<Trash2 size={14} />} onClick={onWriteoff}>Списание</Button>
-      <Button size="sm" icon={<ArrowLeftRight size={14} />} onClick={onTransfer}>Перемещение</Button>
       <Button size="sm" icon={<PackagePlus size={14} />} onClick={onProduct}>Добавить товар</Button>
       <Button size="sm" icon={<ClipboardCheck size={14} />} onClick={onCount}>Инвентаризация</Button>
     </div>
@@ -253,7 +194,7 @@ function MetricsStrip({ products = [], inventory = [], movements = [], batches =
   )
 }
 
-function ProblemProductRow({ inventory, product, warehouse, onOpen, onReceive }) {
+function ProblemProductRow({ inventory, product, onOpen, onReceive }) {
   const status = getStockStatus(inventory)
   return (
     <div className="grid gap-3 border-b border-slate-100 px-3 py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_96px_116px_auto] md:items-center">
@@ -261,7 +202,7 @@ function ProblemProductRow({ inventory, product, warehouse, onOpen, onReceive })
         <ProductThumb product={product} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold text-slate-950">{getProductName(product)}</p>
-          <p className="mt-0.5 truncate font-mono text-xs text-slate-400">{getProductSku(product)} · {getWarehouseName(warehouse)}</p>
+          <p className="mt-0.5 truncate font-mono text-xs text-slate-400">{getProductSku(product)}</p>
         </div>
       </button>
       <div className="flex gap-4 text-xs md:block md:text-right">
@@ -287,7 +228,6 @@ function OperationFeed({ movements, data }) {
       {movements.map((m) => {
         const type = getMovementType(m)
         const product = data.productMap[m.product_id ?? m.ProductID]
-        const warehouse = data.warehouseMap[m.warehouse_id ?? m.WarehouseID]
         const user = m.created_by_name ?? m.CreatedByName ?? '—'
         return (
           <div key={getId(m)} className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
@@ -296,7 +236,7 @@ function OperationFeed({ movements, data }) {
                 <Badge variant={MOVEMENT_BADGE[type] ?? 'slate'}>{MOVEMENT_LABEL[type] ?? type}</Badge>
                 <span className="truncate text-sm font-bold text-slate-950">{getProductName(product)}</span>
               </div>
-              <p className="truncate text-xs text-slate-400">{getWarehouseName(warehouse)} · {user}</p>
+              <p className="truncate text-xs text-slate-400">{user}</p>
             </div>
             <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
               <p className="text-sm font-bold tabular-nums text-slate-950">{m.quantity ?? m.Quantity}</p>

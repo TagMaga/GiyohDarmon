@@ -4,7 +4,7 @@ import KpiCard          from '../../../shared/components/KpiCard'
 import useWarehouseData from '../../warehouse/hooks/useWarehouseData'
 import {
   getStockStatus, STOCK_STATUS_LABEL,
-  getProductName, getProductSku, getWarehouseName,
+  getProductName, getProductSku,
   getId,
 } from '../../warehouse/utils/warehouseHelpers'
 
@@ -29,7 +29,7 @@ const ROW_STYLE = {
 export default function OwnerWarehousePage() {
   const [filter, setFilter] = useState('')
 
-  const { inventory, productMap, warehouseMap, warehouses, loading, refetchAll } = useWarehouseData()
+  const { inventory, productMap, loading, refetchAll } = useWarehouseData()
 
   const totalProducts = inventory.length
   const totalUnits    = inventory.reduce((s, i) => s + (i.available_quantity ?? i.AvailableQuantity ?? 0), 0)
@@ -47,10 +47,7 @@ export default function OwnerWarehousePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Склад</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Остатки в реальном времени · {warehouses.length}{' '}
-            {warehouses.length === 1 ? 'склад' : 'склада'}
-          </p>
+          <p className="text-sm text-slate-500 mt-0.5">Остатки в реальном времени</p>
         </div>
         <button
           onClick={refetchAll}
@@ -125,7 +122,7 @@ export default function OwnerWarehousePage() {
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-b border-slate-100">
-                  {['Товар', 'Склад', 'Остаток', 'Мин. порог', 'Статус'].map(h => (
+                  {['Товар', 'Остаток', 'Мин. порог', 'Статус'].map(h => (
                     <th
                       key={h}
                       className="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap"
@@ -139,12 +136,10 @@ export default function OwnerWarehousePage() {
                 {filtered.map((item) => {
                   const st        = getStockStatus(item)
                   const productId = item.product_id ?? item.ProductID
-                  const warehouseId = item.warehouse_id ?? item.WarehouseID
                   const product   = productMap[productId]
-                  const warehouse = warehouseMap[warehouseId]
                   return (
                     <tr
-                      key={getId(item) ?? `${productId}-${warehouseId}`}
+                      key={getId(item) ?? productId}
                       className={`border-b border-slate-50 ${ROW_STYLE[st] ?? ''}`}
                     >
                       <td className="px-4 py-3">
@@ -154,9 +149,6 @@ export default function OwnerWarehousePage() {
                         {product && getProductSku(product) && (
                           <p className="text-slate-400 text-[11px]">{getProductSku(product)}</p>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {warehouse ? getWarehouseName(warehouse) : '—'}
                       </td>
                       <td className="px-4 py-3 font-semibold text-slate-900 tabular-nums">
                         {(item.available_quantity ?? item.AvailableQuantity ?? 0).toLocaleString('ru-RU')} шт.

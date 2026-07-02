@@ -14,7 +14,6 @@ import (
 	"github.com/megamall/crm/internal/inventory"
 	"github.com/megamall/crm/internal/products"
 	"github.com/megamall/crm/internal/users"
-	"github.com/megamall/crm/internal/warehouse"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -41,20 +40,6 @@ func CreateUser(t *testing.T, db *gorm.DB, role users.Role) *users.User {
 	return u
 }
 
-// CreateWarehouse inserts a test warehouse and returns it.
-func CreateWarehouse(t *testing.T, db *gorm.DB) *warehouse.Warehouse {
-	t.Helper()
-	w := &warehouse.Warehouse{
-		ID:       uuid.New(),
-		Name:     "Test Warehouse " + uuid.New().String()[:8],
-		IsActive: true,
-	}
-	if err := db.Create(w).Error; err != nil {
-		t.Fatalf("testutil: create warehouse: %v", err)
-	}
-	return w
-}
-
 // CreateProduct inserts a test product and returns it.
 func CreateProduct(t *testing.T, db *gorm.DB) *products.Product {
 	t.Helper()
@@ -74,13 +59,12 @@ func CreateProduct(t *testing.T, db *gorm.DB) *products.Product {
 	return p
 }
 
-// CreateInventory inserts an inventory row with the given quantity for (warehouse, product).
+// CreateInventory inserts an inventory row with the given quantity for a product.
 // Also inserts a purchase movement and matching FIFO batch.
-func CreateInventory(t *testing.T, db *gorm.DB, warehouseID, productID, createdBy uuid.UUID, qty int) *inventory.Inventory {
+func CreateInventory(t *testing.T, db *gorm.DB, productID, createdBy uuid.UUID, qty int) *inventory.Inventory {
 	t.Helper()
 	inv := &inventory.Inventory{
 		ID:                uuid.New(),
-		WarehouseID:       warehouseID,
 		ProductID:         productID,
 		Quantity:          qty,
 		ReservedQuantity:  0,
@@ -93,7 +77,6 @@ func CreateInventory(t *testing.T, db *gorm.DB, warehouseID, productID, createdB
 	reason := "test: initial stock"
 	m := &inventory.Movement{
 		ID:               uuid.New(),
-		WarehouseID:      warehouseID,
 		ProductID:        productID,
 		MovementType:     inventory.MovementPurchase,
 		Quantity:         qty,
@@ -108,7 +91,6 @@ func CreateInventory(t *testing.T, db *gorm.DB, warehouseID, productID, createdB
 	if qty > 0 {
 		b := &inventory.Batch{
 			ID:                uuid.New(),
-			WarehouseID:       warehouseID,
 			ProductID:         productID,
 			ReceivedQuantity:  qty,
 			RemainingQuantity: qty,

@@ -29,6 +29,11 @@ SET quantity             = c.quantity,
 FROM consolidated c, keep k
 WHERE i.id = k.id AND k.product_id = c.product_id;
 
+WITH keep AS (
+    SELECT DISTINCT ON (product_id) id, product_id
+    FROM inventory
+    ORDER BY product_id, created_at ASC
+)
 DELETE FROM inventory i
 USING keep k
 WHERE i.product_id = k.product_id AND i.id <> k.id;

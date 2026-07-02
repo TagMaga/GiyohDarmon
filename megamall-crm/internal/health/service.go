@@ -92,15 +92,7 @@ func (s *Service) Ready(ctx context.Context) ReadinessStatus {
 		allOK = false
 	}
 
-	// 3. Default warehouse exists.
-	warehouseOK := s.countCheck(ctx, "warehouses",
-		"name = 'Main Warehouse' AND is_active = true", 1)
-	checks["default_warehouse"] = warehouseOK
-	if !warehouseOK {
-		allOK = false
-	}
-
-	// 4. Default product exists (by seed SKU).
+	// 3. Default product exists (by seed SKU).
 	productOK := s.countCheck(ctx, "products",
 		"sku = 'TEST-001' AND deleted_at IS NULL", 1)
 	checks["default_product"] = productOK
@@ -108,7 +100,7 @@ func (s *Service) Ready(ctx context.Context) ReadinessStatus {
 		allOK = false
 	}
 
-	// 5. All five commission types have at least one active global config.
+	// 4. All five commission types have at least one active global config.
 	commOK := true
 	for _, ct := range compensation.AllCommissionTypes {
 		ok := s.countCheck(ctx, "commission_configs",
@@ -121,7 +113,7 @@ func (s *Service) Ready(ctx context.Context) ReadinessStatus {
 	}
 	checks["commission_configs"] = commOK
 
-	// 6. Active delivery tariff exists.
+	// 5. Active delivery tariff exists.
 	tariffOK := s.countCheck(ctx, "delivery_tariffs",
 		"is_active = true AND effective_to IS NULL", 1)
 	checks["delivery_tariff"] = tariffOK

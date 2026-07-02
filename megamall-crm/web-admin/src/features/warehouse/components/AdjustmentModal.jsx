@@ -6,38 +6,32 @@ import Alert   from '../../../shared/components/Alert'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { createAdjustment } from '../api'
 import { KEYS }  from '../../../shared/queryKeys'
-import { getId, getProductName, getProductSku, getWarehouseName, getQuantity, isUUID } from '../utils/warehouseHelpers'
+import { getId, getProductName, getProductSku, getQuantity, isUUID } from '../utils/warehouseHelpers'
 
-export default function AdjustmentModal({ open, onClose, products, warehouses, inventory = [] }) {
+export default function AdjustmentModal({ open, onClose, products, inventory = [] }) {
   const qc    = useQueryClient()
   const toast = useToast()
 
-  const [warehouseId, setWarehouseId] = useState('')
   const [productId,   setProductId]   = useState('')
   const [newQty,      setNewQty]      = useState('')
   const [reason,      setReason]      = useState('')
-  const validWarehouses = warehouses.filter((w) => isUUID(getId(w)))
   const validProducts = products.filter((p) => isUUID(getId(p)))
 
   const currentStock = useMemo(() => {
-    if (!warehouseId || !productId) return null
-    const inv = inventory.find(i =>
-      (i.warehouse_id ?? i.WarehouseID) === warehouseId &&
-      (i.product_id   ?? i.ProductID)   === productId
-    )
+    if (!productId) return null
+    const inv = inventory.find(i => (i.product_id ?? i.ProductID) === productId)
     return inv ? getQuantity(inv) : 0
-  }, [inventory, warehouseId, productId])
+  }, [inventory, productId])
 
   const newQtyNum = parseInt(newQty, 10)
   const delta = currentStock !== null && !isNaN(newQtyNum) ? newQtyNum - currentStock : null
 
   const { mutate, isPending, error, reset } = useMutation({
     mutationFn: () => {
-      if (!isUUID(warehouseId) || !isUUID(productId)) throw new Error('Выберите склад и товар')
+      if (!isUUID(productId)) throw new Error('Выберите товар')
       if (isNaN(newQtyNum) || newQtyNum < 0) throw new Error('Введите корректное количество (≥ 0)')
       if (!reason.trim())                     throw new Error('Причина обязательна')
       return createAdjustment({
-        warehouse_id: warehouseId,
         product_id:   productId,
         new_quantity: newQtyNum,
         reason:       reason.trim(),
@@ -54,14 +48,13 @@ export default function AdjustmentModal({ open, onClose, products, warehouses, i
 
   function handleClose() {
     reset()
-    setWarehouseId('')
     setProductId('')
     setNewQty('')
     setReason('')
     onClose()
   }
 
-  const canSubmit = isUUID(warehouseId) && isUUID(productId) && newQty !== '' && reason.trim()
+  const canSubmit = isUUID(productId) && newQty !== '' && reason.trim()
   const errMsg = error?.response?.data?.error?.message ?? error?.message
 
   return (
@@ -69,7 +62,7 @@ export default function AdjustmentModal({ open, onClose, products, warehouses, i
       open={open}
       onClose={handleClose}
       title="Приход / корректировка"
-      description="Установить новый итоговый остаток для товара на складе"
+      description="Установить новый итоговый остаток для товара"
       footer={
         <>
           <Button variant="secondary" onClick={handleClose} disabled={isPending}>Отмена</Button>
@@ -82,13 +75,6 @@ export default function AdjustmentModal({ open, onClose, products, warehouses, i
       {errMsg && <Alert variant="error" title="Ошибка" className="mb-4">{errMsg}</Alert>}
 
       <div className="space-y-4">
-        <SelectField
-          label="Склад *"
-          value={warehouseId}
-          onChange={v => { setWarehouseId(v); setProductId(''); setNewQty('') }}
-          placeholder="Выберите склад…"
-          options={validWarehouses.map(w => ({ value: getId(w), label: getWarehouseName(w) }))}
-        />
         <SelectField
           label="Товар *"
           value={productId}
@@ -119,7 +105,7 @@ export default function AdjustmentModal({ open, onClose, products, warehouses, i
               {delta > 0 ? `+${delta} шт. (приход)` : delta < 0 ? `${delta} шт. (списание)` : 'Без изменений'}
             </p>
           )}
-          <p className="text-xs text-slate-400 mt-0.5">Итоговое количество на складе, а не дельта.</p>
+          <p className="text-xs text-slate-400 mt-0.5">Итоговое количество, а не дельта.</p>
         </div>
 
         <div>

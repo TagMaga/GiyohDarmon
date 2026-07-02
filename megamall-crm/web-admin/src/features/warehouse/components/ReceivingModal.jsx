@@ -6,33 +6,27 @@ import Alert from '../../../shared/components/Alert'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
 import { createReceiving } from '../api'
-import { getAvailableQty, getId, getProductName, getProductSku, getQuantity, getWarehouseName, isUUID } from '../utils/warehouseHelpers'
+import { getAvailableQty, getId, getProductName, getProductSku, getQuantity, isUUID } from '../utils/warehouseHelpers'
 
-export default function ReceivingModal({ open, onClose, products, warehouses, inventory = [], initialProduct = null }) {
+export default function ReceivingModal({ open, onClose, products, inventory = [], initialProduct = null }) {
   const qc = useQueryClient()
   const toast = useToast()
-  const [warehouseId, setWarehouseId] = useState('')
   const [productId, setProductId] = useState('')
   const [quantity, setQuantity] = useState('')
   const [unitCost, setUnitCost] = useState('')
   const [invoice, setInvoice] = useState('')
   const [notes, setNotes] = useState('')
-  const validWarehouses = warehouses.filter((w) => isUUID(getId(w)))
 
   useEffect(() => {
     if (!open) return
     if (initialProduct) setProductId(getId(initialProduct) ?? '')
-    if (!warehouseId && validWarehouses.length > 0) setWarehouseId(getId(validWarehouses[0]) ?? '')
-  }, [open, initialProduct, validWarehouses, warehouseId])
+  }, [open, initialProduct])
 
   const currentStock = useMemo(() => {
-    if (!warehouseId || !productId) return null
-    const row = inventory.find((inv) =>
-      (inv.warehouse_id ?? inv.WarehouseID) === warehouseId &&
-      (inv.product_id ?? inv.ProductID) === productId
-    )
+    if (!productId) return null
+    const row = inventory.find((inv) => (inv.product_id ?? inv.ProductID) === productId)
     return row ? getQuantity(row) : 0
-  }, [inventory, productId, warehouseId])
+  }, [inventory, productId])
 
   const qty = Number.parseInt(quantity, 10)
   const cost = unitCost === '' ? 0 : Number.parseFloat(unitCost)
@@ -41,11 +35,10 @@ export default function ReceivingModal({ open, onClose, products, warehouses, in
 
   const mutation = useMutation({
     mutationFn: () => {
-      if (!isUUID(warehouseId) || !isUUID(productId)) throw new Error('Выберите склад и товар')
+      if (!isUUID(productId)) throw new Error('Выберите товар')
       if (Number.isNaN(qty) || qty < 1) throw new Error('Количество прихода должно быть ≥ 1')
       if (Number.isNaN(cost) || cost < 0) throw new Error('Закупочная цена должна быть ≥ 0')
       return createReceiving({
-        warehouse_id: warehouseId,
         product_id: productId,
         quantity: qty,
         unit_cost: cost,
@@ -63,7 +56,6 @@ export default function ReceivingModal({ open, onClose, products, warehouses, in
   })
 
   function handleClose() {
-    setWarehouseId('')
     setProductId('')
     setQuantity('')
     setUnitCost('')
@@ -73,12 +65,9 @@ export default function ReceivingModal({ open, onClose, products, warehouses, in
     onClose()
   }
 
-  const selectedInventory = inventory.find((inv) =>
-    (inv.warehouse_id ?? inv.WarehouseID) === warehouseId &&
-    (inv.product_id ?? inv.ProductID) === productId
-  )
+  const selectedInventory = inventory.find((inv) => (inv.product_id ?? inv.ProductID) === productId)
   const errMsg = mutation.error?.response?.data?.error?.message ?? mutation.error?.message
-  const canSubmit = isUUID(warehouseId) && isUUID(productId) && qty > 0 && !Number.isNaN(cost) && cost >= 0
+  const canSubmit = isUUID(productId) && qty > 0 && !Number.isNaN(cost) && cost >= 0
 
   return (
     <Modal
@@ -98,7 +87,6 @@ export default function ReceivingModal({ open, onClose, products, warehouses, in
     >
       {errMsg && <Alert variant="error" title="Ошибка" className="mb-4">{errMsg}</Alert>}
       <div className="grid gap-4 sm:grid-cols-2">
-        <Select label="Склад *" value={warehouseId} onChange={setWarehouseId} placeholder="Выберите склад" options={validWarehouses.map((w) => ({ value: getId(w), label: getWarehouseName(w) }))} />
         <Select label="Товар *" value={productId} onChange={setProductId} placeholder="Выберите товар" options={products.filter((p) => isUUID(getId(p))).map((p) => ({ value: getId(p), label: `${getProductName(p)} (${getProductSku(p)})` }))} />
         <Field label="Количество прихода *" type="number" min="1" value={quantity} onChange={setQuantity} placeholder="0" />
         <Field label="Закупочная цена за ед. *" type="number" min="0" step="0.01" value={unitCost} onChange={setUnitCost} placeholder="0.00" />

@@ -28,7 +28,7 @@ export default function WarehouseReceivingPage() {
         <p className="mt-1 text-xs text-emerald-800">Введите фактически полученное количество. Остаток пересчитается автоматически.</p>
       </section>
       <MovementList rows={receivingRows} data={data} emptyTitle="Приходов пока нет" />
-      <ReceivingModal open={open} onClose={() => setOpen(false)} products={data.products} warehouses={data.warehouses} inventory={data.inventory} />
+      <ReceivingModal open={open} onClose={() => setOpen(false)} products={data.products} inventory={data.inventory} />
     </div>
   )
 }

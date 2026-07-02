@@ -333,12 +333,12 @@ func seedProduct(ctx context.Context, db *gorm.DB, res *Result, supID uuid.UUID)
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
 
-func seedInventory(ctx context.Context, db *gorm.DB, res *Result, warehouseID, productID, createdBy uuid.UUID) {
+func seedInventory(ctx context.Context, db *gorm.DB, res *Result, productID, createdBy uuid.UUID) {
 	err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// Check existing inventory row.
 		var existing inventory.Inventory
 		err := tx.WithContext(ctx).
-			Where("warehouse_id = ? AND product_id = ?", warehouseID, productID).
+			Where("product_id = ?", productID).
 			First(&existing).Error
 
 		if err == nil {
@@ -346,7 +346,7 @@ func seedInventory(ctx context.Context, db *gorm.DB, res *Result, warehouseID, p
 				return batchErr
 			}
 			if existing.Quantity >= DefaultInventoryQty {
-				res.skipped(fmt.Sprintf("inventory %s/%s (qty=%d)", warehouseID, productID, existing.Quantity))
+				res.skipped(fmt.Sprintf("inventory %s (qty=%d)", productID, existing.Quantity))
 				return nil
 			}
 			// Quantity is below expected — skip to avoid double-stocking.
@@ -360,7 +360,6 @@ func seedInventory(ctx context.Context, db *gorm.DB, res *Result, warehouseID, p
 		// Create inventory row.
 		invRow := inventory.Inventory{
 			ID:                uuid.New(),
-			WarehouseID:       warehouseID,
 			ProductID:         productID,
 			Quantity:          DefaultInventoryQty,
 			ReservedQuantity:  0,
@@ -374,7 +373,6 @@ func seedInventory(ctx context.Context, db *gorm.DB, res *Result, warehouseID, p
 		reason := "seed: initial stock"
 		m := inventory.Movement{
 			ID:               uuid.New(),
-			WarehouseID:      warehouseID,
 			ProductID:        productID,
 			MovementType:     inventory.MovementPurchase,
 			Quantity:         DefaultInventoryQty,
@@ -386,7 +384,7 @@ func seedInventory(ctx context.Context, db *gorm.DB, res *Result, warehouseID, p
 		if err := tx.WithContext(ctx).Create(&m).Error; err != nil {
 			return fmt.Errorf("create movement: %w", err)
 		}
-		if err := createSeedBatch(ctx, tx, warehouseID, productID, DefaultInventoryQty, DefaultProductPurchasePrice, &m.ID, &createdBy); err != nil {
+		if err := createSeedBatch(ctx, tx, productID, DefaultInventoryQty, DefaultProductPurchasePrice, &m.ID, &createdBy); err != nil {
 			return err
 		}
 
@@ -406,7 +404,7 @@ func ensureSeedBatch(ctx context.Context, tx *gorm.DB, res *Result, invRow inven
 	if err := tx.WithContext(ctx).
 		Model(&inventory.Batch{}).
 		Select("COALESCE(SUM(remaining_quantity), 0)").
-		Where("warehouse_id = ? AND product_id = ?", invRow.WarehouseID, invRow.ProductID).
+		Where("product_id = ?", invRow.ProductID).
 		Scan(&batchQty).Error; err != nil {
 		return fmt.Errorf("sum seed batches: %w", err)
 	}
@@ -417,7 +415,6 @@ func ensureSeedBatch(ctx context.Context, tx *gorm.DB, res *Result, invRow inven
 	reason := "seed: FIFO batch sync"
 	m := inventory.Movement{
 		ID:               uuid.New(),
-		WarehouseID:      invRow.WarehouseID,
 		ProductID:        invRow.ProductID,
 		MovementType:     inventory.MovementPurchase,
 		Quantity:         missingQty,
@@ -429,20 +426,19 @@ func ensureSeedBatch(ctx context.Context, tx *gorm.DB, res *Result, invRow inven
 	if err := tx.WithContext(ctx).Create(&m).Error; err != nil {
 		return fmt.Errorf("create seed batch sync movement: %w", err)
 	}
-	if err := createSeedBatch(ctx, tx, invRow.WarehouseID, invRow.ProductID, missingQty, DefaultProductPurchasePrice, &m.ID, &createdBy); err != nil {
+	if err := createSeedBatch(ctx, tx, invRow.ProductID, missingQty, DefaultProductPurchasePrice, &m.ID, &createdBy); err != nil {
 		return err
 	}
-	res.created(fmt.Sprintf("inventory FIFO batch sync %s/%s (qty=%d)", invRow.WarehouseID, invRow.ProductID, missingQty))
+	res.created(fmt.Sprintf("inventory FIFO batch sync %s (qty=%d)", invRow.ProductID, missingQty))
 	return nil
 }
 
-func createSeedBatch(ctx context.Context, tx *gorm.DB, warehouseID, productID uuid.UUID, qty int, unitCost float64, movementID, createdBy *uuid.UUID) error {
+func createSeedBatch(ctx context.Context, tx *gorm.DB, productID uuid.UUID, qty int, unitCost float64, movementID, createdBy *uuid.UUID) error {
 	if qty <= 0 {
 		return nil
 	}
 	b := inventory.Batch{
 		ID:                uuid.New(),
-		WarehouseID:       warehouseID,
 		ProductID:         productID,
 		ReceivedQuantity:  qty,
 		RemainingQuantity: qty,

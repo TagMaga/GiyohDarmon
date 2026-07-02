@@ -4,7 +4,7 @@ import { X, Search, Package, Plus, Minus, Trash2, Store, CheckCircle2 } from 'lu
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
 import { fetchSellers, createOfficeOrder } from '../api'
-import { fetchCustomers, createCustomer, fetchProducts, fetchWarehouses, fetchCities } from '../../seller/api'
+import { fetchCustomers, createCustomer, fetchProducts, fetchCities } from '../../seller/api'
 
 const EMPTY = {
   phone: '', customerId: null, fullName: '', cityId: '', city: '', address: '',
@@ -39,12 +39,6 @@ export default function CreateOfficeOrderModal({ open, onClose }) {
     staleTime: 5 * 60_000,
     enabled: open,
   })
-  const { data: warehousesRaw = [] } = useQuery({
-    queryKey: KEYS.seller.warehouses,
-    queryFn: fetchWarehouses,
-    staleTime: 5 * 60_000,
-    enabled: open,
-  })
   const { data: cities = [] } = useQuery({
     queryKey: ['cities', 'active'],
     queryFn: fetchCities,
@@ -55,8 +49,6 @@ export default function CreateOfficeOrderModal({ open, onClose }) {
   const sellers = Array.isArray(sellersRaw) ? sellersRaw : []
   const customers = Array.isArray(customersRaw) ? customersRaw : []
   const products = Array.isArray(productsRaw) ? productsRaw : []
-  const warehouses = Array.isArray(warehousesRaw) ? warehousesRaw : []
-  const autoWarehouse = useMemo(() => warehouses.find((w) => w.is_active) ?? warehouses[0] ?? null, [warehouses])
 
   const setField = useCallback((key, val) => setForm((p) => ({ ...p, [key]: val })), [])
 
@@ -128,8 +120,6 @@ export default function CreateOfficeOrderModal({ open, onClose }) {
 
   const { mutate: submit, isPending } = useMutation({
     mutationFn: async () => {
-      if (!autoWarehouse) throw new Error('Склад не найден')
-
       let cid = form.customerId
       if (!cid) {
         const newCust = await createCustomer({
@@ -144,7 +134,6 @@ export default function CreateOfficeOrderModal({ open, onClose }) {
 
       return createOfficeOrder({
         customer_id:     cid,
-        warehouse_id:    autoWarehouse.id,
         city_id:         form.cityId,
         order_type:      'seller_order',
         delivery_method: form.deliveryMode,

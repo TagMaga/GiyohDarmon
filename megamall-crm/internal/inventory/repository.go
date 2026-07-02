@@ -13,21 +13,10 @@ import (
 )
 
 // MovementRow is returned by ListMovements and augments Movement with the
-// actor's display name resolved via a LEFT JOIN on the users table, plus —
-// for "sale" movements only — the linked order's number/status, customer,
-// and delivering courier. This lets the inventory Движения screen show full
-// order context without querying /orders directly (warehouse_manager is
-// intentionally excluded from that API — see orders/routes.go).
+// actor's display name resolved via a LEFT JOIN on the users table.
 type MovementRow struct {
 	Movement
-	CreatedByName   string     `gorm:"column:created_by_name"`
-	OrderID         *uuid.UUID `gorm:"column:order_id"`
-	OrderNumber     *string    `gorm:"column:order_number"`
-	OrderStatus     *string    `gorm:"column:order_status"`
-	CustomerName    *string    `gorm:"column:customer_name"`
-	CustomerPhone   *string    `gorm:"column:customer_phone"`
-	DeliveryAddress *string    `gorm:"column:delivery_address"`
-	CourierName     *string    `gorm:"column:courier_name"`
+	CreatedByName string `gorm:"column:created_by_name"`
 }
 
 // Repository handles all inventory persistence.
@@ -148,26 +137,10 @@ func (r *Repository) InsertAdjustment(tx *gorm.DB, ctx context.Context, a *Adjus
 // ─── Movements ────────────────────────────────────────────────────────────────
 
 func (r *Repository) ListMovements(ctx context.Context, f ListMovementsFilter, p pagination.Params) ([]MovementRow, int, error) {
-	// Base query with LEFT JOIN to resolve the actor's display name, and —
-	// for sale movements — the order they fulfilled. The order match prefers
-	// the structured reference_id; older rows (written before reference_id was
-	// populated) fall back to the UUID embedded in the free-text reason.
+	// Base query with LEFT JOIN to resolve the actor's display name.
 	base := r.db.WithContext(ctx).
 		Table("inventory_movements").
-		Joins("LEFT JOIN users ON users.id = inventory_movements.created_by AND users.deleted_at IS NULL").
-		Joins(`LEFT JOIN orders ON inventory_movements.movement_type = 'sale' AND orders.id = COALESCE(
-			inventory_movements.reference_id,
-			substring(inventory_movements.reason from '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')::uuid
-		)`).
-		Joins("LEFT JOIN customers ON customers.id = orders.customer_id").
-		Joins(`LEFT JOIN LATERAL (
-			SELECT u2.full_name AS name
-			FROM order_assignments oa
-			JOIN users u2 ON u2.id = oa.courier_id
-			WHERE oa.order_id = orders.id
-			ORDER BY oa.assigned_at DESC
-			LIMIT 1
-		) courier ON true`)
+		Joins("LEFT JOIN users ON users.id = inventory_movements.created_by AND users.deleted_at IS NULL")
 
 	if f.ProductID != "" {
 		base = base.Where("inventory_movements.product_id = ?", f.ProductID)
@@ -194,15 +167,7 @@ func (r *Repository) ListMovements(ctx context.Context, f ListMovementsFilter, p
 
 	var rows []MovementRow
 	err := base.
-		Select(`inventory_movements.*,
-			COALESCE(users.full_name, '') AS created_by_name,
-			orders.id AS order_id,
-			orders.order_number AS order_number,
-			orders.status AS order_status,
-			customers.full_name AS customer_name,
-			customers.phone AS customer_phone,
-			customers.address AS delivery_address,
-			courier.name AS courier_name`).
+		Select("inventory_movements.*, COALESCE(users.full_name, '') AS created_by_name").
 		Order("inventory_movements.created_at DESC").
 		Limit(p.Limit).Offset(p.Offset()).
 		Find(&rows).Error
