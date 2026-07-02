@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Phone, MessageCircle, Send, MapPin } from 'lucide-react-native'
+import { GlassFill } from './glass'
 import { updateOrderStatus, reportAddressChanged, deferOrder, getOrderComments, addOrderComment } from '../api/orders'
 import useAuthStore from '../store/authStore'
 import { resolveCreator } from '../lib/creator'
@@ -16,8 +17,7 @@ export const SHEET_H = SCREEN_H * 0.90
 const DRAG_CLOSE_THRESHOLD = 120
 
 // Apple Liquid Glass palette: iOS system accents, translucent card surfaces.
-// C.bg stays opaque — it is also the bottom-sheet background and needs full
-// readability over the dimmed backdrop.
+// Sheets get their surface from GlassFill; C.bg is the opaque screen base.
 export const C = {
   bg: '#eef2fa', card: 'rgba(255,255,255,0.66)', ink: '#0a1528', muted: '#5f6e88', line: 'rgba(120,144,180,0.30)',
   blue: '#0a84ff', violet: '#5e5ce6', green: '#34c759', orange: '#ff9500', red: '#ff3b30',
@@ -97,9 +97,12 @@ export function BottomSheet({ visible, onClose, children, height = SHEET_H }) {
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
       <Animated.View style={[bs.backdrop, { opacity: dimOpacity }]}>
+        {/* Frost the screen behind the sheet instead of a heavy dim */}
+        <GlassFill intensity={16} overlay="rgba(9,17,32,0.30)" androidFallback="rgba(9,17,32,0.42)" />
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
       </Animated.View>
       <Animated.View style={[bs.sheet, { height, paddingBottom: insets.bottom, transform: [{ translateY }] }]}>
+        <GlassFill intensity={64} overlay="rgba(242,246,252,0.40)" androidFallback="rgba(240,244,252,0.94)" />
         <View {...panResponder.panHandlers} style={bs.handleArea}>
           <View style={bs.handle} />
         </View>
@@ -630,11 +633,14 @@ function PayRow({ label, value, valueColor }) {
 // ── Styles ──────────────────────────────────────────────────────────────────
 
 const bs = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(7,17,34,0.52)' },
+  backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
-    backgroundColor: C.bg, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.14, shadowRadius: 28, elevation: 24,
+    // Liquid glass: GlassFill provides the frosted surface; overflow clips it
+    // to the rounded top corners. Solid bg/shadow removed so it stays see-through.
+    backgroundColor: 'transparent', borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    overflow: 'hidden',
+    borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.55)',
   },
   handleArea: { alignItems: 'center', paddingTop: 12, paddingBottom: 6 },
   handle:     { width: 40, height: 5, borderRadius: 99, backgroundColor: '#d1d9e6' },
@@ -681,7 +687,7 @@ const d = StyleSheet.create({
   commentsLoading:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
   commentsLoadingText: { fontSize: 12, color: C.muted, fontWeight: '700' },
   emptyComments:       { fontSize: 13, color: C.muted, fontWeight: '700', textAlign: 'center', paddingVertical: 12 },
-  commentThreadItem:   { backgroundColor: C.bg, borderWidth: 1, borderColor: C.line, borderRadius: 14, padding: 12, marginBottom: 8 },
+  commentThreadItem:   { backgroundColor: 'rgba(255,255,255,0.45)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.60)', borderRadius: 14, padding: 12, marginBottom: 8 },
   commentThreadHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   commentAuthor:       { flex: 1, fontSize: 12, color: C.ink, fontWeight: '700' },
   commentRoleBadge:    { backgroundColor: '#eef3ff', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
@@ -690,7 +696,7 @@ const d = StyleSheet.create({
   showMoreText:        { fontSize: 12, color: C.violet, fontWeight: '600', marginTop: 4 },
   commentTime:         { fontSize: 10, color: C.muted, fontWeight: '700', marginTop: 6 },
   commentInputRow:     { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 4 },
-  commentInput:        { flex: 1, minHeight: 42, maxHeight: 86, borderWidth: 1, borderColor: C.line, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: C.bg, color: C.ink, fontSize: 13, fontWeight: '700' },
+  commentInput:        { flex: 1, minHeight: 42, maxHeight: 86, borderWidth: 1, borderColor: C.line, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: 'rgba(255,255,255,0.45)', color: C.ink, fontSize: 13, fontWeight: '700' },
   commentSendBtn:      { width: 42, height: 42, borderRadius: 14, backgroundColor: C.violet, alignItems: 'center', justifyContent: 'center' },
 
   // Person row (creator merged)
@@ -731,7 +737,7 @@ const d = StyleSheet.create({
   actionBar:      { gap: 10, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.line },
   primaryBtn:     { borderRadius: 18, paddingVertical: 16, alignItems: 'center' },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  secondaryBtn:   { borderRadius: 18, paddingVertical: 13, alignItems: 'center', backgroundColor: C.bg, borderWidth: 1, borderColor: C.line },
+  secondaryBtn:   { borderRadius: 999, paddingVertical: 13, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.45)', borderWidth: 1, borderColor: C.line },
   secondaryBtnText: { fontSize: 15, fontWeight: '600', color: C.ink },
   btnDisabled:    { opacity: 0.45 },
 })
@@ -740,7 +746,7 @@ const ps = StyleSheet.create({
   stepTitle: { fontSize: 20, fontWeight: '700', color: C.ink, marginBottom: 8 },
   stepSub:   { fontSize: 14, color: C.muted, marginBottom: 20, lineHeight: 20 },
   optRow:    { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.line },
-  optIcon:   { width: 44, height: 44, borderRadius: 14, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line },
+  optIcon:   { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.45)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line },
   optLabel:  { fontSize: 15, fontWeight: '600', color: C.ink, marginBottom: 2 },
   optDesc:   { fontSize: 12, color: C.muted, fontWeight: '600' },
   chevron:   { fontSize: 22, color: C.muted },

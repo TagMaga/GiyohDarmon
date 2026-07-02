@@ -9,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { getCashSummary, submitHandover, getHandoverHistory, getMyOrders } from '../../src/api/orders'
 import client, { API_URL } from '../../src/api/client'
 import { FadeSlideIn, PressScale, CountUp, Skeleton, animateLayout } from '../../src/components/motion'
-import { GlassBackdrop } from '../../src/components/glass'
+import { GlassBackdrop, GlassFill } from '../../src/components/glass'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 dayjs.locale('ru')
@@ -374,6 +374,7 @@ export default function CashScreen() {
       <Modal visible={showHandover} animationType="slide" transparent statusBarTranslucent>
         <Pressable style={s.overlay} onPress={() => { if (!submitting) { setShowHandover(false); setAttachments([]); setActualAmount(''); setNotes('') } }}>
           <Pressable style={s.sheet} onPress={e => e.stopPropagation()}>
+            <GlassFill intensity={64} overlay="rgba(242,246,252,0.40)" androidFallback="rgba(240,244,252,0.94)" />
             <View style={s.sheetHandle} />
             <ScrollView contentContainerStyle={s.sheetContent} showsVerticalScrollIndicator={false}>
               <Text style={s.sheetTitle}>Сдать наличные</Text>
@@ -506,8 +507,8 @@ const s = StyleSheet.create({
   cashItemTitle: { fontSize: 14, fontWeight: '700', color: C.ink },
   cashAmount: { fontSize: 16, fontWeight: '700', color: C.orange },
   // Sheet
-  overlay: { flex: 1, backgroundColor: 'rgba(7,17,34,0.55)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#f2f5fc', borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '92%' },
+  overlay: { flex: 1, backgroundColor: 'rgba(9,17,32,0.38)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: 'transparent', borderTopLeftRadius: 32, borderTopRightRadius: 32, maxHeight: '92%', overflow: 'hidden', borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.55)' },
   sheetHandle: { width: 74, height: 6, borderRadius: 99, backgroundColor: '#d9deea', alignSelf: 'center', marginTop: 14 },
   sheetContent: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40, gap: 16 },
   sheetTitle: { fontSize: 28, fontWeight: '700', color: C.ink },

@@ -3,6 +3,7 @@ import { Animated, Modal, Pressable, StyleSheet, Switch, Text, TouchableOpacity,
 import { router } from 'expo-router'
 import Avatar from './Avatar'
 import { animateLayout } from './motion'
+import { GlassFill } from './glass'
 
 const C = {
   panel: 'rgba(16,28,48,0.90)',
@@ -63,6 +64,7 @@ export function AccountMenu({
           }}
         >
         <Pressable style={s.menu} onPress={event => event.stopPropagation()}>
+          <GlassFill tint="dark" intensity={56} overlay="rgba(15,26,46,0.62)" androidFallback="rgba(16,28,48,0.94)" />
           <View style={s.header}>
             <Avatar uri={user?.avatar_url} name={user?.full_name} fallback={initials} size={70} color={C.violet} />
             <View style={s.headerText}>
@@ -163,7 +165,7 @@ function getInitials(user) {
 
 const s = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-start', alignItems: 'center', paddingTop: 62, paddingHorizontal: 12, backgroundColor: 'rgba(6,12,22,0.42)' },
-  menu: { width: '100%', maxWidth: 440, borderRadius: 28, backgroundColor: C.panel, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 18 }, shadowOpacity: 0.24, shadowRadius: 30, elevation: 18 },
+  menu: { width: '100%', maxWidth: 440, borderRadius: 28, backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', overflow: 'hidden' },
   header: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 24, paddingVertical: 22 },
   headerText: { flex: 1, minWidth: 0 },
   name: { color: C.text, fontSize: 22, fontWeight: '700', lineHeight: 27 },

@@ -9,7 +9,8 @@
  * Real BlurView is reserved for chrome (the floating tab bar) where the content
  * scrolling underneath makes actual blur worth it.
  */
-import { View, StyleSheet, useWindowDimensions } from 'react-native'
+import { Platform, View, StyleSheet, useWindowDimensions } from 'react-native'
+import { BlurView } from 'expo-blur'
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 /** Glass surface tokens — iOS system accents + translucent fills. */
@@ -26,6 +27,28 @@ export const G = {
   green:  '#34c759',
   orange: '#ff9500',
   red:    '#ff3b30',
+}
+
+/**
+ * Absolute-fill frosted glass layer for sheets, modals and panels.
+ * iOS: real UIVisualEffectView blur + a soft tint overlay so text stays readable.
+ * Android: translucent solid fallback — expo-blur inside a <Modal> is unreliable
+ * there, and a high-opacity tint still reads as glass over the dim.
+ * The parent must set borderRadius + overflow:'hidden' to clip the blur.
+ */
+export function GlassFill({ tint = 'light', intensity = 55, overlay, androidFallback }) {
+  const isDark = tint === 'dark'
+  const wash = overlay ?? (isDark ? 'rgba(15,26,46,0.55)' : 'rgba(242,246,252,0.45)')
+  const solid = androidFallback ?? (isDark ? 'rgba(16,28,48,0.94)' : 'rgba(240,244,252,0.93)')
+  if (Platform.OS === 'ios') {
+    return (
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <BlurView tint={isDark ? 'dark' : 'light'} intensity={intensity} style={StyleSheet.absoluteFill} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: wash }]} />
+      </View>
+    )
+  }
+  return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: solid }]} />
 }
 
 function Wash({ id, cx, cy, r, color, opacity }) {
