@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, Alert } from 'react-native'
 import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { getMyOrders, getCashSummary, getClaimableOrders, updateOrderStatus } from '../../src/api/orders'
@@ -9,6 +9,7 @@ import { OrderDetailSheet, C } from '../../src/components/OrderDetailSheet'
 import { OrderCard } from '../../src/components/OrderCard'
 import { AccountMenu } from '../../src/components/AccountMenu'
 import Avatar from '../../src/components/Avatar'
+import { FadeSlideIn, PressScale, CountUp, PulseDot, Skeleton, OrderCardSkeleton, animateLayout } from '../../src/components/motion'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 dayjs.locale('ru')
@@ -100,70 +101,85 @@ export default function DashboardScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.onlineBtn, !isOnline && s.offlineBtn]}
-            onPress={() => setIsOnline(v => !v)}
+            onPress={() => { animateLayout(); setIsOnline(v => !v) }}
           >
-            <View style={[s.dot, !isOnline && s.dotOff]} />
+            <PulseDot color={isOnline ? C.green : '#8a93a3'} size={8} active={isOnline} />
             <Text style={[s.onlineText, !isOnline && s.offlineText]}>{isOnline ? 'На линии' : 'Не на линии'}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Hero */}
-        <View style={s.hero}>
-          <Text style={s.heroSmall}>заработок сегодня</Text>
-          <Text style={s.heroMoney}>{fmt(salary)} TJS</Text>
-          <Text style={s.heroParagraph}>{done} доставок · {fmt(collected)} TJS наличные на руках</Text>
-        </View>
+        <FadeSlideIn delay={0}>
+          <View style={s.hero}>
+            <Text style={s.heroSmall}>заработок сегодня</Text>
+            <CountUp value={salary} style={s.heroMoney} suffix=" TJS" duration={900} />
+            <Text style={s.heroParagraph}>{done} доставок · {fmt(collected)} TJS наличные на руках</Text>
+          </View>
+        </FadeSlideIn>
 
         {/* KPI bubbles */}
-        <View style={s.kpis}>
-          <TouchableOpacity style={s.kpi} onPress={() => router.push('/(tabs)/deliveries')}>
-            <Text style={[s.kpiNum, { color: C.green }]}>{done}</Text>
-            <Text style={s.kpiLabel}>доставлено</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.kpi} onPress={() => router.push('/(tabs)/deliveries')}>
-            <Text style={[s.kpiNum, { color: C.blue }]}>{active}</Text>
-            <Text style={s.kpiLabel}>активный</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.kpi} onPress={() => router.push('/(tabs)/claimable')}>
-            <Text style={[s.kpiNum, { color: C.orange }]}>{availCount}</Text>
-            <Text style={s.kpiLabel}>доступно</Text>
-          </TouchableOpacity>
-        </View>
+        <FadeSlideIn delay={70}>
+          <View style={s.kpis}>
+            <PressScale style={s.kpi} scaleTo={0.94} onPress={() => router.push('/(tabs)/deliveries')}>
+              <CountUp value={done} style={[s.kpiNum, { color: C.green }]} />
+              <Text style={s.kpiLabel}>доставлено</Text>
+            </PressScale>
+            <PressScale style={s.kpi} scaleTo={0.94} onPress={() => router.push('/(tabs)/deliveries')}>
+              <CountUp value={active} style={[s.kpiNum, { color: C.blue }]} />
+              <Text style={s.kpiLabel}>активный</Text>
+            </PressScale>
+            <PressScale style={s.kpi} scaleTo={0.94} onPress={() => router.push('/(tabs)/claimable')}>
+              <CountUp value={availCount} style={[s.kpiNum, { color: C.orange }]} />
+              <Text style={s.kpiLabel}>доступно</Text>
+            </PressScale>
+          </View>
+        </FadeSlideIn>
 
         {loading
-          ? <ActivityIndicator color={C.blue} style={{ marginTop: 32 }} />
+          ? (
+            <View style={{ gap: 12 }}>
+              <View style={s.sectionHead}><Skeleton width={140} height={22} /></View>
+              <OrderCardSkeleton />
+              <OrderCardSkeleton />
+            </View>
+          )
           : (
             <>
               {inRoute.length > 0 && (
                 <>
-                  <View style={s.sectionHead}>
-                    <Text style={s.sectionTitle}>Сейчас</Text>
-                    <TouchableOpacity onPress={() => router.push('/(tabs)/deliveries')}>
-                      <Text style={s.link}>Все</Text>
-                    </TouchableOpacity>
-                  </View>
-                  {inRoute.map(order => (
-                    <OrderCard
-                      key={order.id}
-                      order={order}
-                      onOpen={() => { setDetailOrder(order); setActionLoading(false) }}
-                      onStart={handleStart}
-                      actionLoading={actionLoading}
-                    />
+                  <FadeSlideIn delay={140}>
+                    <View style={s.sectionHead}>
+                      <Text style={s.sectionTitle}>Сейчас</Text>
+                      <TouchableOpacity onPress={() => router.push('/(tabs)/deliveries')}>
+                        <Text style={s.link}>Все</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </FadeSlideIn>
+                  {inRoute.map((order, i) => (
+                    <FadeSlideIn key={order.id} delay={180 + Math.min(i, 5) * 60} style={{ marginBottom: 12 }}>
+                      <OrderCard
+                        order={order}
+                        onOpen={() => { setDetailOrder(order); setActionLoading(false) }}
+                        onStart={handleStart}
+                        actionLoading={actionLoading}
+                      />
+                    </FadeSlideIn>
                   ))}
                 </>
               )}
 
-              <View style={s.sectionHead}>
-                <Text style={s.sectionTitle}>Статус дня</Text>
-              </View>
-              <View style={[s.card, s.statusCard]}>
-                <View style={s.iconBox}><Text style={{ fontSize: 26 }}>🔥</Text></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.statusTitle}>{done} доставок сегодня</Text>
-                  <Text style={s.statusSub}>Рейтинг 4.9 · {fmt(salary)} TJS заработано</Text>
+              <FadeSlideIn delay={inRoute.length > 0 ? 240 : 140}>
+                <View style={s.sectionHead}>
+                  <Text style={s.sectionTitle}>Статус дня</Text>
                 </View>
-              </View>
+                <View style={[s.card, s.statusCard]}>
+                  <View style={s.iconBox}><Text style={{ fontSize: 26 }}>🔥</Text></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.statusTitle}>{done} доставок сегодня</Text>
+                    <Text style={s.statusSub}>Рейтинг 4.9 · {fmt(salary)} TJS заработано</Text>
+                  </View>
+                </View>
+              </FadeSlideIn>
             </>
           )
         }

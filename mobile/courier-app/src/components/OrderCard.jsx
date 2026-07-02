@@ -5,6 +5,7 @@
  */
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native'
 import { C, STATUS_LABEL, STATUS_COLOR } from './OrderDetailSheet'
+import { PressScale } from './motion'
 
 const isUrgent = (o) => {
   const m = String(o?.delivery_method ?? o?.DeliveryMethod ?? o?.deliveryMethod ?? '').toLowerCase()
@@ -27,7 +28,7 @@ export function OrderCard({ order, onOpen, onStart, actionLoading }) {
   const isDone       = ['delivered', 'returned', 'issue', 'confirmed', 'cancelled'].includes(order.status)
 
   return (
-    <TouchableOpacity style={[oc.card, isUrgent(order) && oc.cardUrgent]} onPress={onOpen} activeOpacity={0.78}>
+    <PressScale style={[oc.card, isUrgent(order) && oc.cardUrgent]} onPress={onOpen} scaleTo={0.98}>
       {/* Top: order number + status badge */}
       <View style={oc.topRow}>
         <Text style={oc.orderNum}>{order.order_number}</Text>
@@ -85,7 +86,7 @@ export function OrderCard({ order, onOpen, onStart, actionLoading }) {
           </TouchableOpacity>
         )}
       </View>
-    </TouchableOpacity>
+    </PressScale>
   )
 }
 

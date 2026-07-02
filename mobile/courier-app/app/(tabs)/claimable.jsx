@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl, Alert, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, RefreshControl, Alert, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { getClaimableOrders, claimOrder } from '../../src/api/orders'
 import useAuthStore from '../../src/store/authStore'
 import { resolveCreator } from '../../src/lib/creator'
 import { C } from '../../src/components/OrderDetailSheet'
 import Avatar from '../../src/components/Avatar'
+import { FadeSlideIn, PressScale, OrderCardSkeleton, animateLayout } from '../../src/components/motion'
 
 // Canonical DB value is "fast"; "express" kept as legacy fallback.
 // Defensive check across all possible field-name shapes from the API.
@@ -39,6 +40,9 @@ export default function ClaimableScreen() {
     setClaiming(order.id)
     try {
       await claimOrder(order.id)
+      // Claimed card slides out of the list smoothly
+      animateLayout()
+      setOrders(prev => prev.filter(o => o.id !== order.id))
       fetchOrders()
     } catch (e) {
       Alert.alert('Ошибка', e.response?.data?.error?.message || 'Не удалось взять заказ')
@@ -59,21 +63,28 @@ export default function ClaimableScreen() {
         contentContainerStyle={s.listContent}
       >
         {loading
-          ? <ActivityIndicator color={C.blue} style={{ marginTop: 64 }} />
+          ? (<>
+              <OrderCardSkeleton />
+              <OrderCardSkeleton />
+              <OrderCardSkeleton />
+            </>)
           : orders.length === 0
             ? (
-              <View style={s.empty}>
-                <Text style={s.emptyIcon}>🎯</Text>
-                <Text style={s.emptyTitle}>Нет доступных заказов</Text>
-                <Text style={s.emptySub}>Потяните вниз чтобы обновить</Text>
-              </View>
+              <FadeSlideIn>
+                <View style={s.empty}>
+                  <Text style={s.emptyIcon}>🎯</Text>
+                  <Text style={s.emptyTitle}>Нет доступных заказов</Text>
+                  <Text style={s.emptySub}>Потяните вниз чтобы обновить</Text>
+                </View>
+              </FadeSlideIn>
             )
-            : orders.map((order) => {
+            : orders.map((order, index) => {
               const cr         = resolveCreator(order, currentUserName)
               const collectAmt = Number(order.courier_collect_amount ?? order.amount_to_collect ?? 0)
               const urgent     = isUrgent(order)
               return (
-                <View key={order.id} style={[s.card, urgent && s.cardUrgent]}>
+                <FadeSlideIn key={order.id} delay={Math.min(index, 6) * 55}>
+                <View style={[s.card, urgent && s.cardUrgent]}>
                   {/* Top: order number + badges */}
                   <View style={s.cardTop}>
                     <Text style={s.orderNum}>{order.order_number}</Text>
@@ -122,8 +133,9 @@ export default function ClaimableScreen() {
                   </View>
 
                   {/* Claim button */}
-                  <TouchableOpacity
+                  <PressScale
                     style={[s.claimBtn, claiming === order.id && s.claimBtnDisabled]}
+                    scaleTo={0.96}
                     onPress={() => handleClaim(order)}
                     disabled={!!claiming}
                   >
@@ -131,8 +143,9 @@ export default function ClaimableScreen() {
                       ? <ActivityIndicator color="#fff" size="small" />
                       : <Text style={s.claimBtnText}>🎯 Взять заказ</Text>
                     }
-                  </TouchableOpacity>
+                  </PressScale>
                 </View>
+                </FadeSlideIn>
               )
             })
         }

@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { getCashSummary, submitHandover, getHandoverHistory, getMyOrders } from '../../src/api/orders'
 import client, { API_URL } from '../../src/api/client'
+import { FadeSlideIn, PressScale, CountUp, Skeleton, animateLayout } from '../../src/components/motion'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 dayjs.locale('ru')
@@ -210,12 +211,26 @@ export default function CashScreen() {
         </View>
 
         {loading
-          ? <ActivityIndicator color={C.blue} style={{ marginTop: 64 }} />
+          ? (
+            <>
+              <View style={s.cashHero}>
+                <Skeleton width={170} height={13} />
+                <Skeleton width={220} height={44} style={{ marginTop: 16 }} />
+                <Skeleton height={52} radius={22} style={{ marginTop: 18 }} />
+                <Skeleton height={56} radius={22} style={{ marginTop: 16 }} />
+              </View>
+              <View style={s.kpiRow}>
+                <Skeleton height={96} radius={20} style={{ flex: 1 }} />
+                <Skeleton height={96} radius={20} style={{ flex: 1 }} />
+              </View>
+            </>
+          )
           : <>
             {/* Cash hero (white/orange card) */}
+            <FadeSlideIn>
             <View style={s.cashHero}>
               <Text style={s.cashLabel}>нужно вернуть сегодня</Text>
-              <Text style={s.cashSum}>{fmt(toReturn)} TJS</Text>
+              <CountUp value={toReturn} style={s.cashSum} suffix=" TJS" duration={900} />
               <View style={s.formula}>
                 <Text style={s.formulaVal}>{fmt(collected)}</Text>
                 <Text style={s.formulaMuted}>−</Text>
@@ -230,42 +245,45 @@ export default function CashScreen() {
                   <Text style={s.pendingVal}>{fmt(pendingHandover)} TJS</Text>
                 </View>
               )}
-              <TouchableOpacity
+              <PressScale
                 style={[s.submitBtn, toReturn === 0 && s.submitBtnDisabled]}
+                scaleTo={0.96}
                 onPress={() => toReturn > 0 && setShowHandover(true)}
-                activeOpacity={toReturn > 0 ? 0.8 : 1}
               >
                 <Text style={s.submitBtnText}>
                   {toReturn === 0 ? 'Касса сдана' : 'Сдать наличные'}
                 </Text>
-              </TouchableOpacity>
+              </PressScale>
             </View>
+            </FadeSlideIn>
 
             {/* KPI cards (act as tabs) */}
+            <FadeSlideIn delay={80}>
             <View style={s.kpiRow}>
-              <TouchableOpacity
+              <PressScale
                 style={[s.kpiCard, cashTab === 'handover' && s.kpiCardActive]}
-                onPress={() => setCashTab('handover')}
-                activeOpacity={0.8}
+                scaleTo={0.95}
+                onPress={() => { animateLayout(); setCashTab('handover') }}
               >
                 <Text style={s.kpiLabel}>Сдано наличных</Text>
-                <Text style={s.kpiValue}>{fmt(totalHandedOver)}</Text>
+                <CountUp value={totalHandedOver} style={s.kpiValue} />
                 <Text style={s.kpiUnit}>TJS</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </PressScale>
+              <PressScale
                 style={[s.kpiCard, cashTab === 'earnings' && s.kpiCardActive]}
-                onPress={() => setCashTab('earnings')}
-                activeOpacity={0.8}
+                scaleTo={0.95}
+                onPress={() => { animateLayout(); setCashTab('earnings') }}
               >
                 <Text style={s.kpiLabel}>Заработки</Text>
-                <Text style={s.kpiValue}>{fmt(earningsTotal)}</Text>
+                <CountUp value={earningsTotal} style={s.kpiValue} />
                 <Text style={s.kpiUnit}>TJS</Text>
-              </TouchableOpacity>
+              </PressScale>
             </View>
+            </FadeSlideIn>
 
             {/* Handover tab */}
             {cashTab === 'handover' && (
-              <>
+              <FadeSlideIn delay={140} from={10}>
                 <View style={s.filterRow}>
                   <TouchableOpacity
                     style={[s.filterChip, periodFilter !== 'all' && s.filterChipActive]}
@@ -319,11 +337,12 @@ export default function CashScreen() {
                     )
                   })}
                 </View>
-              </>
+              </FadeSlideIn>
             )}
 
             {/* Earnings tab */}
             {cashTab === 'earnings' && (
+              <FadeSlideIn delay={0} from={10}>
               <View style={s.histCard}>
                 {earnings.length === 0 ? (
                   <View style={{ padding: 24, alignItems: 'center' }}>
@@ -343,6 +362,7 @@ export default function CashScreen() {
                   </View>
                 ))}
               </View>
+              </FadeSlideIn>
             )}
           </>
         }

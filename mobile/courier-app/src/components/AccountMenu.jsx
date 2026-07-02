@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Modal, Pressable, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { Animated, Modal, Pressable, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native'
 import { router } from 'expo-router'
 import Avatar from './Avatar'
+import { animateLayout } from './motion'
 
 const C = {
   panel: '#0d1a2d',
@@ -29,6 +30,15 @@ export function AccountMenu({
   const initials = getInitials(user)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
+  // Spring drop-in: panel slides down slightly and fades while the dim appears
+  const progress = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    if (visible) {
+      progress.setValue(0)
+      Animated.spring(progress, { toValue: 1, useNativeDriver: true, damping: 17, stiffness: 210, mass: 0.8 }).start()
+    }
+  }, [visible])
+
   const goProfile = () => {
     onClose()
     router.push('/(tabs)/profile')
@@ -42,6 +52,16 @@ export function AccountMenu({
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={s.overlay} onPress={onClose}>
+        <Animated.View
+          style={{
+            width: '100%', alignItems: 'center',
+            opacity: progress,
+            transform: [
+              { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [-18, 0] }) },
+              { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1] }) },
+            ],
+          }}
+        >
         <Pressable style={s.menu} onPress={event => event.stopPropagation()}>
           <View style={s.header}>
             <Avatar uri={user?.avatar_url} name={user?.full_name} fallback={initials} size={70} color={C.violet} />
@@ -61,7 +81,7 @@ export function AccountMenu({
           <View style={s.divider} />
 
           <MenuRow icon="♙" label="Мой профиль" onPress={goProfile} />
-          <MenuRow icon="⚙" label="Настройки" value={settingsOpen ? 'Скрыть параметры' : 'Показать параметры'} onPress={() => setSettingsOpen(value => !value)} />
+          <MenuRow icon="⚙" label="Настройки" value={settingsOpen ? 'Скрыть параметры' : 'Показать параметры'} onPress={() => { animateLayout(); setSettingsOpen(value => !value) }} />
           {settingsOpen && (
             <View style={s.settingsPanel}>
               <SettingLine label="Статус" value={isOnline ? 'Онлайн' : 'Не на линии'} />
@@ -93,6 +113,7 @@ export function AccountMenu({
             <Text style={s.logoutText}>Выйти из системы</Text>
           </TouchableOpacity>
         </Pressable>
+        </Animated.View>
       </Pressable>
     </Modal>
   )

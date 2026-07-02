@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl, Alert, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { getMyOrders, updateOrderStatus } from '../../src/api/orders'
 import { OrderDetailSheet, C } from '../../src/components/OrderDetailSheet'
 import { OrderCard } from '../../src/components/OrderCard'
+import { FadeSlideIn, PulseDot, OrderCardSkeleton, animateLayout } from '../../src/components/motion'
 
 const FILTERS = [
   { key: 'all',         label: 'Все' },
@@ -77,7 +78,7 @@ export default function DeliveriesScreen() {
           <Text style={s.headSub}>Сегодня · {orders.length} заказов</Text>
         </View>
         <View style={s.onlinePill}>
-          <View style={s.dot} />
+          <PulseDot color={C.green} size={8} />
           <Text style={s.onlineText}>онлайн</Text>
         </View>
       </View>
@@ -93,7 +94,7 @@ export default function DeliveriesScreen() {
           <TouchableOpacity
             key={f.key}
             style={[s.chip, activeFilter === f.key && s.chipActive]}
-            onPress={() => setActiveFilter(f.key)}
+            onPress={() => { animateLayout(); setActiveFilter(f.key) }}
           >
             <Text
               numberOfLines={1}
@@ -111,23 +112,30 @@ export default function DeliveriesScreen() {
         contentContainerStyle={s.listContent}
       >
         {loading
-          ? <ActivityIndicator color={C.blue} style={{ marginTop: 64 }} />
+          ? (<>
+              <OrderCardSkeleton />
+              <OrderCardSkeleton />
+              <OrderCardSkeleton />
+            </>)
           : filtered.length === 0
             ? (
-              <View style={s.empty}>
-                <Text style={s.emptyIcon}>📦</Text>
-                <Text style={s.emptyTitle}>Нет заказов</Text>
-                <Text style={s.emptySub}>Заказы появятся здесь после назначения</Text>
-              </View>
+              <FadeSlideIn>
+                <View style={s.empty}>
+                  <Text style={s.emptyIcon}>📦</Text>
+                  <Text style={s.emptyTitle}>Нет заказов</Text>
+                  <Text style={s.emptySub}>Заказы появятся здесь после назначения</Text>
+                </View>
+              </FadeSlideIn>
             )
-            : filtered.map(order => (
-              <OrderCard
-                key={order.id}
-                order={order}
-                onOpen={() => openDetail(order)}
-                onStart={handleStart}
-                actionLoading={actionLoading}
-              />
+            : filtered.map((order, i) => (
+              <FadeSlideIn key={order.id} delay={Math.min(i, 6) * 55}>
+                <OrderCard
+                  order={order}
+                  onOpen={() => openDetail(order)}
+                  onStart={handleStart}
+                  actionLoading={actionLoading}
+                />
+              </FadeSlideIn>
             ))
         }
       </ScrollView>

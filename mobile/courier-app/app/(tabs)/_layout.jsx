@@ -1,19 +1,42 @@
 import { Tabs } from 'expo-router'
-import { View, StyleSheet } from 'react-native'
+import { useEffect, useRef } from 'react'
+import { Animated, StyleSheet } from 'react-native'
 import { Home, Package, MapPin, Wallet } from 'lucide-react-native'
 
 const BLUE = '#1683ff'
 const INACTIVE = '#b0bac8'
 
 function TabIcon({ Icon, focused }) {
+  // Active pill springs in behind the icon; icon gives a small pop on focus.
+  const progress = useRef(new Animated.Value(focused ? 1 : 0)).current
+  useEffect(() => {
+    Animated.spring(progress, {
+      toValue: focused ? 1 : 0,
+      useNativeDriver: true,
+      damping: 14, stiffness: 220, mass: 0.7,
+    }).start()
+  }, [focused])
+
   return (
-    <View style={[styles.pill, focused && styles.pillActive]}>
-      <Icon
-        size={22}
-        color={focused ? BLUE : INACTIVE}
-        strokeWidth={focused ? 2.5 : 1.8}
+    <Animated.View style={styles.pill}>
+      <Animated.View
+        style={[styles.pillActive, {
+          opacity: progress,
+          transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }],
+        }]}
       />
-    </View>
+      <Animated.View
+        style={{
+          transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] }) }],
+        }}
+      >
+        <Icon
+          size={22}
+          color={focused ? BLUE : INACTIVE}
+          strokeWidth={focused ? 2.5 : 1.8}
+        />
+      </Animated.View>
+    </Animated.View>
   )
 }
 
@@ -26,6 +49,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pillActive: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 17,
     backgroundColor: '#deeaff',
   },
 })

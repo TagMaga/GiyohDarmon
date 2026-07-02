@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  View, Text, TextInput, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView
 } from 'react-native'
 import { router } from 'expo-router'
 import { login, getMe } from '../../src/api/auth'
 import { API_URL } from '../../src/api/client'
 import useAuthStore from '../../src/store/authStore'
+import { FadeSlideIn, PressScale } from '../../src/components/motion'
 
 const C = {
   bg: '#0d0f14', bg2: '#13161e', surface: '#1e2130',
@@ -57,8 +58,11 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView style={s.wrap} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
+        <FadeSlideIn from={22} style={{ width: '100%', alignItems: 'center' }}>
         <View style={s.card}>
-          <View style={s.iconBox}><Text style={s.iconText}>🛵</Text></View>
+          <FadeSlideIn delay={90} from={10}>
+            <View style={s.iconBox}><Text style={s.iconText}>🛵</Text></View>
+          </FadeSlideIn>
           <Text style={s.title}>Курьер Портал</Text>
           <Text style={s.sub}>MegaMall Delivery</Text>
 
@@ -78,13 +82,15 @@ export default function LoginScreen() {
             />
           </View>
 
-          <TouchableOpacity
+          <PressScale
             style={[s.btn, loading && s.btnDisabled]}
+            scaleTo={0.96}
             onPress={handleLogin} disabled={loading}
           >
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnText}>Войти</Text>}
-          </TouchableOpacity>
+          </PressScale>
         </View>
+        </FadeSlideIn>
       </ScrollView>
     </KeyboardAvoidingView>
   )
