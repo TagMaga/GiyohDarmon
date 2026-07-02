@@ -6,6 +6,7 @@ import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
 import { createOrder, createCustomer } from '../api'
 import client from '../../../shared/api/client'
+import useProfile from '../../../shared/hooks/useProfile'
 import useCustomers from '../hooks/useCustomers'
 import useProducts from '../hooks/useProducts'
 import useDeliverySettings from '../hooks/useDeliverySettings'
@@ -153,11 +154,19 @@ export function formatDeliveryFee(fee) {
   return fee <= 0 ? 'Бесплатно' : `${fee.toLocaleString('ru-RU')} с`
 }
 
+const ORDER_TYPE_BY_ROLE = {
+  manager: 'manager_personal_order',
+  sales_team_lead: 'team_lead_personal_order',
+  seller: 'seller_order',
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────────
 export default function CreateOrder() {
   const toast = useToast()
   const qc = useQueryClient()
   const navigate = useNavigate()
+  const { role } = useProfile()
+  const orderType = ORDER_TYPE_BY_ROLE[role] ?? 'seller_order'
 
   const [form, setForm] = useState(() => loadDraft() ?? EMPTY_FORM)
   const [success, setSuccess] = useState(null)
@@ -303,7 +312,7 @@ export default function CreateOrder() {
       const order = await createOrder({
         customer_id:   cid,
         city_id:       form.cityId,
-        order_type:    'seller_order',
+        order_type:    orderType,
         delivery_method: form.deliveryMode,
         items: cartItems.map((it) => ({
           product_id: it.product_id,

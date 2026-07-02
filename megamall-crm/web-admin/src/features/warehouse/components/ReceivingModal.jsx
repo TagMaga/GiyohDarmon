@@ -14,7 +14,6 @@ export default function ReceivingModal({ open, onClose, products, inventory = []
   const [productId, setProductId] = useState('')
   const [quantity, setQuantity] = useState('')
   const [unitCost, setUnitCost] = useState('')
-  const [invoice, setInvoice] = useState('')
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
@@ -42,7 +41,6 @@ export default function ReceivingModal({ open, onClose, products, inventory = []
         product_id: productId,
         quantity: qty,
         unit_cost: cost,
-        invoice_no: invoice.trim() || undefined,
         notes: notes.trim() || undefined,
       })
     },
@@ -59,7 +57,6 @@ export default function ReceivingModal({ open, onClose, products, inventory = []
     setProductId('')
     setQuantity('')
     setUnitCost('')
-    setInvoice('')
     setNotes('')
     mutation.reset()
     onClose()
@@ -90,7 +87,6 @@ export default function ReceivingModal({ open, onClose, products, inventory = []
         <Select label="Товар *" value={productId} onChange={setProductId} placeholder="Выберите товар" options={products.filter((p) => isUUID(getId(p))).map((p) => ({ value: getId(p), label: `${getProductName(p)} (${getProductSku(p)})` }))} />
         <Field label="Количество прихода *" type="number" min="1" value={quantity} onChange={setQuantity} placeholder="0" />
         <Field label="Закупочная цена за ед. *" type="number" min="0" step="0.01" value={unitCost} onChange={setUnitCost} placeholder="0.00" />
-        <Field label="Номер накладной" value={invoice} onChange={setInvoice} placeholder="Необязательно" />
         <Field label="Примечание" value={notes} onChange={setNotes} placeholder="Необязательно" />
       </div>
 
