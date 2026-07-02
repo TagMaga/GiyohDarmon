@@ -8,6 +8,7 @@ import useAuthStore from '../../src/store/authStore'
 import { OrderDetailSheet, C } from '../../src/components/OrderDetailSheet'
 import { OrderCard } from '../../src/components/OrderCard'
 import { AccountMenu } from '../../src/components/AccountMenu'
+import Avatar from '../../src/components/Avatar'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 dayjs.locale('ru')
@@ -91,9 +92,7 @@ export default function DashboardScreen() {
         {/* Top bar */}
         <View style={s.top}>
           <TouchableOpacity style={s.profile} activeOpacity={0.82} onPress={() => setMenuOpen(true)}>
-            <View style={s.avatar}>
-              <Text style={s.avatarText}>{initial}</Text>
-            </View>
+            <Avatar uri={user?.avatar_url} name={user?.full_name} fallback={initial} size={52} radius={19} color="#101827" />
             <View style={{ minWidth: 0 }}>
               <Text style={s.name}>{firstName}</Text>
               <Text style={s.sub}>Курьер · MegaMall</Text>
@@ -204,8 +203,6 @@ const s = StyleSheet.create({
   content: { padding: 18, paddingBottom: 24 },
   top:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, marginTop: 6, gap: 12 },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 13, flex: 1, minWidth: 0 },
-  avatar:  { width: 52, height: 52, borderRadius: 19, backgroundColor: '#101827', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 12, elevation: 3 },
-  avatarText: { color: '#fff', fontSize: 22, fontWeight: '900' },
   name:    { fontSize: 22, fontWeight: '900', color: C.ink, lineHeight: 26 },
   sub:     { fontSize: 13, color: C.muted, fontWeight: '700', marginTop: 3 },
   onlineBtn:  { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, paddingVertical: 10, borderRadius: 999, backgroundColor: '#e8f8f0' },

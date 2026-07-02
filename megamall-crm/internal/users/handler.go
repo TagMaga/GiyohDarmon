@@ -30,6 +30,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	// Self-service routes for any authenticated user.
 	rg.GET("/me", middleware.RequireAuth(), h.GetMe)
 	rg.PATCH("/me", middleware.RequireAuth(), h.PatchMe)
+	rg.POST("/me/avatar", middleware.RequireAuth(), h.UploadMyAvatar)
 
 	rg.POST("", middleware.RequireRoles(string(RoleOwner)), h.Create)
 	rg.GET("", middleware.RequireRoles(string(RoleOwner), string(RoleManager), string(RoleSalesTeamLead)), h.List)
@@ -195,7 +196,17 @@ func (h *Handler) UploadAvatar(c *gin.Context) {
 	if !ok {
 		return
 	}
+	h.uploadAvatar(c, id)
+}
 
+// UploadMyAvatar handles POST /users/me/avatar — lets any authenticated user
+// (e.g. a courier) upload their own profile photo.
+func (h *Handler) UploadMyAvatar(c *gin.Context) {
+	claims := middleware.ClaimsFromContext(c)
+	h.uploadAvatar(c, claims.UserID)
+}
+
+func (h *Handler) uploadAvatar(c *gin.Context, id uuid.UUID) {
 	file, err := c.FormFile("avatar")
 	if err != nil {
 		response.Error(c, apperrors.BadRequest("avatar file is required"))

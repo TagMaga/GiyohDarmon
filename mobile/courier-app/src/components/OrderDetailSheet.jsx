@@ -9,6 +9,7 @@ import { Phone, MessageCircle, Send, MapPin } from 'lucide-react-native'
 import { updateOrderStatus, reportAddressChanged, deferOrder, getOrderComments, addOrderComment } from '../api/orders'
 import useAuthStore from '../store/authStore'
 import { resolveCreator } from '../lib/creator'
+import Avatar from './Avatar'
 
 const { height: SCREEN_H } = Dimensions.get('window')
 export const SHEET_H = SCREEN_H * 0.90
@@ -172,13 +173,15 @@ export function OrderDetailSheet({
 
   const clientComment = order.notes || order.comment || order.customer_comment || ''
 
-  const sellerName  = order.seller?.full_name || order.seller_name || null
-  const sellerPhone = order.seller?.phone || order.seller_phone || null
+  const sellerName   = order.seller?.full_name || order.seller_name || null
+  const sellerPhone  = order.seller?.phone || order.seller_phone || null
+  const sellerAvatar = order.seller?.avatar_url || order.seller_avatar_url || null
 
   // Merged creator display — prefer enriched seller data when available
-  const creatorName  = sellerName || creator.name
-  const creatorPhone = sellerPhone || creator.phone
-  const showCreator  = sellerName || creator.hasCreator
+  const creatorName      = sellerName || creator.name
+  const creatorPhone     = sellerPhone || creator.phone
+  const creatorAvatarUrl = sellerAvatar || creator.avatarUrl
+  const showCreator      = sellerName || creator.hasCreator
 
   const callPhone = () => {
     const phone = order.customer?.phone
@@ -455,10 +458,8 @@ export function OrderDetailSheet({
           {showCreator && (
             <SectionCard label="Создал заказ">
               <View style={d.personRow}>
-                <View style={d.personAvatar}>
-                  <Text style={d.personAvatarInitial}>
-                    {(creatorName || '?')[0].toUpperCase()}
-                  </Text>
+                <View style={d.personAvatarRing}>
+                  <Avatar uri={creatorAvatarUrl} name={creatorName} size={40} radius={11} color="#eef3ff" textColor={C.violet} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={d.personName}>{creatorName}</Text>
@@ -691,8 +692,7 @@ const d = StyleSheet.create({
 
   // Person row (creator merged)
   personRow:         { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  personAvatar:      { width: 42, height: 42, borderRadius: 13, backgroundColor: '#eef3ff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line, flexShrink: 0 },
-  personAvatarInitial: { fontSize: 16, fontWeight: '900', color: C.violet },
+  personAvatarRing:  { borderRadius: 13, borderWidth: 1, borderColor: C.line, flexShrink: 0, overflow: 'hidden' },
   personName:        { fontSize: 15, fontWeight: '900', color: C.ink, marginBottom: 3 },
   personPhone:       { fontSize: 13, color: C.blue, fontWeight: '700' },
   personPhoneMuted:  { fontSize: 13, color: C.muted, fontWeight: '600' },

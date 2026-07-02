@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/megamall/crm/internal/courier_tariffs"
 	logistics_settings "github.com/megamall/crm/internal/logistics_settings"
 	"github.com/megamall/crm/internal/orders"
 	apperrors "github.com/megamall/crm/pkg/errors"
@@ -108,6 +109,7 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID, stat
 		CreatorName          *string            `gorm:"column:creator_name"`
 		CreatorPhone         *string            `gorm:"column:creator_phone"`
 		CreatorRole          *string            `gorm:"column:creator_role"`
+		CreatorAvatarURL     *string            `gorm:"column:creator_avatar_url"`
 		DeliveryMethod       string             `gorm:"column:delivery_method"`
 		ProductTotal         float64            `gorm:"column:product_total"`
 		DeliveryFee          float64            `gorm:"column:delivery_fee"`
@@ -133,6 +135,7 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID, stat
 			creator.full_name AS creator_name,
 			creator.phone AS creator_phone,
 			creator.role AS creator_role,
+			creator.avatar_url AS creator_avatar_url,
 			COALESCE(o.delivery_method, 'normal') AS delivery_method,
 			o.total_amount AS product_total,
 			o.delivery_fee,
@@ -191,6 +194,7 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID, stat
 			CreatorName:          derefStr(rw.CreatorName),
 			CreatorPhone:         derefStr(rw.CreatorPhone),
 			CreatorRole:          derefStr(rw.CreatorRole),
+			CreatorAvatarURL:     rw.CreatorAvatarURL,
 			DeliveryMethod:       rw.DeliveryMethod,
 			ProductTotal:         rw.ProductTotal,
 			DeliveryFee:          rw.DeliveryFee,
@@ -298,6 +302,7 @@ func (r *Repository) ListAvailableOrders(ctx context.Context, courierID uuid.UUI
 		CreatorName          *string            `gorm:"column:creator_name"`
 		CreatorPhone         *string            `gorm:"column:creator_phone"`
 		CreatorRole          *string            `gorm:"column:creator_role"`
+		CreatorAvatarURL     *string            `gorm:"column:creator_avatar_url"`
 		DeliveryMethod       string             `gorm:"column:delivery_method"`
 		ProductTotal         float64            `gorm:"column:product_total"`
 		DeliveryFee          float64            `gorm:"column:delivery_fee"`
@@ -318,6 +323,7 @@ func (r *Repository) ListAvailableOrders(ctx context.Context, courierID uuid.UUI
 			creator.full_name AS creator_name,
 			creator.phone AS creator_phone,
 			creator.role AS creator_role,
+			creator.avatar_url AS creator_avatar_url,
 			COALESCE(o.delivery_method,'normal') AS delivery_method,
 			o.total_amount AS product_total,
 			o.delivery_fee,
@@ -367,6 +373,7 @@ func (r *Repository) ListAvailableOrders(ctx context.Context, courierID uuid.UUI
 			CreatorName:          derefStr(rw.CreatorName),
 			CreatorPhone:         derefStr(rw.CreatorPhone),
 			CreatorRole:          derefStr(rw.CreatorRole),
+			CreatorAvatarURL:     rw.CreatorAvatarURL,
 			DeliveryMethod:       rw.DeliveryMethod,
 			ProductTotal:         rw.ProductTotal,
 			DeliveryFee:          rw.DeliveryFee,
@@ -397,6 +404,7 @@ func (r *Repository) GetOrderByIDForCourier(ctx context.Context, courierID, orde
 		CreatorName          *string            `gorm:"column:creator_name"`
 		CreatorPhone         *string            `gorm:"column:creator_phone"`
 		CreatorRole          *string            `gorm:"column:creator_role"`
+		CreatorAvatarURL     *string            `gorm:"column:creator_avatar_url"`
 		DeliveryMethod       string             `gorm:"column:delivery_method"`
 		ProductTotal         float64            `gorm:"column:product_total"`
 		DeliveryFee          float64            `gorm:"column:delivery_fee"`
@@ -422,6 +430,7 @@ func (r *Repository) GetOrderByIDForCourier(ctx context.Context, courierID, orde
 			creator.full_name AS creator_name,
 			creator.phone AS creator_phone,
 			creator.role AS creator_role,
+			creator.avatar_url AS creator_avatar_url,
 			COALESCE(o.delivery_method, 'normal') AS delivery_method,
 			o.total_amount AS product_total,
 			o.delivery_fee,
@@ -477,6 +486,7 @@ func (r *Repository) GetOrderByIDForCourier(ctx context.Context, courierID, orde
 		CreatorName:          derefStr(rw.CreatorName),
 		CreatorPhone:         derefStr(rw.CreatorPhone),
 		CreatorRole:          derefStr(rw.CreatorRole),
+		CreatorAvatarURL:     rw.CreatorAvatarURL,
 		DeliveryMethod:       rw.DeliveryMethod,
 		ProductTotal:         rw.ProductTotal,
 		DeliveryFee:          rw.DeliveryFee,
@@ -968,6 +978,7 @@ func (r *Repository) GetMe(ctx context.Context, userID uuid.UUID) (*CourierMeRes
 		        phone,
 		        email,
 		        role,
+		        avatar_url,
 		        courier_order_intake_enabled AS order_intake_enabled,
 		        courier_order_intake_reason AS order_intake_reason
 		 FROM users
@@ -977,6 +988,17 @@ func (r *Repository) GetMe(ctx context.Context, userID uuid.UUID) (*CourierMeRes
 	if err != nil {
 		return nil, fmt.Errorf("get courier me: %w", err)
 	}
+
+	tariffRepo := courier_tariffs.NewRepository(r.db)
+	rules, err := tariffRepo.ListByCourier(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get courier me: %w", err)
+	}
+	me.TariffRules = make([]courier_tariffs.TariffRuleResponse, len(rules))
+	for i, rule := range rules {
+		me.TariffRules[i] = courier_tariffs.ToResponse(&rule)
+	}
+
 	return &me, nil
 }
 

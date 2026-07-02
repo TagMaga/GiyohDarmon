@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/megamall/crm/internal/courier_tariffs"
 	"github.com/megamall/crm/internal/orders"
 )
 
@@ -85,6 +86,7 @@ type MyOrderResponse struct {
 	CreatorName          string              `json:"creator_name"`
 	CreatorPhone         string              `json:"creator_phone"`
 	CreatorRole          string              `json:"creator_role"` // raw role; localized label resolved on the client
+	CreatorAvatarURL     *string             `json:"creator_avatar_url"`
 	DeliveryMethod       string              `json:"delivery_method"`
 	ProductTotal         float64             `json:"product_total"`
 	DeliveryFee          float64             `json:"delivery_fee"`
@@ -111,13 +113,15 @@ type CashSummaryResponse struct {
 
 // CourierMeResponse is the profile response for GET /courier/me.
 type CourierMeResponse struct {
-	ID                 uuid.UUID `json:"id"`
-	FullName           string    `json:"full_name"`
-	Phone              string    `json:"phone"`
-	Email              *string   `json:"email"`
-	Role               string    `json:"role"`
-	OrderIntakeEnabled bool      `json:"order_intake_enabled"`
-	OrderIntakeReason  *string   `json:"order_intake_reason,omitempty"`
+	ID                 uuid.UUID                            `json:"id"`
+	FullName           string                               `json:"full_name"`
+	Phone              string                               `json:"phone"`
+	Email              *string                              `json:"email"`
+	Role               string                               `json:"role"`
+	AvatarURL          *string                              `json:"avatar_url"`
+	OrderIntakeEnabled bool                                 `json:"order_intake_enabled"`
+	OrderIntakeReason  *string                              `json:"order_intake_reason,omitempty"`
+	TariffRules        []courier_tariffs.TariffRuleResponse `json:"tariff_rules"`
 }
 
 type NoteResponse struct {

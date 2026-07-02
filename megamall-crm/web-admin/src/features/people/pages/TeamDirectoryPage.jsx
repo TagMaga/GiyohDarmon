@@ -19,7 +19,7 @@ import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query'
 import {
   Search, X, ChevronLeft, Edit2, Upload, Phone,
   MapPin, Calendar, Briefcase, Clock, Users,
-  TrendingUp,
+  TrendingUp, Plus, Trash2,
 } from 'lucide-react'
 
 import {
@@ -28,6 +28,9 @@ import {
   createConfig, disableConfig,
   updateEmployee, uploadUserAvatar,
 } from '../api'
+import {
+  fetchCourierTariffs, createCourierTariff, deleteCourierTariff,
+} from '../../dispatcher/api'
 import { ALL_ROLES, ROLE_LABEL, COMMISSION_TYPE_LABEL, fmtDate, fmtMoney, fmtPct, isConfigActive } from '../utils/peopleHelpers'
 import Modal               from '../../../shared/components/Modal'
 import Button              from '../../../shared/components/Button'
@@ -627,6 +630,155 @@ function SetSalaryModal({ open, onClose, personId, current }) {
   )
 }
 
+// ── Modal: courier delivery tariffs (normal / fast, range-based) ───────────────
+const DELIVERY_TYPES = [
+  { key: 'normal', label: 'Обычная доставка' },
+  { key: 'fast',   label: 'Срочная доставка' },
+]
+const TARIFF_TYPES = [
+  { key: 'fixed',   label: 'Фиксированная (сом)' },
+  { key: 'percent', label: 'Процент (%)' },
+]
+
+function CourierTariffsModal({ open, onClose, courierId, courierName }) {
+  const qc    = useQueryClient()
+  const toast = useToast()
+  const [tab, setTab] = useState('normal')
+  const [form, setForm] = useState({ amount_from: '', amount_to: '', tariff_type: 'fixed', tariff_value: '' })
+
+  const { data: rules = [], isLoading } = useQuery({
+    queryKey: ['courier-tariffs', courierId],
+    queryFn:  () => fetchCourierTariffs(courierId),
+    enabled:  open,
+  })
+
+  useEffect(() => {
+    if (open) {
+      setTab('normal')
+      setForm({ amount_from: '', amount_to: '', tariff_type: 'fixed', tariff_value: '' })
+    }
+  }, [open])
+
+  const setF = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }))
+
+  const { mutate: addRule, isPending: adding, error: addError, reset: resetAdd } = useMutation({
+    mutationFn: () => {
+      const amtFrom = parseFloat(form.amount_from)
+      const amtTo   = form.amount_to.trim() !== '' ? parseFloat(form.amount_to) : null
+      const val     = parseFloat(form.tariff_value)
+      if (isNaN(amtFrom) || amtFrom < 0) throw new Error('Сумма от: некорректное значение')
+      if (amtTo !== null && (isNaN(amtTo) || amtTo <= amtFrom)) throw new Error('Сумма до должна быть больше суммы от')
+      if (isNaN(val) || val <= 0) throw new Error('Значение тарифа должно быть > 0')
+      return createCourierTariff(courierId, {
+        delivery_type: tab, amount_from: amtFrom, amount_to: amtTo,
+        tariff_type: form.tariff_type, tariff_value: val,
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['courier-tariffs', courierId] })
+      setForm({ amount_from: '', amount_to: '', tariff_type: 'fixed', tariff_value: '' })
+      resetAdd()
+    },
+  })
+
+  const { mutate: removeRule } = useMutation({
+    mutationFn: (rule) => deleteCourierTariff(courierId, rule.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['courier-tariffs', courierId] })
+      toast.success('Тариф удалён')
+    },
+    onError: (e) => toast.error(e?.response?.data?.error?.message ?? 'Ошибка удаления'),
+  })
+
+  const visibleRules = rules.filter((r) => r.delivery_type === tab)
+
+  return (
+    <Modal open={open} onClose={onClose} title={`Тарифы — ${courierName}`}
+      description="Оплата курьеру зависит от типа доставки и суммы заказа" size="lg"
+      footer={<Button variant="secondary" onClick={onClose}>Закрыть</Button>}
+    >
+      <div className="flex gap-1 border-b border-slate-100 mb-4">
+        {DELIVERY_TYPES.map((dt) => (
+          <button
+            key={dt.key}
+            onClick={() => setTab(dt.key)}
+            className={`px-4 py-2 text-sm font-semibold -mb-px border-b-2 transition-colors ${
+              tab === dt.key ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent'
+            }`}
+          >
+            {dt.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-slate-50 rounded-xl border border-slate-100 p-4 mb-5">
+        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-3">Добавить тариф</p>
+        <div className="grid grid-cols-2 gap-2.5 mb-2.5">
+          <div>
+            <label className="input-label">Сумма от (сом)</label>
+            <input type="number" min="0" value={form.amount_from} onChange={setF('amount_from')} className="input mt-1" placeholder="0" />
+          </div>
+          <div>
+            <label className="input-label">Сумма до (сом)</label>
+            <input type="number" min="0" value={form.amount_to} onChange={setF('amount_to')} className="input mt-1" placeholder="∞ (без ограничений)" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2.5 mb-3">
+          <div>
+            <label className="input-label">Тип тарифа</label>
+            <select value={form.tariff_type} onChange={setF('tariff_type')} className="input mt-1">
+              {TARIFF_TYPES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="input-label">Значение</label>
+            <input type="number" min="0" step="0.01" value={form.tariff_value} onChange={setF('tariff_value')}
+              className="input mt-1" placeholder={form.tariff_type === 'percent' ? '5 (= 5%)' : '15 (сом)'} />
+          </div>
+        </div>
+        {addError && <Alert variant="error" className="mb-3">{addError.response?.data?.error?.message ?? addError.message}</Alert>}
+        <div className="flex justify-end">
+          <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => addRule()} loading={adding}>
+            Добавить
+          </Button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <p className="text-sm text-slate-400 py-3">Загрузка…</p>
+      ) : visibleRules.length === 0 ? (
+        <div className="text-center py-7 text-slate-400 text-sm border border-dashed border-slate-200 rounded-xl">
+          Тарифов нет. Добавьте первый тариф выше.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {visibleRules.map((r) => (
+            <div key={r.id} className="flex items-center justify-between gap-2 bg-white border border-slate-100 rounded-xl px-3.5 py-2.5">
+              <div className="text-[13px]">
+                <span className="text-slate-500">{r.amount_from} – {r.amount_to != null ? r.amount_to : '∞'} сом</span>
+                <span className="mx-2 text-slate-300">→</span>
+                <span className="font-bold text-slate-900">
+                  {r.tariff_type === 'percent' ? `${r.tariff_value}%` : `${r.tariff_value} сом`}
+                </span>
+                <span className="ml-2 text-[11px] text-slate-400">
+                  ({r.tariff_type === 'percent' ? 'процент' : 'фиксировано'})
+                </span>
+              </div>
+              <button
+                onClick={() => removeRule(r)}
+                title="Удалить"
+                className="text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg p-1.5 flex-shrink-0"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
+  )
+}
+
 // ── Modal: set personal commission rate override ───────────────────────────────
 function PersonalRateModal({ open, onClose, personId, commType, label, existing }) {
   const qc    = useQueryClient()
@@ -741,7 +893,14 @@ function CommRateRow({ rowDef, empConfig, teamConfig, personId }) {
 function PayPanel({ person, teamId, teamName, teamColor, teams, employees, empConfigs, teamConfigs, salaryData }) {
   const [showTeam,    setShowTeam]    = useState(false)
   const [showSalary,  setShowSalary]  = useState(false)
+  const [showTariffs, setShowTariffs] = useState(false)
   const isCourier = person.role === 'courier'
+
+  const { data: courierTariffs = [] } = useQuery({
+    queryKey: ['courier-tariffs', person.id],
+    queryFn:  () => fetchCourierTariffs(person.id),
+    enabled:  isCourier,
+  })
 
   const color = teamColor ?? '#6366f1'
 
@@ -771,13 +930,28 @@ function PayPanel({ person, teamId, teamName, teamColor, teams, employees, empCo
         </button>
       </div>
 
-      {/* ── Courier note ──────────────────────────────────────────────────── */}
+      {/* ── Courier tariff ───────────────────────────────────────────────── */}
       {isCourier && (
-        <div className="flex items-start gap-3 bg-amber-50 rounded-xl p-4 border border-amber-100">
-          <TrendingUp size={15} className="text-amber-600 mt-0.5 flex-shrink-0" />
-          <p className="text-[12.5px] text-amber-700 font-medium">
-            Оплата по тарифу доставки.
-          </p>
+        <div className="flex items-start justify-between gap-3 bg-amber-50 rounded-xl p-4 border border-amber-100">
+          <div className="flex items-start gap-3 min-w-0">
+            <TrendingUp size={15} className="text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="text-[12.5px] text-amber-700 font-medium">
+                Оплата по тарифу доставки
+              </p>
+              <p className="text-[11px] text-amber-600/80 mt-0.5">
+                {courierTariffs.length > 0
+                  ? `Настроено тарифов: ${courierTariffs.length}`
+                  : 'Тарифы не настроены'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowTariffs(true)}
+            className="text-[11px] font-semibold text-amber-700 hover:text-amber-900 transition-colors px-2 py-1 rounded-lg hover:bg-amber-100 min-h-[28px] flex-shrink-0"
+          >
+            Настроить
+          </button>
         </div>
       )}
 
@@ -816,6 +990,14 @@ function PayPanel({ person, teamId, teamName, teamColor, teams, employees, empCo
         personId={person.id}
         current={salaryData}
       />
+      {isCourier && (
+        <CourierTariffsModal
+          open={showTariffs}
+          onClose={() => setShowTariffs(false)}
+          courierId={person.id}
+          courierName={person.full_name}
+        />
+      )}
     </div>
   )
 }

@@ -33,6 +33,7 @@ export function resolveCreator(order, currentUserName = '') {
     id: order?.creator_id || null,
     name: order?.creator_name || 'Неизвестный пользователь',
     phone: order?.creator_phone || '',
+    avatarUrl: order?.creator_avatar_url || null,
     role,
     roleLabel: CREATOR_ROLE_LABEL[role] || (role || null),
     roleColor: CREATOR_ROLE_COLOR[role] || FALLBACK_COLOR,

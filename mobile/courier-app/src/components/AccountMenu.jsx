@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Modal, Pressable, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native'
 import { router } from 'expo-router'
+import Avatar from './Avatar'
 
 const C = {
   panel: '#0d1a2d',
@@ -43,9 +44,7 @@ export function AccountMenu({
       <Pressable style={s.overlay} onPress={onClose}>
         <Pressable style={s.menu} onPress={event => event.stopPropagation()}>
           <View style={s.header}>
-            <View style={s.avatar}>
-              <Text style={s.avatarText}>{initials}</Text>
-            </View>
+            <Avatar uri={user?.avatar_url} name={user?.full_name} fallback={initials} size={70} color={C.violet} />
             <View style={s.headerText}>
               <Text style={s.name} numberOfLines={1}>{user?.phone || user?.full_name || 'Курьер'}</Text>
               <Text style={s.role}>Курьер</Text>
@@ -145,8 +144,6 @@ const s = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-start', alignItems: 'center', paddingTop: 62, paddingHorizontal: 12, backgroundColor: 'rgba(6,12,22,0.42)' },
   menu: { width: '100%', maxWidth: 440, borderRadius: 24, backgroundColor: C.panel, borderWidth: 1, borderColor: C.line, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 18 }, shadowOpacity: 0.24, shadowRadius: 30, elevation: 18 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 24, paddingVertical: 22 },
-  avatar: { width: 70, height: 70, borderRadius: 35, backgroundColor: C.violet, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontSize: 26, fontWeight: '900' },
   headerText: { flex: 1, minWidth: 0 },
   name: { color: C.text, fontSize: 22, fontWeight: '900', lineHeight: 27 },
   role: { color: C.muted, fontSize: 16, fontWeight: '700', marginTop: 6 },

@@ -5,6 +5,7 @@ import { getClaimableOrders, claimOrder } from '../../src/api/orders'
 import useAuthStore from '../../src/store/authStore'
 import { resolveCreator } from '../../src/lib/creator'
 import { C } from '../../src/components/OrderDetailSheet'
+import Avatar from '../../src/components/Avatar'
 
 // Canonical DB value is "fast"; "express" kept as legacy fallback.
 // Defensive check across all possible field-name shapes from the API.
@@ -106,7 +107,7 @@ export default function ClaimableScreen() {
 
                   {/* Creator strip */}
                   <View style={s.creatorStrip}>
-                    <Text style={s.creatorIcon}>👤</Text>
+                    <Avatar uri={cr.avatarUrl} name={cr.name} size={18} color={C.muted} />
                     <Text style={s.creatorName} numberOfLines={1}>{cr.name}</Text>
                     {cr.isOwn
                       ? <View style={[s.rolePill, { backgroundColor: `${C.green}1A` }]}>
@@ -176,7 +177,6 @@ const s = StyleSheet.create({
   amountLabel:  { fontSize: 10, fontWeight: '800', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4 },
   amountVal:    { fontSize: 18, fontWeight: '900', color: C.violet, letterSpacing: -0.5 },
   creatorStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: C.line },
-  creatorIcon:  { fontSize: 14 },
   creatorName:  { flex: 1, minWidth: 0, fontSize: 13, fontWeight: '800', color: C.ink },
   rolePill:     { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0 },
   rolePillText: { fontSize: 11, fontWeight: '900' },
