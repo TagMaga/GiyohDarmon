@@ -96,8 +96,8 @@
   .check.checked{background:linear-gradient(135deg,#4F46E5,#6D28D9); border-color:var(--indigo);}
   .check svg{width:13px; height:13px; color:#fff; opacity:0;}
   .check.checked svg{opacity:1;}
-  .pay-caption{font-size:11px; color:var(--slate-400); font-weight:700; margin-bottom:7px;}
   .pay-stats{display:flex; gap:14px; margin-top:8px; font-size:11px;}
+  .pay-stats + .pay-stats{margin-top:10px; padding-top:10px; border-top:1px dashed var(--slate-100);}
   .pay-stats div{color:var(--slate-400); font-weight:700;}
   .pay-stats b{display:block; color:var(--slate-900); font-size:12.5px; font-weight:900; margin-top:1px;}
   .amt-input{width:100%; text-align:right; border:1.5px solid #E2E8F0; border-radius:10px; padding:8px 9px; font-weight:800; font-size:13px; color:var(--indigo); background:#F8FAFF; margin-top:9px;}
@@ -512,9 +512,12 @@
                   <span style="font-weight:800; font-size:13.5px; color:var(--slate-900)">Фарход Раҳимов</span>
                   <span class="badge badge-indigo">Менеджер</span>
                 </div>
-                <div class="pay-caption">34 заказа · сумма 48 200 сомони</div>
                 <div class="pay-stats">
-                  <div>Заработано<b>4 820 сомони</b></div>
+                  <div>Заказов<b>34</b></div>
+                  <div>Сумма заказов<b>48 200 сомони</b></div>
+                  <div>Доход<b>4 820 сомони</b></div>
+                </div>
+                <div class="pay-stats">
                   <div>Выплачено<b>3 000 сомони</b></div>
                   <div>Осталось<b style="color:var(--indigo)">1 820 сомони</b></div>
                 </div>
@@ -530,9 +533,12 @@
                   <span style="font-weight:800; font-size:13.5px; color:var(--slate-900)">Мадина Юсупова</span>
                   <span class="badge badge-violet">Продавец</span>
                 </div>
-                <div class="pay-caption">58 заказов · сумма 31 500 сомони</div>
                 <div class="pay-stats">
-                  <div>Заработано<b>3 150 сомони</b></div>
+                  <div>Заказов<b>58</b></div>
+                  <div>Сумма заказов<b>31 500 сомони</b></div>
+                  <div>Доход<b>3 150 сомони</b></div>
+                </div>
+                <div class="pay-stats">
                   <div>Выплачено<b>3 150 сомони</b></div>
                   <div>Осталось<b style="color:var(--emerald)">0 сомони</b></div>
                 </div>
@@ -548,9 +554,12 @@
                   <span style="font-weight:800; font-size:13.5px; color:var(--slate-900)">Далер Каримов</span>
                   <span class="badge badge-violet">Продавец</span>
                 </div>
-                <div class="pay-caption">41 заказ · сумма 26 400 сомони</div>
                 <div class="pay-stats">
-                  <div>Заработано<b>2 640 сомони</b></div>
+                  <div>Заказов<b>41</b></div>
+                  <div>Сумма заказов<b>26 400 сомони</b></div>
+                  <div>Доход<b>2 640 сомони</b></div>
+                </div>
+                <div class="pay-stats">
                   <div>Выплачено<b>1 200 сомони</b></div>
                   <div>Осталось<b style="color:var(--indigo)">1 440 сомони</b></div>
                 </div>
@@ -566,9 +575,12 @@
                   <span style="font-weight:800; font-size:13.5px; color:var(--slate-900)">Нилуфар Толибова</span>
                   <span class="badge badge-violet">Продавец</span>
                 </div>
-                <div class="pay-caption">37 заказов · сумма 22 100 сомони</div>
                 <div class="pay-stats">
-                  <div>Заработано<b>2 210 сомони</b></div>
+                  <div>Заказов<b>37</b></div>
+                  <div>Сумма заказов<b>22 100 сомони</b></div>
+                  <div>Доход<b>2 210 сомони</b></div>
+                </div>
+                <div class="pay-stats">
                   <div>Выплачено<b>0 сомони</b></div>
                   <div>Осталось<b style="color:var(--indigo)">2 210 сомони</b></div>
                 </div>
@@ -584,9 +596,12 @@
                   <span style="font-weight:800; font-size:13.5px; color:var(--slate-900)">Рустам Сафаров</span>
                   <span class="badge badge-violet">Продавец</span>
                 </div>
-                <div class="pay-caption">12 заказов · сумма 6 400 сомони</div>
                 <div class="pay-stats">
-                  <div>Заработано<b>640 сомони</b></div>
+                  <div>Заказов<b>12</b></div>
+                  <div>Сумма заказов<b>6 400 сомони</b></div>
+                  <div>Доход<b>640 сомони</b></div>
+                </div>
+                <div class="pay-stats">
                   <div>Выплачено<b>640 сомони</b></div>
                   <div>Осталось<b style="color:var(--emerald)">0 сомони</b></div>
                 </div>
@@ -602,9 +617,12 @@
                   <span style="font-weight:800; font-size:13.5px; color:var(--slate-900)">Саидахон Назарова</span>
                   <span class="badge badge-indigo">Менеджер</span>
                 </div>
-                <div class="pay-caption">21 заказ · сумма 31 400 сомони</div>
                 <div class="pay-stats">
-                  <div>Заработано<b>3 140 сомони</b></div>
+                  <div>Заказов<b>21</b></div>
+                  <div>Сумма заказов<b>31 400 сомони</b></div>
+                  <div>Доход<b>3 140 сомони</b></div>
+                </div>
+                <div class="pay-stats">
                   <div>Выплачено<b>2 000 сомони</b></div>
                   <div>Осталось<b style="color:var(--indigo)">1 140 сомони</b></div>
                 </div>
@@ -666,7 +684,7 @@
     <div class="note-card"><b>Единый леджер выплат:</b> модель <code>SellerPayout</code> сейчас жёстко привязана к <code>seller_id</code> (<code>internal/seller_payouts/model.go</code>) — выплатить менеджеру или тимлиду физически некуда записать. Нужна замена/расширение на <code>payouts(payee_id, payee_role, payer_id, payer_role, amount, method, period_start, period_end, status)</code>. Выплата Тимлид→Менеджер и Менеджер→Продавец — одна и та же форма записи, разница только в ролях.</div>
     <div class="note-card"><b>Итог:</b> раз структура общая, Owner Finance просто фильтрует леджер по <code>payer_role IN (team_lead, manager)</code> и показывает как авто-расход — без отдельной формы «добавить расход вручную» (экран 5).</div>
     <div class="note-card">Массовый выбор: чекбокс + сумма по умолчанию = «Осталось», редактируемая. Полностью выплаченные — задизейблены и отмечены зелёным бейджем.</div>
-    <div class="note-card">Каждая строка списка теперь начинается с контекстной подписи «34 заказа · сумма 48 200 сомони» (объём + валовая сумма, тот же источник, что <code>data-orders</code>/<code>data-value</code> в шторке экрана 2) — до трёх стат-полей «Заработано/Выплачено/Осталось» тимлид сразу видит, из какого объёма работы взялась комиссия, не открывая шторку.</div>
+    <div class="note-card">Каждая строка теперь — две стат-строки, а не подпись+3 поля: строка 1 «Заказов / Сумма заказов / Доход» (объём и валовая сумма, тот же источник, что <code>data-orders</code>/<code>data-value</code> в шторке экрана 2 — лейбл сознательно «Доход», не «Заработано», чтобы термин совпадал с шторкой), строка 2 «Выплачено / Осталось» — механика самой выплаты, разделены тонкой пунктирной линией. Тимлид видит объём работы и итог выплаты в одном месте, не открывая шторку.</div>
   </div>
 </section>
 
