@@ -110,6 +110,17 @@ export async function createReceiving(payload) {
   return unwrap(res)
 }
 
+export async function updateReceiving(movementId, payload) {
+  const res = await client.patch(`/inventory/receiving/${requireUUID(movementId, 'movement_id')}`, cleanPayload(payload))
+  return unwrap(res)
+}
+
+export async function fetchReceivingHistory(movementId) {
+  if (!isUUID(movementId)) return []
+  const res = await client.get(`/inventory/receiving/${movementId}/history`)
+  return toArray(unwrap(res))
+}
+
 export async function createReceipt(payload) {
   const res = await client.post('/inventory/adjustments', cleanPayload(payload))
   return unwrap(res)

@@ -47,6 +47,51 @@ type ReceivingResponse struct {
 	Batch      BatchResponse `json:"batch"`
 }
 
+type UpdateReceivingRequest struct {
+	ProductID uuid.UUID `json:"product_id" validate:"required"`
+	Quantity  int       `json:"quantity" validate:"required,min=1"`
+	UnitCost  float64   `json:"unit_cost" validate:"min=0"`
+	Notes     *string   `json:"notes"`
+}
+
+type ReceivingEditResponse struct {
+	ID             uuid.UUID `json:"id"`
+	MovementID     uuid.UUID `json:"movement_id"`
+	EditedBy       uuid.UUID `json:"edited_by"`
+	EditorName     string    `json:"editor_name"`
+	OldProductID   uuid.UUID `json:"old_product_id"`
+	NewProductID   uuid.UUID `json:"new_product_id"`
+	OldProductName string    `json:"old_product_name"`
+	NewProductName string    `json:"new_product_name"`
+	OldQuantity    int       `json:"old_quantity"`
+	NewQuantity    int       `json:"new_quantity"`
+	OldUnitCost    float64   `json:"old_unit_cost"`
+	NewUnitCost    float64   `json:"new_unit_cost"`
+	OldNote        string    `json:"old_note"`
+	NewNote        string    `json:"new_note"`
+	EditedAt       time.Time `json:"edited_at"`
+}
+
+func ToReceivingEditResponse(row *ReceivingEditRow) ReceivingEditResponse {
+	return ReceivingEditResponse{
+		ID:             row.ID,
+		MovementID:     row.MovementID,
+		EditedBy:       row.EditedBy,
+		EditorName:     row.EditorName,
+		OldProductID:   row.OldProductID,
+		NewProductID:   row.NewProductID,
+		OldProductName: row.OldProductName,
+		NewProductName: row.NewProductName,
+		OldQuantity:    row.OldQuantity,
+		NewQuantity:    row.NewQuantity,
+		OldUnitCost:    row.OldUnitCost,
+		NewUnitCost:    row.NewUnitCost,
+		OldNote:        row.OldNote,
+		NewNote:        row.NewNote,
+		EditedAt:       row.EditedAt,
+	}
+}
+
 // ─── Batch ────────────────────────────────────────────────────────────────────
 
 type BatchResponse struct {
@@ -152,32 +197,64 @@ func ToWriteoffResponse(w *Writeoff) WriteoffResponse {
 // ─── Movement ─────────────────────────────────────────────────────────────────
 
 type MovementResponse struct {
-	ID               uuid.UUID    `json:"id"`
-	ProductID        uuid.UUID    `json:"product_id"`
-	MovementType     MovementType `json:"movement_type"`
-	Quantity         int          `json:"quantity"`
-	PreviousQuantity int          `json:"previous_quantity"`
-	NewQuantity      int          `json:"new_quantity"`
-	Reason           *string      `json:"reason"`
-	ReferenceID      *uuid.UUID   `json:"reference_id"`
-	CreatedBy        uuid.UUID    `json:"created_by"`
-	CreatedByName    string       `json:"created_by_name"`
-	CreatedAt        time.Time    `json:"created_at"`
+	ID                uuid.UUID    `json:"id"`
+	ProductID         uuid.UUID    `json:"product_id"`
+	MovementType      MovementType `json:"movement_type"`
+	Quantity          int          `json:"quantity"`
+	PreviousQuantity  int          `json:"previous_quantity"`
+	NewQuantity       int          `json:"new_quantity"`
+	Reason            *string      `json:"reason"`
+	ReferenceID       *uuid.UUID   `json:"reference_id"`
+	CreatedBy         uuid.UUID    `json:"created_by"`
+	CreatedByName     string       `json:"created_by_name"`
+	CreatedAt         time.Time    `json:"created_at"`
+	BatchID           *uuid.UUID   `json:"batch_id,omitempty"`
+	BatchUnitCost     *float64     `json:"batch_unit_cost,omitempty"`
+	BatchReceivedQty  *int         `json:"batch_received_quantity,omitempty"`
+	BatchRemainingQty *int         `json:"batch_remaining_quantity,omitempty"`
+	EditCount         int          `json:"edit_count"`
+	OrderID           *uuid.UUID   `json:"order_id,omitempty"`
+	OrderNumber       string       `json:"order_number,omitempty"`
+	OrderStatus       string       `json:"order_status,omitempty"`
+	CustomerName      string       `json:"customer_name,omitempty"`
+	CustomerPhone     string       `json:"customer_phone,omitempty"`
+	DeliveryAddress   string       `json:"delivery_address,omitempty"`
+	CourierName       string       `json:"courier_name,omitempty"`
+	SellerName        string       `json:"seller_name,omitempty"`
+	TotalAmount       *float64     `json:"total_amount,omitempty"`
+	DeliveryFee       *float64     `json:"delivery_fee,omitempty"`
+	TotalOrderAmount  *float64     `json:"total_order_amount,omitempty"`
 }
 
 func ToMovementResponse(row *MovementRow) MovementResponse {
 	return MovementResponse{
-		ID:               row.ID,
-		ProductID:        row.ProductID,
-		MovementType:     row.MovementType,
-		Quantity:         row.Quantity,
-		PreviousQuantity: row.PreviousQuantity,
-		NewQuantity:      row.NewQuantity,
-		Reason:           row.Reason,
-		ReferenceID:      row.ReferenceID,
-		CreatedBy:        row.CreatedBy,
-		CreatedByName:    row.CreatedByName,
-		CreatedAt:        row.CreatedAt,
+		ID:                row.ID,
+		ProductID:         row.ProductID,
+		MovementType:      row.MovementType,
+		Quantity:          row.Quantity,
+		PreviousQuantity:  row.PreviousQuantity,
+		NewQuantity:       row.NewQuantity,
+		Reason:            row.Reason,
+		ReferenceID:       row.ReferenceID,
+		CreatedBy:         row.CreatedBy,
+		CreatedByName:     row.CreatedByName,
+		CreatedAt:         row.CreatedAt,
+		BatchID:           row.BatchID,
+		BatchUnitCost:     row.BatchUnitCost,
+		BatchReceivedQty:  row.BatchReceivedQty,
+		BatchRemainingQty: row.BatchRemainingQty,
+		EditCount:         row.EditCount,
+		OrderID:           row.OrderID,
+		OrderNumber:       row.OrderNumber,
+		OrderStatus:       row.OrderStatus,
+		CustomerName:      row.CustomerName,
+		CustomerPhone:     row.CustomerPhone,
+		DeliveryAddress:   row.DeliveryAddress,
+		CourierName:       row.CourierName,
+		SellerName:        row.SellerName,
+		TotalAmount:       row.TotalAmount,
+		DeliveryFee:       row.DeliveryFee,
+		TotalOrderAmount:  row.TotalOrderAmount,
 	}
 }
 

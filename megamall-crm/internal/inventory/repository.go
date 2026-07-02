@@ -16,7 +16,30 @@ import (
 // actor's display name resolved via a LEFT JOIN on the users table.
 type MovementRow struct {
 	Movement
-	CreatedByName string `gorm:"column:created_by_name"`
+	CreatedByName     string     `gorm:"column:created_by_name"`
+	BatchID           *uuid.UUID `gorm:"column:batch_id"`
+	BatchUnitCost     *float64   `gorm:"column:batch_unit_cost"`
+	BatchReceivedQty  *int       `gorm:"column:batch_received_quantity"`
+	BatchRemainingQty *int       `gorm:"column:batch_remaining_quantity"`
+	EditCount         int        `gorm:"column:edit_count"`
+	OrderID           *uuid.UUID `gorm:"column:order_id"`
+	OrderNumber       string     `gorm:"column:order_number"`
+	OrderStatus       string     `gorm:"column:order_status"`
+	CustomerName      string     `gorm:"column:customer_name"`
+	CustomerPhone     string     `gorm:"column:customer_phone"`
+	DeliveryAddress   string     `gorm:"column:delivery_address"`
+	CourierName       string     `gorm:"column:courier_name"`
+	SellerName        string     `gorm:"column:seller_name"`
+	TotalAmount       *float64   `gorm:"column:total_amount"`
+	DeliveryFee       *float64   `gorm:"column:delivery_fee"`
+	TotalOrderAmount  *float64   `gorm:"column:total_order_amount"`
+}
+
+type ReceivingEditRow struct {
+	ReceivingEdit
+	EditorName     string `gorm:"column:editor_name"`
+	OldProductName string `gorm:"column:old_product_name"`
+	NewProductName string `gorm:"column:new_product_name"`
 }
 
 // Repository handles all inventory persistence.
@@ -116,6 +139,24 @@ func (r *Repository) InsertMovement(tx *gorm.DB, ctx context.Context, m *Movemen
 	return nil
 }
 
+func (r *Repository) GetMovementForUpdate(tx *gorm.DB, ctx context.Context, id uuid.UUID) (*Movement, error) {
+	var m Movement
+	if err := tx.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id).
+		First(&m).Error; err != nil {
+		return nil, fmt.Errorf("lock movement: %w", err)
+	}
+	return &m, nil
+}
+
+func (r *Repository) UpdateMovement(tx *gorm.DB, ctx context.Context, m *Movement) error {
+	if err := tx.WithContext(ctx).Save(m).Error; err != nil {
+		return fmt.Errorf("update movement: %w", err)
+	}
+	return nil
+}
+
 // InsertWriteoff appends a writeoff record.
 // Must be called inside a transaction.
 func (r *Repository) InsertWriteoff(tx *gorm.DB, ctx context.Context, w *Writeoff) error {
@@ -140,7 +181,12 @@ func (r *Repository) ListMovements(ctx context.Context, f ListMovementsFilter, p
 	// Base query with LEFT JOIN to resolve the actor's display name.
 	base := r.db.WithContext(ctx).
 		Table("inventory_movements").
-		Joins("LEFT JOIN users ON users.id = inventory_movements.created_by AND users.deleted_at IS NULL")
+		Joins("LEFT JOIN users ON users.id = inventory_movements.created_by AND users.deleted_at IS NULL").
+		Joins("LEFT JOIN inventory_batches ON inventory_batches.movement_id = inventory_movements.id").
+		Joins("LEFT JOIN orders ON orders.id = inventory_movements.reference_id AND orders.deleted_at IS NULL").
+		Joins("LEFT JOIN customers ON customers.id = orders.customer_id").
+		Joins("LEFT JOIN users seller_user ON seller_user.id = orders.seller_id AND seller_user.deleted_at IS NULL").
+		Joins("LEFT JOIN users courier_user ON courier_user.id = orders.courier_id AND courier_user.deleted_at IS NULL")
 
 	if f.ProductID != "" {
 		base = base.Where("inventory_movements.product_id = ?", f.ProductID)
@@ -167,7 +213,30 @@ func (r *Repository) ListMovements(ctx context.Context, f ListMovementsFilter, p
 
 	var rows []MovementRow
 	err := base.
-		Select("inventory_movements.*, COALESCE(users.full_name, '') AS created_by_name").
+		Select(`
+			inventory_movements.*,
+			COALESCE(users.full_name, '') AS created_by_name,
+			inventory_batches.id AS batch_id,
+			inventory_batches.unit_cost AS batch_unit_cost,
+			inventory_batches.received_quantity AS batch_received_quantity,
+			inventory_batches.remaining_quantity AS batch_remaining_quantity,
+			(
+				SELECT COUNT(*)
+				FROM inventory_receiving_edits ire
+				WHERE ire.movement_id = inventory_movements.id
+			)::int AS edit_count,
+			orders.id AS order_id,
+			COALESCE(orders.order_number, '') AS order_number,
+			COALESCE(orders.status::text, '') AS order_status,
+			COALESCE(customers.full_name, '') AS customer_name,
+			COALESCE(customers.phone, '') AS customer_phone,
+			COALESCE(orders.delivery_address, '') AS delivery_address,
+			COALESCE(courier_user.full_name, '') AS courier_name,
+			COALESCE(seller_user.full_name, '') AS seller_name,
+			orders.total_amount AS total_amount,
+			orders.delivery_fee AS delivery_fee,
+			(orders.total_amount + orders.delivery_fee) AS total_order_amount
+		`).
 		Order("inventory_movements.created_at DESC").
 		Limit(p.Limit).Offset(p.Offset()).
 		Find(&rows).Error
@@ -232,6 +301,53 @@ func (r *Repository) UpdateBatchRemaining(tx *gorm.DB, ctx context.Context, batc
 		return fmt.Errorf("update batch remaining: %w", result.Error)
 	}
 	return nil
+}
+
+func (r *Repository) GetBatchByMovementForUpdate(tx *gorm.DB, ctx context.Context, movementID uuid.UUID) (*Batch, error) {
+	var b Batch
+	if err := tx.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("movement_id = ?", movementID).
+		First(&b).Error; err != nil {
+		return nil, fmt.Errorf("lock receiving batch: %w", err)
+	}
+	return &b, nil
+}
+
+func (r *Repository) UpdateBatch(tx *gorm.DB, ctx context.Context, b *Batch) error {
+	if err := tx.WithContext(ctx).Save(b).Error; err != nil {
+		return fmt.Errorf("update batch: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) InsertReceivingEdit(tx *gorm.DB, ctx context.Context, e *ReceivingEdit) error {
+	if err := tx.WithContext(ctx).Create(e).Error; err != nil {
+		return fmt.Errorf("insert receiving edit: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) ListReceivingEdits(ctx context.Context, movementID uuid.UUID) ([]ReceivingEditRow, error) {
+	var rows []ReceivingEditRow
+	err := r.db.WithContext(ctx).
+		Table("inventory_receiving_edits").
+		Joins("LEFT JOIN users ON users.id = inventory_receiving_edits.edited_by AND users.deleted_at IS NULL").
+		Joins("LEFT JOIN products old_products ON old_products.id = inventory_receiving_edits.old_product_id").
+		Joins("LEFT JOIN products new_products ON new_products.id = inventory_receiving_edits.new_product_id").
+		Select(`
+			inventory_receiving_edits.*,
+			COALESCE(users.full_name, '') AS editor_name,
+			COALESCE(old_products.name, '') AS old_product_name,
+			COALESCE(new_products.name, '') AS new_product_name
+		`).
+		Where("inventory_receiving_edits.movement_id = ?", movementID).
+		Order("inventory_receiving_edits.edited_at DESC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("list receiving edits: %w", err)
+	}
+	return rows, nil
 }
 
 // InsertBatchConsumptions inserts multiple consumption records in one call.

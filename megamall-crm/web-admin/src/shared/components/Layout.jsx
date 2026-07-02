@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { Home, ShoppingCart, Plus, Wallet, User, Users, TrendingUp, Truck, MoreHorizontal } from 'lucide-react'
+import { Home, ShoppingCart, Plus, Wallet, User, Users, TrendingUp, Truck, MoreHorizontal, Package, PackagePlus, BarChart3 } from 'lucide-react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import useAuthStore from '../store/authStore'
@@ -22,6 +22,14 @@ const OWNER_TABS = [
   { label: 'Ещё',      icon: MoreHorizontal, path: '/owner/settings', end: false },
 ]
 
+const WAREHOUSE_TABS = [
+  { label: 'Главная', icon: Home,        path: '/warehouse',           end: true },
+  { label: 'Товары',  icon: Package,     path: '/warehouse/inventory', end: false },
+  { label: 'Приёмка', icon: PackagePlus, path: '/warehouse/receiving', end: false },
+  { label: 'Движ.',   icon: BarChart3,   path: '/warehouse/movements', end: false },
+  { label: 'Профиль', icon: User,        path: '/warehouse/profile',   end: false },
+]
+
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
@@ -30,7 +38,8 @@ export default function Layout() {
   const isOwner   = role === 'owner'
   const isSeller  = role === 'seller'
   const isManager = role === 'manager'
-  const hasMobileNav = isOwner || isSeller || isManager
+  const isWarehouse = role === 'warehouse_manager'
+  const hasMobileNav = isOwner || isSeller || isManager || isWarehouse
 
   if (isDispatcherBoard) {
     return <Outlet />
@@ -68,6 +77,7 @@ export default function Layout() {
       {isOwner   && <BottomNav tabs={OWNER_TABS} />}
       {isSeller  && <BottomNav />}
       {isManager && <BottomNav tabs={MANAGER_TABS} />}
+      {isWarehouse && <BottomNav tabs={WAREHOUSE_TABS} />}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Clock, Download, FilterX, History, Package, Search, Trash2 } from 'lucide-react'
+import { Clock, Download, FilterX, History, Package, PackagePlus, Pencil, Search, Trash2 } from 'lucide-react'
 import PageHeader from '../../../shared/components/PageHeader'
 import Button from '../../../shared/components/Button'
 import Badge from '../../../shared/components/Badge'
@@ -19,12 +19,16 @@ import {
   getAvailableQty,
   getId,
   getLastMovementForProduct,
+  getProductBarcode,
   getProductImage,
   getProductName,
   getProductSku,
+  getPurchasePrice,
   getQuantity,
   getReservedQty,
+  getSalePrice,
   getStockStatus,
+  isProductActive,
 } from '../utils/warehouseHelpers'
 
 const STATUS_OPTIONS = [
@@ -40,24 +44,28 @@ export default function WarehouseInventoryPage() {
   const [search, setSearch] = useState(params.get('q') ?? '')
   const [drawerProduct, setDrawerProduct] = useState(null)
   const [modalProduct, setModalProduct] = useState(null)
+  const [showCreateProduct, setShowCreateProduct] = useState(false)
   const [receiveProduct, setReceiveProduct] = useState(undefined)
   const [writeoffProduct, setWriteoffProduct] = useState(null)
   const data = useWarehouseData()
 
-  const filteredInventory = useMemo(() => {
+  const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return data.inventory.filter((inv) => {
-      const product = data.productMap[inv.product_id ?? inv.ProductID]
+    const inventoryByProduct = new Map(data.inventory.map((inv) => [inv.product_id ?? inv.ProductID, inv]))
+    return data.products.map((product) => {
+      const inv = inventoryByProduct.get(getId(product)) ?? null
+      return { product, inv }
+    }).filter(({ product, inv }) => {
       const status = getStockStatus(inv)
       if (statusFilter && status !== statusFilter) return false
       if (!q) return true
       return (
         getProductName(product).toLowerCase().includes(q) ||
         getProductSku(product).toLowerCase().includes(q) ||
-        (product?.barcode ?? product?.Barcode ?? '').toLowerCase().includes(q)
+        getProductBarcode(product).toLowerCase().includes(q)
       )
     })
-  }, [data.inventory, data.productMap, search, statusFilter])
+  }, [data.inventory, data.products, search, statusFilter])
 
   function clearFilters() {
     setSearch('')
@@ -72,10 +80,15 @@ export default function WarehouseInventoryPage() {
   return (
     <div className="animate-fade-in p-6 pb-20 lg:pb-6">
       <PageHeader
-        title="Остатки"
-        subtitle="Быстрый поиск, доступность и операции по товарам."
+        title="Остатки и товары"
+        subtitle="Карточки товаров, цены, доступность и складские операции."
         icon={<Package size={20} />}
-        action={<Button variant="primary" icon={<Download size={15} />} onClick={() => setReceiveProduct(null)}>Новый приход</Button>}
+        action={
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="primary" icon={<Download size={15} />} onClick={() => setReceiveProduct(null)}>Новая приёмка</Button>
+            <Button icon={<PackagePlus size={15} />} onClick={() => setShowCreateProduct(true)}>Добавить товар</Button>
+          </div>
+        }
       />
 
       {data.error && (
@@ -103,26 +116,29 @@ export default function WarehouseInventoryPage() {
       </section>
 
       <div className="hidden lg:block">
-        <InventoryTable
-          rows={filteredInventory}
+          <InventoryTable
+          rows={filteredRows}
           data={data}
           onProduct={setDrawerProduct}
           onReceive={setReceiveProduct}
           onWriteoff={setWriteoffProduct}
           onHistory={openHistory}
+          onEdit={setModalProduct}
         />
       </div>
       <div className="space-y-3 lg:hidden">
-        {filteredInventory.length === 0 ? (
+        {filteredRows.length === 0 ? (
           <EmptyState icon={<Package size={22} />} title="Остатки не найдены" description="Измените поиск или сбросьте фильтры." />
-        ) : filteredInventory.map((inv) => (
+        ) : filteredRows.map(({ product, inv }) => (
           <InventoryCard
-            key={getId(inv)}
+            key={getId(product)}
             inv={inv}
+            product={product}
             data={data}
             onProduct={setDrawerProduct}
             onReceive={setReceiveProduct}
             onWriteoff={setWriteoffProduct}
+            onEdit={setModalProduct}
           />
         ))}
       </div>
@@ -145,13 +161,14 @@ export default function WarehouseInventoryPage() {
         onEdit={setModalProduct}
       />
       <ProductModal open={Boolean(modalProduct)} onClose={() => setModalProduct(null)} product={modalProduct} suppliers={data.suppliers} />
+      <ProductModal open={showCreateProduct} onClose={() => setShowCreateProduct(false)} suppliers={data.suppliers} />
       <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={data.products} inventory={data.inventory} />
       <WriteoffModal open={Boolean(writeoffProduct)} onClose={() => setWriteoffProduct(null)} products={writeoffProduct ? [writeoffProduct] : data.products} inventory={data.inventory} />
     </div>
   )
 }
 
-function InventoryTable({ rows, data, onProduct, onReceive, onWriteoff, onHistory }) {
+function InventoryTable({ rows, data, onProduct, onReceive, onWriteoff, onHistory, onEdit }) {
   if (!rows.length) {
     return <EmptyState icon={<Package size={22} />} title="Остатки не найдены" description="Измените поиск или сбросьте фильтры." />
   }
@@ -164,19 +181,20 @@ function InventoryTable({ rows, data, onProduct, onReceive, onWriteoff, onHistor
             <th className="px-3 py-2.5 text-right">На складе</th>
             <th className="px-3 py-2.5 text-right">Доступно</th>
             <th className="px-3 py-2.5 text-right">Резерв</th>
+            <th className="px-3 py-2.5 text-right">Закупка</th>
+            <th className="px-3 py-2.5 text-right">Продажа</th>
             <th className="px-3 py-2.5 text-right">Стоимость</th>
             <th className="px-3 py-2.5 text-left">Статус</th>
             <th className="px-3 py-2.5 text-right">Операции</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {rows.map((inv) => {
-            const product = data.productMap[inv.product_id ?? inv.ProductID]
+          {rows.map(({ product, inv }) => {
             const status = getStockStatus(inv)
             const last = getLastMovementForProduct(getId(product), data.movements)
             const stockValue = getInventoryFifoValue(inv, data.batches)
             return (
-              <tr key={getId(inv)} className="hover:bg-slate-50">
+              <tr key={getId(product)} className="hover:bg-slate-50">
                 <td className="px-3 py-2.5">
                   <button onClick={() => onProduct(product)} className="flex min-w-0 items-center gap-3 text-left">
                     <ProductThumb product={product} />
@@ -189,10 +207,12 @@ function InventoryTable({ rows, data, onProduct, onReceive, onWriteoff, onHistor
                 <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-950">{getQuantity(inv)}</td>
                 <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-emerald-700">{getAvailableQty(inv)}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums text-amber-700">{getReservedQty(inv)}</td>
+                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-600">{fmtMoney(getPurchasePrice(product))}</td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums text-indigo-700">{fmtMoney(getSalePrice(product))}</td>
                 <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-700">{fmtMoney(stockValue)}</td>
                 <td className="px-3 py-2.5">
                   <div className="flex flex-col gap-1.5">
-                    <Badge variant={STOCK_STATUS_BADGE[status]}>{STOCK_STATUS_LABEL[status]}</Badge>
+                    <Badge variant={isProductActive(product) ? STOCK_STATUS_BADGE[status] : 'slate'}>{isProductActive(product) ? STOCK_STATUS_LABEL[status] : 'Неактивен'}</Badge>
                     <span className="text-xs text-slate-400">{last ? fmtDate(last.created_at ?? last.CreatedAt) : 'Нет движений'}</span>
                   </div>
                 </td>
@@ -201,6 +221,7 @@ function InventoryTable({ rows, data, onProduct, onReceive, onWriteoff, onHistor
                     <IconAction title="Приход" icon={<Download size={15} />} onClick={() => onReceive(product)} />
                     <IconAction title="Списание" icon={<Trash2 size={15} />} onClick={() => onWriteoff(product)} danger />
                     <IconAction title="История" icon={<History size={15} />} onClick={() => onHistory(product)} />
+                    <IconAction title="Изменить" icon={<Pencil size={15} />} onClick={() => onEdit(product)} />
                   </div>
                 </td>
               </tr>
@@ -212,8 +233,7 @@ function InventoryTable({ rows, data, onProduct, onReceive, onWriteoff, onHistor
   )
 }
 
-function InventoryCard({ inv, data, onProduct, onReceive, onWriteoff }) {
-  const product = data.productMap[inv.product_id ?? inv.ProductID]
+function InventoryCard({ inv, product, data, onProduct, onReceive, onWriteoff, onEdit }) {
   const status = getStockStatus(inv)
   const last = getLastMovementForProduct(getId(product), data.movements)
   return (
@@ -226,7 +246,7 @@ function InventoryCard({ inv, data, onProduct, onReceive, onWriteoff }) {
               <p className="truncate text-sm font-bold text-slate-950">{getProductName(product)}</p>
               <p className="mt-0.5 font-mono text-xs text-slate-400">{getProductSku(product)}</p>
             </div>
-            <Badge variant={STOCK_STATUS_BADGE[status]}>{STOCK_STATUS_LABEL[status]}</Badge>
+            <Badge variant={isProductActive(product) ? STOCK_STATUS_BADGE[status] : 'slate'}>{isProductActive(product) ? STOCK_STATUS_LABEL[status] : 'Неактивен'}</Badge>
           </div>
         </div>
       </button>
@@ -234,21 +254,23 @@ function InventoryCard({ inv, data, onProduct, onReceive, onWriteoff }) {
         <MiniMetric label="Склад" value={getQuantity(inv)} />
         <MiniMetric label="Доступ" value={getAvailableQty(inv)} tone="emerald" />
         <MiniMetric label="Резерв" value={getReservedQty(inv)} tone="amber" />
-        <MiniMetric label="Порог" value={inv.low_stock_threshold ?? inv.LowStockThreshold ?? 0} />
+        <MiniMetric label="Продажа" value={fmtMoney(getSalePrice(product))} />
       </div>
       <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
         <span className="flex items-center gap-1"><Clock size={13} />{last ? fmtDate(last.created_at ?? last.CreatedAt) : 'Нет движений'}</span>
         <span>{fmtMoney(getInventoryFifoValue(inv, data.batches))}</span>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-3 grid grid-cols-3 gap-2">
         <Button size="sm" icon={<Download size={14} />} onClick={() => onReceive(product)}>Приход</Button>
         <Button size="sm" variant="danger" icon={<Trash2 size={14} />} onClick={() => onWriteoff(product)}>Списать</Button>
+        <Button size="sm" icon={<Pencil size={14} />} onClick={() => onEdit(product)}>Изм.</Button>
       </div>
     </article>
   )
 }
 
 function getInventoryFifoValue(inv, batches = []) {
+  if (!inv) return 0
   const productId = inv.product_id ?? inv.ProductID
   return batches
     .filter((b) => (b.product_id ?? b.ProductID) === productId)

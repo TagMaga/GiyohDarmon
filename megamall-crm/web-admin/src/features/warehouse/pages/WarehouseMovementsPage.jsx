@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeftRight, FilterX, Search, Package, User2, Phone, MapPin, Truck } from 'lucide-react'
+import { ArrowLeftRight, FilterX, Search, Package, User2, Phone, MapPin, Truck, Pencil, FileText, Calendar, BadgeDollarSign } from 'lucide-react'
 import PageHeader from '../../../shared/components/PageHeader'
 import Button from '../../../shared/components/Button'
 import Badge from '../../../shared/components/Badge'
@@ -7,8 +7,9 @@ import EmptyState from '../../../shared/components/EmptyState'
 import Alert from '../../../shared/components/Alert'
 import Modal from '../../../shared/components/Modal'
 import { STATUS_LABELS, STATUS_BADGE } from '../../../shared/orderStatusConfig'
+import ReceivingEditModal from '../components/ReceivingEditModal'
 import useWarehouseData from '../hooks/useWarehouseData'
-import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, getId, getMovementType, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
+import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getId, getMovementType, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
 
 const TYPES = [
   { value: '', label: 'Все типы' },
@@ -72,7 +73,8 @@ export default function WarehouseMovementsPage() {
 }
 
 export function MovementList({ rows, data, emptyTitle = 'Движения не найдены' }) {
-  const [orderMovement, setOrderMovement] = useState(null)
+  const [detailMovement, setDetailMovement] = useState(null)
+  const [editReceiving, setEditReceiving] = useState(null)
   if (!rows.length) return <EmptyState icon={<ArrowLeftRight size={22} />} title={emptyTitle} description="Измените фильтры или выполните складскую операцию." />
   return (
     <>
@@ -91,41 +93,51 @@ export function MovementList({ rows, data, emptyTitle = 'Движения не �
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rows.map((m) => <MovementRow key={getId(m)} m={m} data={data} onOrderClick={setOrderMovement} />)}
+            {rows.map((m) => <MovementRow key={getId(m)} m={m} data={data} onOpen={setDetailMovement} />)}
           </tbody>
         </table>
       </div>
       <div className="space-y-3 lg:hidden">
-        {rows.map((m) => <MovementCard key={getId(m)} m={m} data={data} onOrderClick={setOrderMovement} />)}
+        {rows.map((m) => <MovementCard key={getId(m)} m={m} data={data} onOpen={setDetailMovement} />)}
       </div>
-      <MovementOrderModal movement={orderMovement} product={orderMovement ? data.productMap[orderMovement.product_id ?? orderMovement.ProductID] : null} onClose={() => setOrderMovement(null)} />
+      <MovementDetailModal
+        movement={detailMovement}
+        product={detailMovement ? data.productMap[detailMovement.product_id ?? detailMovement.ProductID] : null}
+        onClose={() => setDetailMovement(null)}
+        onEditReceiving={(movement) => {
+          setDetailMovement(null)
+          setEditReceiving(movement)
+        }}
+      />
+      <ReceivingEditModal movement={editReceiving} products={data.products} onClose={() => setEditReceiving(null)} />
     </>
   )
 }
 
-/** Reason/comment cell — sale movements linked to an order render as a
- *  clickable "Заказ ORD-XXXX" badge instead of the raw UUID-bearing text. */
-function MovementReason({ m, onOrderClick, className }) {
-  if (m.order_number) {
-    return (
-      <button
-        type="button"
-        onClick={() => onOrderClick(m)}
-        className={`inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-100 ${className ?? ''}`}
-      >
-        <Package size={12} />
-        Заказ {m.order_number}
-      </button>
-    )
+function cleanReason(m) {
+  const type = getMovementType(m)
+  const reason = m.reason ?? m.Reason ?? ''
+  if (type === 'sale') {
+    return m.order_number ? `Заказ ${m.order_number}` : 'Продажа по заказу'
   }
-  return <span className={className}>{m.reason ?? m.Reason ?? '—'}</span>
+  if (type === 'purchase') {
+    return reason.replace(/^Приёмка товара\s*·?\s*/, '').trim() || 'Приёмка товара'
+  }
+  return reason || '—'
 }
 
-function MovementRow({ m, data, onOrderClick }) {
+function MovementReason({ m, className }) {
+  if (m.order_number) {
+    return <span className={`inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-2 py-1 text-xs font-medium text-sky-700 ${className ?? ''}`}><Package size={12} />Заказ {m.order_number}</span>
+  }
+  return <span className={className}>{cleanReason(m)}</span>
+}
+
+function MovementRow({ m, data, onOpen }) {
   const type = getMovementType(m)
   const product = data.productMap[m.product_id ?? m.ProductID]
   return (
-    <tr className="hover:bg-slate-50">
+    <tr className="cursor-pointer hover:bg-slate-50" onClick={() => onOpen(m)}>
       <td className="px-3 py-2.5"><Badge variant={MOVEMENT_BADGE[type] ?? 'slate'}>{MOVEMENT_LABEL[type] ?? type}</Badge></td>
       <td className="px-3 py-2.5"><p className="font-bold text-slate-900">{getProductName(product)}</p><p className="font-mono text-xs text-slate-400">{getProductSku(product)}</p></td>
       <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-950">{m.quantity ?? m.Quantity}</td>
@@ -134,17 +146,17 @@ function MovementRow({ m, data, onOrderClick }) {
       <td className="px-3 py-2.5 text-slate-500">{m.created_by_name ?? m.CreatedByName ?? '—'}</td>
       <td className="px-3 py-2.5 text-xs text-slate-400">{fmtDate(m.created_at ?? m.CreatedAt)}</td>
       <td className="max-w-[220px] px-3 py-2.5 text-xs text-slate-500">
-        <MovementReason m={m} onOrderClick={onOrderClick} className="truncate" />
+        <MovementReason m={m} className="truncate" />
       </td>
     </tr>
   )
 }
 
-function MovementCard({ m, data, onOrderClick }) {
+function MovementCard({ m, data, onOpen }) {
   const type = getMovementType(m)
   const product = data.productMap[m.product_id ?? m.ProductID]
   return (
-    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
+    <article onClick={() => onOpen(m)} className="cursor-pointer rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-slate-950">{getProductName(product)}</p>
@@ -156,7 +168,7 @@ function MovementCard({ m, data, onOrderClick }) {
         <p className="text-right text-xs text-slate-400">{fmtDate(m.created_at ?? m.CreatedAt)}<br />{m.created_by_name ?? m.CreatedByName ?? '—'}</p>
       </div>
       <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-        <MovementReason m={m} onOrderClick={onOrderClick} />
+        <MovementReason m={m} />
       </div>
     </article>
   )
@@ -175,19 +187,70 @@ function InfoRow({ icon, label, value }) {
   )
 }
 
-/** Order detail popup opened from a "Заказ ORD-XXXX" badge in the movements list.
- *  Uses the order/customer/courier fields already embedded in the movement row
- *  (returned by GET /inventory/movements) instead of calling /orders — that API
- *  intentionally excludes warehouse_manager (see orders/routes.go RBAC notes). */
-function MovementOrderModal({ movement, product, onClose }) {
+function MoneyRow({ label, value, bold = false }) {
+  if (value == null) return null
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-sm text-slate-500">{label}</span>
+      <span className={`${bold ? 'text-lg font-black text-slate-950' : 'text-sm font-bold text-slate-800'}`}>{fmtMoney(value)}</span>
+    </div>
+  )
+}
+
+function MovementDetailModal({ movement, product, onClose, onEditReceiving }) {
   const open = !!movement
   if (!open) return null
+  const type = getMovementType(movement)
+  if (type === 'purchase' || type === 'adjustment') {
+    return <ReceivingDetailModal movement={movement} product={product} onClose={onClose} onEditReceiving={onEditReceiving} />
+  }
+  if (type === 'sale') {
+    return <MovementOrderModal movement={movement} product={product} onClose={onClose} />
+  }
+  return (
+    <Modal open={open} onClose={onClose} title={MOVEMENT_LABEL[type] ?? 'Движение'} description="Детали складской операции">
+      <div className="space-y-4">
+        <InfoRow icon={<Package size={13} />} label="Товар" value={`${getProductName(product)} × ${movement.quantity ?? movement.Quantity}`} />
+        <InfoRow icon={<User2 size={13} />} label="Пользователь" value={movement.created_by_name ?? movement.CreatedByName ?? '—'} />
+        <InfoRow icon={<Calendar size={13} />} label="Дата" value={fmtDate(movement.created_at ?? movement.CreatedAt)} />
+        <InfoRow icon={<FileText size={13} />} label="Комментарий" value={cleanReason(movement)} />
+      </div>
+    </Modal>
+  )
+}
+
+function ReceivingDetailModal({ movement, product, onClose, onEditReceiving }) {
+  return (
+    <Modal
+      open={!!movement}
+      onClose={onClose}
+      title="Приёмка"
+      description="Детали поступления товара"
+      footer={getMovementType(movement) === 'purchase' ? (
+        <Button variant="primary" icon={<Pencil size={15} />} onClick={() => onEditReceiving(movement)}>
+          Редактировать
+        </Button>
+      ) : null}
+    >
+      <div className="space-y-4">
+        <InfoRow icon={<Package size={13} />} label="Товар" value={`${getProductName(product)} × ${movement.quantity ?? movement.Quantity}`} />
+        <InfoRow icon={<BadgeDollarSign size={13} />} label="Закупочная цена" value={fmtMoney(movement.batch_unit_cost ?? 0)} />
+        <InfoRow icon={<FileText size={13} />} label="Примечание" value={cleanReason(movement)} />
+        <InfoRow icon={<User2 size={13} />} label="Пользователь" value={movement.created_by_name ?? movement.CreatedByName ?? '—'} />
+        <InfoRow icon={<Calendar size={13} />} label="Дата" value={fmtDate(movement.created_at ?? movement.CreatedAt)} />
+        {movement.edit_count > 0 && <Badge variant="amber">Изменено {movement.edit_count}</Badge>}
+      </div>
+    </Modal>
+  )
+}
+
+function MovementOrderModal({ movement, product, onClose }) {
   const status = movement.order_status
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={`Заказ ${movement.order_number}`}
+      title={movement.order_number ? `Заказ ${movement.order_number}` : 'Заказ'}
       description="Информация о заказе, к которому относится это движение"
     >
       <div className="space-y-4">
@@ -197,6 +260,12 @@ function MovementOrderModal({ movement, product, onClose }) {
         <InfoRow icon={<Phone size={13} />} label="Телефон" value={movement.customer_phone} />
         <InfoRow icon={<MapPin size={13} />} label="Адрес доставки" value={movement.delivery_address} />
         <InfoRow icon={<Truck size={13} />} label="Курьер" value={movement.courier_name ?? 'Не назначен'} />
+        <div className="rounded-2xl bg-indigo-50 p-4">
+          <MoneyRow label="Сумма товаров" value={movement.total_amount} />
+          <MoneyRow label="Доставка" value={movement.delivery_fee} />
+          <div className="my-2 h-px bg-indigo-100" />
+          <MoneyRow label="Итого" value={movement.total_order_amount} bold />
+        </div>
       </div>
     </Modal>
   )

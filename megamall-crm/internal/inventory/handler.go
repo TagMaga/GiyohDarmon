@@ -98,6 +98,46 @@ func (h *Handler) CreateReceiving(c *gin.Context) {
 	response.Created(c, result)
 }
 
+func (h *Handler) UpdateReceiving(c *gin.Context) {
+	id, ok := parseUUID(c, "id")
+	if !ok {
+		return
+	}
+	var req UpdateReceivingRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	result, err := h.svc.UpdateReceiving(c.Request.Context(), claims.UserID, id, req)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, result)
+}
+
+func (h *Handler) ListReceivingHistory(c *gin.Context) {
+	id, ok := parseUUID(c, "id")
+	if !ok {
+		return
+	}
+	rows, err := h.svc.ListReceivingEdits(c.Request.Context(), id)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	out := make([]ReceivingEditResponse, 0, len(rows))
+	for i := range rows {
+		out = append(out, ToReceivingEditResponse(&rows[i]))
+	}
+	response.OK(c, out)
+}
+
 // ─── Batches ──────────────────────────────────────────────────────────────────
 
 func (h *Handler) ListBatches(c *gin.Context) {

@@ -9,6 +9,7 @@ import ProductModal from '../components/ProductModal'
 import ReceivingModal from '../components/ReceivingModal'
 import WriteoffModal from '../components/WriteoffModal'
 import useWarehouseData from '../hooks/useWarehouseData'
+import { MovementList } from './WarehouseMovementsPage'
 import {
   MOVEMENT_BADGE,
   MOVEMENT_LABEL,
@@ -40,8 +41,6 @@ export default function WarehouseDashboard() {
       return status === 'low_stock' || status === 'out_of_stock'
     })
     .slice(0, 6), [data.inventory])
-
-  const visibleMovements = data.movements.slice(0, 10)
 
   function submitSearch(e) {
     e.preventDefault()
@@ -98,30 +97,32 @@ export default function WarehouseDashboard() {
 
       <MetricsStrip products={data.products} inventory={data.inventory} movements={data.movements} batches={data.batches} loading={data.loading} />
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="space-y-4">
-          <Panel title="Требует внимания" subtitle="Товары с низким остатком и отсутствующие позиции.">
-            {stockAlerts.length === 0 ? (
-              <CompactEmpty icon={<Package size={18} />} title="Критичных остатков нет" description="Низкие остатки появятся здесь." />
-            ) : (
-              <div className="overflow-hidden rounded-lg border border-slate-200">
-                {stockAlerts.map((inv) => (
-                  <ProblemProductRow
-                    key={getId(inv)}
-                    inventory={inv}
-                    product={data.productMap[inv.product_id ?? inv.ProductID]}
-                    onOpen={() => navigate(`/warehouse/inventory?q=${encodeURIComponent(getProductSku(data.productMap[inv.product_id ?? inv.ProductID]))}`)}
-                    onReceive={() => setReceiveProduct(data.productMap[inv.product_id ?? inv.ProductID] ?? null)}
-                  />
-                ))}
-              </div>
-            )}
-          </Panel>
-        </div>
-
-        <Panel title="Лента операций" subtitle="Последние складские события.">
-          <OperationFeed movements={visibleMovements} data={data} />
+      <section className="space-y-4">
+        <Panel title="Требует внимания" subtitle="Товары с низким остатком и отсутствующие позиции.">
+          {stockAlerts.length === 0 ? (
+            <CompactEmpty icon={<Package size={18} />} title="Критичных остатков нет" description="Низкие остатки появятся здесь." />
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-slate-200">
+              {stockAlerts.map((inv) => (
+                <ProblemProductRow
+                  key={getId(inv)}
+                  inventory={inv}
+                  product={data.productMap[inv.product_id ?? inv.ProductID]}
+                  onOpen={() => navigate(`/warehouse/inventory?q=${encodeURIComponent(getProductSku(data.productMap[inv.product_id ?? inv.ProductID]))}`)}
+                  onReceive={() => setReceiveProduct(data.productMap[inv.product_id ?? inv.ProductID] ?? null)}
+                />
+              ))}
+            </div>
+          )}
         </Panel>
+
+        <section>
+          <div className="mb-3">
+            <h2 className="text-sm font-bold text-slate-950">Движения</h2>
+            <p className="mt-1 text-xs text-slate-400">Полная лента операций склада.</p>
+          </div>
+          <MovementList rows={data.movements} data={data} />
+        </section>
       </section>
 
       <ProductModal open={showProduct} onClose={() => setShowProduct(false)} suppliers={data.suppliers} />

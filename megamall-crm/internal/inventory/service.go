@@ -3,6 +3,7 @@ package inventory
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/megamall/crm/internal/activity"
@@ -35,6 +36,10 @@ func (s *Service) GetByProduct(ctx context.Context, productID uuid.UUID, p pagin
 
 func (s *Service) ListMovements(ctx context.Context, f ListMovementsFilter, p pagination.Params) ([]MovementRow, int, error) {
 	return s.repo.ListMovements(ctx, f, p)
+}
+
+func (s *Service) ListReceivingEdits(ctx context.Context, movementID uuid.UUID) ([]ReceivingEditRow, error) {
+	return s.repo.ListReceivingEdits(ctx, movementID)
 }
 
 // ─── Receiving ────────────────────────────────────────────────────────────────
@@ -127,6 +132,168 @@ func (s *Service) Receive(ctx context.Context, actorID uuid.UUID, req CreateRece
 		return nil, txErr
 	}
 	return resp, nil
+}
+
+func (s *Service) UpdateReceiving(ctx context.Context, actorID, movementID uuid.UUID, req UpdateReceivingRequest) (*ReceivingResponse, error) {
+	var resp *ReceivingResponse
+
+	txErr := s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		m, err := s.repo.GetMovementForUpdate(tx, ctx, movementID)
+		if err != nil {
+			return err
+		}
+		if m.MovementType != MovementPurchase {
+			return apperrors.BadRequest("only receiving movements can be edited")
+		}
+
+		b, err := s.repo.GetBatchByMovementForUpdate(tx, ctx, movementID)
+		if err != nil {
+			return err
+		}
+
+		oldProductID := m.ProductID
+		oldQuantity := m.Quantity
+		oldUnitCost := b.UnitCost
+		oldNote := receivingNoteFromReason(m.Reason)
+		newNote := strings.TrimSpace(derefString(req.Notes))
+		consumedQty := b.ReceivedQuantity - b.RemainingQuantity
+		if req.Quantity < consumedQty {
+			return apperrors.BadRequest(fmt.Sprintf(
+				"cannot set receiving quantity below already consumed FIFO stock (%d)",
+				consumedQty,
+			))
+		}
+		if req.ProductID != oldProductID && consumedQty > 0 {
+			return apperrors.BadRequest("cannot change product after this receiving batch was partially consumed")
+		}
+
+		if req.ProductID == oldProductID {
+			inv, err := s.repo.GetOrCreateForUpdate(tx, ctx, oldProductID)
+			if err != nil {
+				return err
+			}
+			delta := req.Quantity - oldQuantity
+			if inv.Quantity+delta < 0 {
+				return apperrors.BadRequest("receiving edit would make stock negative")
+			}
+			if err := s.repo.UpdateQuantity(tx, ctx, inv.ID, inv.Quantity+delta); err != nil {
+				return err
+			}
+		} else {
+			oldInv, err := s.repo.GetOrCreateForUpdate(tx, ctx, oldProductID)
+			if err != nil {
+				return err
+			}
+			if oldInv.Quantity-oldQuantity < 0 {
+				return apperrors.BadRequest("receiving edit would make old product stock negative")
+			}
+			if err := s.repo.UpdateQuantity(tx, ctx, oldInv.ID, oldInv.Quantity-oldQuantity); err != nil {
+				return err
+			}
+			newInv, err := s.repo.GetOrCreateForUpdate(tx, ctx, req.ProductID)
+			if err != nil {
+				return err
+			}
+			if err := s.repo.UpdateQuantity(tx, ctx, newInv.ID, newInv.Quantity+req.Quantity); err != nil {
+				return err
+			}
+		}
+
+		m.ProductID = req.ProductID
+		m.Quantity = req.Quantity
+		m.NewQuantity = m.PreviousQuantity + req.Quantity
+		reason := receivingReason(newNote)
+		m.Reason = &reason
+		if err := s.repo.UpdateMovement(tx, ctx, m); err != nil {
+			return err
+		}
+
+		b.ProductID = req.ProductID
+		b.ReceivedQuantity = req.Quantity
+		b.RemainingQuantity = req.Quantity - consumedQty
+		b.UnitCost = req.UnitCost
+		if err := s.repo.UpdateBatch(tx, ctx, b); err != nil {
+			return err
+		}
+
+		edit := &ReceivingEdit{
+			ID:           uuid.New(),
+			MovementID:   movementID,
+			EditedBy:     actorID,
+			OldProductID: oldProductID,
+			NewProductID: req.ProductID,
+			OldQuantity:  oldQuantity,
+			NewQuantity:  req.Quantity,
+			OldUnitCost:  oldUnitCost,
+			NewUnitCost:  req.UnitCost,
+			OldNote:      oldNote,
+			NewNote:      newNote,
+		}
+		if err := s.repo.InsertReceivingEdit(tx, ctx, edit); err != nil {
+			return err
+		}
+
+		if err := s.logger.LogSync(tx, activity.Entry{
+			ActorID:    &actorID,
+			Action:     "edit_receiving",
+			EntityType: "inventory_movement",
+			EntityID:   &movementID,
+			BeforeState: map[string]interface{}{
+				"product_id": oldProductID,
+				"quantity":   oldQuantity,
+				"unit_cost":  oldUnitCost,
+				"notes":      oldNote,
+			},
+			AfterState: map[string]interface{}{
+				"product_id": req.ProductID,
+				"quantity":   req.Quantity,
+				"unit_cost":  req.UnitCost,
+				"notes":      newNote,
+			},
+			Reason: &reason,
+		}); err != nil {
+			return err
+		}
+
+		resp = &ReceivingResponse{
+			MovementID: m.ID,
+			Batch:      ToBatchResponse(b),
+		}
+		return nil
+	})
+
+	if txErr != nil {
+		return nil, txErr
+	}
+	return resp, nil
+}
+
+func receivingReason(note string) string {
+	reason := "Приёмка товара"
+	if note != "" {
+		reason += " · " + note
+	}
+	return reason
+}
+
+func receivingNoteFromReason(reason *string) string {
+	if reason == nil {
+		return ""
+	}
+	text := strings.TrimSpace(*reason)
+	for _, prefix := range []string{"Приёмка товара · ", "Приёмка товара"} {
+		if strings.HasPrefix(text, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(text, prefix))
+		}
+	}
+	return text
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 // ─── Adjustment ───────────────────────────────────────────────────────────────

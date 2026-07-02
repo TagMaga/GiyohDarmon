@@ -21,46 +21,64 @@ const (
 
 // Inventory tracks the current stock level for one product.
 type Inventory struct {
-	ID                 uuid.UUID `gorm:"type:uuid;primaryKey"`
-	ProductID          uuid.UUID `gorm:"type:uuid;not null;column:product_id"`
-	Quantity           int       `gorm:"not null;default:0"`
-	ReservedQuantity   int       `gorm:"not null;default:0;column:reserved_quantity"`
+	ID               uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ProductID        uuid.UUID `gorm:"type:uuid;not null;column:product_id"`
+	Quantity         int       `gorm:"not null;default:0"`
+	ReservedQuantity int       `gorm:"not null;default:0;column:reserved_quantity"`
 	// Read-only: PostgreSQL GENERATED ALWAYS AS (quantity - reserved_quantity) STORED
-	AvailableQuantity  int       `gorm:"->;<-:false;column:available_quantity"`
-	LowStockThreshold  int       `gorm:"not null;default:0;column:low_stock_threshold"`
-	CreatedAt          time.Time `gorm:"autoCreateTime"`
-	UpdatedAt          time.Time `gorm:"autoUpdateTime"`
+	AvailableQuantity int       `gorm:"->;<-:false;column:available_quantity"`
+	LowStockThreshold int       `gorm:"not null;default:0;column:low_stock_threshold"`
+	CreatedAt         time.Time `gorm:"autoCreateTime"`
+	UpdatedAt         time.Time `gorm:"autoUpdateTime"`
 }
 
 func (Inventory) TableName() string { return "inventory" }
 
 // Movement is an immutable record of every stock change. Never updated.
 type Movement struct {
-	ID               uuid.UUID    `gorm:"type:uuid;primaryKey"`
-	ProductID        uuid.UUID    `gorm:"type:uuid;not null;column:product_id"`
-	MovementType     MovementType `gorm:"type:inventory_movement_type;not null;column:movement_type"`
+	ID           uuid.UUID    `gorm:"type:uuid;primaryKey"`
+	ProductID    uuid.UUID    `gorm:"type:uuid;not null;column:product_id"`
+	MovementType MovementType `gorm:"type:inventory_movement_type;not null;column:movement_type"`
 	// Quantity is always positive; movement_type determines direction.
-	Quantity         int          `gorm:"not null"`
-	PreviousQuantity int          `gorm:"not null;column:previous_quantity"`
-	NewQuantity      int          `gorm:"not null;column:new_quantity"`
+	Quantity         int `gorm:"not null"`
+	PreviousQuantity int `gorm:"not null;column:previous_quantity"`
+	NewQuantity      int `gorm:"not null;column:new_quantity"`
 	Reason           *string
 	// Links paired transfer_out / transfer_in movements.
-	ReferenceID      *uuid.UUID   `gorm:"type:uuid;column:reference_id"`
-	CreatedBy        uuid.UUID    `gorm:"type:uuid;not null;column:created_by"`
-	CreatedAt        time.Time    `gorm:"autoCreateTime"`
+	ReferenceID *uuid.UUID `gorm:"type:uuid;column:reference_id"`
+	CreatedBy   uuid.UUID  `gorm:"type:uuid;not null;column:created_by"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime"`
 }
 
 func (Movement) TableName() string { return "inventory_movements" }
 
+// ReceivingEdit records every edit to a purchase/receiving movement.
+type ReceivingEdit struct {
+	ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
+	MovementID   uuid.UUID `gorm:"type:uuid;not null;column:movement_id"`
+	EditedBy     uuid.UUID `gorm:"type:uuid;not null;column:edited_by"`
+	OldProductID uuid.UUID `gorm:"type:uuid;not null;column:old_product_id"`
+	NewProductID uuid.UUID `gorm:"type:uuid;not null;column:new_product_id"`
+	OldQuantity  int       `gorm:"not null;column:old_quantity"`
+	NewQuantity  int       `gorm:"not null;column:new_quantity"`
+	OldUnitCost  float64   `gorm:"type:numeric(12,2);not null;column:old_unit_cost"`
+	NewUnitCost  float64   `gorm:"type:numeric(12,2);not null;column:new_unit_cost"`
+	OldNote      string    `gorm:"not null;column:old_note"`
+	NewNote      string    `gorm:"not null;column:new_note"`
+	EditedAt     time.Time `gorm:"autoCreateTime;column:edited_at"`
+}
+
+func (ReceivingEdit) TableName() string { return "inventory_receiving_edits" }
+
 // Writeoff records damaged or lost stock that is removed from inventory.
 type Writeoff struct {
-	ID          uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	ProductID   uuid.UUID  `gorm:"type:uuid;not null;column:product_id"`
-	Quantity    int        `gorm:"not null"`
-	Reason      string     `gorm:"not null"`
-	ApprovedBy  *uuid.UUID `gorm:"type:uuid;column:approved_by"`
-	CreatedBy   uuid.UUID  `gorm:"type:uuid;not null;column:created_by"`
-	CreatedAt   time.Time  `gorm:"autoCreateTime"`
+	ID         uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	ProductID  uuid.UUID  `gorm:"type:uuid;not null;column:product_id"`
+	Quantity   int        `gorm:"not null"`
+	Reason     string     `gorm:"not null"`
+	ApprovedBy *uuid.UUID `gorm:"type:uuid;column:approved_by"`
+	CreatedBy  uuid.UUID  `gorm:"type:uuid;not null;column:created_by"`
+	CreatedAt  time.Time  `gorm:"autoCreateTime"`
 }
 
 func (Writeoff) TableName() string { return "writeoffs" }
