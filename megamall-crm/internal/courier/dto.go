@@ -121,7 +121,7 @@ type CourierMeResponse struct {
 	AvatarURL          *string                              `json:"avatar_url"`
 	OrderIntakeEnabled bool                                 `json:"order_intake_enabled"`
 	OrderIntakeReason  *string                              `json:"order_intake_reason,omitempty"`
-	TariffRules        []courier_tariffs.TariffRuleResponse `json:"tariff_rules"`
+	TariffRules        []courier_tariffs.TariffRuleResponse `json:"tariff_rules" gorm:"-"`
 }
 
 type NoteResponse struct {
