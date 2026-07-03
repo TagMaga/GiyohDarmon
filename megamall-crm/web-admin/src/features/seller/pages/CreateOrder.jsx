@@ -437,7 +437,7 @@ export default function CreateOrder() {
         fontFamily: M.font,
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)',
         paddingLeft: 16, paddingRight: 16,
-        paddingBottom: '8rem',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 280px)',
       }}
     >
       <div className="max-w-xl mx-auto">
@@ -609,13 +609,16 @@ export default function CreateOrder() {
         )}
         </div>
 
-        {/* ── Sticky total + CTA ── */}
+        {/* ── Fixed total + CTA (always reachable, independent of page length) ── */}
         <div
-          className="sticky z-30"
+          className="fixed left-0 right-0 z-30 px-4"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)' }}
+        >
+        <div
+          className="max-w-xl mx-auto"
           style={{
-            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
             background: '#fff', border: `1px solid ${M.border}`,
-            borderRadius: 20, padding: '14px 18px 16px', marginTop: 14,
+            borderRadius: 20, padding: '14px 18px 16px',
             boxShadow: '0 -8px 24px rgba(20,20,20,.05), 0 10px 28px rgba(20,20,20,.10)',
           }}
         >
@@ -676,6 +679,7 @@ export default function CreateOrder() {
               )}
             </button>
           </div>
+        </div>
         </div>
       </div>
     </div>
