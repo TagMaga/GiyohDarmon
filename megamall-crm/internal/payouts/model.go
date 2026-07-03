@@ -11,22 +11,38 @@ import (
 // or a Seller, and (symmetrically) an Owner can pay a Team Lead, through the
 // same shape.
 type Payout struct {
-	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	PayeeID     uuid.UUID `gorm:"type:uuid;not null;column:payee_id"`
-	PayeeRole   string    `gorm:"type:user_role;not null;column:payee_role"`
-	PayerID     uuid.UUID `gorm:"type:uuid;not null;column:payer_id"`
-	PayerRole   string    `gorm:"type:user_role;not null;column:payer_role"`
-	Amount      float64   `gorm:"type:numeric(12,2);not null;column:amount"`
-	PeriodStart time.Time `gorm:"type:date;not null;column:period_start"`
-	PeriodEnd   time.Time `gorm:"type:date;not null;column:period_end"`
-	Method      *string   `gorm:"column:method"`
-	Status      string    `gorm:"column:status;not null;default:paid"`
-	Note        *string   `gorm:"type:text;column:note"`
-	CreatedAt   time.Time `gorm:"autoCreateTime"`
-	UpdatedAt   time.Time `gorm:"autoUpdateTime"`
+	ID          uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	PayeeID     uuid.UUID  `gorm:"type:uuid;not null;column:payee_id"`
+	PayeeRole   string     `gorm:"type:user_role;not null;column:payee_role"`
+	PayerID     uuid.UUID  `gorm:"type:uuid;not null;column:payer_id"`
+	PayerRole   string     `gorm:"type:user_role;not null;column:payer_role"`
+	Amount      float64    `gorm:"type:numeric(12,2);not null;column:amount"`
+	PeriodStart time.Time  `gorm:"type:date;not null;column:period_start"`
+	PeriodEnd   time.Time  `gorm:"type:date;not null;column:period_end"`
+	Method      *string    `gorm:"column:method"`
+	Status      string     `gorm:"column:status;not null;default:paid"` // "paid" | "pending" | "voided"
+	Note        *string    `gorm:"type:text;column:note"`
+	BatchID     *uuid.UUID `gorm:"type:uuid;column:batch_id"`
+	VoidedAt    *time.Time `gorm:"column:voided_at"`
+	VoidedBy    *uuid.UUID `gorm:"type:uuid;column:voided_by"`
+	VoidReason  *string    `gorm:"type:text;column:void_reason"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt   time.Time  `gorm:"autoUpdateTime"`
 }
 
 func (Payout) TableName() string { return "payouts" }
+
+// PayoutBatch is one bulk "Выплатить" submission — exists purely so a
+// retried/duplicated request can be recognized by (payer_id, idempotency_key)
+// and replayed instead of creating a second set of payouts.
+type PayoutBatch struct {
+	ID             uuid.UUID `gorm:"type:uuid;primaryKey"`
+	PayerID        uuid.UUID `gorm:"type:uuid;not null;column:payer_id"`
+	IdempotencyKey string    `gorm:"column:idempotency_key;not null"`
+	CreatedAt      time.Time `gorm:"autoCreateTime"`
+}
+
+func (PayoutBatch) TableName() string { return "payout_batches" }
 
 // PayoutResponse is the JSON shape returned to clients.
 type PayoutResponse struct {
@@ -42,6 +58,8 @@ type PayoutResponse struct {
 	Status      string     `json:"status"`
 	PaidAt      *time.Time `json:"paid_at"`
 	Note        *string    `json:"note"`
+	VoidedAt    *time.Time `json:"voided_at,omitempty"`
+	VoidReason  *string    `json:"void_reason,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 }
 
@@ -64,6 +82,8 @@ func ToResponse(p *Payout) PayoutResponse {
 		Status:      p.Status,
 		PaidAt:      paidAt,
 		Note:        p.Note,
+		VoidedAt:    p.VoidedAt,
+		VoidReason:  p.VoidReason,
 		CreatedAt:   p.CreatedAt,
 	}
 }

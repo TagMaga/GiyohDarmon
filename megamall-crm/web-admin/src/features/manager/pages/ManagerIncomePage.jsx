@@ -33,6 +33,7 @@ function currentMonthDefault() {
 const PAYOUT_STATUS = {
   paid:    { label: 'Выплачено', cls: 'text-emerald-700 bg-emerald-50' },
   pending: { label: 'Ожидает',  cls: 'text-amber-700 bg-amber-50' },
+  voided:  { label: 'Отменено', cls: 'text-slate-500 bg-slate-100' },
 }
 
 export default function ManagerIncomePage() {

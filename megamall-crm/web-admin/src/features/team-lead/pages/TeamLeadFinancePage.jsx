@@ -58,6 +58,11 @@ export default function TeamLeadFinancePage() {
   const [amounts, setAmounts]   = useState({})
   const [method, setMethod]     = useState('cash')
   const [confirmOpen, setConfirmOpen] = useState(false)
+  // Stable across retries of the *same* submission attempt (network error,
+  // impatient re-click) so the server recognizes a resend and replays the
+  // original result instead of creating a second batch of payouts. Only
+  // rotates once a submission actually succeeds.
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
 
   // Seed amount inputs with "remaining" whenever fresh payables data arrives.
   useEffect(() => {
@@ -84,6 +89,15 @@ export default function TeamLeadFinancePage() {
   const selectedMembers = members.filter(m => selected.has(m.payee_id))
   const total = selectedMembers.reduce((s, m) => s + (parseFloat(amounts[m.payee_id]) || 0), 0)
 
+  // Client-side mirror of the server's amount ceiling — catches the mistake
+  // before a round-trip, but the server (validatePayoutItems) is the real
+  // guard since this check alone is trivially bypassable.
+  function isAmountInvalid(m) {
+    const amt = parseFloat(amounts[m.payee_id]) || 0
+    return amt <= 0 || amt > m.remaining + 0.01
+  }
+  const hasInvalidSelected = selectedMembers.some(isAmountInvalid)
+
   async function handleConfirm() {
     try {
       await createPayouts.mutateAsync({
@@ -95,9 +109,11 @@ export default function TeamLeadFinancePage() {
         period_end: to,
         method,
         note: '',
+        idempotency_key: idempotencyKey,
       })
       setConfirmOpen(false)
       setSelected(new Set())
+      setIdempotencyKey(crypto.randomUUID()) // fresh key for the next, unrelated submission
       toast.success('Выплата проведена · появится в Финансах владельца')
     } catch (err) {
       toast.error(err?.response?.data?.error?.message ?? 'Не удалось провести выплату')
@@ -200,14 +216,23 @@ export default function TeamLeadFinancePage() {
                 {isFullyPaid ? (
                   <Badge variant="emerald" size="sm">Выплачено полностью</Badge>
                 ) : (
-                  <input
-                    className="w-full text-right border-2 rounded-xl px-2.5 py-2 text-sm font-black"
-                    style={{ borderColor: '#E2E8F0', background: '#F8FAFF', color: '#4F46E5' }}
-                    inputMode="numeric"
-                    disabled={!isChecked}
-                    value={amounts[m.payee_id] ?? ''}
-                    onChange={e => setAmounts(prev => ({ ...prev, [m.payee_id]: e.target.value }))}
-                  />
+                  <>
+                    <input
+                      className="w-full text-right border-2 rounded-xl px-2.5 py-2 text-sm font-black"
+                      style={isChecked && isAmountInvalid(m)
+                        ? { borderColor: '#FCA5A5', background: '#FEF2F2', color: '#DC2626' }
+                        : { borderColor: '#E2E8F0', background: '#F8FAFF', color: '#4F46E5' }}
+                      inputMode="numeric"
+                      disabled={!isChecked}
+                      value={amounts[m.payee_id] ?? ''}
+                      onChange={e => setAmounts(prev => ({ ...prev, [m.payee_id]: e.target.value }))}
+                    />
+                    {isChecked && isAmountInvalid(m) && (
+                      <p className="text-[10px] font-bold text-right mt-1" style={{ color: '#DC2626' }}>
+                        Не более {fmtAmount(m.remaining)} сомони
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -225,8 +250,9 @@ export default function TeamLeadFinancePage() {
             <p className="text-base font-black text-slate-900">Итого: {fmtRu(total)} сомони</p>
           </div>
           <button
-            className="rounded-xl px-5 py-3 text-white font-black text-sm"
+            className="rounded-xl px-5 py-3 text-white font-black text-sm disabled:opacity-40"
             style={{ background: 'linear-gradient(135deg,#4F46E5,#6D28D9)', boxShadow: '0 8px 18px rgba(79,70,229,.3)' }}
+            disabled={hasInvalidSelected}
             onClick={() => setConfirmOpen(true)}
           >
             Выплатить
@@ -270,7 +296,7 @@ export default function TeamLeadFinancePage() {
         <button
           className="w-full rounded-2xl py-3.5 text-white font-black text-sm disabled:opacity-50"
           style={{ background: 'linear-gradient(135deg,#4F46E5,#6D28D9)' }}
-          disabled={createPayouts.isPending}
+          disabled={createPayouts.isPending || hasInvalidSelected}
           onClick={handleConfirm}
         >
           {createPayouts.isPending ? 'Отправляем…' : 'Подтвердить выплату'}

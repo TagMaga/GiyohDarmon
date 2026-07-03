@@ -14,8 +14,9 @@
  *   action   {ReactNode} optional header action
  */
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, FileText, RotateCcw, Pencil } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileText, RotateCcw, Pencil, Undo2 } from 'lucide-react'
 import EditFinanceExpenseModal from './EditFinanceExpenseModal'
+import VoidPayoutModal from './VoidPayoutModal'
 import Badge              from '../../../shared/components/Badge'
 import EmptyState         from '../../../shared/components/EmptyState'
 import { CardSkeleton }   from '../../../shared/components/Skeleton'
@@ -130,6 +131,7 @@ function AmountRangeFilter({ minAmount, maxAmount, onMinChange, onMaxChange }) {
 
 export default function FinanceEventsTable({ from, to, action = null, onExpenseEdited }) {
   const [editExpense, setEditExpense] = useState(null)
+  const [voidTarget, setVoidTarget] = useState(null)
   const [eventType, setEventType] = useState('')
   const [orderSearch, setOrderSearch] = useState('')
   const [userSearch,  setUserSearch]  = useState('')
@@ -374,6 +376,15 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
                           <Pencil size={12} />
                         </button>
                       )}
+                      {PAYOUT_EVENT_TYPES.has(ev.event_type) && (
+                        <button
+                          onClick={() => setVoidTarget({ id: ev.id, amount: ev.amount, created_at: ev.created_at })}
+                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-100 flex items-center justify-center text-slate-400 hover:text-rose-600 transition-colors"
+                          title="Отменить выплату"
+                        >
+                          <Undo2 size={12} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -430,6 +441,16 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
                     </button>
                   </div>
                 )}
+                {PAYOUT_EVENT_TYPES.has(ev.event_type) && (
+                  <div className="pt-1">
+                    <button
+                      onClick={() => setVoidTarget({ id: ev.id, amount: ev.amount, created_at: ev.created_at })}
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-800"
+                    >
+                      <Undo2 size={11} /> Отменить выплату
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -468,6 +489,11 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
           onExpenseEdited?.()
           setEditExpense(null)
         }}
+      />
+
+      <VoidPayoutModal
+        payout={voidTarget}
+        onClose={() => setVoidTarget(null)}
       />
     </div>
   )

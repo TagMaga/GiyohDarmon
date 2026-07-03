@@ -26,3 +26,9 @@ export async function createPayouts(payload) {
   const res = await client.post('/payouts', payload)
   return unwrap(res)
 }
+
+/** POST /payouts/:id/void — reverses a payout (status flag, never deleted). */
+export async function voidPayout(id, reason) {
+  const res = await client.post(`/payouts/${id}/void`, { reason })
+  return unwrap(res)
+}

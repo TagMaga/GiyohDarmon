@@ -65,3 +65,29 @@ func (h *Handler) CreatePayouts(c *gin.Context) {
 	}
 	response.Created(c, out)
 }
+
+// VoidPayout handles POST /payouts/:id/void — reverses a payout.
+func (h *Handler) VoidPayout(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, apperrors.BadRequest("invalid payout id"))
+		return
+	}
+
+	var req VoidPayoutRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+
+	claims := middleware.ClaimsFromContext(c)
+	if err := h.svc.VoidPayout(c.Request.Context(), claims.UserID, claims.Role, id, req.Reason); err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.NoContent(c)
+}

@@ -10,12 +10,24 @@ type CreatePayoutItem struct {
 
 // CreatePayoutsRequest bulk-creates payouts in one transaction — matches the
 // mockup's multi-select → one confirm sheet → one POST flow.
+//
+// IdempotencyKey is required: the client generates one UUID per submission
+// attempt (not per row) and resends the same value on a retry. The server
+// dedupes on (payer_id, idempotency_key) via payout_batches — a retried
+// request replays the original result instead of creating a second batch.
 type CreatePayoutsRequest struct {
-	Items       []CreatePayoutItem `json:"items"        validate:"required,min=1,dive"`
-	PeriodStart string             `json:"period_start" validate:"required"` // YYYY-MM-DD
-	PeriodEnd   string             `json:"period_end"   validate:"required"` // YYYY-MM-DD
-	Method      string             `json:"method"       validate:"omitempty,oneof=cash bank_transfer card"`
-	Note        string             `json:"note"`
+	Items          []CreatePayoutItem `json:"items"           validate:"required,min=1,dive"`
+	PeriodStart    string             `json:"period_start"    validate:"required"` // YYYY-MM-DD
+	PeriodEnd      string             `json:"period_end"      validate:"required"` // YYYY-MM-DD
+	Method         string             `json:"method"          validate:"omitempty,oneof=cash bank_transfer card"`
+	Note           string             `json:"note"`
+	IdempotencyKey string             `json:"idempotency_key" validate:"required,min=8,max=100"`
+}
+
+// VoidPayoutRequest reverses a payout — a status flag + audit trail, never a
+// hard delete, so the ledger stays append-only.
+type VoidPayoutRequest struct {
+	Reason string `json:"reason" validate:"required,min=3"`
 }
 
 // PayableMember is one row of the Team Lead "Кому выплатить" payables list.

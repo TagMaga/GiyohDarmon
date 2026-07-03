@@ -93,13 +93,20 @@ func (r *Repository) GetRevenueSummary(
 ) ([]eventAggRow, error) {
 	var rows []eventAggRow
 	err := r.db.WithContext(ctx).Raw(`
+		WITH delivered_orders AS (
+			SELECT DISTINCT o.id
+			FROM orders o
+			JOIN order_timeline tl ON tl.order_id = o.id
+			WHERE o.deleted_at   IS NULL
+			  AND tl.to_status   = 'delivered'
+			  AND tl.created_at >= ?
+			  AND tl.created_at <= ?
+		)
 		SELECT
-			event_type::text          AS event_type,
-			COALESCE(SUM(amount), 0)  AS total
-		FROM financial_events
-		WHERE order_id   IS NOT NULL
-		  AND created_at >= ?
-		  AND created_at <= ?
+			fe.event_type::text          AS event_type,
+			COALESCE(SUM(fe.amount), 0)  AS total
+		FROM financial_events fe
+		JOIN delivered_orders d ON d.id = fe.order_id
 		GROUP BY event_type
 		ORDER BY event_type
 	`, from, to).Scan(&rows).Error
@@ -503,7 +510,10 @@ func (r *Repository) ListFinancialEvents(
 	}
 
 	payoutArgs := []interface{}{from, to}
-	payoutWhere := "p.created_at >= ? AND p.created_at <= ?"
+	// Voided payouts are excluded entirely: a void means the payment was
+	// reversed/never really happened, so it shouldn't show as a reconciled
+	// expense line — the reversal itself isn't a separate financial event.
+	payoutWhere := "p.status != 'voided' AND p.created_at >= ? AND p.created_at <= ?"
 	if userID != nil {
 		payoutWhere += " AND p.payee_id = ?"
 		payoutArgs = append(payoutArgs, *userID)
@@ -678,21 +688,35 @@ func (r *Repository) GetDailyRevenue(
 ) ([]dailyRow, error) {
 	var rows []dailyRow
 	err := r.db.WithContext(ctx).Raw(`
+		WITH delivered_orders AS (
+			SELECT DISTINCT
+				o.id,
+				o.total_amount,
+				o.delivery_fee,
+				tl.created_at::date AS delivered_date
+			FROM orders o
+			JOIN order_timeline tl ON tl.order_id = o.id
+			WHERE o.deleted_at  IS NULL
+			  AND tl.to_status  = 'delivered'
+			  AND tl.created_at >= ?
+			  AND tl.created_at <= ?
+		),
+		company_events AS (
+			SELECT order_id, COALESCE(SUM(amount), 0) AS company_revenue
+			FROM financial_events
+			WHERE event_type = 'company_revenue_earned'
+			GROUP BY order_id
+		)
 		SELECT
-			tl.created_at::date                                                            AS date,
-			COUNT(*)                                                                       AS orders_count,
-			COALESCE(SUM(o.total_amount), 0)                                               AS total_sales,
-			COALESCE(SUM(o.delivery_fee), 0)                                               AS delivery_fees,
-			COALESCE(SUM(fe.amount) FILTER (WHERE fe.event_type = 'company_revenue_earned'), 0) AS company_revenue
-		FROM orders o
-		JOIN order_timeline tl ON tl.order_id = o.id
-		LEFT JOIN financial_events fe ON fe.order_id = o.id
-		WHERE o.deleted_at  IS NULL
-		  AND tl.to_status  = 'delivered'
-		  AND tl.created_at >= ?
-		  AND tl.created_at <= ?
-		GROUP BY tl.created_at::date
-		ORDER BY tl.created_at::date
+			d.delivered_date                                      AS date,
+			COUNT(*)                                              AS orders_count,
+			COALESCE(SUM(d.total_amount), 0)                      AS total_sales,
+			COALESCE(SUM(d.delivery_fee), 0)                      AS delivery_fees,
+			COALESCE(SUM(ce.company_revenue), 0)                  AS company_revenue
+		FROM delivered_orders d
+		LEFT JOIN company_events ce ON ce.order_id = d.id
+		GROUP BY d.delivered_date
+		ORDER BY d.delivered_date
 	`, from, to).Scan(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("get daily revenue: %w", err)
@@ -712,21 +736,34 @@ func (r *Repository) GetSellerPerformance(
 	}
 	var rows []sellerPerfRow
 	err := r.db.WithContext(ctx).Raw(`
+		WITH delivered_orders AS (
+			SELECT DISTINCT
+				o.id,
+				o.seller_id,
+				o.total_amount
+			FROM orders o
+			JOIN order_timeline tl ON tl.order_id = o.id
+			WHERE o.deleted_at  IS NULL
+			  AND tl.to_status  = 'delivered'
+			  AND tl.created_at >= ?
+			  AND tl.created_at <= ?
+		),
+		seller_events AS (
+			SELECT order_id, COALESCE(SUM(amount), 0) AS seller_commission
+			FROM financial_events
+			WHERE event_type = 'seller_commission_earned'
+			GROUP BY order_id
+		)
 		SELECT
-			o.seller_id,
+			d.seller_id,
 			u.full_name,
-			COUNT(*)                                                                             AS orders_count,
-			COALESCE(SUM(o.total_amount), 0)                                                     AS total_revenue,
-			COALESCE(SUM(fe.amount) FILTER (WHERE fe.event_type = 'seller_commission_earned'), 0) AS total_commission
-		FROM orders o
-		JOIN order_timeline tl ON tl.order_id = o.id
-		JOIN users u ON u.id = o.seller_id
-		LEFT JOIN financial_events fe ON fe.order_id = o.id
-		WHERE o.deleted_at  IS NULL
-		  AND tl.to_status  = 'delivered'
-		  AND tl.created_at >= ?
-		  AND tl.created_at <= ?
-		GROUP BY o.seller_id, u.full_name
+			COUNT(*)                                          AS orders_count,
+			COALESCE(SUM(d.total_amount), 0)                  AS total_revenue,
+			COALESCE(SUM(se.seller_commission), 0)            AS total_commission
+		FROM delivered_orders d
+		JOIN users u ON u.id = d.seller_id
+		LEFT JOIN seller_events se ON se.order_id = d.id
+		GROUP BY d.seller_id, u.full_name
 		ORDER BY total_revenue DESC
 		LIMIT ?
 	`, from, to, limit).Scan(&rows).Error
@@ -744,24 +781,37 @@ func (r *Repository) GetTeamPerformance(
 ) ([]teamPerfRow, error) {
 	var rows []teamPerfRow
 	err := r.db.WithContext(ctx).Raw(`
+		WITH delivered_orders AS (
+			SELECT DISTINCT
+				o.id,
+				o.team_lead_id,
+				o.total_amount
+			FROM orders o
+			JOIN order_timeline tl ON tl.order_id = o.id
+			WHERE o.deleted_at    IS NULL
+			  AND o.team_lead_id  IS NOT NULL
+			  AND tl.to_status    = 'delivered'
+			  AND tl.created_at  >= ?
+			  AND tl.created_at  <= ?
+		),
+		company_events AS (
+			SELECT order_id, COALESCE(SUM(amount), 0) AS company_revenue
+			FROM financial_events
+			WHERE event_type = 'company_revenue_earned'
+			GROUP BY order_id
+		)
 		SELECT
-			o.team_lead_id,
+			d.team_lead_id,
 			COALESCE(t.name, '')                                                                   AS team_name,
 			COALESCE(u.full_name, '')                                                              AS team_lead_name,
 			COUNT(*)                                                                               AS orders_count,
-			COALESCE(SUM(o.total_amount), 0)                                                       AS total_revenue,
-			COALESCE(SUM(fe.amount) FILTER (WHERE fe.event_type = 'company_revenue_earned'), 0)    AS company_revenue
-		FROM orders o
-		JOIN order_timeline tl ON tl.order_id = o.id
-		LEFT JOIN teams t  ON t.team_lead_id = o.team_lead_id AND t.deleted_at IS NULL
-		LEFT JOIN users u  ON u.id           = o.team_lead_id
-		LEFT JOIN financial_events fe ON fe.order_id = o.id
-		WHERE o.deleted_at    IS NULL
-		  AND o.team_lead_id  IS NOT NULL
-		  AND tl.to_status    = 'delivered'
-		  AND tl.created_at  >= ?
-		  AND tl.created_at  <= ?
-		GROUP BY o.team_lead_id, t.name, u.full_name
+			COALESCE(SUM(d.total_amount), 0)                                                       AS total_revenue,
+			COALESCE(SUM(ce.company_revenue), 0)                                                   AS company_revenue
+		FROM delivered_orders d
+		LEFT JOIN teams t  ON t.team_lead_id = d.team_lead_id AND t.deleted_at IS NULL
+		LEFT JOIN users u  ON u.id           = d.team_lead_id
+		LEFT JOIN company_events ce ON ce.order_id = d.id
+		GROUP BY d.team_lead_id, t.name, u.full_name
 		ORDER BY total_revenue DESC
 	`, from, to).Scan(&rows).Error
 	if err != nil {

@@ -2,6 +2,7 @@ package payouts
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -40,7 +41,8 @@ func (s *Service) GetMyPayouts(ctx context.Context, userID uuid.UUID) ([]PayoutR
 // a team lead's Финансы screen. RBAC mirrors compensation.GetTeamIncome
 // exactly (owner may view any team; a team lead may only view their own) —
 // enforced by delegating the income lookup to compSvc.GetTeamIncome, which
-// already applies that check.
+// already applies that check. All I/O happens here; the aggregation itself
+// is the pure, unit-testable buildPayablesResponse below.
 func (s *Service) GetPayablesForTeamLead(
 	ctx context.Context,
 	actorID uuid.UUID,
@@ -90,24 +92,36 @@ func (s *Service) GetPayablesForTeamLead(
 		return nil, apperrors.Internal(err)
 	}
 
-	members := make([]PayableMember, 0, len(teamIncome.Members))
+	return buildPayablesResponse(teamLeadID, from, to, teamIncome.Members, users, grossTotals, alreadyPaid, personalPool), nil
+}
+
+// buildPayablesResponse is the pure aggregation step behind
+// GetPayablesForTeamLead — no I/O, so it can be unit tested without a
+// database (mirrors compensation/income_service.go's buildTeamReport).
+func buildPayablesResponse(
+	teamLeadID uuid.UUID,
+	from, to time.Time,
+	teamMembers []compensation.TeamMemberIncome,
+	users map[uuid.UUID]userInfo,
+	grossTotals map[uuid.UUID]orderTotalsRow,
+	alreadyPaid map[uuid.UUID]float64,
+	personalPool float64,
+) *PayablesResponse {
+	members := make([]PayableMember, 0, len(teamMembers))
 	var teamEarned, teamPaid float64
-	for _, m := range teamIncome.Members {
+	for _, m := range teamMembers {
 		u := users[m.UserID]
 		// GetTeamIncomeSummary sweeps in anyone with a financial_events row
 		// tied to this team's orders — that includes couriers (courier_fee_earned)
 		// and the team lead's own team_lead_pool_earned row. Payables is only
 		// ever managers/sellers; the team lead's own pool is reported
-		// separately via PersonalPool/PersonalNet above.
+		// separately via PersonalPool/PersonalNet.
 		if u.Role != "manager" && u.Role != "seller" {
 			continue
 		}
 		gt := grossTotals[m.UserID]
 		paid := alreadyPaid[m.UserID]
-		remaining := m.TotalIncome - paid
-		if remaining < 0 {
-			remaining = 0
-		}
+		remaining := computeRemaining(m.TotalIncome, paid)
 		members = append(members, PayableMember{
 			PayeeID:     m.UserID,
 			FullName:    u.FullName,
@@ -121,33 +135,70 @@ func (s *Service) GetPayablesForTeamLead(
 		teamEarned += m.TotalIncome
 		teamPaid += paid
 	}
-	// personalPool (sum of team_lead_pool_earned events) is already the team
-	// lead's net take-home — ApplyCommissionRules computes it as
-	// poolGross - seller - manager *per order*, before the event is ever
-	// written. It must NOT be reduced again by payouts already made to staff:
-	// that money was never the team lead's to begin with, so subtracting it
-	// here would double-count the same commission. (Previously this did
-	// `personalPool - allPaid`, which was wrong for exactly that reason.)
-	personalNet := personalPool
 
 	return &PayablesResponse{
-		TeamLeadID:    teamLeadID,
-		PeriodStart:   from.Format("2006-01-02"),
-		PeriodEnd:     to.Format("2006-01-02"),
-		TeamEarned:    teamEarned,
-		TeamPaid:      teamPaid,
+		TeamLeadID:  teamLeadID,
+		PeriodStart: from.Format("2006-01-02"),
+		PeriodEnd:   to.Format("2006-01-02"),
+		TeamEarned:  teamEarned,
+		TeamPaid:    teamPaid,
+		// personalPool (sum of team_lead_pool_earned events) is already the
+		// team lead's net take-home — ApplyCommissionRules computes it as
+		// poolGross - seller - manager *per order*, before the event is ever
+		// written. PersonalNet must NOT be reduced again by payouts already
+		// made to staff: that money was never the team lead's to begin with.
 		TeamRemaining: teamEarned - teamPaid,
 		PersonalPool:  personalPool,
-		PersonalNet:   personalNet,
+		PersonalNet:   personalPool,
 		Members:       members,
-	}, nil
+	}
+}
+
+// computeRemaining floors "earned minus already paid" at 0.
+func computeRemaining(earned, paid float64) float64 {
+	r := earned - paid
+	if r < 0 {
+		return 0
+	}
+	return r
+}
+
+// validatePayoutItems is the pure guard behind CreatePayouts: every payee
+// must be in the caller's own payables list (when restricted — i.e. the
+// caller is a team lead, not owner), and no item's amount may exceed what's
+// actually owed. This is the amount ceiling that was previously missing
+// entirely — a team lead could submit any amount for a valid payee.
+func validatePayoutItems(items []CreatePayoutItem, allowed map[uuid.UUID]PayableMember, restricted bool) error {
+	const epsilon = 0.01 // float rounding tolerance
+	for _, item := range items {
+		if !restricted {
+			continue // owner: unrestricted, no "remaining" ceiling to check against
+		}
+		m, ok := allowed[item.PayeeID]
+		if !ok {
+			return apperrors.Forbidden(fmt.Sprintf("payee %s is not a member of your team for this period", item.PayeeID))
+		}
+		if item.Amount > m.Remaining+epsilon {
+			return apperrors.BadRequest(fmt.Sprintf(
+				"amount %.2f for %s exceeds remaining %.2f — cannot pay more than what's owed",
+				item.Amount, m.FullName, m.Remaining,
+			))
+		}
+	}
+	return nil
 }
 
 // CreatePayouts validates and bulk-inserts a Team Lead's "Выплатить" action.
 // Scope: only sales_team_lead (paying their own team) and owner (unrestricted)
-// may create payouts today — manager-pays-seller is left for a future pass
-// since no shipping screen drives it yet, even though the payee/payer_role
-// columns already support it.
+// may create payouts today — manager-pays-seller is left for a future pass:
+// RequireRoles already excludes "manager" at the route level (see routes.go),
+// so there is no half-built code path implying the capability exists yet,
+// even though the payee/payer_role columns are generic enough to support it
+// whenever a Manager-facing Финансы screen is built.
+//
+// Idempotent: req.IdempotencyKey + actorID must be unique. A retried request
+// (network retry, double-click) with the same key replays the original
+// batch's result instead of creating a second set of payouts.
 func (s *Service) CreatePayouts(ctx context.Context, actorID uuid.UUID, actorRole string, req CreatePayoutsRequest) ([]PayoutResponse, error) {
 	if actorRole != "owner" && actorRole != "sales_team_lead" {
 		return nil, apperrors.Forbidden("only a team lead or owner can create payouts")
@@ -168,24 +219,26 @@ func (s *Service) CreatePayouts(ctx context.Context, actorID uuid.UUID, actorRol
 	// Team leads may only pay members that actually show up in their own
 	// payables list for this period — reuses the exact same RBAC + team
 	// scoping as the payables endpoint, so there's one source of truth for
-	// "who is payable," not a second hand-rolled hierarchy check.
-	var allowed map[uuid.UUID]bool
-	if actorRole == "sales_team_lead" {
+	// "who is payable" and "how much do they have left."
+	restricted := actorRole == "sales_team_lead"
+	var allowed map[uuid.UUID]PayableMember
+	if restricted {
 		payables, err := s.GetPayablesForTeamLead(ctx, actorID, actorRole, actorID, req.PeriodStart, req.PeriodEnd)
 		if err != nil {
 			return nil, err
 		}
-		allowed = make(map[uuid.UUID]bool, len(payables.Members))
+		allowed = make(map[uuid.UUID]PayableMember, len(payables.Members))
 		for _, m := range payables.Members {
-			allowed[m.PayeeID] = true
+			allowed[m.PayeeID] = m
 		}
+	}
+
+	if err := validatePayoutItems(req.Items, allowed, restricted); err != nil {
+		return nil, err
 	}
 
 	rows := make([]*Payout, 0, len(req.Items))
 	for _, item := range req.Items {
-		if actorRole == "sales_team_lead" && !allowed[item.PayeeID] {
-			return nil, apperrors.Forbidden(fmt.Sprintf("payee %s is not a member of your team for this period", item.PayeeID))
-		}
 		payeeRole, err := s.repo.GetUserRole(ctx, item.PayeeID)
 		if err != nil || payeeRole == "" {
 			return nil, apperrors.BadRequest(fmt.Sprintf("payee %s not found", item.PayeeID))
@@ -215,7 +268,24 @@ func (s *Service) CreatePayouts(ctx context.Context, actorID uuid.UUID, actorRol
 		})
 	}
 
-	if err := s.repo.CreateBatch(ctx, rows); err != nil {
+	batch := &PayoutBatch{ID: uuid.New(), PayerID: actorID, IdempotencyKey: req.IdempotencyKey}
+	err = s.repo.CreateBatchIdempotent(ctx, batch, rows)
+	if errors.Is(err, ErrDuplicateBatch) {
+		existing, ferr := s.repo.FindBatchByKey(ctx, actorID, req.IdempotencyKey)
+		if ferr != nil {
+			return nil, apperrors.Internal(ferr)
+		}
+		existingRows, lerr := s.repo.ListByBatchID(ctx, existing.ID)
+		if lerr != nil {
+			return nil, apperrors.Internal(lerr)
+		}
+		out := make([]PayoutResponse, len(existingRows))
+		for i := range existingRows {
+			out[i] = ToResponse(&existingRows[i])
+		}
+		return out, nil
+	}
+	if err != nil {
 		return nil, apperrors.Internal(err)
 	}
 
@@ -224,6 +294,27 @@ func (s *Service) CreatePayouts(ctx context.Context, actorID uuid.UUID, actorRol
 		out[i] = ToResponse(row)
 	}
 	return out, nil
+}
+
+// VoidPayout reverses a payout — a status flag + audit trail, never a hard
+// delete, so the ledger stays append-only. Only the original payer or an
+// owner may void; already-voided payouts are rejected (not silently no-op),
+// so a client can tell a stale double-submit apart from a real void.
+func (s *Service) VoidPayout(ctx context.Context, actorID uuid.UUID, actorRole string, payoutID uuid.UUID, reason string) error {
+	p, err := s.repo.GetByID(ctx, payoutID)
+	if err != nil {
+		return apperrors.NotFound("payout not found")
+	}
+	if actorRole != "owner" && p.PayerID != actorID {
+		return apperrors.Forbidden("only the original payer or owner can void a payout")
+	}
+	if p.Status == "voided" {
+		return apperrors.BadRequest("payout is already voided")
+	}
+	if err := s.repo.Void(ctx, payoutID, actorID, reason); err != nil {
+		return apperrors.Internal(err)
+	}
+	return nil
 }
 
 // parsePeriod mirrors compensation's income_service.go parsePeriod/defaultPeriod
