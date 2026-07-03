@@ -26,7 +26,7 @@ export default function Topbar({ onMenuClick }) {
 
   return (
     <header
-      className="sticky top-0 z-20 h-[60px] flex items-center justify-between px-4 lg:px-6 flex-shrink-0"
+      className="hidden lg:flex sticky top-0 z-20 h-[60px] items-center justify-between px-4 lg:px-6 flex-shrink-0"
       style={{
         background: 'rgba(242, 244, 247, 0.85)',
         backdropFilter: 'blur(12px)',
