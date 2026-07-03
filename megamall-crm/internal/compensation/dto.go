@@ -280,7 +280,7 @@ type CommissionBreakdown struct {
 	ManagerPersonalCommission float64 `json:"manager_personal_commission"`
 	TeamLeadPool              float64 `json:"team_lead_pool"`
 	CompanyRevenue            float64 `json:"company_revenue"`
-	CourierFee                float64 `json:"courier_fee"` // = tariff_fee
+	CourierFee                float64 `json:"courier_fee"` // courier payout deducted before commission split
 }
 
 // PreviewResponse is returned by GET /hr/compensation/preview.

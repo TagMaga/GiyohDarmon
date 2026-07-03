@@ -12,11 +12,12 @@
  *   seller_rate           → Продавец
  *   manager_team_rate     → Менеджер команды
  *   manager_personal_rate → Личные заказы менеджера
- *   team_lead_pool_rate   → Руководитель группы (gets остаток if no fixed rate)
+ *   team_lead_pool_rate   → Gross pool; руководитель группы получает остаток after seller/manager
  *
  * company_rate:
  *   Intentionally READ-ONLY here — it is a global owner-level setting,
- *   not a per-team parameter. Fetched from global configs for simulation only.
+ *   not a per-team parameter. It is displayed for audit/config visibility;
+ *   the actual company amount is the remainder outside the team lead gross pool.
  *
  * No backend changes. No API contract changes. Frontend only.
  */
@@ -124,17 +125,16 @@ function pctLabel(rate) {
 }
 
 // Build distribution from rates for a given net revenue amount
-function calcDistribution({ netRevenue, companyRate, sellerRate, managerRate, poolRate }) {
+function calcDistribution({ netRevenue, sellerRate, managerRate, poolRate }) {
   const nr = Math.max(0, netRevenue)
-  const company  = nr * (companyRate  ?? 0)
+  const poolGross = nr * (poolRate ?? 0)
+  const company  = nr - poolGross
   const seller   = nr * (sellerRate   ?? 0)
   const manager  = nr * (managerRate  ?? 0)
-  // pool: if poolRate is explicitly set, use it; otherwise get remainder
-  const poolFixed = poolRate != null ? nr * poolRate : null
-  const remainder = Math.max(0, nr - company - seller - manager)
-  const pool      = poolFixed !== null ? poolFixed : remainder
+  const pool      = Math.max(0, poolGross - seller - manager)
+  const remainder = Math.max(0, nr - company - seller - manager - pool)
 
-  return { company, seller, manager, pool, remainder }
+  return { company, seller, manager, pool, poolGross, remainder }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -327,16 +327,16 @@ function RevenueSimulator({ companyRate, sellerRate, managerRate, poolRate }) {
 
   const nr = parseFloat(netRevenue) || 0
   const dist = useMemo(() =>
-    calcDistribution({ netRevenue: nr, companyRate, sellerRate, managerRate, poolRate }),
-    [nr, companyRate, sellerRate, managerRate, poolRate]
+    calcDistribution({ netRevenue: nr, sellerRate, managerRate, poolRate }),
+    [nr, sellerRate, managerRate, poolRate]
   )
 
   // Build bar segments (only visible roles: company, seller, manager, pool)
   const segments = [
-    { label: 'Компания',       amount: dist.company,  pct: companyRate,  accent: 'slate',   barColor: 'bg-slate-400'   },
+    { label: 'Компания',       amount: dist.company,  pct: poolRate == null ? companyRate : 1 - poolRate,  accent: 'slate',   barColor: 'bg-slate-400'   },
     { label: 'Продавец',       amount: dist.seller,   pct: sellerRate,   accent: 'emerald', barColor: 'bg-emerald-400' },
     { label: 'Менеджер',       amount: dist.manager,  pct: managerRate,  accent: 'violet',  barColor: 'bg-violet-400'  },
-    { label: 'Руководитель',   amount: dist.pool,     pct: poolRate,     accent: 'amber',   barColor: 'bg-amber-400', isPool: poolRate == null },
+    { label: 'Руководитель',   amount: dist.pool,     pct: nr > 0 ? dist.pool / nr : null, accent: 'amber',   barColor: 'bg-amber-400', isPool: true },
   ]
 
   const totalMapped = dist.company + dist.seller + dist.manager + dist.pool
@@ -412,7 +412,7 @@ function RevenueSimulator({ companyRate, sellerRate, managerRate, poolRate }) {
               </div>
               <div className="text-right flex-shrink-0">
                 <span className="text-xs text-slate-400 mr-2">
-                  {s.isPool && s.pct == null ? '—' : pctLabel(s.pct)}
+                  {s.isPool ? 'остаток' : pctLabel(s.pct)}
                 </span>
                 <span className={`text-sm font-bold ${isUnconfigured && !s.isPool ? 'text-slate-600' : 'text-white'}`}>
                   {fmtSom(s.amount)}
@@ -673,17 +673,22 @@ export default function TeamFinancialModelSection({ configs = [], scopeId, loadi
     return m
   }, [configs])
 
+  const activeGlobalByType = useMemo(() => {
+    const m = {}
+    globalConfigs
+      .filter(c => c.scope === 'global' && isConfigActive(c))
+      .forEach(c => { m[c.commission_type] = c })
+    return m
+  }, [globalConfigs])
+
   // Find active global company_rate
-  const activeCompanyConfig = useMemo(() =>
-    globalConfigs.find(c => c.commission_type === 'company_rate' && isConfigActive(c)),
-    [globalConfigs]
-  )
+  const activeCompanyConfig = activeGlobalByType['company_rate']
   const companyRate = activeCompanyConfig?.rate ?? null
 
-  // Rates for simulator
-  const sellerRate  = activeByType['seller_rate']?.rate  ?? null
-  const managerRate = activeByType['manager_team_rate']?.rate ?? null
-  const poolRate    = activeByType['team_lead_pool_rate']?.rate ?? null
+  // Rates for simulator: team override first, global default second.
+  const sellerRate  = activeByType['seller_rate']?.rate ?? activeGlobalByType['seller_rate']?.rate ?? null
+  const managerRate = activeByType['manager_team_rate']?.rate ?? activeGlobalByType['manager_team_rate']?.rate ?? null
+  const poolRate    = activeByType['team_lead_pool_rate']?.rate ?? activeGlobalByType['team_lead_pool_rate']?.rate ?? null
 
   if (loading) {
     return (

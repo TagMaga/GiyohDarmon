@@ -284,6 +284,201 @@ func TestApply_SpecExample_AggregateConsistency(t *testing.T) {
 	}
 }
 
+func TestApply_MegaMall23OrderScenario(t *testing.T) {
+	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
+
+	var totals CommissionBreakdown
+	totalSales := 23.0 * 100.0
+	courierPayout := 23.0 * 20.0
+	commissionBasePerOrder := 100.0 - 20.0
+
+	add := func(orderType OrderType, count int) {
+		t.Helper()
+		for i := 0; i < count; i++ {
+			b, err := ApplyCommissionRules(orderType, commissionBasePerOrder, s)
+			if err != nil {
+				t.Fatalf("%s order %d: %v", orderType, i+1, err)
+			}
+			totals.CompanyRevenue += b.CompanyRevenue
+			totals.SellerCommission += b.SellerCommission
+			totals.ManagerTeamCommission += b.ManagerTeamCommission
+			totals.ManagerPersonalCommission += b.ManagerPersonalCommission
+			totals.TeamLeadPool += b.TeamLeadPool
+		}
+	}
+
+	add(OrderTypeManagerPersonalOrder, 3)
+	add(OrderTypeTeamLeadPersonalOrder, 2)
+	add(OrderTypeSellerOrder, 18)
+
+	managerTotal := totals.ManagerPersonalCommission + totals.ManagerTeamCommission
+	finalTotal := courierPayout + totals.CompanyRevenue + totals.SellerCommission + managerTotal + totals.TeamLeadPool
+	teamLeadGrossPool := totalSales - courierPayout - totals.CompanyRevenue
+
+	if !near2(totalSales, 2300) {
+		t.Fatalf("test setup total_sales: got %.2f, want 2300.00", totalSales)
+	}
+	if !near2(courierPayout, 460) {
+		t.Errorf("courier: got %.2f, want 460.00", courierPayout)
+	}
+	if !near2(totalSales-courierPayout, 1840) {
+		t.Errorf("commission_base: got %.2f, want 1840.00", totalSales-courierPayout)
+	}
+	if !near2(totals.CompanyRevenue, 1104) {
+		t.Errorf("company: got %.2f, want 1104.00", totals.CompanyRevenue)
+	}
+	if !near2(teamLeadGrossPool, 736) {
+		t.Errorf("team_lead_gross_pool: got %.2f, want 736.00", teamLeadGrossPool)
+	}
+	if !near2(totals.SellerCommission, 144) {
+		t.Errorf("seller_income: got %.2f, want 144.00", totals.SellerCommission)
+	}
+	if !near2(totals.ManagerPersonalCommission, 48) {
+		t.Errorf("manager own orders: got %.2f, want 48.00", totals.ManagerPersonalCommission)
+	}
+	if !near2(totals.ManagerTeamCommission, 48) {
+		t.Errorf("manager override orders: got %.2f, want 48.00", totals.ManagerTeamCommission)
+	}
+	if !near2(managerTotal, 96) {
+		t.Errorf("manager total: got %.2f, want 96.00", managerTotal)
+	}
+	if !near2(totals.TeamLeadPool, 496) {
+		t.Errorf("team_lead_net: got %.2f, want 496.00", totals.TeamLeadPool)
+	}
+	if !near2(finalTotal, 2300) {
+		t.Errorf("final total: got %.2f, want 2300.00", finalTotal)
+	}
+	if !near2(totals.TeamLeadPool, teamLeadGrossPool-totals.SellerCommission-managerTotal) {
+		t.Errorf("team lead must be residual: net %.2f != gross %.2f - sellers %.2f - managers %.2f",
+			totals.TeamLeadPool, teamLeadGrossPool, totals.SellerCommission, managerTotal)
+	}
+}
+
+func TestApply_EdgeCaseZeroSellerOrders(t *testing.T) {
+	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
+	var totals CommissionBreakdown
+	for i := 0; i < 3; i++ {
+		b, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 80, s)
+		if err != nil {
+			t.Fatalf("manager order %d: %v", i+1, err)
+		}
+		totals.CompanyRevenue += b.CompanyRevenue
+		totals.ManagerPersonalCommission += b.ManagerPersonalCommission
+		totals.TeamLeadPool += b.TeamLeadPool
+	}
+	for i := 0; i < 2; i++ {
+		b, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, 80, s)
+		if err != nil {
+			t.Fatalf("team lead order %d: %v", i+1, err)
+		}
+		totals.CompanyRevenue += b.CompanyRevenue
+		totals.ManagerTeamCommission += b.ManagerTeamCommission
+		totals.TeamLeadPool += b.TeamLeadPool
+	}
+	if totals.SellerCommission != 0 {
+		t.Errorf("seller commission with 0 seller orders: got %.2f, want 0", totals.SellerCommission)
+	}
+	if !near2(sumBreakdown(totals), 400) {
+		t.Errorf("total split: got %.2f, want 400.00", sumBreakdown(totals))
+	}
+}
+
+func TestApply_EdgeCaseZeroManagerOwnOrders(t *testing.T) {
+	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
+	var totals CommissionBreakdown
+	for i := 0; i < 18; i++ {
+		b, err := ApplyCommissionRules(OrderTypeSellerOrder, 80, s)
+		if err != nil {
+			t.Fatalf("seller order %d: %v", i+1, err)
+		}
+		totals.CompanyRevenue += b.CompanyRevenue
+		totals.SellerCommission += b.SellerCommission
+		totals.ManagerTeamCommission += b.ManagerTeamCommission
+		totals.TeamLeadPool += b.TeamLeadPool
+	}
+	if totals.ManagerPersonalCommission != 0 {
+		t.Errorf("manager personal with 0 manager own orders: got %.2f, want 0", totals.ManagerPersonalCommission)
+	}
+	if !near2(totals.ManagerTeamCommission, 43.20) {
+		t.Errorf("manager override from seller orders: got %.2f, want 43.20", totals.ManagerTeamCommission)
+	}
+}
+
+func TestApply_EdgeCaseOnlySellers(t *testing.T) {
+	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
+	var totals CommissionBreakdown
+	for i := 0; i < 5; i++ {
+		b, err := ApplyCommissionRules(OrderTypeSellerOrder, 80, s)
+		if err != nil {
+			t.Fatalf("seller order %d: %v", i+1, err)
+		}
+		totals.CompanyRevenue += b.CompanyRevenue
+		totals.SellerCommission += b.SellerCommission
+		totals.ManagerTeamCommission += b.ManagerTeamCommission
+		totals.TeamLeadPool += b.TeamLeadPool
+	}
+	if !near2(totals.SellerCommission, 40) {
+		t.Errorf("seller total: got %.2f, want 40.00", totals.SellerCommission)
+	}
+	if !near2(totals.ManagerTeamCommission, 12) {
+		t.Errorf("manager override total: got %.2f, want 12.00", totals.ManagerTeamCommission)
+	}
+	if !near2(totals.TeamLeadPool, 108) {
+		t.Errorf("team lead residual: got %.2f, want 108.00", totals.TeamLeadPool)
+	}
+	if !near2(sumBreakdown(totals), 400) {
+		t.Errorf("total split: got %.2f, want 400.00", sumBreakdown(totals))
+	}
+}
+
+func TestApply_EdgeCaseOnlyManagerOwnOrders(t *testing.T) {
+	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
+	var totals CommissionBreakdown
+	for i := 0; i < 5; i++ {
+		b, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 80, s)
+		if err != nil {
+			t.Fatalf("manager order %d: %v", i+1, err)
+		}
+		totals.CompanyRevenue += b.CompanyRevenue
+		totals.ManagerPersonalCommission += b.ManagerPersonalCommission
+		totals.TeamLeadPool += b.TeamLeadPool
+	}
+	if totals.SellerCommission != 0 || totals.ManagerTeamCommission != 0 {
+		t.Errorf("only manager own orders should not pay sellers or manager override: seller %.2f manager_team %.2f",
+			totals.SellerCommission, totals.ManagerTeamCommission)
+	}
+	if !near2(totals.ManagerPersonalCommission, 80) {
+		t.Errorf("manager personal total: got %.2f, want 80.00", totals.ManagerPersonalCommission)
+	}
+	if !near2(totals.TeamLeadPool, 80) {
+		t.Errorf("team lead residual: got %.2f, want 80.00", totals.TeamLeadPool)
+	}
+	if !near2(sumBreakdown(totals), 400) {
+		t.Errorf("total split: got %.2f, want 400.00", sumBreakdown(totals))
+	}
+}
+
+func TestApply_EdgeCaseCourierPayoutDeductedBeforeCommission(t *testing.T) {
+	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
+	orderTotal := 100.0
+	courierPayout := 20.0
+	commissionBase := orderTotal - courierPayout
+
+	b, err := ApplyCommissionRules(OrderTypeSellerOrder, commissionBase, s)
+	if err != nil {
+		t.Fatalf("seller order: %v", err)
+	}
+
+	if !near2(b.CompanyRevenue, 48) || !near2(b.SellerCommission, 8) ||
+		!near2(b.ManagerTeamCommission, 2.40) || !near2(b.TeamLeadPool, 21.60) {
+		t.Fatalf("commissions must be calculated from 80.00 base, got company %.2f seller %.2f manager %.2f tl %.2f",
+			b.CompanyRevenue, b.SellerCommission, b.ManagerTeamCommission, b.TeamLeadPool)
+	}
+	if !near2(courierPayout+sumBreakdown(b), orderTotal) {
+		t.Errorf("courier + commission split: got %.2f, want %.2f", courierPayout+sumBreakdown(b), orderTotal)
+	}
+}
+
 // ─── unknown order type ────────────────────────────────────────────────────────
 
 func TestApply_UnknownOrderType_ReturnsError(t *testing.T) {

@@ -62,6 +62,34 @@ func TestBuildRevenueSummary_TotalEmployeePayouts(t *testing.T) {
 	}
 }
 
+func TestBuildRevenueSummary_MegaMall23OrderScenarioTotalsClose(t *testing.T) {
+	rows := []eventAggRow{
+		{EventType: "company_revenue_earned", Total: 1104},
+		{EventType: "seller_commission_earned", Total: 144},
+		{EventType: "manager_personal_commission_earned", Total: 48},
+		{EventType: "manager_team_commission_earned", Total: 48},
+		{EventType: "team_lead_pool_earned", Total: 496},
+		{EventType: "courier_fee_earned", Total: 460},
+	}
+
+	rev := buildRevenueSummary(rows)
+	employeeTotal := rev.SellerCommissionEarned +
+		rev.ManagerPersonalCommissionEarned +
+		rev.ManagerTeamCommissionEarned +
+		rev.TeamLeadPoolEarned
+	finalTotal := rev.CourierPayouts + rev.CompanyRevenueEarned + employeeTotal
+
+	if !near2(rev.TotalEmployeePayouts, 736) {
+		t.Errorf("team gross pool via employee payouts: got %.2f, want 736.00", rev.TotalEmployeePayouts)
+	}
+	if !near2(employeeTotal, 736) {
+		t.Errorf("employee total: got %.2f, want 736.00", employeeTotal)
+	}
+	if !near2(finalTotal, 2300) {
+		t.Errorf("courier + company + employees: got %.2f, want 2300.00", finalTotal)
+	}
+}
+
 // TestBuildRevenueSummary_CompanyExcludedFromEmployeePayouts confirms company revenue
 // is NOT included in total_employee_payouts even if present in rows.
 func TestBuildRevenueSummary_CompanyExcludedFromEmployeePayouts(t *testing.T) {

@@ -70,26 +70,34 @@ const (
 //
 // COMMISSION RULES BY ORDER TYPE
 // ──────────────────────────────────────────────────────────────────────────────
-//   seller_order:
-//     seller_commission          = net_revenue × seller_rate
-//     manager_team_commission    = net_revenue × manager_team_rate
-//     manager_personal_commission = 0
-//     team_lead_pool             = net_revenue × team_lead_pool_rate
-//     company_revenue            = net_revenue × company_rate
 //
-//   manager_personal_order:
-//     seller_commission          = 0
-//     manager_team_commission    = 0     ← manager cannot double-pay himself
-//     manager_personal_commission = net_revenue × manager_personal_rate
-//     team_lead_pool             = net_revenue × team_lead_pool_rate
-//     company_revenue            = net_revenue × company_rate
+//	All commissions use commission_base = total_amount - courier_payout.
+//	team_lead_pool_rate defines the gross team pool. Seller and manager
+//	commissions are paid from that gross pool; TeamLeadPool below is the net
+//	residual after those payouts. CompanyRevenue is the remainder outside the
+//	gross team pool. CompanyRate is stored for config/history visibility.
 //
-//   team_lead_personal_order:
-//     seller_commission          = 0
-//     manager_team_commission    = net_revenue × manager_team_rate
-//     manager_personal_commission = 0
-//     team_lead_pool             = net_revenue × team_lead_pool_rate
-//     company_revenue            = net_revenue × company_rate
+//	seller_order:
+//	  seller_commission          = commission_base × seller_rate
+//	  manager_team_commission    = commission_base × manager_team_rate
+//	  manager_personal_commission = 0
+//	  team_lead_pool             = commission_base × team_lead_pool_rate − seller − manager
+//	  company_revenue            = commission_base − commission_base × team_lead_pool_rate
+//
+//	manager_personal_order:
+//	  seller_commission          = 0
+//	  manager_team_commission    = 0     ← manager cannot double-pay himself
+//	  manager_personal_commission = commission_base × manager_personal_rate
+//	  team_lead_pool             = commission_base × team_lead_pool_rate − manager_personal
+//	  company_revenue            = commission_base − commission_base × team_lead_pool_rate
+//
+//	team_lead_personal_order:
+//	  seller_commission          = 0
+//	  manager_team_commission    = commission_base × manager_team_rate
+//	  manager_personal_commission = 0
+//	  team_lead_pool             = commission_base × team_lead_pool_rate − manager
+//	  company_revenue            = commission_base − commission_base × team_lead_pool_rate
+//
 // ──────────────────────────────────────────────────────────────────────────────
 type OrderType string
 
@@ -212,7 +220,8 @@ func (DeliveryTariffRange) TableName() string { return "delivery_tariff_ranges" 
 // or delivery_tariffs during commission calculations.
 //
 // Phase 4 adds the FK: ALTER TABLE order_financial_snapshots
-//   ADD CONSTRAINT fk_snapshot_order FOREIGN KEY (order_id) REFERENCES orders(id).
+//
+//	ADD CONSTRAINT fk_snapshot_order FOREIGN KEY (order_id) REFERENCES orders(id).
 type OrderFinancialSnapshot struct {
 	ID      uuid.UUID  `gorm:"type:uuid;primaryKey"`
 	OrderID *uuid.UUID `gorm:"type:uuid;uniqueIndex"` // FK to orders added in Phase 4
@@ -256,9 +265,10 @@ func (OrderFinancialSnapshot) TableName() string { return "order_financial_snaps
 // Written by the Financial Engine (Phase 4) on order status transitions.
 //
 // Phase 25 hardening:
-//   OrderID is now a value type (uuid.UUID, not *uuid.UUID) matching the
-//   NOT NULL DB constraint added in migration 00036.  A zero UUID is rejected
-//   by the DB FK; Go-level enforcement happens in emitFinancialEvents (orders/financial.go).
+//
+//	OrderID is now a value type (uuid.UUID, not *uuid.UUID) matching the
+//	NOT NULL DB constraint added in migration 00036.  A zero UUID is rejected
+//	by the DB FK; Go-level enforcement happens in emitFinancialEvents (orders/financial.go).
 type FinancialEvent struct {
 	ID         uuid.UUID          `gorm:"type:uuid;primaryKey"`
 	OrderID    uuid.UUID          `gorm:"type:uuid;not null"` // Phase 25: NOT NULL, ON DELETE RESTRICT
@@ -292,8 +302,8 @@ type EmployeeCompensation struct {
 	ID               uuid.UUID        `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	UserID           uuid.UUID        `gorm:"type:uuid;not null"`
 	CompensationType CompensationKind `gorm:"type:compensation_kind;not null"`
-	CommissionRate   *float64         `gorm:"type:numeric(6,5)"`   // decimal 0-1, used for percent/mixed
-	FixedSalary      *float64         `gorm:"type:numeric(12,2)"`  // monthly amount in Currency
+	CommissionRate   *float64         `gorm:"type:numeric(6,5)"`  // decimal 0-1, used for percent/mixed
+	FixedSalary      *float64         `gorm:"type:numeric(12,2)"` // monthly amount in Currency
 	Currency         string           `gorm:"type:varchar(10);not null;default:'TJS'"`
 	EffectiveFrom    time.Time        `gorm:"not null"`
 	EffectiveTo      *time.Time       // NULL = currently active

@@ -347,26 +347,32 @@ func (s *Service) GetHistory(
 //
 // CORRECTED COMMISSION RULES (applied here):
 //
+// All commission lines below use commission_base = order_total - courier_payout.
+// team_lead_pool_rate creates the gross team pool; TeamLeadPool returned by the
+// API is the team lead's net residual after seller/manager payouts. company_rate
+// is resolved and returned for audit/config visibility, while CompanyRevenue is
+// the remainder outside the gross team pool.
+//
 //	seller_order:
-//	  seller_commission          = net_revenue × seller_rate
-//	  manager_team_commission    = net_revenue × manager_team_rate
+//	  seller_commission          = commission_base × seller_rate
+//	  manager_team_commission    = commission_base × manager_team_rate
 //	  manager_personal_commission = 0
-//	  team_lead_pool             = net_revenue × team_lead_pool_rate
-//	  company_revenue            = net_revenue × company_rate
+//	  team_lead_pool             = commission_base × team_lead_pool_rate − seller − manager
+//	  company_revenue            = commission_base − commission_base × team_lead_pool_rate
 //
 //	manager_personal_order:
 //	  seller_commission          = 0
 //	  manager_team_commission    = 0     ← manager cannot double-pay himself
-//	  manager_personal_commission = net_revenue × manager_personal_rate
-//	  team_lead_pool             = net_revenue × team_lead_pool_rate
-//	  company_revenue            = net_revenue × company_rate
+//	  manager_personal_commission = commission_base × manager_personal_rate
+//	  team_lead_pool             = commission_base × team_lead_pool_rate − manager_personal
+//	  company_revenue            = commission_base − commission_base × team_lead_pool_rate
 //
 //	team_lead_personal_order:
 //	  seller_commission          = 0
-//	  manager_team_commission    = net_revenue × manager_team_rate
+//	  manager_team_commission    = commission_base × manager_team_rate
 //	  manager_personal_commission = 0
-//	  team_lead_pool             = net_revenue × team_lead_pool_rate
-//	  company_revenue            = net_revenue × company_rate
+//	  team_lead_pool             = commission_base × team_lead_pool_rate − manager
+//	  company_revenue            = commission_base − commission_base × team_lead_pool_rate
 func (s *Service) Preview(ctx context.Context, req PreviewRequest) (*PreviewResponse, error) {
 	if !req.OrderType.IsValid() {
 		return nil, apperrors.BadRequest(fmt.Sprintf("invalid order_type: %s", req.OrderType))
