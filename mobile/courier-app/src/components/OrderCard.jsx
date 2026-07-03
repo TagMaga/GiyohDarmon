@@ -6,6 +6,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native'
 import { C, STATUS_LABEL, STATUS_COLOR } from './OrderDetailSheet'
 import { PressScale } from './motion'
+import { Sheen, useGlass } from './glass'
 
 const isUrgent = (o) => {
   const m = String(o?.delivery_method ?? o?.DeliveryMethod ?? o?.deliveryMethod ?? '').toLowerCase()
@@ -13,6 +14,7 @@ const isUrgent = (o) => {
 }
 
 export function OrderCard({ order, onOpen, onStart, actionLoading }) {
+  const { T }      = useGlass()
   const color      = STATUS_COLOR[order.status] || C.muted
   const collectAmt = Number(order.amount_to_collect ?? order.courier_collect_amount ?? 0)
   const fmt        = (n) => Number(n || 0).toLocaleString()
@@ -28,10 +30,15 @@ export function OrderCard({ order, onOpen, onStart, actionLoading }) {
   const isDone       = ['delivered', 'returned', 'issue', 'confirmed', 'cancelled'].includes(order.status)
 
   return (
-    <PressScale style={[oc.card, isUrgent(order) && oc.cardUrgent]} onPress={onOpen} scaleTo={0.98}>
+    <PressScale
+      style={[oc.card, { backgroundColor: T.card, borderColor: T.cardEdge }, isUrgent(order) && oc.cardUrgent]}
+      onPress={onOpen}
+      scaleTo={0.98}
+    >
+      <Sheen radius={24} />
       {/* Top: order number + status badge */}
       <View style={oc.topRow}>
-        <Text style={oc.orderNum}>{order.order_number}</Text>
+        <Text style={[oc.orderNum, { color: T.ink }]}>{order.order_number}</Text>
         <View style={[oc.badge, { backgroundColor: `${color}18` }]}>
           <Text style={[oc.badgeText, { color }]}>{STATUS_LABEL[order.status] || order.status}</Text>
         </View>
@@ -39,9 +46,9 @@ export function OrderCard({ order, onOpen, onStart, actionLoading }) {
 
       {/* Customer name + address */}
       <View style={oc.infoRow}>
-        <Text style={oc.clientName} numberOfLines={1}>{order.customer?.full_name || '—'}</Text>
+        <Text style={[oc.clientName, { color: T.ink }]} numberOfLines={1}>{order.customer?.full_name || '—'}</Text>
         {order.customer?.address
-          ? <Text style={oc.address} numberOfLines={1}>📍 {order.customer.address}{order.customer?.city ? `, ${order.customer.city}` : ''}</Text>
+          ? <Text style={[oc.address, { color: T.muted }]} numberOfLines={1}>📍 {order.customer.address}{order.customer?.city ? `, ${order.customer.city}` : ''}</Text>
           : null
         }
       </View>
@@ -81,8 +88,8 @@ export function OrderCard({ order, onOpen, onStart, actionLoading }) {
 
         {/* Открыть — in_delivery (to mark delivered inside sheet) + done states */}
         {(isInDelivery || isDone) && (
-          <TouchableOpacity style={[oc.btn, oc.btnOpen]} onPress={onOpen}>
-            <Text style={oc.btnOpenText}>{isInDelivery ? 'Открыть ›' : 'Детали ›'}</Text>
+          <TouchableOpacity style={[oc.btn, oc.btnOpen, { backgroundColor: T.chip, borderColor: T.chipEdge }]} onPress={onOpen}>
+            <Text style={[oc.btnOpenText, { color: T.ink }]}>{isInDelivery ? 'Открыть ›' : 'Детали ›'}</Text>
           </TouchableOpacity>
         )}
       </View>

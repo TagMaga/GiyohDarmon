@@ -9,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { getCashSummary, submitHandover, getHandoverHistory, getMyOrders } from '../../src/api/orders'
 import client, { API_URL } from '../../src/api/client'
 import { FadeSlideIn, PressScale, CountUp, Skeleton, animateLayout } from '../../src/components/motion'
-import { GlassBackdrop, GlassFill } from '../../src/components/glass'
+import { GlassBackdrop, GlassFill, Sheen, useGlass } from '../../src/components/glass'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 dayjs.locale('ru')
@@ -51,6 +51,7 @@ const at = StyleSheet.create({
 })
 
 export default function CashScreen() {
+  const { dark, T }                 = useGlass()
   const [summary, setSummary]       = useState(null)
   const [history, setHistory]       = useState([])
   const [loading, setLoading]       = useState(true)
@@ -198,7 +199,7 @@ export default function CashScreen() {
   const hasDiff = amtNum > 0
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
       <GlassBackdrop />
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData() }} tintColor={C.blue} />}
@@ -207,8 +208,8 @@ export default function CashScreen() {
         {/* Header */}
         <View style={s.header}>
           <View>
-            <Text style={s.headTitle}>Касса</Text>
-            <Text style={s.headSub}>{dayjs().format('dddd, D MMMM')}</Text>
+            <Text style={[s.headTitle, { color: T.ink }]}>Касса</Text>
+            <Text style={[s.headSub, { color: T.muted }]}>{dayjs().format('dddd, D MMMM')}</Text>
           </View>
         </View>
 
@@ -230,17 +231,18 @@ export default function CashScreen() {
           : <>
             {/* Cash hero (white/orange card) */}
             <FadeSlideIn>
-            <View style={s.cashHero}>
+            <View style={[s.cashHero, { backgroundColor: T.card }]}>
+              <Sheen radius={32} />
               <Text style={s.cashLabel}>нужно вернуть сегодня</Text>
               <CountUp value={toReturn} style={s.cashSum} suffix=" TJS" duration={900} />
-              <View style={s.formula}>
-                <Text style={s.formulaVal}>{fmt(collected)}</Text>
+              <View style={[s.formula, { backgroundColor: T.chip, borderColor: T.chipEdge }]}>
+                <Text style={[s.formulaVal, { color: T.ink }]}>{fmt(collected)}</Text>
                 <Text style={s.formulaMuted}>−</Text>
                 <Text style={s.formulaGreen}>{fmt(salary)}</Text>
                 <Text style={s.formulaMuted}>=</Text>
                 <Text style={s.formulaOrange}>{fmt(toReturn)} TJS</Text>
               </View>
-              <Text style={s.caption}>Собранные наличные − Ваша зарплата</Text>
+              <Text style={[s.caption, { color: T.muted }]}>Собранные наличные − Ваша зарплата</Text>
               {pendingHandover > 0 && (
                 <View style={s.pendingRow}>
                   <Text style={s.pendingText}>На проверке у диспетчера</Text>
@@ -263,22 +265,24 @@ export default function CashScreen() {
             <FadeSlideIn delay={80}>
             <View style={s.kpiRow}>
               <PressScale
-                style={[s.kpiCard, cashTab === 'handover' && s.kpiCardActive]}
+                style={[s.kpiCard, { backgroundColor: T.chip, borderColor: T.chipEdge }, cashTab === 'handover' && s.kpiCardActive, cashTab === 'handover' && { backgroundColor: T.card }]}
                 scaleTo={0.95}
                 onPress={() => { animateLayout(); setCashTab('handover') }}
               >
-                <Text style={s.kpiLabel}>Сдано наличных</Text>
-                <CountUp value={totalHandedOver} style={s.kpiValue} />
-                <Text style={s.kpiUnit}>TJS</Text>
+                <Sheen radius={20} />
+                <Text style={[s.kpiLabel, { color: T.muted }]}>Сдано наличных</Text>
+                <CountUp value={totalHandedOver} style={[s.kpiValue, { color: T.ink }]} />
+                <Text style={[s.kpiUnit, { color: T.muted }]}>TJS</Text>
               </PressScale>
               <PressScale
-                style={[s.kpiCard, cashTab === 'earnings' && s.kpiCardActive]}
+                style={[s.kpiCard, { backgroundColor: T.chip, borderColor: T.chipEdge }, cashTab === 'earnings' && s.kpiCardActive, cashTab === 'earnings' && { backgroundColor: T.card }]}
                 scaleTo={0.95}
                 onPress={() => { animateLayout(); setCashTab('earnings') }}
               >
-                <Text style={s.kpiLabel}>Заработки</Text>
-                <CountUp value={earningsTotal} style={s.kpiValue} />
-                <Text style={s.kpiUnit}>TJS</Text>
+                <Sheen radius={20} />
+                <Text style={[s.kpiLabel, { color: T.muted }]}>Заработки</Text>
+                <CountUp value={earningsTotal} style={[s.kpiValue, { color: T.ink }]} />
+                <Text style={[s.kpiUnit, { color: T.muted }]}>TJS</Text>
               </PressScale>
             </View>
             </FadeSlideIn>
@@ -287,27 +291,29 @@ export default function CashScreen() {
             {cashTab === 'handover' && (
               <FadeSlideIn delay={140} from={10}>
                 <View style={s.filterRow}>
-                  <TouchableOpacity
-                    style={[s.filterChip, periodFilter !== 'all' && s.filterChipActive]}
+                  <PressScale
+                    scaleTo={0.94}
+                    style={[s.filterChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, periodFilter !== 'all' && s.filterChipActive]}
                     onPress={openPeriodFilter}
                   >
-                    <Text style={[s.filterChipText, periodFilter !== 'all' && s.filterChipTextActive]}>
+                    <Text style={[s.filterChipText, { color: T.muted }, periodFilter !== 'all' && s.filterChipTextActive]}>
                       {periodLabel} ▼
                     </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[s.filterChip, statusFilter !== 'all' && s.filterChipActive]}
+                  </PressScale>
+                  <PressScale
+                    scaleTo={0.94}
+                    style={[s.filterChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, statusFilter !== 'all' && s.filterChipActive]}
                     onPress={openStatusFilter}
                   >
-                    <Text style={[s.filterChipText, statusFilter !== 'all' && s.filterChipTextActive]}>
+                    <Text style={[s.filterChipText, { color: T.muted }, statusFilter !== 'all' && s.filterChipTextActive]}>
                       {statusLabel} ▼
                     </Text>
-                  </TouchableOpacity>
+                  </PressScale>
                 </View>
-                <View style={s.histCard}>
+                <View style={[s.histCard, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
                   {filteredHistory.length === 0 && (
                     <View style={{ padding: 24, alignItems: 'center' }}>
-                      <Text style={{ color: C.muted, fontWeight: '600' }}>
+                      <Text style={{ color: T.muted, fontWeight: '600' }}>
                         {history.length === 0 ? 'Инкассаций пока нет' : 'Нет записей по фильтру'}
                       </Text>
                     </View>
@@ -321,15 +327,15 @@ export default function CashScreen() {
                     const amount = h.actual_returned ?? h.total_to_return ?? 0
                     const proof = fullUrl(h.proof_url)
                     return (
-                      <View key={h.id || i} style={[s.cashItem, i === filteredHistory.length - 1 && { borderBottomWidth: 0 }]}>
+                      <View key={h.id || i} style={[s.cashItem, { borderBottomColor: T.hairline }, i === filteredHistory.length - 1 && { borderBottomWidth: 0 }]}>
                         {proof
                           ? <TouchableOpacity activeOpacity={0.85} onPress={() => setPreviewUri(proof)}>
                               <Image source={{ uri: proof }} style={s.receipt} />
                             </TouchableOpacity>
-                          : <View style={s.receipt} />}
+                          : <View style={[s.receipt, { backgroundColor: T.chip }]} />}
                         <View style={{ flex: 1 }}>
-                          <Text style={s.cashItemTime}>{h.created_at ? dayjs(h.created_at).format('HH:mm') : '—'}</Text>
-                          <Text style={s.cashItemTitle}>Сдано наличными</Text>
+                          <Text style={[s.cashItemTime, { color: T.muted }]}>{h.created_at ? dayjs(h.created_at).format('HH:mm') : '—'}</Text>
+                          <Text style={[s.cashItemTitle, { color: T.ink }]}>Сдано наличными</Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
                           <Text style={s.cashAmount}>{fmt(amount)} TJS</Text>
@@ -345,17 +351,17 @@ export default function CashScreen() {
             {/* Earnings tab */}
             {cashTab === 'earnings' && (
               <FadeSlideIn delay={0} from={10}>
-              <View style={s.histCard}>
+              <View style={[s.histCard, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
                 {earnings.length === 0 ? (
                   <View style={{ padding: 24, alignItems: 'center' }}>
-                    <Text style={{ color: C.muted, fontWeight: '600' }}>Пока нет доставленных заказов</Text>
+                    <Text style={{ color: T.muted, fontWeight: '600' }}>Пока нет доставленных заказов</Text>
                   </View>
                 ) : earnings.map((e, i) => (
-                  <View key={e.id || i} style={[s.cashItem, i === earnings.length - 1 && { borderBottomWidth: 0 }]}>
+                  <View key={e.id || i} style={[s.cashItem, { borderBottomColor: T.hairline }, i === earnings.length - 1 && { borderBottomWidth: 0 }]}>
                     <View style={s.earnIcon}><Text style={{ fontSize: 20 }}>💰</Text></View>
                     <View style={{ flex: 1 }}>
-                      <Text style={s.cashItemTitle}>Доставка {e.number}</Text>
-                      <Text style={s.cashItemTime}>{e.date ? dayjs(e.date).format('HH:mm') : '—'}</Text>
+                      <Text style={[s.cashItemTitle, { color: T.ink }]}>Доставка {e.number}</Text>
+                      <Text style={[s.cashItemTime, { color: T.muted }]}>{e.date ? dayjs(e.date).format('HH:mm') : '—'}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={s.cashAmount}>{fmt(e.fee)} TJS</Text>
@@ -375,6 +381,7 @@ export default function CashScreen() {
         <Pressable style={s.overlay} onPress={() => { if (!submitting) { setShowHandover(false); setAttachments([]); setActualAmount(''); setNotes('') } }}>
           <Pressable style={s.sheet} onPress={e => e.stopPropagation()}>
             <GlassFill intensity={64} overlay="rgba(242,246,252,0.40)" androidFallback="rgba(240,244,252,0.94)" />
+            <Sheen radius={32} opacity={0.35} />
             <View style={s.sheetHandle} />
             <ScrollView contentContainerStyle={s.sheetContent} showsVerticalScrollIndicator={false}>
               <Text style={s.sheetTitle}>Сдать наличные</Text>
@@ -512,20 +519,20 @@ const s = StyleSheet.create({
   sheetHandle: { width: 74, height: 6, borderRadius: 99, backgroundColor: '#d9deea', alignSelf: 'center', marginTop: 14 },
   sheetContent: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40, gap: 16 },
   sheetTitle: { fontSize: 28, fontWeight: '700', color: C.ink },
-  sheetRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', borderWidth: 1, borderColor: C.line, borderRadius: 22, paddingHorizontal: 18, paddingVertical: 15 },
+  sheetRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.50)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', borderRadius: 22, paddingHorizontal: 18, paddingVertical: 15 },
   sheetRowLabel: { color: C.muted, fontWeight: '600', fontSize: 14 },
   sheetRowVal: { fontSize: 22, fontWeight: '700', color: C.orange },
   field: {},
   fieldLabel: { fontSize: 14, color: C.muted, fontWeight: '700', marginBottom: 10 },
-  amountInput: { borderWidth: 1.5, borderColor: '#dfe5ef', backgroundColor: '#f8fafc', borderRadius: 22, paddingVertical: 18, fontSize: 28, fontWeight: '700', textAlign: 'center', color: C.ink },
+  amountInput: { borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.62)', backgroundColor: 'rgba(255,255,255,0.50)', borderRadius: 22, paddingVertical: 18, fontSize: 28, fontWeight: '700', textAlign: 'center', color: C.ink },
   diffRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1 },
   diffLabel: { fontSize: 13, fontWeight: '700', color: C.muted },
   diffVal: { fontSize: 15, fontWeight: '700' },
-  uploadArea: { borderWidth: 1.5, borderColor: '#dfe5ef', borderStyle: 'dashed', borderRadius: 22, paddingVertical: 24, alignItems: 'center', backgroundColor: '#f8fafc' },
+  uploadArea: { borderWidth: 1.5, borderColor: 'rgba(120,144,180,0.40)', borderStyle: 'dashed', borderRadius: 22, paddingVertical: 24, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.40)' },
   uploadPlus: { fontSize: 34, fontWeight: '700', color: C.ink, marginBottom: 8 },
   uploadText: { fontSize: 16, fontWeight: '700', color: C.muted },
   uploadSub: { fontSize: 12, color: C.muted, marginTop: 4 },
-  textarea: { borderWidth: 1.5, borderColor: '#dfe5ef', backgroundColor: '#f8fafc', borderRadius: 22, padding: 18, fontSize: 15, fontWeight: '700', color: C.ink, minHeight: 88, textAlignVertical: 'top' },
+  textarea: { borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.62)', backgroundColor: 'rgba(255,255,255,0.50)', borderRadius: 22, padding: 18, fontSize: 15, fontWeight: '700', color: C.ink, minHeight: 88, textAlignVertical: 'top' },
   submitBigBtn: { backgroundColor: C.blue, borderRadius: 999, paddingVertical: 18, alignItems: 'center', shadowColor: C.blue, shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.25, shadowRadius: 28, elevation: 4 },
   submitBigBtnText: { color: '#fff', fontWeight: '700', fontSize: 17 },
   // Earnings

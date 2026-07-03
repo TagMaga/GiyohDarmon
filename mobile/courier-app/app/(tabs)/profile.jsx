@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
 import * as ImagePicker from 'expo-image-picker'
 import useAuthStore from '../../src/store/authStore'
 import { logout as apiLogout, getMe, uploadAvatar } from '../../src/api/auth'
@@ -60,6 +61,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={s.safe}>
       <GlassBackdrop dark />
+      <StatusBar style="light" />
       <ScrollView contentContainerStyle={s.content}>
         {/* Avatar block */}
         <View style={s.avatarBlock}>

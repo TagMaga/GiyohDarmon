@@ -4,8 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { getMyOrders, updateOrderStatus } from '../../src/api/orders'
 import { OrderDetailSheet, C } from '../../src/components/OrderDetailSheet'
 import { OrderCard } from '../../src/components/OrderCard'
-import { FadeSlideIn, PulseDot, OrderCardSkeleton, animateLayout } from '../../src/components/motion'
-import { GlassBackdrop } from '../../src/components/glass'
+import { FadeSlideIn, PressScale, PulseDot, OrderCardSkeleton, animateLayout } from '../../src/components/motion'
+import { GlassBackdrop, useGlass } from '../../src/components/glass'
 
 const FILTERS = [
   { key: 'all',         label: 'Все' },
@@ -16,6 +16,7 @@ const FILTERS = [
 ]
 
 export default function DeliveriesScreen() {
+  const { T }                             = useGlass()
   const [orders, setOrders]               = useState([])
   const [loading, setLoading]             = useState(true)
   const [refreshing, setRefreshing]       = useState(false)
@@ -71,13 +72,13 @@ export default function DeliveriesScreen() {
   }
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
       <GlassBackdrop />
       {/* Header */}
       <View style={s.header}>
         <View>
-          <Text style={s.headTitle}>Мои заказы</Text>
-          <Text style={s.headSub}>Сегодня · {orders.length} заказов</Text>
+          <Text style={[s.headTitle, { color: T.ink }]}>Мои заказы</Text>
+          <Text style={[s.headSub, { color: T.muted }]}>Сегодня · {orders.length} заказов</Text>
         </View>
         <View style={s.onlinePill}>
           <PulseDot color={C.green} size={8} />
@@ -93,18 +94,19 @@ export default function DeliveriesScreen() {
         contentContainerStyle={s.filterRow}
       >
         {FILTERS.map(f => (
-          <TouchableOpacity
+          <PressScale
             key={f.key}
-            style={[s.chip, activeFilter === f.key && s.chipActive]}
+            scaleTo={0.94}
+            style={[s.chip, { backgroundColor: T.chip, borderColor: T.chipEdge }, activeFilter === f.key && s.chipActive]}
             onPress={() => { animateLayout(); setActiveFilter(f.key) }}
           >
             <Text
               numberOfLines={1}
-              style={[s.chipText, activeFilter === f.key && s.chipTextActive]}
+              style={[s.chipText, { color: T.ink }, activeFilter === f.key && s.chipTextActive]}
             >
               {f.label}
             </Text>
-          </TouchableOpacity>
+          </PressScale>
         ))}
       </ScrollView>
 
@@ -124,8 +126,8 @@ export default function DeliveriesScreen() {
               <FadeSlideIn>
                 <View style={s.empty}>
                   <Text style={s.emptyIcon}>📦</Text>
-                  <Text style={s.emptyTitle}>Нет заказов</Text>
-                  <Text style={s.emptySub}>Заказы появятся здесь после назначения</Text>
+                  <Text style={[s.emptyTitle, { color: T.muted }]}>Нет заказов</Text>
+                  <Text style={[s.emptySub, { color: T.muted }]}>Заказы появятся здесь после назначения</Text>
                 </View>
               </FadeSlideIn>
             )

@@ -3,6 +3,20 @@ import { Stack, router } from 'expo-router'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { StatusBar } from 'expo-status-bar'
 import useAuthStore from '../src/store/authStore'
+import { GlassThemeProvider, useGlass } from '../src/components/glass'
+
+function AppShell() {
+  const { dark } = useGlass()
+  return (
+    <>
+      <StatusBar style={dark ? 'light' : 'dark'} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+    </>
+  )
+}
 
 export default function RootLayout() {
   const { isAuthenticated, rehydrate } = useAuthStore()
@@ -19,11 +33,9 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-      </Stack>
+      <GlassThemeProvider>
+        <AppShell />
+      </GlassThemeProvider>
     </GestureHandlerRootView>
   )
 }

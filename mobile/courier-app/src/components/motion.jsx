@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Animated, Easing, LayoutAnimation, Platform, Pressable, StyleSheet, UIManager,
 } from 'react-native'
+import { useGlass } from './glass'
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true)
@@ -127,6 +128,7 @@ export function PulseDot({ color = '#12b76a', size = 8, active = true }) {
 
 /** Pulsing skeleton block for loading states. */
 export function Skeleton({ width = '100%', height = 16, radius = 10, style }) {
+  const { dark } = useGlass()
   const pulse = useRef(new Animated.Value(0.45)).current
   useEffect(() => {
     const loop = Animated.loop(
@@ -140,15 +142,16 @@ export function Skeleton({ width = '100%', height = 16, radius = 10, style }) {
   }, [])
   return (
     <Animated.View
-      style={[sk.base, { width, height, borderRadius: radius, opacity: pulse }, style]}
+      style={[sk.base, dark && sk.baseDark, { width, height, borderRadius: radius, opacity: pulse }, style]}
     />
   )
 }
 
 /** Ready-made skeleton that mirrors an OrderCard while lists load. */
 export function OrderCardSkeleton() {
+  const { T } = useGlass()
   return (
-    <Animated.View style={sk.card}>
+    <Animated.View style={[sk.card, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
       <Animated.View style={sk.row}>
         <Skeleton width={110} height={14} />
         <Skeleton width={78} height={22} radius={999} />
@@ -166,6 +169,7 @@ export function OrderCardSkeleton() {
 
 const sk = StyleSheet.create({
   base: { backgroundColor: 'rgba(130,152,186,0.28)' },
+  baseDark: { backgroundColor: 'rgba(255,255,255,0.12)' },
   card: {
     backgroundColor: 'rgba(255,255,255,0.50)', borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.65)',
     padding: 16,

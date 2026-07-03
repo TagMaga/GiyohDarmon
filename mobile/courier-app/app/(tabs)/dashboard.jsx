@@ -10,7 +10,7 @@ import { OrderCard } from '../../src/components/OrderCard'
 import { AccountMenu } from '../../src/components/AccountMenu'
 import Avatar from '../../src/components/Avatar'
 import { FadeSlideIn, PressScale, CountUp, PulseDot, Skeleton, OrderCardSkeleton, animateLayout } from '../../src/components/motion'
-import { GlassBackdrop } from '../../src/components/glass'
+import { GlassBackdrop, Sheen, useGlass } from '../../src/components/glass'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 dayjs.locale('ru')
@@ -27,7 +27,7 @@ export default function DashboardScreen() {
   const [isOnline, setIsOnline]       = useState(true)
   const [menuOpen, setMenuOpen]       = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
-  const [darkTheme, setDarkTheme]     = useState(false)
+  const { dark, T, setDark }          = useGlass()
 
   const fetchAll = async () => {
     try {
@@ -85,10 +85,10 @@ export default function DashboardScreen() {
   const collected = summary?.cash_to_handover || 0
 
   return (
-    <SafeAreaView style={[s.safe, darkTheme && s.safeDark]}>
-      <GlassBackdrop dark={darkTheme} />
+    <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
+      <GlassBackdrop />
       <ScrollView
-        style={[{ flex: 1 }, darkTheme && s.scrollDark]}
+        style={{ flex: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll() }} tintColor={C.blue} />}
         contentContainerStyle={s.content}
       >
@@ -97,22 +97,23 @@ export default function DashboardScreen() {
           <TouchableOpacity style={s.profile} activeOpacity={0.82} onPress={() => setMenuOpen(true)}>
             <Avatar uri={user?.avatar_url} name={user?.full_name} fallback={initial} size={52} radius={19} color="#101827" />
             <View style={{ minWidth: 0 }}>
-              <Text style={s.name}>{firstName}</Text>
-              <Text style={s.sub}>Курьер · MegaMall</Text>
+              <Text style={[s.name, { color: T.ink }]}>{firstName}</Text>
+              <Text style={[s.sub, { color: T.muted }]}>Курьер · MegaMall</Text>
             </View>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[s.onlineBtn, !isOnline && s.offlineBtn]}
+            style={[s.onlineBtn, !isOnline && { backgroundColor: T.chip, borderColor: T.chipEdge }]}
             onPress={() => { animateLayout(); setIsOnline(v => !v) }}
           >
             <PulseDot color={isOnline ? C.green : '#8a93a3'} size={8} active={isOnline} />
-            <Text style={[s.onlineText, !isOnline && s.offlineText]}>{isOnline ? 'На линии' : 'Не на линии'}</Text>
+            <Text style={[s.onlineText, !isOnline && { color: T.muted }]}>{isOnline ? 'На линии' : 'Не на линии'}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Hero */}
         <FadeSlideIn delay={0}>
           <View style={s.hero}>
+            <Sheen radius={28} opacity={0.16} />
             <Text style={s.heroSmall}>заработок сегодня</Text>
             <CountUp value={salary} style={s.heroMoney} suffix=" TJS" duration={900} />
             <Text style={s.heroParagraph}>{done} доставок · {fmt(collected)} TJS наличные на руках</Text>
@@ -122,17 +123,20 @@ export default function DashboardScreen() {
         {/* KPI bubbles */}
         <FadeSlideIn delay={70}>
           <View style={s.kpis}>
-            <PressScale style={s.kpi} scaleTo={0.94} onPress={() => router.push('/(tabs)/deliveries')}>
+            <PressScale style={[s.kpi, { backgroundColor: T.card, borderColor: T.cardEdge }]} scaleTo={0.94} onPress={() => router.push('/(tabs)/deliveries')}>
+              <Sheen radius={22} />
               <CountUp value={done} style={[s.kpiNum, { color: C.green }]} />
-              <Text style={s.kpiLabel}>доставлено</Text>
+              <Text style={[s.kpiLabel, { color: T.muted }]}>доставлено</Text>
             </PressScale>
-            <PressScale style={s.kpi} scaleTo={0.94} onPress={() => router.push('/(tabs)/deliveries')}>
+            <PressScale style={[s.kpi, { backgroundColor: T.card, borderColor: T.cardEdge }]} scaleTo={0.94} onPress={() => router.push('/(tabs)/deliveries')}>
+              <Sheen radius={22} />
               <CountUp value={active} style={[s.kpiNum, { color: C.blue }]} />
-              <Text style={s.kpiLabel}>активный</Text>
+              <Text style={[s.kpiLabel, { color: T.muted }]}>активный</Text>
             </PressScale>
-            <PressScale style={s.kpi} scaleTo={0.94} onPress={() => router.push('/(tabs)/claimable')}>
+            <PressScale style={[s.kpi, { backgroundColor: T.card, borderColor: T.cardEdge }]} scaleTo={0.94} onPress={() => router.push('/(tabs)/claimable')}>
+              <Sheen radius={22} />
               <CountUp value={availCount} style={[s.kpiNum, { color: C.orange }]} />
-              <Text style={s.kpiLabel}>доступно</Text>
+              <Text style={[s.kpiLabel, { color: T.muted }]}>доступно</Text>
             </PressScale>
           </View>
         </FadeSlideIn>
@@ -151,7 +155,7 @@ export default function DashboardScreen() {
                 <>
                   <FadeSlideIn delay={140}>
                     <View style={s.sectionHead}>
-                      <Text style={s.sectionTitle}>Сейчас</Text>
+                      <Text style={[s.sectionTitle, { color: T.ink }]}>Сейчас</Text>
                       <TouchableOpacity onPress={() => router.push('/(tabs)/deliveries')}>
                         <Text style={s.link}>Все</Text>
                       </TouchableOpacity>
@@ -172,13 +176,14 @@ export default function DashboardScreen() {
 
               <FadeSlideIn delay={inRoute.length > 0 ? 240 : 140}>
                 <View style={s.sectionHead}>
-                  <Text style={s.sectionTitle}>Статус дня</Text>
+                  <Text style={[s.sectionTitle, { color: T.ink }]}>Статус дня</Text>
                 </View>
-                <View style={[s.card, s.statusCard]}>
+                <View style={[s.card, s.statusCard, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
+                  <Sheen radius={28} />
                   <View style={s.iconBox}><Text style={{ fontSize: 26 }}>🔥</Text></View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.statusTitle}>{done} доставок сегодня</Text>
-                    <Text style={s.statusSub}>Рейтинг 4.9 · {fmt(salary)} TJS заработано</Text>
+                    <Text style={[s.statusTitle, { color: T.ink }]}>{done} доставок сегодня</Text>
+                    <Text style={[s.statusSub, { color: T.muted }]}>Рейтинг 4.9 · {fmt(salary)} TJS заработано</Text>
                   </View>
                 </View>
               </FadeSlideIn>
@@ -202,12 +207,12 @@ export default function DashboardScreen() {
         user={user}
         isOnline={isOnline}
         notificationsEnabled={notificationsEnabled}
-        darkTheme={darkTheme}
+        darkTheme={dark}
         onClose={() => setMenuOpen(false)}
         onRefresh={fetchAll}
         onToggleOnline={() => setIsOnline(v => !v)}
         onToggleNotifications={() => setNotificationsEnabled(v => !v)}
-        onToggleDarkTheme={() => setDarkTheme(v => !v)}
+        onToggleDarkTheme={() => setDark(!dark)}
         onLogout={handleLogout}
       />
     </SafeAreaView>
@@ -215,16 +220,13 @@ export default function DashboardScreen() {
 }
 
 const s = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: C.bg },
-  safeDark: { backgroundColor: '#0b1220' },
-  scrollDark: { backgroundColor: 'transparent' },
+  safe:    { flex: 1 },
   content: { padding: 18, paddingBottom: 130 },
   top:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, marginTop: 6, gap: 12 },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 13, flex: 1, minWidth: 0 },
   name:    { fontSize: 22, fontWeight: '700', color: C.ink, lineHeight: 26 },
   sub:     { fontSize: 13, color: C.muted, fontWeight: '700', marginTop: 3 },
   onlineBtn:  { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, paddingVertical: 10, borderRadius: 999, backgroundColor: 'rgba(52,199,89,0.16)', borderWidth: 1, borderColor: 'rgba(52,199,89,0.28)' },
-  offlineBtn: { backgroundColor: 'rgba(255,255,255,0.42)', borderColor: 'rgba(255,255,255,0.60)' },
   dot:        { width: 8, height: 8, borderRadius: 4, backgroundColor: C.green },
   dotOff:     { backgroundColor: '#8a93a3' },
   onlineText: { fontSize: 14, fontWeight: '700', color: '#07884e' },

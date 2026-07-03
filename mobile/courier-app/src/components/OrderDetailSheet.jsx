@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, Pressable,
   Alert, ActivityIndicator, Modal, Image,
-  Animated, PanResponder, Dimensions, Linking, TextInput,
+  Animated, Dimensions, Linking, TextInput,
 } from 'react-native'
+import { PanGestureHandler, State } from 'react-native-gesture-handler'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Phone, MessageCircle, Send, MapPin } from 'lucide-react-native'
-import { GlassFill } from './glass'
+import { GlassFill, Sheen } from './glass'
 import { updateOrderStatus, reportAddressChanged, deferOrder, getOrderComments, addOrderComment } from '../api/orders'
 import useAuthStore from '../store/authStore'
 import { resolveCreator } from '../lib/creator'
@@ -15,6 +16,9 @@ import Avatar from './Avatar'
 const { height: SCREEN_H } = Dimensions.get('window')
 export const SHEET_H = SCREEN_H * 0.90
 const DRAG_CLOSE_THRESHOLD = 120
+const DRAG_CLOSE_VELOCITY = 1
+const HANDLE_COLLAPSED_RATIO = 0.34
+const HANDLE_MAX_COLLAPSE = 260
 
 // Apple Liquid Glass palette: iOS system accents, translucent card surfaces.
 // Sheets get their surface from GlassFill; C.bg is the opaque screen base.
@@ -63,17 +67,73 @@ function addDays(n) {
 export function BottomSheet({ visible, onClose, children, height = SHEET_H }) {
   const insets    = useSafeAreaInsets()
   const translateY = useRef(new Animated.Value(height)).current
+  const gestureY   = useRef(new Animated.Value(0)).current
   const dimOpacity = useRef(new Animated.Value(0)).current
   const isOpen     = useRef(false)
+  const currentSnap = useRef(0)
+  const isClosing   = useRef(false)
+  const previousHeight = useRef(height)
+  const collapsedSnap = Math.min(height * HANDLE_COLLAPSED_RATIO, HANDLE_MAX_COLLAPSE)
+  const closeSnap = height + insets.bottom + 32
+
+  const animatedTranslateY = Animated.add(translateY, gestureY).interpolate({
+    inputRange: [-height, 0, closeSnap],
+    outputRange: [0, 0, closeSnap],
+    extrapolate: 'clamp',
+  })
+
+  const snapTo = (toValue, after) => {
+    gestureY.setValue(0)
+    currentSnap.current = toValue
+    Animated.spring(translateY, {
+      toValue,
+      useNativeDriver: true,
+      damping: 24,
+      stiffness: 230,
+      mass: 0.85,
+    }).start(({ finished }) => {
+      if (finished) after?.()
+    })
+  }
+
+  const closeWithAnimation = () => {
+    if (isClosing.current) return
+    isClosing.current = true
+    Animated.parallel([
+      Animated.spring(translateY, {
+        toValue: closeSnap,
+        useNativeDriver: true,
+        damping: 28,
+        stiffness: 260,
+        mass: 0.85,
+      }),
+      Animated.timing(dimOpacity, { toValue: 0, duration: 160, useNativeDriver: true }),
+    ]).start(() => onClose())
+  }
 
   useEffect(() => {
+    const heightChanged = previousHeight.current !== height
+
     if (visible && !isOpen.current) {
       isOpen.current = true
+      isClosing.current = false
+      currentSnap.current = 0
+      gestureY.setValue(0)
       translateY.setValue(height)
       Animated.parallel([
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }),
         Animated.timing(dimOpacity,  { toValue: 1, duration: 200, useNativeDriver: true }),
       ]).start()
+    } else if (visible && isOpen.current && heightChanged && !isClosing.current) {
+      currentSnap.current = 0
+      gestureY.setValue(0)
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 24,
+        stiffness: 230,
+        mass: 0.85,
+      }).start()
     } else if (!visible && isOpen.current) {
       isOpen.current = false
       Animated.parallel([
@@ -81,31 +141,53 @@ export function BottomSheet({ visible, onClose, children, height = SHEET_H }) {
         Animated.timing(dimOpacity,  { toValue: 0, duration: 180, useNativeDriver: true }),
       ]).start()
     }
-  }, [visible])
 
-  const panResponder = useRef(PanResponder.create({
-    onMoveShouldSetPanResponder: (_, g) => g.dy > 5 && Math.abs(g.dy) > Math.abs(g.dx),
-    onPanResponderMove:  (_, g) => { if (g.dy > 0) translateY.setValue(g.dy) },
-    onPanResponderRelease: (_, g) => {
-      if (g.dy > DRAG_CLOSE_THRESHOLD || g.vy > 0.8) onClose()
-      else Animated.spring(translateY, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 200 }).start()
-    },
-  })).current
+    previousHeight.current = height
+  }, [visible, height])
+
+  const handleGesture = Animated.event(
+    [{ nativeEvent: { translationY: gestureY } }],
+    { useNativeDriver: true }
+  )
+
+  const handleGestureState = ({ nativeEvent }) => {
+    if (nativeEvent.oldState !== State.ACTIVE) return
+
+    const projected = currentSnap.current + nativeEvent.translationY + nativeEvent.velocityY * 80
+    const isFastClose = nativeEvent.velocityY > DRAG_CLOSE_VELOCITY && nativeEvent.translationY > 12
+    const isPastClose = projected > collapsedSnap + DRAG_CLOSE_THRESHOLD
+
+    if (isFastClose || isPastClose) {
+      closeWithAnimation()
+      return
+    }
+
+    const nextSnap = projected > collapsedSnap / 2 ? collapsedSnap : 0
+    snapTo(nextSnap)
+  }
 
   if (!visible) return null
 
   return (
-    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={onClose}>
+    <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={closeWithAnimation}>
       <Animated.View style={[bs.backdrop, { opacity: dimOpacity }]}>
         {/* Frost the screen behind the sheet instead of a heavy dim */}
         <GlassFill intensity={16} overlay="rgba(9,17,32,0.30)" androidFallback="rgba(9,17,32,0.42)" />
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeWithAnimation} />
       </Animated.View>
-      <Animated.View style={[bs.sheet, { height, paddingBottom: insets.bottom, transform: [{ translateY }] }]}>
+      <Animated.View style={[bs.sheet, { height, paddingBottom: insets.bottom, transform: [{ translateY: animatedTranslateY }] }]}>
         <GlassFill intensity={64} overlay="rgba(242,246,252,0.40)" androidFallback="rgba(240,244,252,0.94)" />
-        <View {...panResponder.panHandlers} style={bs.handleArea}>
-          <View style={bs.handle} />
-        </View>
+        <Sheen radius={28} opacity={0.35} />
+        <PanGestureHandler
+          activeOffsetY={[-8, 8]}
+          failOffsetX={[-24, 24]}
+          onGestureEvent={handleGesture}
+          onHandlerStateChange={handleGestureState}
+        >
+          <Animated.View style={bs.handleArea}>
+            <View style={bs.handle} />
+          </Animated.View>
+        </PanGestureHandler>
         {children}
       </Animated.View>
     </Modal>
@@ -642,8 +724,8 @@ const bs = StyleSheet.create({
     overflow: 'hidden',
     borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.55)',
   },
-  handleArea: { alignItems: 'center', paddingTop: 12, paddingBottom: 6 },
-  handle:     { width: 40, height: 5, borderRadius: 99, backgroundColor: '#d1d9e6' },
+  handleArea: { alignItems: 'center', paddingTop: 12, paddingBottom: 8 },
+  handle:     { width: 46, height: 5, borderRadius: 99, backgroundColor: '#d1d9e6' },
 })
 
 const d = StyleSheet.create({

@@ -3,11 +3,11 @@ import { useEffect, useRef } from 'react'
 import { Animated, StyleSheet } from 'react-native'
 import { BlurView } from 'expo-blur'
 import { Home, Package, MapPin, Wallet } from 'lucide-react-native'
+import { useGlass } from '../../src/components/glass'
 
 const BLUE = '#0a84ff'
-const INACTIVE = 'rgba(72,88,112,0.62)'
 
-function TabIcon({ Icon, focused }) {
+function TabIcon({ Icon, focused, inactiveColor }) {
   // Active pill springs in behind the icon; icon gives a small pop on focus.
   const progress = useRef(new Animated.Value(focused ? 1 : 0)).current
   useEffect(() => {
@@ -33,7 +33,7 @@ function TabIcon({ Icon, focused }) {
       >
         <Icon
           size={22}
-          color={focused ? BLUE : INACTIVE}
+          color={focused ? BLUE : inactiveColor}
           strokeWidth={focused ? 2.5 : 1.8}
         />
       </Animated.View>
@@ -59,12 +59,14 @@ const styles = StyleSheet.create({
 })
 
 export default function TabsLayout() {
+  const { dark } = useGlass()
+  const inactive = dark ? 'rgba(200,212,232,0.55)' : 'rgba(72,88,112,0.62)'
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: BLUE,
-        tabBarInactiveTintColor: INACTIVE,
+        tabBarInactiveTintColor: inactive,
         // Floating liquid-glass pill: real blur over the content scrolling under it
         tabBarStyle: {
           position: 'absolute',
@@ -82,16 +84,16 @@ export default function TabsLayout() {
         tabBarBackground: () => (
           <BlurView
             intensity={42}
-            tint="light"
+            tint={dark ? 'dark' : 'light'}
             experimentalBlurMethod="dimezisBlurView"
             style={[
               StyleSheet.absoluteFillObject,
               {
                 borderRadius: 34,
                 overflow: 'hidden',
-                backgroundColor: 'rgba(255,255,255,0.48)',
+                backgroundColor: dark ? 'rgba(18,26,44,0.55)' : 'rgba(255,255,255,0.48)',
                 borderWidth: 1,
-                borderColor: 'rgba(255,255,255,0.65)',
+                borderColor: dark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.65)',
               },
             ]}
           />
@@ -105,10 +107,10 @@ export default function TabsLayout() {
         tabBarItemStyle: { paddingTop: 2 },
       }}
     >
-      <Tabs.Screen name="dashboard"  options={{ title: 'Главная',   tabBarIcon: ({ focused }) => <TabIcon Icon={Home}    focused={focused} /> }} />
-      <Tabs.Screen name="deliveries" options={{ title: 'Доставки',  tabBarIcon: ({ focused }) => <TabIcon Icon={Package} focused={focused} /> }} />
-      <Tabs.Screen name="claimable"  options={{ title: 'Доступные', tabBarIcon: ({ focused }) => <TabIcon Icon={MapPin}  focused={focused} /> }} />
-      <Tabs.Screen name="cash"       options={{ title: 'Касса',     tabBarIcon: ({ focused }) => <TabIcon Icon={Wallet}  focused={focused} /> }} />
+      <Tabs.Screen name="dashboard"  options={{ title: 'Главная',   tabBarIcon: ({ focused }) => <TabIcon Icon={Home}    focused={focused} inactiveColor={inactive} /> }} />
+      <Tabs.Screen name="deliveries" options={{ title: 'Доставки',  tabBarIcon: ({ focused }) => <TabIcon Icon={Package} focused={focused} inactiveColor={inactive} /> }} />
+      <Tabs.Screen name="claimable"  options={{ title: 'Доступные', tabBarIcon: ({ focused }) => <TabIcon Icon={MapPin}  focused={focused} inactiveColor={inactive} /> }} />
+      <Tabs.Screen name="cash"       options={{ title: 'Касса',     tabBarIcon: ({ focused }) => <TabIcon Icon={Wallet}  focused={focused} inactiveColor={inactive} /> }} />
       <Tabs.Screen name="profile"    options={{ href: null }} />
     </Tabs>
   )

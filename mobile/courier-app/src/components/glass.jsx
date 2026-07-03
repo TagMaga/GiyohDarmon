@@ -1,33 +1,77 @@
 /**
- * Apple Liquid Glass surface kit.
+ * Apple Liquid Glass design system.
  *
- * GlassBackdrop — soft colorful radial washes rendered behind every screen so
- * translucent surfaces have something to refract. Because the washes are smooth
- * gradients, a translucent white fill on top reads as blurred glass without
- * paying for a real blur on every card.
+ * Layers (back to front):
+ *   1. GlassBackdrop — colorful radial washes so glass has something to refract
+ *   2. Surfaces — translucent fills with bright hairline edges (GlassCard / tokens)
+ *   3. Sheen — specular top highlight, the "reflection" signature of liquid glass
+ *   4. Real blur (expo-blur) — reserved for chrome: tab bar, sheets, menus
  *
- * Real BlurView is reserved for chrome (the floating tab bar) where the content
- * scrolling underneath makes actual blur worth it.
+ * Appearance adapts to the system light/dark setting via GlassThemeProvider;
+ * the in-app toggle (account menu) overrides it. Content cards use pseudo-glass
+ * (translucent fill over smooth washes ≈ blur, at zero GPU cost); real BlurView
+ * stays on chrome, which is also how Apple applies materials.
  */
-import { Platform, View, StyleSheet, useWindowDimensions } from 'react-native'
+import { createContext, useContext, useMemo, useState } from 'react'
+import { Platform, View, StyleSheet, useColorScheme, useWindowDimensions } from 'react-native'
 import { BlurView } from 'expo-blur'
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg'
+import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg'
 
-/** Glass surface tokens — iOS system accents + translucent fills. */
-export const G = {
-  fill:       'rgba(255,255,255,0.58)',   // standard card glass
-  fillStrong: 'rgba(255,255,255,0.72)',   // panels that need more opacity for text
-  fillSoft:   'rgba(255,255,255,0.42)',   // secondary buttons, chips
-  edge:       'rgba(255,255,255,0.65)',   // light border on glass edges
-  hairline:   'rgba(120,144,180,0.28)',   // separators inside glass
-  darkFill:   'rgba(14,24,44,0.80)',      // smoked glass (hero, dark menus)
-  darkEdge:   'rgba(255,255,255,0.16)',
-  blue:   '#0a84ff',
-  indigo: '#5e5ce6',
-  green:  '#34c759',
-  orange: '#ff9500',
-  red:    '#ff3b30',
+// ── Tokens ──────────────────────────────────────────────────────────────────
+
+export const RADIUS = { card: 24, panel: 28, sheet: 32, chip: 999, input: 16 }
+export const SPACE  = { gutter: 18, card: 16, section: 24 }
+
+export const LIGHT = {
+  dark: false,
+  base:     '#eef2fa',
+  ink:      '#0a1528',
+  muted:    '#5f6e88',
+  card:     'rgba(255,255,255,0.58)',
+  cardEdge: 'rgba(255,255,255,0.68)',
+  chip:     'rgba(255,255,255,0.45)',
+  chipEdge: 'rgba(255,255,255,0.62)',
+  hairline: 'rgba(120,144,180,0.30)',
+  sheen:    0.5,
+  blue: '#0a84ff', green: '#34c759', orange: '#ff9500', red: '#ff3b30', indigo: '#5e5ce6',
 }
+
+export const DARK = {
+  dark: true,
+  base:     '#0b101e',
+  ink:      '#f2f5fc',
+  muted:    '#9aa6bd',
+  card:     'rgba(38,48,76,0.52)',
+  cardEdge: 'rgba(255,255,255,0.14)',
+  chip:     'rgba(255,255,255,0.08)',
+  chipEdge: 'rgba(255,255,255,0.14)',
+  hairline: 'rgba(255,255,255,0.10)',
+  sheen:    0.14,
+  blue: '#0a84ff', green: '#30d158', orange: '#ff9f0a', red: '#ff453a', indigo: '#5e5ce6',
+}
+
+// Legacy alias kept for older imports.
+export const G = LIGHT
+
+// ── Theme context ────────────────────────────────────────────────────────────
+
+const ThemeCtx = createContext({ dark: false, T: LIGHT, setDark: () => {} })
+
+/** Wrap the app root. Follows the system appearance until setDark() overrides it. */
+export function GlassThemeProvider({ children }) {
+  const system = useColorScheme()
+  const [override, setOverride] = useState(null) // null → follow system
+  const dark = override ?? (system === 'dark')
+  const value = useMemo(() => ({ dark, T: dark ? DARK : LIGHT, setDark: setOverride }), [dark])
+  return <ThemeCtx.Provider value={value}>{children}</ThemeCtx.Provider>
+}
+
+/** { dark, T, setDark } — T is the active token set. */
+export function useGlass() {
+  return useContext(ThemeCtx)
+}
+
+// ── Frosted fill (real blur) for sheets / modals / chrome ───────────────────
 
 /**
  * Absolute-fill frosted glass layer for sheets, modals and panels.
@@ -51,6 +95,60 @@ export function GlassFill({ tint = 'light', intensity = 55, overlay, androidFall
   return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: solid }]} />
 }
 
+// ── Specular highlight ───────────────────────────────────────────────────────
+
+/**
+ * Soft reflection across the top of a glass surface. Render as the first child
+ * of any rounded card/sheet; it clips itself to `radius`.
+ */
+export function Sheen({ radius = RADIUS.card, opacity }) {
+  const { T } = useGlass()
+  const o = opacity ?? T.sheen
+  return (
+    <View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden' }]}
+    >
+      <Svg width="100%" height="100%">
+        <Defs>
+          <LinearGradient id="sheenV" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0"    stopColor="#ffffff" stopOpacity={o * 0.55} />
+            <Stop offset="0.35" stopColor="#ffffff" stopOpacity={o * 0.10} />
+            <Stop offset="1"    stopColor="#ffffff" stopOpacity="0" />
+          </LinearGradient>
+          <LinearGradient id="sheenD" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0"   stopColor="#ffffff" stopOpacity={o * 0.30} />
+            <Stop offset="0.4" stopColor="#ffffff" stopOpacity="0" />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#sheenV)" />
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#sheenD)" />
+      </Svg>
+    </View>
+  )
+}
+
+/**
+ * Themed glass panel: translucent fill, bright hairline edge, specular sheen.
+ * Layout comes from `style`; the material comes from the theme.
+ */
+export function GlassCard({ style, radius = RADIUS.card, sheen = true, children }) {
+  const { T } = useGlass()
+  return (
+    <View
+      style={[
+        { borderRadius: radius, backgroundColor: T.card, borderWidth: 1, borderColor: T.cardEdge },
+        style,
+      ]}
+    >
+      {sheen && <Sheen radius={radius} />}
+      {children}
+    </View>
+  )
+}
+
+// ── Backdrop washes ──────────────────────────────────────────────────────────
+
 function Wash({ id, cx, cy, r, color, opacity }) {
   return (
     <RadialGradient id={id} cx={cx} cy={cy} r={r}>
@@ -61,11 +159,13 @@ function Wash({ id, cx, cy, r, color, opacity }) {
 }
 
 /**
- * Full-screen colorful backdrop. Render as the first child of the screen root
- * (a plain flex:1 View), before the SafeAreaView.
+ * Full-screen colorful backdrop. Render as the first child of the screen root.
+ * Follows the active theme; pass `dark` to force an appearance (login/profile).
  */
-export function GlassBackdrop({ dark = false }) {
+export function GlassBackdrop({ dark: forced }) {
   const { width, height } = useWindowDimensions()
+  const { dark: themeDark } = useGlass()
+  const dark = forced ?? themeDark
   const base = dark ? '#0b101e' : '#eef2fa'
   const washes = dark
     ? [

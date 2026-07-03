@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView
 } from 'react-native'
 import { router } from 'expo-router'
+import { StatusBar } from 'expo-status-bar'
 import { login, getMe } from '../../src/api/auth'
 import { API_URL } from '../../src/api/client'
 import useAuthStore from '../../src/store/authStore'
@@ -59,6 +60,7 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView style={s.wrap} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <GlassBackdrop dark />
+      <StatusBar style="light" />
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
         <FadeSlideIn from={22} style={{ width: '100%', alignItems: 'center' }}>
         <View style={s.card}>

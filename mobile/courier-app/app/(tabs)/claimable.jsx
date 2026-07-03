@@ -7,7 +7,7 @@ import { resolveCreator } from '../../src/lib/creator'
 import { C } from '../../src/components/OrderDetailSheet'
 import Avatar from '../../src/components/Avatar'
 import { FadeSlideIn, PressScale, OrderCardSkeleton, animateLayout } from '../../src/components/motion'
-import { GlassBackdrop } from '../../src/components/glass'
+import { GlassBackdrop, Sheen, useGlass } from '../../src/components/glass'
 
 // Canonical DB value is "fast"; "express" kept as legacy fallback.
 // Defensive check across all possible field-name shapes from the API.
@@ -17,6 +17,7 @@ const isUrgent = (o) => {
 }
 
 export default function ClaimableScreen() {
+  const { T }                   = useGlass()
   const [orders, setOrders]     = useState([])
   const [loading, setLoading]   = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -53,11 +54,11 @@ export default function ClaimableScreen() {
   const fmt = (n) => Number(n || 0).toLocaleString()
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
       <GlassBackdrop />
       <View style={s.header}>
-        <Text style={s.headTitle}>Общий заказ</Text>
-        <Text style={s.headSub}>{orders.length} заказов рядом</Text>
+        <Text style={[s.headTitle, { color: T.ink }]}>Общий заказ</Text>
+        <Text style={[s.headSub, { color: T.muted }]}>{orders.length} заказов рядом</Text>
       </View>
 
       <ScrollView
@@ -75,8 +76,8 @@ export default function ClaimableScreen() {
               <FadeSlideIn>
                 <View style={s.empty}>
                   <Text style={s.emptyIcon}>🎯</Text>
-                  <Text style={s.emptyTitle}>Нет доступных заказов</Text>
-                  <Text style={s.emptySub}>Потяните вниз чтобы обновить</Text>
+                  <Text style={[s.emptyTitle, { color: T.muted }]}>Нет доступных заказов</Text>
+                  <Text style={[s.emptySub, { color: T.muted }]}>Потяните вниз чтобы обновить</Text>
                 </View>
               </FadeSlideIn>
             )
@@ -86,10 +87,11 @@ export default function ClaimableScreen() {
               const urgent     = isUrgent(order)
               return (
                 <FadeSlideIn key={order.id} delay={Math.min(index, 6) * 55}>
-                <View style={[s.card, urgent && s.cardUrgent]}>
+                <View style={[s.card, { backgroundColor: T.card, borderColor: T.cardEdge }, urgent && s.cardUrgent]}>
+                  <Sheen radius={24} />
                   {/* Top: order number + badges */}
                   <View style={s.cardTop}>
-                    <Text style={s.orderNum}>{order.order_number}</Text>
+                    <Text style={[s.orderNum, { color: T.ink }]}>{order.order_number}</Text>
                     <View style={s.topBadges}>
                       {urgent && (
                         <View style={s.expressBadge}><Text style={s.expressText}>⚡ Экспресс</Text></View>
@@ -100,9 +102,9 @@ export default function ClaimableScreen() {
 
                   {/* Address / customer */}
                   <View style={s.infoBlock}>
-                    <Text style={s.clientName} numberOfLines={1}>{order.customer?.full_name || '—'}</Text>
+                    <Text style={[s.clientName, { color: T.ink }]} numberOfLines={1}>{order.customer?.full_name || '—'}</Text>
                     {order.customer?.address
-                      ? <Text style={s.address} numberOfLines={2}>📍 {order.customer.address}{order.customer?.city ? `, ${order.customer.city}` : ''}</Text>
+                      ? <Text style={[s.address, { color: T.muted }]} numberOfLines={2}>📍 {order.customer.address}{order.customer?.city ? `, ${order.customer.city}` : ''}</Text>
                       : null
                     }
                   </View>
@@ -119,9 +121,9 @@ export default function ClaimableScreen() {
                   </View>
 
                   {/* Creator strip */}
-                  <View style={s.creatorStrip}>
+                  <View style={[s.creatorStrip, { borderTopColor: T.hairline }]}>
                     <Avatar uri={cr.avatarUrl} name={cr.name} size={18} color={C.muted} />
-                    <Text style={s.creatorName} numberOfLines={1}>{cr.name}</Text>
+                    <Text style={[s.creatorName, { color: T.ink }]} numberOfLines={1}>{cr.name}</Text>
                     {cr.isOwn
                       ? <View style={[s.rolePill, { backgroundColor: `${C.green}1A` }]}>
                           <Text style={[s.rolePillText, { color: C.green }]}>Мой заказ</Text>

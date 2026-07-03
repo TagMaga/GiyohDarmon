@@ -3,7 +3,7 @@ import { Animated, Modal, Pressable, StyleSheet, Switch, Text, TouchableOpacity,
 import { router } from 'expo-router'
 import Avatar from './Avatar'
 import { animateLayout } from './motion'
-import { GlassFill } from './glass'
+import { GlassFill, Sheen } from './glass'
 
 const C = {
   panel: 'rgba(16,28,48,0.90)',
@@ -65,6 +65,7 @@ export function AccountMenu({
         >
         <Pressable style={s.menu} onPress={event => event.stopPropagation()}>
           <GlassFill tint="dark" intensity={56} overlay="rgba(15,26,46,0.62)" androidFallback="rgba(16,28,48,0.94)" />
+          <Sheen radius={28} opacity={0.12} />
           <View style={s.header}>
             <Avatar uri={user?.avatar_url} name={user?.full_name} fallback={initials} size={70} color={C.violet} />
             <View style={s.headerText}>
