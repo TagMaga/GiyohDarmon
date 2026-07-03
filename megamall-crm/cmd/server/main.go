@@ -20,6 +20,7 @@ import (
 	"github.com/megamall/crm/internal/compensation"
 	"github.com/megamall/crm/internal/courier"
 	"github.com/megamall/crm/internal/customers"
+	delivery_settings "github.com/megamall/crm/internal/delivery_settings"
 	"github.com/megamall/crm/internal/dispatch"
 	"github.com/megamall/crm/internal/finance"
 	"github.com/megamall/crm/internal/health"
@@ -30,7 +31,6 @@ import (
 	"github.com/megamall/crm/internal/orders"
 	"github.com/megamall/crm/internal/payouts"
 	"github.com/megamall/crm/internal/products"
-	delivery_settings "github.com/megamall/crm/internal/delivery_settings"
 	"github.com/megamall/crm/internal/teams"
 	"github.com/megamall/crm/internal/users"
 	"github.com/megamall/crm/pkg/database"
@@ -96,10 +96,44 @@ func main() {
 		return userRepo.GetByPhone(ctx, phone)
 	}
 
+	userBriefsFn := func(ctx context.Context, ids []uuid.UUID) ([]hierarchy.UserBrief, error) {
+		list, err := userRepo.GetByIDs(ctx, ids)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]hierarchy.UserBrief, len(list))
+		for i, u := range list {
+			out[i] = hierarchy.UserBrief{
+				ID:        u.ID,
+				FullName:  u.FullName,
+				Phone:     u.Phone,
+				Role:      string(u.Role),
+				AvatarURL: u.AvatarURL,
+			}
+		}
+		return out, nil
+	}
+
+	teamBriefFn := func(ctx context.Context, id uuid.UUID) (*hierarchy.TeamBrief, error) {
+		t, err := teamRepo.GetByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if t == nil {
+			return nil, nil
+		}
+		return &hierarchy.TeamBrief{
+			ID:         t.ID,
+			Name:       t.Name,
+			TeamLeadID: t.TeamLeadID,
+			ManagerID:  t.ManagerID,
+		}, nil
+	}
+
 	// ── Services ─────────────────────────────────────────────────────────────
 	userSvc := users.NewService(userRepo)
 	teamSvc := teams.NewService(teamRepo, userExistsFn)
-	hierarchySvc := hierarchy.NewService(hierarchyRepo, userExistsFn, teamExistsFn)
+	hierarchySvc := hierarchy.NewService(hierarchyRepo, userExistsFn, teamExistsFn, userBriefsFn, teamBriefFn)
 	authSvc := auth.NewService(authRepo, cfg.JWT, userByPhoneFn, teamForUserFn)
 
 	// Wire role resolver after all services exist (breaks the circular init order).

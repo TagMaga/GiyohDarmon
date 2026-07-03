@@ -1,7 +1,17 @@
 import { useLocation, Outlet, Link, NavLink } from 'react-router-dom'
-import { Info, Users, ChevronRight, LogOut, Trophy, Percent } from 'lucide-react'
-import { useSellerMe, useSellerCompensation, useSellerTeamRank } from '../hooks/useSellerMe'
+import { Info, Users, ChevronRight, LogOut, Trophy, Percent, Pencil } from 'lucide-react'
+import { useSellerMe, useSellerCompensation, useSellerTeamRank, useMyTeam } from '../hooks/useSellerMe'
+import useSellerOrders from '../hooks/useSellerOrders'
 import useAuthStore from '../../../shared/store/authStore'
+import { M, MobileShell, Card, StatTile, InitialsAvatar, SectionLabel } from '../components/mobileUi'
+
+function monthsOnline(iso) {
+  if (!iso) return null
+  const start = new Date(iso)
+  if (Number.isNaN(start.getTime())) return null
+  const months = (Date.now() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.44)
+  return Math.max(1, Math.floor(months))
+}
 
 const NAV_CARDS = [
   {
@@ -29,6 +39,8 @@ export default function SellerProfilePage() {
   const { data: me, isLoading } = useSellerMe()
   const { data: compensation } = useSellerCompensation()
   const { data: rankData } = useSellerTeamRank()
+  const { data: myTeam } = useMyTeam()
+  const { orders = [] } = useSellerOrders()
   const logout = useAuthStore(s => s.clearAuth)
 
   const fullName = me?.full_name ?? ''
@@ -36,6 +48,12 @@ export default function SellerProfilePage() {
   const commissionPct = compensation?.commission_percent ?? null
   const rank = rankData?.rank ?? null
   const totalMembers = rankData?.total_members ?? null
+  const tenure = monthsOnline(me?.hire_date ?? me?.created_at)
+  const teamSize = (myTeam?.members?.length ?? 0) + (myTeam?.team_lead ? 1 : 0) + (myTeam?.manager ? 1 : 0)
+  const teamDesc = myTeam
+    ? [myTeam.manager && 'менеджер', myTeam.team_lead && 'тимлид', myTeam.members?.length ? `${myTeam.members.length} коллег` : null]
+        .filter(Boolean).join(', ')
+    : 'Рейтинг и состав команды'
 
   return (
     <>
@@ -153,100 +171,120 @@ export default function SellerProfilePage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════
-          MOBILE LAYOUT
+          MOBILE LAYOUT — Seller Panel Redesign
       ═══════════════════════════════════════════════════════════ */}
-      <div className="lg:hidden min-h-screen" style={{ background: '#F2F4F7' }}>
-        {/* Profile header */}
-        <div
-          className="relative overflow-hidden px-[10px] pb-[10px]"
-          style={{
-            background: 'linear-gradient(135deg, #1E293B 0%, #334155 100%)',
-            borderRadius: '0 0 32px 32px',
-            boxShadow: '0 8px 32px rgba(15,23,42,0.3)',
-            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 40px)',
-          }}
-        >
-          <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/5 -translate-y-12 translate-x-12" />
-          <div className="relative z-10 flex items-center gap-4">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-black text-white flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#4F46E5,#6D28D9)' }}
-            >
-              {isLoading ? '…' : initials}
-            </div>
-            <div className="min-w-0">
-              <p className="text-lg font-black text-white truncate">
-                {isLoading ? '…' : (fullName || '—')}
-              </p>
-              <p className="text-sm text-slate-400 mt-0.5">Продавец</p>
-              {me?.phone && <p className="text-xs text-slate-500 mt-0.5">{me.phone}</p>}
-            </div>
-          </div>
-          {(commissionPct !== null || rank !== null) && (
-            <div className="relative z-10 flex gap-2 mt-5 flex-wrap">
-              {commissionPct !== null && (
-                <span
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
-                  style={{ background: 'rgba(99,102,241,0.25)', color: '#A5B4FC' }}
-                >
-                  {commissionPct}% комиссия
-                </span>
-              )}
-              {rank !== null && (
-                <span
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
-                  style={{ background: 'rgba(245,158,11,0.2)', color: '#FCD34D' }}
-                >
-                  #{rank}{totalMembers ? ` из ${totalMembers}` : ''} в команде
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="px-[10px] pt-4 pb-28">
+      <MobileShell>
+        <div className="px-5">
           {isRoot ? (
-            <div className="space-y-3">
-              {NAV_CARDS.map(card => (
-                <Link
-                  key={card.to}
-                  to={card.to}
-                  className="card flex items-center gap-4 p-4 active:scale-[0.99] transition-transform"
-                  style={{ boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 4px 16px rgba(16,24,40,0.05)' }}
-                >
+            <>
+              <h1 style={{ fontSize: 24, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0, paddingTop: 8 }}>Профиль</h1>
+
+              {/* Profile card */}
+              <Card className="flex flex-col items-center text-center" style={{ borderRadius: 20, padding: '22px 18px', marginTop: 14 }}>
+                <div className="relative">
                   <div
-                    className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: card.iconBg }}
+                    className="flex items-center justify-center"
+                    style={{ width: 80, height: 80, borderRadius: '50%', background: '#E7E5FB', color: M.indigoDeep, fontWeight: 800, fontSize: 26 }}
                   >
-                    <card.icon size={18} style={{ color: card.iconColor }} />
+                    {isLoading ? '…' : initials}
+                  </div>
+                  <Link
+                    to="/seller/profile/info"
+                    className="absolute flex items-center justify-center"
+                    style={{ right: -2, bottom: -2, width: 28, height: 28, borderRadius: '50%', background: M.indigo, border: '3px solid #fff', color: '#fff' }}
+                  >
+                    <Pencil size={12} />
+                  </Link>
+                </div>
+                <div style={{ fontSize: 19, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', marginTop: 14 }}>
+                  {isLoading ? '…' : (fullName || '—')}
+                </div>
+                {me?.phone && <div style={{ fontSize: 13.5, color: M.sub, fontWeight: 500, marginTop: 3 }}>{me.phone}</div>}
+                <div className="flex items-center gap-[6px]" style={{ marginTop: 11, background: '#F0EFEA', padding: '5px 12px', borderRadius: 9 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#76766E' }}>Продавец</span>
+                  {myTeam?.team_name && (
+                    <>
+                      <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#C7C5BC' }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#76766E' }}>{myTeam.team_name}</span>
+                    </>
+                  )}
+                </div>
+              </Card>
+
+              {/* Stat tiles */}
+              <div className="grid grid-cols-3 gap-[9px]" style={{ marginTop: 12 }}>
+                <Card style={{ borderRadius: 15, padding: '13px 10px', textAlign: 'center' }}>
+                  <div className="flex items-center justify-center gap-1">
+                    <Trophy size={14} style={{ color: '#D97706' }} />
+                    <span style={{ fontSize: 19, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>
+                      {rank !== null ? `#${rank}` : '—'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: M.sub, fontWeight: 600, marginTop: 3 }}>
+                    {totalMembers ? `Из ${totalMembers} в команде` : 'В команде'}
+                  </div>
+                </Card>
+                <Card style={{ borderRadius: 15, padding: '13px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 19, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{orders.length}</div>
+                  <div style={{ fontSize: 11, color: M.sub, fontWeight: 600, marginTop: 3 }}>Заказов</div>
+                </Card>
+                <Card style={{ borderRadius: 15, padding: '13px 10px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 19, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{tenure ?? '—'}</div>
+                  <div style={{ fontSize: 11, color: M.sub, fontWeight: 600, marginTop: 3 }}>Мес. в сети</div>
+                </Card>
+              </div>
+
+              {/* Team section */}
+              <SectionLabel style={{ margin: '22px 4px 10px' }}>Команда</SectionLabel>
+              <Card className="overflow-hidden">
+                <Link to="/seller/profile/team" className="flex items-center gap-3" style={{ padding: '14px 15px' }}>
+                  <div className="flex items-center justify-center flex-shrink-0" style={{ width: 36, height: 36, borderRadius: 11, background: M.amberBg, color: M.amber }}>
+                    <Users size={17} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-900">{card.label}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{card.desc}</p>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: M.ink }}>Моя команда</div>
+                    <div className="truncate" style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>
+                      {teamSize > 0 ? teamDesc : 'Рейтинг и состав команды'}
+                    </div>
                   </div>
-                  <ChevronRight size={16} className="text-slate-300 flex-shrink-0" />
+                  <ChevronRight size={17} style={{ color: '#C7C5BC' }} className="flex-shrink-0" />
                 </Link>
-              ))}
-              <div className="pt-2" />
+              </Card>
+
+              {/* Account section */}
+              <SectionLabel style={{ margin: '20px 4px 10px' }}>Аккаунт</SectionLabel>
+              <Card className="overflow-hidden">
+                <Link to="/seller/profile/info" className="flex items-center gap-3" style={{ padding: '13px 15px' }}>
+                  <div className="flex items-center justify-center flex-shrink-0" style={{ width: 32, height: 32, color: '#76766E' }}>
+                    <Info size={18} />
+                  </div>
+                  <span className="flex-1" style={{ fontSize: 13.5, fontWeight: 600, color: M.ink }}>Личные данные</span>
+                  <ChevronRight size={16} style={{ color: '#C7C5BC' }} />
+                </Link>
+              </Card>
+
+              {/* Logout */}
               <button
                 onClick={logout}
-                className="w-full card flex items-center gap-4 p-4 active:scale-[0.99] transition-transform"
-                style={{ boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 4px 16px rgba(16,24,40,0.05)' }}
+                className="w-full flex items-center justify-center gap-2 active:scale-[0.99] transition-transform"
+                style={{
+                  background: '#FDECEC', color: '#B91C1C', border: 'none', fontFamily: 'inherit',
+                  fontSize: 14, fontWeight: 700, padding: 13, borderRadius: 14, cursor: 'pointer', marginTop: 20,
+                }}
               >
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: '#FFF1F2' }}>
-                  <LogOut size={16} style={{ color: '#E11D48' }} />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-bold text-rose-600">Выйти</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Выход из аккаунта</p>
-                </div>
+                <LogOut size={16} />
+                Выйти из аккаунта
               </button>
-            </div>
+              <div className="text-center" style={{ fontSize: 11.5, color: M.faint, fontWeight: 500, margin: '14px 0 6px' }}>
+                MegaMall Seller
+              </div>
+            </>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-4" style={{ paddingTop: 8 }}>
               <Link
                 to="/seller/profile"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 mb-1"
+                className="inline-flex items-center gap-1.5"
+                style={{ fontSize: 12.5, fontWeight: 700, color: M.indigo }}
               >
                 <ChevronRight size={13} className="rotate-180" />
                 Назад к профилю
@@ -255,7 +293,7 @@ export default function SellerProfilePage() {
             </div>
           )}
         </div>
-      </div>
+      </MobileShell>
     </>
   )
 }

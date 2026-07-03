@@ -1,20 +1,16 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Phone, ChevronRight, TrendingUp, Percent, Trophy, Wallet, Clock, ShoppingCart, Package, CheckCircle } from 'lucide-react'
-import { fmtAmount, fmtDate, STATUS_LABELS, STATUS_BADGE } from '../../../shared/orderStatusConfig'
-import Badge from '../../../shared/components/Badge'
+import { Plus, Phone, Wallet, Clock, ShoppingCart, CheckCircle } from 'lucide-react'
+import { fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import KpiCard from '../../../shared/components/KpiCard'
 import useSellerOrders from '../hooks/useSellerOrders'
-import useSellerPayouts from '../hooks/useSellerPayouts'
 import { useSellerCompensation, useSellerTeamRank, useSellerMe } from '../hooks/useSellerMe'
-import useMyIncome from '../../hr/hooks/useMyIncome'
 import OrderDetailBottomSheet from '../components/OrderDetailBottomSheet'
 import SellerOrdersTable from '../components/SellerOrdersTable'
+import { M, MobileShell, Card, DarkCard, StatTile, StatusPill, InitialsAvatar, PrimaryButton } from '../components/mobileUi'
 import { fetchCities } from '../api'
 import { KEYS } from '../../../shared/queryKeys'
-
-function toDateStr(d) { return d.toISOString().slice(0, 10) }
 
 function calcStats(orders = []) {
   const today = new Date().toDateString()
@@ -35,27 +31,15 @@ function calcStats(orders = []) {
 export default function SellerHome() {
   const [detailOrder, setDetailOrder] = useState(null)
   const { orders = [], isLoading } = useSellerOrders()
-  const { data: payouts = [] } = useSellerPayouts()
   const { data: compensation } = useSellerCompensation()
   const { data: rankData } = useSellerTeamRank()
   const { data: me } = useSellerMe()
   const { data: cities = [] } = useQuery({ queryKey: KEYS.seller.cities, queryFn: fetchCities, staleTime: 10 * 60 * 1000 })
 
-  const now = new Date()
-  const { data: incomeReport } = useMyIncome({
-    from: toDateStr(new Date(now.getFullYear(), now.getMonth(), 1)),
-    to: toDateStr(now),
-  })
-
   const citiesById = useMemo(() => Object.fromEntries(cities.map(c => [c.id, c.name])), [cities])
   const stats = useMemo(() => calcStats(orders), [orders])
-  const pendingPayout = useMemo(
-    () => payouts.filter(p => p.status === 'pending').reduce((s, p) => s + (p.amount ?? 0), 0),
-    [payouts]
-  )
   const commissionPct = compensation?.commission_percent ?? null
   const rank = rankData?.rank ?? null
-  const monthIncome = incomeReport?.total_income ?? 0
   const recent = orders.slice(0, 5)
   const firstName = me?.full_name?.split(' ')[0] ?? null
 
@@ -133,87 +117,84 @@ export default function SellerHome() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════
-          MOBILE LAYOUT  (below lg)
+          MOBILE LAYOUT  (below lg) — Seller Panel Redesign
       ═══════════════════════════════════════════════════════════ */}
-      <div className="lg:hidden min-h-screen" style={{ background: '#F2F4F7' }}>
-        {/* Hero */}
-        <div
-          className="relative overflow-hidden px-6 pb-8"
-          style={{
-            background: 'linear-gradient(135deg, #4F46E5 0%, #6D28D9 100%)',
-            borderRadius: '0 0 32px 32px',
-            boxShadow: '0 8px 32px rgba(79,70,229,0.35)',
-            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 40px)',
-            margin: '0 10px',
-          }}
-        >
-          <div className="absolute top-0 right-0 w-56 h-56 rounded-full bg-white/5 -translate-y-20 translate-x-20" />
-          <div className="absolute bottom-0 left-8 w-28 h-28 rounded-full bg-white/5 translate-y-10" />
-          <div className="relative z-10">
-            <p className="text-sm font-medium text-indigo-200">Сегодня заработано</p>
-            <p className="text-[42px] font-black text-white tracking-tight leading-none mt-1">
-              {isLoading ? '—' : fmtAmount(stats.todayEarnings)}
-            </p>
-            <p className="text-xs text-indigo-300 mt-2">По доставленным заказам · {stats.todayCount} заказ(ов) за день</p>
-            <Link
-              to="/seller/orders/create"
-              className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white text-indigo-700 text-sm font-bold active:scale-95 transition-transform"
-              style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}
-            >
-              <Plus size={15} />
-              Новый заказ
-            </Link>
+      <MobileShell>
+        <div className="px-[18px]">
+          {/* Greeting */}
+          <div className="flex items-center justify-between" style={{ padding: '8px 4px 16px' }}>
+            <div>
+              <div style={{ fontSize: 13, color: M.sub, fontWeight: 500 }}>Добрый день,</div>
+              <div style={{ fontSize: 21, fontWeight: 700, color: M.ink, letterSpacing: '-.01em', marginTop: 1 }}>
+                {firstName ?? '—'}
+              </div>
+            </div>
+            <InitialsAvatar name={me?.full_name ?? ''} size={42} radius={14} />
           </div>
-        </div>
 
-        <div className="pb-28 space-y-5" style={{ padding: '10px', paddingBottom: '7rem' }}>
-          {/* Info strip */}
-          <div className="grid grid-cols-2 gap-3">
-            {commissionPct !== null && (
-              <InfoChip icon={<Percent size={15} className="text-indigo-600" />} label="Мой процент" value={`${commissionPct}%`} />
-            )}
-            {rank !== null && (
-              <InfoChip icon={<Trophy size={15} className="text-amber-500" />} label="Рейтинг" value={`#${rank} в команде`} compact />
-            )}
-            <InfoChip icon={<TrendingUp size={15} className="text-emerald-600" />} label="Доход (месяц)" value={fmtAmount(monthIncome)} />
-            {pendingPayout > 0 && (
-              <InfoChip icon={<Clock size={15} className="text-orange-500" />} label="Ожидает выплаты" value={fmtAmount(pendingPayout)} accent />
-            )}
+          {/* Earnings money card */}
+          <DarkCard style={{ padding: '22px 22px 20px' }}>
+            <div className="flex items-center gap-[7px]">
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34D399' }} />
+              <span style={{ fontSize: 12.5, color: M.darkSub, fontWeight: 600, letterSpacing: '.02em' }}>Заработано сегодня</span>
+            </div>
+            <div style={{ fontSize: 42, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', lineHeight: 1, marginTop: 12 }}>
+              {isLoading ? '—' : fmtAmount(stats.todayEarnings)}{' '}
+              <span style={{ fontSize: 24, fontWeight: 600, color: M.darkMuted }}>с</span>
+            </div>
+            <div style={{ fontSize: 12.5, color: M.darkMuted, marginTop: 9, fontWeight: 500 }}>
+              {isLoading ? 'Загрузка…' : `${stats.todayCount} заказов сегодня · ${stats.deliveredCount} доставлено`}
+            </div>
+            <Link to="/seller/orders/create" style={{ display: 'inline-block', marginTop: 18 }}>
+              <PrimaryButton as="span" style={{ pointerEvents: 'none' }}>
+                <Plus size={17} strokeWidth={2.4} />
+                Новый заказ
+              </PrimaryButton>
+            </Link>
+          </DarkCard>
+
+          {/* Stat tiles */}
+          <div className="grid grid-cols-3 gap-[9px] mt-[14px]">
+            <StatTile value={isLoading ? '—' : String(stats.activeCount)} label="В работе" />
+            <StatTile value={isLoading ? '—' : String(stats.deliveredCount)} label="Доставлено" />
+            {commissionPct !== null
+              ? <StatTile value={`${commissionPct}%`} label="Мой процент" valueColor={M.green} />
+              : <StatTile value={rank !== null ? `#${rank}` : '—'} label="В команде" />}
           </div>
 
           {/* Recent orders */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-slate-800">Последние заказы</h2>
-              <Link to="/seller/orders" className="text-xs text-indigo-600 font-semibold flex items-center gap-0.5">
-                Все заказы <ChevronRight size={13} />
-              </Link>
-            </div>
-
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map(i => <div key={i} className="card h-[104px] animate-pulse" />)}
-              </div>
-            ) : recent.length === 0 ? (
-              <div className="card p-8 text-center">
-                <p className="text-sm text-slate-400 mb-4">Заказов нет. Создайте первый!</p>
-                <Link to="/seller/orders/create" className="btn btn-primary btn-md">Создать заказ</Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recent.map(order => (
-                  <RecentCard
-                    key={order.id}
-                    order={order}
-                    cityName={citiesById[order.city_id]}
-                    onDetail={() => setDetailOrder(order)}
-                  />
-                ))}
-              </div>
-            )}
+          <div className="flex items-center justify-between" style={{ margin: '22px 4px 12px' }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>Последние заказы</span>
+            <Link to="/seller/orders" style={{ fontSize: 13, fontWeight: 600, color: M.indigo }}>
+              Все →
+            </Link>
           </div>
+
+          {isLoading ? (
+            <div className="space-y-[10px]">
+              {[1, 2, 3].map(i => <Card key={i} className="h-[104px] animate-pulse" />)}
+            </div>
+          ) : recent.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p style={{ fontSize: 13, color: M.muted, marginBottom: 14 }}>Заказов нет. Создайте первый!</p>
+              <Link to="/seller/orders/create" className="inline-block">
+                <PrimaryButton as="span" style={{ pointerEvents: 'none' }}>Создать заказ</PrimaryButton>
+              </Link>
+            </Card>
+          ) : (
+            <div className="space-y-[10px]">
+              {recent.map(order => (
+                <RecentCard
+                  key={order.id}
+                  order={order}
+                  cityName={citiesById[order.city_id]}
+                  onDetail={() => setDetailOrder(order)}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      </div>
+      </MobileShell>
 
       {/* Bottom sheet — works on both mobile and desktop dashboard */}
       <OrderDetailBottomSheet order={detailOrder} onClose={() => setDetailOrder(null)} citiesById={citiesById} />
@@ -223,97 +204,54 @@ export default function SellerHome() {
 
 /* ─── Sub-components ──────────────────────────────────────────────────────── */
 
-function StatCard({ label, value, bg, color, loading }) {
-  return (
-    <div
-      className="rounded-[20px] p-4"
-      style={{ background: bg, boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 8px 24px rgba(16,24,40,0.06)' }}
-    >
-      {loading
-        ? <div className="h-8 w-16 bg-white/50 rounded-lg animate-pulse mb-2" />
-        : <p className="text-3xl font-black" style={{ color }}>{value}</p>
-      }
-      <p className="text-xs font-medium text-slate-500 mt-1">{label}</p>
-    </div>
-  )
-}
-
-function InfoChip({ icon, label, value, accent, compact }) {
-  return (
-    <div
-      className="card p-3 flex items-center gap-2"
-      style={{ boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 4px 16px rgba(16,24,40,0.05)' }}
-    >
-      <div className="w-7 h-7 rounded-xl bg-slate-50 flex items-center justify-center flex-shrink-0">
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider leading-none">{label}</p>
-        <p className={`${compact ? 'text-xs' : 'text-sm'} font-bold mt-0.5 ${accent ? 'text-orange-600' : 'text-slate-900'} leading-tight`}>
-          {value}
-        </p>
-      </div>
-    </div>
-  )
-}
-
 function RecentCard({ order, cityName, onDetail }) {
   return (
-    <div
-      className="card p-4 active:scale-[0.99] transition-transform"
-      style={{ boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 8px 24px rgba(16,24,40,0.06)' }}
-    >
-      <div className="flex items-start justify-between gap-2 mb-2.5">
+    <Card className="p-[15px] active:scale-[0.99] transition-transform" onClick={onDetail}>
+      <div className="flex items-start justify-between gap-[10px]">
         <div className="min-w-0">
-          <p className="font-mono text-[11px] font-bold text-slate-400">
+          <p style={{ fontSize: 11, fontWeight: 700, color: M.faint, letterSpacing: '.03em', fontVariantNumeric: 'tabular-nums' }}>
             {order.order_number ?? order.id?.slice(0, 8)}
           </p>
-          <p className="text-sm font-semibold text-slate-900 mt-0.5 truncate">
+          <p className="truncate" style={{ fontSize: 15, fontWeight: 700, color: M.ink, marginTop: 3 }}>
             {order.customer?.full_name ?? '—'}
           </p>
-          {order.customer?.phone && (
-            <p className="text-xs text-slate-400 mt-0.5">{order.customer.phone}</p>
-          )}
-        </div>
-        <Badge variant={STATUS_BADGE[order.status] ?? 'slate'} dot>
-          {STATUS_LABELS[order.status] ?? order.status}
-        </Badge>
-      </div>
-
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
-            {cityName && <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium flex-shrink-0">{cityName}</span>}
-            <span className="flex-shrink-0">{fmtDate(order.created_at)}</span>
+          <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 6 }}>
+            {cityName && (
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: '#76766E', background: '#F0EFEA', padding: '2px 8px', borderRadius: 7 }}>
+                {cityName}
+              </span>
+            )}
+            <span style={{ fontSize: 11.5, color: M.muted, fontWeight: 500 }}>{fmtDate(order.created_at)}</span>
           </div>
-          {order.delivery_address && (
-            <p className="text-xs text-slate-500 truncate">{order.delivery_address}</p>
-          )}
         </div>
-        <span className="text-sm font-bold text-slate-900">
-          {fmtAmount(order.total_order_amount ?? order.total_amount)}
-        </span>
+        <div className="text-right flex-shrink-0">
+          <StatusPill status={order.status} />
+          <div style={{ fontSize: 16, fontWeight: 800, color: M.ink, marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>
+            {fmtAmount(order.total_order_amount ?? order.total_amount)} с
+          </div>
+        </div>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2" style={{ marginTop: 13 }}>
         {order.customer?.phone && (
           <a
             href={`tel:${order.customer.phone}`}
             onClick={e => e.stopPropagation()}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold min-h-[40px] active:scale-95 transition-transform"
+            className="flex-1 flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+            style={{ background: '#EAF6EF', color: M.green, fontSize: 13, fontWeight: 700, padding: 10, borderRadius: 11, minHeight: 40 }}
           >
-            <Phone size={13} />
+            <Phone size={14} />
             Позвонить
           </a>
         )}
         <button
-          onClick={onDetail}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-semibold min-h-[40px] active:scale-95 transition-transform"
+          onClick={e => { e.stopPropagation(); onDetail() }}
+          className="flex-1 flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+          style={{ background: '#EEEDFB', color: M.indigoDeep, border: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, padding: 10, borderRadius: 11, minHeight: 40, cursor: 'pointer' }}
         >
-          <ChevronRight size={13} />
-          Детали
+          Детали →
         </button>
       </div>
-    </div>
+    </Card>
   )
 }

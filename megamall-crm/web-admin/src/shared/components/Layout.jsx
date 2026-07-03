@@ -84,7 +84,7 @@ export default function Layout() {
 
       {/* Mobile bottom navigation */}
       {isOwner   && <BottomNav tabs={OWNER_TABS} />}
-      {isSeller  && <BottomNav />}
+      {isSeller  && <BottomNav variant="seller" />}
       {isManager && <BottomNav tabs={MANAGER_TABS} />}
       {isWarehouse && <BottomNav tabs={WAREHOUSE_TABS} />}
       {isTeamLead  && <BottomNav tabs={TEAM_LEAD_TABS} />}

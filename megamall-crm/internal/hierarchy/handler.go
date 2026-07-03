@@ -22,6 +22,23 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/assign", ownerOnly, h.Assign)
 	rg.GET("/user/:user_id", middleware.RequireRoles("owner", "sales_team_lead", "manager"), h.GetUserChain)
 	rg.GET("/team/:team_id/members", middleware.RequireRoles("owner", "sales_team_lead", "manager"), h.GetTeamMembers)
+	rg.GET("/my-team", middleware.RequireRoles("owner", "sales_team_lead", "manager", "seller"), h.GetMyTeam)
+}
+
+// GetMyTeam handles GET /hierarchy/my-team — the caller's own team roster.
+func (h *Handler) GetMyTeam(c *gin.Context) {
+	claims := middleware.ClaimsFromContext(c)
+	if claims.TeamID == nil {
+		response.Error(c, apperrors.NotFound("team"))
+		return
+	}
+
+	roster, err := h.svc.GetMyTeam(c.Request.Context(), *claims.TeamID)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, roster)
 }
 
 // Assign handles POST /hierarchy/assign

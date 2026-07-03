@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { KEYS } from '../../../shared/queryKeys'
-import { fetchMe, patchMe, fetchMyCompensation, fetchMyTeamRank } from '../api'
+import { fetchMe, patchMe, fetchMyCompensation, fetchMyTeamRank, fetchMyTeam } from '../api'
 
 export function useSellerMe() {
   return useQuery({
@@ -31,5 +31,14 @@ export function useSellerTeamRank() {
     queryKey: KEYS.seller.teamRank,
     queryFn:  fetchMyTeamRank,
     staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useMyTeam() {
+  return useQuery({
+    queryKey: KEYS.seller.myTeam,
+    queryFn:  fetchMyTeam,
+    staleTime: 5 * 60 * 1000,
+    retry: (failureCount, err) => err?.response?.status !== 404 && failureCount < 2,
   })
 }

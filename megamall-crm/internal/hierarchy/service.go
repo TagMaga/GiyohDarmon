@@ -3,6 +3,7 @@ package hierarchy
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/google/uuid"
 	apperrors "github.com/megamall/crm/pkg/errors"
@@ -12,14 +13,22 @@ import (
 type UserExistsFn func(ctx context.Context, id uuid.UUID) (bool, error)
 type TeamExistsFn func(ctx context.Context, id uuid.UUID) (bool, error)
 
+// UserBriefsFn resolves minimal user cards for a set of user IDs.
+type UserBriefsFn func(ctx context.Context, ids []uuid.UUID) ([]UserBrief, error)
+
+// TeamBriefFn resolves a team's name and leadership IDs; nil when not found.
+type TeamBriefFn func(ctx context.Context, id uuid.UUID) (*TeamBrief, error)
+
 type Service struct {
 	repo       *Repository
 	userExists UserExistsFn
 	teamExists TeamExistsFn
+	userBriefs UserBriefsFn
+	teamBrief  TeamBriefFn
 }
 
-func NewService(repo *Repository, userExists UserExistsFn, teamExists TeamExistsFn) *Service {
-	return &Service{repo: repo, userExists: userExists, teamExists: teamExists}
+func NewService(repo *Repository, userExists UserExistsFn, teamExists TeamExistsFn, userBriefs UserBriefsFn, teamBrief TeamBriefFn) *Service {
+	return &Service{repo: repo, userExists: userExists, teamExists: teamExists, userBriefs: userBriefs, teamBrief: teamBrief}
 }
 
 // Assign sets or updates a user's team and/or parent.
@@ -92,6 +101,76 @@ func (s *Service) GetUserChain(ctx context.Context, userID uuid.UUID) ([]Hierarc
 		out[i] = toResponse(&h)
 	}
 	return out, nil
+}
+
+// GetMyTeam returns the roster of the caller's own team: leadership plus
+// members, resolved to user cards. Leadership is excluded from members even
+// when they also have a hierarchy entry in the team.
+func (s *Service) GetMyTeam(ctx context.Context, teamID uuid.UUID) (*MyTeamResponse, error) {
+	team, err := s.teamBrief(ctx, teamID)
+	if err != nil {
+		return nil, apperrors.Internal(fmt.Errorf("resolve team: %w", err))
+	}
+	if team == nil {
+		return nil, apperrors.NotFound("team")
+	}
+
+	entries, err := s.repo.GetByTeamID(ctx, teamID)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+
+	ids := make([]uuid.UUID, 0, len(entries)+2)
+	for _, e := range entries {
+		ids = append(ids, e.UserID)
+	}
+	if team.TeamLeadID != nil {
+		ids = append(ids, *team.TeamLeadID)
+	}
+	if team.ManagerID != nil {
+		ids = append(ids, *team.ManagerID)
+	}
+
+	briefs, err := s.userBriefs(ctx, ids)
+	if err != nil {
+		return nil, apperrors.Internal(fmt.Errorf("resolve team users: %w", err))
+	}
+	byID := make(map[uuid.UUID]UserBrief, len(briefs))
+	for _, b := range briefs {
+		byID[b.ID] = b
+	}
+
+	resp := &MyTeamResponse{
+		TeamID:   team.ID,
+		TeamName: team.Name,
+		Members:  make([]UserBrief, 0, len(entries)),
+	}
+	if team.TeamLeadID != nil {
+		if b, ok := byID[*team.TeamLeadID]; ok {
+			resp.TeamLead = &b
+		}
+	}
+	if team.ManagerID != nil {
+		if b, ok := byID[*team.ManagerID]; ok {
+			resp.Manager = &b
+		}
+	}
+	for _, e := range entries {
+		if team.TeamLeadID != nil && e.UserID == *team.TeamLeadID {
+			continue
+		}
+		if team.ManagerID != nil && e.UserID == *team.ManagerID {
+			continue
+		}
+		if b, ok := byID[e.UserID]; ok {
+			resp.Members = append(resp.Members, b)
+		}
+	}
+	sort.Slice(resp.Members, func(i, j int) bool {
+		return resp.Members[i].FullName < resp.Members[j].FullName
+	})
+
+	return resp, nil
 }
 
 // GetTeamMembers returns all hierarchy entries for a team.

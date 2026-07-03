@@ -5,11 +5,12 @@ const SELLER_TABS = [
   { label: 'Главная',  icon: Home,         path: '/seller',              end: true  },
   { label: 'Заказы',   icon: ShoppingCart, path: '/seller/orders',       end: false },
   { label: null,       icon: Plus,         path: '/seller/orders/create', end: false, fab: true },
-  { label: 'Доходы',   icon: Wallet,       path: '/seller/income',       end: false },
+  { label: 'Доход',    icon: Wallet,       path: '/seller/income',       end: false },
   { label: 'Профиль',  icon: User,         path: '/seller/profile',      end: false },
 ]
 
-export default function BottomNav({ tabs = SELLER_TABS }) {
+export default function BottomNav({ tabs = SELLER_TABS, variant }) {
+  if (variant === 'seller') return <SellerBottomNav tabs={tabs} />
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-40 lg:hidden flex items-end justify-around px-3"
@@ -74,6 +75,67 @@ export default function BottomNav({ tabs = SELLER_TABS }) {
           )
         )}
       </div>
+    </nav>
+  )
+}
+
+/**
+ * Seller Panel Redesign variant: flat white bar with hairline top border,
+ * dark active items, and a raised square-rounded indigo FAB.
+ */
+function SellerBottomNav({ tabs }) {
+  return (
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-40 lg:hidden flex items-center justify-around"
+      style={{
+        background: '#fff',
+        borderTop: '1px solid #EAE8E2',
+        padding: '10px 14px calc(env(safe-area-inset-bottom, 12px) + 10px)',
+        fontFamily: "'Golos Text', 'Inter', system-ui, sans-serif",
+      }}
+    >
+      {tabs.map(tab =>
+        tab.fab ? (
+          <NavLink
+            key={tab.path}
+            to={tab.path}
+            className="active:scale-90 transition-transform"
+            style={{ marginTop: -26 }}
+          >
+            <div
+              className="flex items-center justify-center"
+              style={{
+                width: 54, height: 54, borderRadius: 18, background: '#6366F1',
+                boxShadow: '0 8px 20px rgba(99,102,241,.4)', color: '#fff',
+              }}
+            >
+              <Plus size={26} strokeWidth={2.4} />
+            </div>
+          </NavLink>
+        ) : (
+          <NavLink
+            key={tab.path}
+            to={tab.path}
+            end={tab.end}
+            className="flex flex-col items-center gap-1 py-1 px-2"
+          >
+            {({ isActive }) => (
+              <>
+                <tab.icon
+                  size={22}
+                  strokeWidth={isActive ? 2.2 : 2}
+                  style={{ color: isActive ? '#1C1C1A' : '#A3A39A' }}
+                />
+                {tab.label && (
+                  <span style={{ fontSize: 10.5, fontWeight: isActive ? 700 : 600, color: isActive ? '#1C1C1A' : '#A3A39A' }}>
+                    {tab.label}
+                  </span>
+                )}
+              </>
+            )}
+          </NavLink>
+        )
+      )}
     </nav>
   )
 }

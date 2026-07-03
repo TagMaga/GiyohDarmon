@@ -115,6 +115,12 @@ export async function fetchMyTeamRank() {
   return unwrap(res)
 }
 
+/** GET /hierarchy/my-team — own team roster (leadership + members) */
+export async function fetchMyTeam() {
+  const res = await client.get('/hierarchy/my-team')
+  return unwrap(res)
+}
+
 // ── Payouts ───────────────────────────────────────────────────────────────────
 /** GET /seller-payouts/me */
 export async function fetchMyPayouts() {

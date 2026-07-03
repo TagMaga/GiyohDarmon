@@ -35,6 +35,32 @@ type ChainResponse struct {
 	Chain []HierarchyResponse `json:"chain"`
 }
 
+// UserBrief is the minimal user card exposed to teammates.
+type UserBrief struct {
+	ID        uuid.UUID `json:"id"`
+	FullName  string    `json:"full_name"`
+	Phone     string    `json:"phone"`
+	Role      string    `json:"role"`
+	AvatarURL *string   `json:"avatar_url,omitempty"`
+}
+
+// TeamBrief carries the team fields GetMyTeam needs from the teams module.
+type TeamBrief struct {
+	ID         uuid.UUID
+	Name       string
+	TeamLeadID *uuid.UUID
+	ManagerID  *uuid.UUID
+}
+
+// MyTeamResponse is the caller's own team roster.
+type MyTeamResponse struct {
+	TeamID   uuid.UUID   `json:"team_id"`
+	TeamName string      `json:"team_name"`
+	TeamLead *UserBrief  `json:"team_lead"`
+	Manager  *UserBrief  `json:"manager"`
+	Members  []UserBrief `json:"members"`
+}
+
 func toResponse(h *UserHierarchy) HierarchyResponse {
 	return HierarchyResponse{
 		ID:        h.ID,

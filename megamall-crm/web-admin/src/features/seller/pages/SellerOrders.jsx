@@ -2,8 +2,8 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Search, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import PageHeader from '../../../shared/components/PageHeader'
 import SellerOrderMobileCard from '../components/SellerOrderMobileCard'
+import { M, MobileShell, Chip } from '../components/mobileUi'
 import OrderDetailBottomSheet from '../components/OrderDetailBottomSheet'
 import SellerOrderDetailPanel from '../components/SellerOrderDetailPanel'
 import Badge from '../../../shared/components/Badge'
@@ -23,6 +23,12 @@ export default function SellerOrders() {
   const [detailOrder, setDetailOrder] = useState(null)
 
   const citiesById = useMemo(() => Object.fromEntries(cities.map((c) => [c.id, c.name])), [cities])
+
+  const statusCounts = useMemo(() => {
+    const counts = {}
+    for (const o of orders) counts[o.status] = (counts[o.status] ?? 0) + 1
+    return counts
+  }, [orders])
 
   const filtered = useMemo(() => {
     let result = orders
@@ -98,27 +104,67 @@ export default function SellerOrders() {
   return (
     <>
       {/* ═══════════════════════════════════════════════════════════
-          MOBILE LAYOUT
+          MOBILE LAYOUT — Seller Panel Redesign
       ═══════════════════════════════════════════════════════════ */}
-      <div className="lg:hidden page-container">
-        <PageHeader
-          title="Мои заказы"
-          subtitle={`Всего: ${orders.length}`}
-        />
-        <div className="mb-4">{filtersSection}</div>
-        <SellerOrderMobileCard
-          orders={filtered}
-          loading={isLoading}
-          showCreate
-          citiesById={citiesById}
-          onDetail={setDetailOrder}
-        />
+      <MobileShell>
+        <div className="px-5">
+          {/* Header */}
+          <div className="flex items-baseline gap-[9px]" style={{ padding: '8px 0 0' }}>
+            <h1 style={{ fontSize: 24, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0 }}>Мои заказы</h1>
+            <span style={{ fontSize: 14, color: M.muted, fontWeight: 600 }}>{orders.length}</span>
+          </div>
+
+          {/* Search */}
+          <div className="relative" style={{ marginTop: 14 }}>
+            <Search size={17} className="absolute left-[14px] top-1/2 -translate-y-1/2" style={{ color: M.muted }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск по клиенту, номеру…"
+              className="w-full outline-none"
+              style={{
+                border: `1px solid ${M.borderAlt}`, background: '#fff', borderRadius: 13,
+                padding: '11px 40px 11px 40px', fontFamily: 'inherit', fontSize: 13.5, color: M.ink,
+              }}
+            />
+            {search && (
+              <button type="button" onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: M.muted }}>
+                <X size={15} />
+              </button>
+            )}
+          </div>
+
+          {/* Filter chips */}
+          <div className="flex gap-[7px] overflow-x-auto scrollbar-none" style={{ marginTop: 12, paddingBottom: 2 }}>
+            {SELLER_STATUS_FILTERS.map((f) => {
+              const count = f.key === 'all' ? orders.length : statusCounts[f.key] ?? 0
+              return (
+                <Chip key={f.key} active={statusFilter === f.key} onClick={() => setStatusFilter(f.key)}>
+                  {f.label}{count > 0 ? ` ${count}` : ''}
+                </Chip>
+              )
+            })}
+          </div>
+
+          {/* List */}
+          <div style={{ marginTop: 14 }}>
+            <SellerOrderMobileCard
+              orders={filtered}
+              loading={isLoading}
+              showCreate
+              citiesById={citiesById}
+              onDetail={setDetailOrder}
+            />
+          </div>
+        </div>
         <OrderDetailBottomSheet
           order={detailOrder}
           onClose={() => setDetailOrder(null)}
           citiesById={citiesById}
         />
-      </div>
+      </MobileShell>
 
       {/* ═══════════════════════════════════════════════════════════
           DESKTOP MASTER-DETAIL LAYOUT

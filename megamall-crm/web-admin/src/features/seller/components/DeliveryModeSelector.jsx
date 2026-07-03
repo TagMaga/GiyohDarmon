@@ -1,4 +1,4 @@
-import { Truck, Zap } from 'lucide-react'
+import { M } from './mobileUi'
 
 export const DELIVERY_MODES = [
   { key: 'normal', label: 'Обычная доставка' },
@@ -18,51 +18,38 @@ export default function DeliveryModeSelector({ mode, onChange, normalFee = 0, fa
   const fmtFee = (f) => (f <= 0 ? 'Бесплатно' : `${f.toLocaleString('ru-RU')} сомони`)
 
   const options = [
-    {
-      key: 'normal',
-      label: 'Обычная доставка',
-      feeLabel: fmtFee(normalFee),
-      Icon: Truck,
-      active: { tile: 'border-slate-400 bg-slate-50 ring-2 ring-slate-400/20', icon: 'bg-slate-200 text-slate-600', label: 'text-slate-800' },
-    },
-    {
-      key: 'fast',
-      label: 'Быстрая доставка',
-      feeLabel: fmtFee(fastFee),
-      Icon: Zap,
-      active: { tile: 'border-amber-400 bg-amber-50 ring-2 ring-amber-500/20', icon: 'bg-amber-100 text-amber-600', label: 'text-amber-800' },
-    },
+    { key: 'normal', label: 'Обычная', sub: `1–2 дня · ${fmtFee(normalFee)}` },
+    { key: 'fast',   label: 'Срочная', sub: `Сегодня · ${fmtFee(fastFee)}` },
   ]
 
   return (
-    <div className="space-y-2">
-      <label className="input-label">Способ доставки *</label>
-      <div className="grid grid-cols-2 gap-2">
-        {options.map(({ key, label, feeLabel, Icon, active: c }) => {
-          const isActive = mode === key
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onChange(key)}
-              className={`text-left p-3 rounded-xl border transition-all
-                ${isActive ? c.tile : 'border-slate-200 bg-white hover:bg-slate-50'}`}
-            >
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center mb-2 transition-colors
-                ${isActive ? c.icon : 'bg-slate-100 text-slate-400'}`}>
-                <Icon size={14} />
+    <div className="flex gap-[9px]">
+      {options.map(({ key, label, sub }) => {
+        const isActive = mode === key
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onChange(key)}
+            className="flex-1 text-left relative transition-all active:scale-[0.98]"
+            style={{
+              border: isActive ? `1.5px solid ${M.indigo}` : `1.5px solid ${M.borderAlt}`,
+              background: isActive ? '#F5F4FE' : '#fff',
+              borderRadius: 13, padding: 12, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            {isActive ? (
+              <div className="absolute flex items-center justify-center" style={{ top: 10, right: 10, width: 16, height: 16, borderRadius: '50%', background: M.indigo }}>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5"><path d="M20 6 9 17l-5-5" /></svg>
               </div>
-              <p className={`text-[11px] font-semibold leading-tight
-                ${isActive ? c.label : 'text-slate-700'}`}>
-                {label}
-              </p>
-              <p className={`text-[11px] font-bold mt-0.5 ${isActive ? c.label : 'text-slate-500'}`}>
-                {feeLabel}
-              </p>
-            </button>
-          )
-        })}
-      </div>
+            ) : (
+              <div className="absolute" style={{ top: 10, right: 10, width: 16, height: 16, borderRadius: '50%', border: '1.5px solid #D6D4CC' }} />
+            )}
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>{label}</div>
+            <div style={{ fontSize: 12, color: '#76766E', marginTop: 2 }}>{sub}</div>
+          </button>
+        )
+      })}
     </div>
   )
 }

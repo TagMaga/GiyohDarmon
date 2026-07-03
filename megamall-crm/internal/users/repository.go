@@ -159,6 +159,21 @@ func (r *Repository) ExistsByID(ctx context.Context, id uuid.UUID) (bool, error)
 	return count > 0, nil
 }
 
+// GetByIDs returns all active users whose IDs are in the given set.
+func (r *Repository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var list []User
+	err := r.db.WithContext(ctx).
+		Where("id IN ? AND deleted_at IS NULL", ids).
+		Find(&list).Error
+	if err != nil {
+		return nil, fmt.Errorf("get users by ids: %w", err)
+	}
+	return list, nil
+}
+
 // GetTeamIDForUser returns the hierarchy team_id for a user, or nil if the
 // user has no hierarchy entry or no team assigned.
 func (r *Repository) GetTeamIDForUser(ctx context.Context, userID uuid.UUID) (*uuid.UUID, error) {

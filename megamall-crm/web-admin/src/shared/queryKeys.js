@@ -28,6 +28,7 @@ export const KEYS = {
     me:            ['seller', 'me'],
     compensation:  ['seller', 'compensation'],
     teamRank:      ['seller', 'teamRank'],
+    myTeam:        ['seller', 'myTeam'],
     payouts:       ['seller', 'payouts'],
     orderComments: (orderId) => ['seller', 'order', orderId, 'comments'],
     cities:        ['seller', 'cities'],
