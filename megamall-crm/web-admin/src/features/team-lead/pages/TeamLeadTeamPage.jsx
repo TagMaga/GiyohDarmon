@@ -19,7 +19,14 @@ import usePayables        from '../hooks/usePayables'
 import useOwnerOrders     from '../../orders/hooks/useOwnerOrders'
 import { formatOrderLabel, getOrderId } from '../../dispatcher/utils/orderHelpers'
 
-function toYMD(d) { return d.toISOString().slice(0, 10) }
+// Local Y/M/D, not toISOString() — that converts to UTC first and can shift
+// the calendar date by a day depending on timezone/time-of-day.
+function toYMD(d) {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 function initialsOf(name) {
   return (name ?? '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()

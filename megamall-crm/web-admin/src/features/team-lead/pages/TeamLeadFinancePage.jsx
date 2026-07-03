@@ -22,7 +22,14 @@ import useCurrentUser   from '../../../shared/hooks/useCurrentUser'
 import usePayables       from '../hooks/usePayables'
 import useCreatePayouts  from '../hooks/useCreatePayouts'
 
-function toYMD(d) { return d.toISOString().slice(0, 10) }
+// Local Y/M/D, not toISOString() — that converts to UTC first and can shift
+// the calendar date by a day depending on timezone/time-of-day.
+function toYMD(d) {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 function initialsOf(name) {
   return (name ?? '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()
 }
@@ -125,20 +132,22 @@ export default function TeamLeadFinancePage() {
           >
             {fmtRu(payables?.personal_net)} сомони
           </div>
+          <p className="text-center text-slate-400 font-bold text-xs mb-3.5">
+            Ваша доля пула команды (40%) — уже за вычетом продавцов и менеджеров
+          </p>
+          {/* Real subtraction: this one, unlike personal income above, actually
+              is A − B = C — team_lead_pool_earned is already net, so it has no
+              further subtraction of its own. */}
           <div className="rounded-2xl py-3 px-3 flex justify-center gap-2 items-center text-base font-black flex-wrap" style={{ background: '#F6F5FF' }}>
-            <span className="text-slate-900">{fmtRu(payables?.personal_pool)}</span>
+            <span className="text-slate-900">{fmtRu(payables?.team_earned)}</span>
             <span className="text-slate-400">−</span>
-            <span style={{ color: '#B45309' }}>{fmtRu((payables?.personal_pool ?? 0) - (payables?.personal_net ?? 0))}</span>
+            <span style={{ color: '#B45309' }}>{fmtRu(payables?.team_paid)}</span>
             <span className="text-slate-400">=</span>
-            <span className="text-indigo-600">{fmtRu(payables?.personal_net)}</span>
+            <span className="text-indigo-600">{fmtRu(payables?.team_remaining)}</span>
           </div>
           <p className="text-center text-slate-400 font-bold text-xs mt-3">
-            Доход команды (40%) − Выплаты сотрудникам
+            Доход команды − Уже выплачено = Осталось выплатить
           </p>
-          <div className="mt-3.5 rounded-2xl px-3.5 py-2.5 flex justify-between items-center text-xs font-bold" style={{ background: '#F5F3FF', color: '#6D28D9' }}>
-            <span>Осталось выплатить команде</span>
-            <b>{fmtRu(payables?.team_remaining)} сомони</b>
-          </div>
         </div>
       )}
 

@@ -121,14 +121,14 @@ func (s *Service) GetPayablesForTeamLead(
 		teamEarned += m.TotalIncome
 		teamPaid += paid
 	}
-	// Personal net nets against everything the team lead paid out this
-	// period, not just payouts to current income-query members (a payout to
-	// someone who left the team mid-period should still reduce personal net).
-	var allPaid float64
-	for _, amt := range alreadyPaid {
-		allPaid += amt
-	}
-	personalNet := personalPool - allPaid
+	// personalPool (sum of team_lead_pool_earned events) is already the team
+	// lead's net take-home — ApplyCommissionRules computes it as
+	// poolGross - seller - manager *per order*, before the event is ever
+	// written. It must NOT be reduced again by payouts already made to staff:
+	// that money was never the team lead's to begin with, so subtracting it
+	// here would double-count the same commission. (Previously this did
+	// `personalPool - allPaid`, which was wrong for exactly that reason.)
+	personalNet := personalPool
 
 	return &PayablesResponse{
 		TeamLeadID:    teamLeadID,
