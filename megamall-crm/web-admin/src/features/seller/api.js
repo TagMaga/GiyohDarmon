@@ -118,7 +118,7 @@ export async function fetchMyTeamRank() {
 // ── Payouts ───────────────────────────────────────────────────────────────────
 /** GET /seller-payouts/me */
 export async function fetchMyPayouts() {
-  const res = await client.get('/seller-payouts/me')
+  const res = await client.get('/payouts/me')
   const data = unwrap(res)
   return Array.isArray(data) ? data : []
 }

@@ -118,4 +118,9 @@ export const KEYS = {
     performance: (id, params)   => ['logistics', 'couriers', id, 'performance', params ?? {}],
     handovers:   (params) => ['logistics', 'handovers', params ?? {}],
   },
+  // ── Generalized payouts ledger (Team Lead / Manager / Seller) ─────────────
+  payouts: {
+    me:       ['payouts', 'me'],
+    payables: (teamLeadId, params) => ['payouts', 'payables', teamLeadId, params ?? {}],
+  },
 }

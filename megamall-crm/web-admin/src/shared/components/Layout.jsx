@@ -30,6 +30,14 @@ const WAREHOUSE_TABS = [
   { label: 'Профиль', icon: User,        path: '/warehouse/profile',   end: false },
 ]
 
+const TEAM_LEAD_TABS = [
+  { label: 'Главная',      icon: Home,           path: '/team-lead',         end: true  },
+  { label: 'Заказы',       icon: ShoppingCart,    path: '/team-lead/orders',  end: false },
+  { label: 'Моя команда',  icon: Users,           path: '/team-lead/team',    end: false },
+  { label: 'Финансы',      icon: Wallet,          path: '/team-lead/finance', end: false },
+  { label: 'Ещё',          icon: MoreHorizontal,  path: '/team-lead/more',    end: false },
+]
+
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
@@ -39,7 +47,8 @@ export default function Layout() {
   const isSeller  = role === 'seller'
   const isManager = role === 'manager'
   const isWarehouse = role === 'warehouse_manager'
-  const hasMobileNav = isOwner || isSeller || isManager || isWarehouse
+  const isTeamLead = role === 'sales_team_lead'
+  const hasMobileNav = isOwner || isSeller || isManager || isWarehouse || isTeamLead
 
   if (isDispatcherBoard) {
     return <Outlet />
@@ -78,6 +87,7 @@ export default function Layout() {
       {isSeller  && <BottomNav />}
       {isManager && <BottomNav tabs={MANAGER_TABS} />}
       {isWarehouse && <BottomNav tabs={WAREHOUSE_TABS} />}
+      {isTeamLead  && <BottomNav tabs={TEAM_LEAD_TABS} />}
     </div>
   )
 }

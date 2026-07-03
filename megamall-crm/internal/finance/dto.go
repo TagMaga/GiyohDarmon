@@ -121,6 +121,11 @@ type FinanceEventResponse struct {
 	EditCount       int        `json:"edit_count"`
 	LastEditedAt    *time.Time `json:"last_edited_at,omitempty"`
 	CreatedAt       time.Time  `json:"created_at"`
+	// PayerID/PayerRole are only set for payout rows (team_lead_payout /
+	// manager_payout / owner_payout) — who made the payment, as opposed to
+	// UserID which (for these rows) holds the payee.
+	PayerID   *uuid.UUID `json:"payer_id,omitempty"`
+	PayerRole *string    `json:"payer_role,omitempty"`
 }
 
 // ─── Finance cash response ─────────────────────────────────────────────────────

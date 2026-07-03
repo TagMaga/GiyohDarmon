@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -416,8 +417,29 @@ func (r *Repository) ListExpenses(ctx context.Context, p ExpenseListParams) ([]B
 
 // ─── Events list ──────────────────────────────────────────────────────────────
 
-// ListFinancialEvents returns paginated rows combining financial_events and
-// manual_expense rows from company_budget_transactions.
+// payoutEventTypes are the synthesized event_type literals for payout rows
+// (see payoutsSQL below) — keyed by payer_role.
+var payoutEventTypes = map[string]string{
+	"sales_team_lead": "team_lead_payout",
+	"manager":         "manager_payout",
+	"owner":           "owner_payout",
+}
+
+func isPayoutEventType(t string) bool {
+	for _, v := range payoutEventTypes {
+		if v == t {
+			return true
+		}
+	}
+	return false
+}
+
+// ListFinancialEvents returns paginated rows combining financial_events,
+// finance_business_expenses, and payouts. payouts cannot live inside
+// financial_events (financial_events.order_id is NOT NULL, but a payout is
+// period-based, not per-order) — same reason business_expense already lives
+// in its own table and gets UNIONed in here rather than being a
+// financial_events row.
 // Empty/nil filter values mean no filter on those fields.
 func (r *Repository) ListFinancialEvents(
 	ctx context.Context,
@@ -431,12 +453,15 @@ func (r *Repository) ListFinancialEvents(
 ) ([]FinanceEventResponse, int, error) {
 	db := r.db.WithContext(ctx)
 
-	// When filtering by event_type, include expenses only if filter matches or is empty.
+	// When filtering by event_type, include each source only if the filter
+	// matches it (or the filter is empty, meaning "all sources").
 	includeExpenses := eventType == "" || eventType == "business_expense"
-	includeEvents := eventType == "" || eventType != "business_expense"
-	// When filtering by order_id, expenses have no order — exclude them.
+	includePayouts := eventType == "" || isPayoutEventType(eventType)
+	includeEvents := eventType == "" || (eventType != "business_expense" && !isPayoutEventType(eventType))
+	// When filtering by order_id, expenses/payouts have no order — exclude them.
 	if orderID != nil {
 		includeExpenses = false
+		includePayouts = false
 	}
 
 	args := []interface{}{from, to}
@@ -477,6 +502,25 @@ func (r *Repository) ListFinancialEvents(
 		expArgs = append(expArgs, *maxAmount)
 	}
 
+	payoutArgs := []interface{}{from, to}
+	payoutWhere := "p.created_at >= ? AND p.created_at <= ?"
+	if userID != nil {
+		payoutWhere += " AND p.payee_id = ?"
+		payoutArgs = append(payoutArgs, *userID)
+	}
+	if minAmount != nil {
+		payoutWhere += " AND p.amount >= ?"
+		payoutArgs = append(payoutArgs, *minAmount)
+	}
+	if maxAmount != nil {
+		payoutWhere += " AND p.amount <= ?"
+		payoutArgs = append(payoutArgs, *maxAmount)
+	}
+	if eventType != "" && includePayouts {
+		payoutWhere += " AND (CASE p.payer_role::text WHEN 'sales_team_lead' THEN 'team_lead_payout' WHEN 'manager' THEN 'manager_payout' ELSE 'owner_payout' END) = ?"
+		payoutArgs = append(payoutArgs, eventType)
+	}
+
 	eventsSQL := fmt.Sprintf(`
 		SELECT
 			id,
@@ -489,7 +533,9 @@ func (r *Repository) ListFinancialEvents(
 			FALSE AS is_edited,
 			0 AS edit_count,
 			NULL::timestamptz AS last_edited_at,
-			created_at
+			created_at,
+			NULL::uuid AS payer_id,
+			NULL::text AS payer_role
 		FROM financial_events WHERE %s`, eventsWhere)
 
 	expensesSQL := fmt.Sprintf(`
@@ -504,7 +550,9 @@ func (r *Repository) ListFinancialEvents(
 			COALESCE(ed.edit_count, 0) > 0 AS is_edited,
 			COALESCE(ed.edit_count, 0) AS edit_count,
 			ed.last_edited_at,
-			t.created_at
+			t.created_at,
+			NULL::uuid AS payer_id,
+			NULL::text AS payer_role
 		FROM finance_business_expenses t
 		LEFT JOIN (
 			SELECT subject_id, COUNT(*)::int AS edit_count, MAX(edited_at) AS last_edited_at
@@ -513,35 +561,63 @@ func (r *Repository) ListFinancialEvents(
 		) ed ON ed.subject_id = t.id
 		WHERE %s`, expWhere)
 
-	var unionSQL, countSQL string
-	var unionArgs []interface{}
+	payoutsSQL := fmt.Sprintf(`
+		SELECT
+			p.id,
+			NULL::uuid AS order_id,
+			p.payee_id AS user_id,
+			CASE p.payer_role::text
+				WHEN 'sales_team_lead' THEN 'team_lead_payout'
+				WHEN 'manager'         THEN 'manager_payout'
+				ELSE 'owner_payout'
+			END AS event_type,
+			p.amount,
+			p.note,
+			NULL::text AS expense_category,
+			FALSE AS is_edited,
+			0 AS edit_count,
+			NULL::timestamptz AS last_edited_at,
+			p.created_at,
+			p.payer_id,
+			p.payer_role::text AS payer_role
+		FROM payouts p
+		WHERE %s`, payoutWhere)
 
-	switch {
-	case includeEvents && includeExpenses:
-		unionSQL = fmt.Sprintf("SELECT * FROM (%s UNION ALL %s) u ORDER BY created_at DESC LIMIT ? OFFSET ?", eventsSQL, expensesSQL)
-		countSQL = fmt.Sprintf("SELECT COUNT(*) FROM (%s UNION ALL %s) u", eventsSQL, expensesSQL)
-		unionArgs = append(args, expArgs...)
-	case includeEvents:
-		unionSQL = eventsSQL + " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-		countSQL = fmt.Sprintf("SELECT COUNT(*) FROM (%s) u", eventsSQL)
-		unionArgs = args
-	default:
-		unionSQL = expensesSQL + " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-		countSQL = fmt.Sprintf("SELECT COUNT(*) FROM (%s) u", expensesSQL)
-		unionArgs = expArgs
+	type sourcePart struct {
+		sql  string
+		args []interface{}
 	}
+	var parts []sourcePart
+	if includeEvents {
+		parts = append(parts, sourcePart{eventsSQL, args})
+	}
+	if includeExpenses {
+		parts = append(parts, sourcePart{expensesSQL, expArgs})
+	}
+	if includePayouts {
+		parts = append(parts, sourcePart{payoutsSQL, payoutArgs})
+	}
+	if len(parts) == 0 {
+		return []FinanceEventResponse{}, 0, nil
+	}
+
+	sqlParts := make([]string, len(parts))
+	var unionArgs []interface{}
+	for i, part := range parts {
+		sqlParts[i] = part.sql
+		unionArgs = append(unionArgs, part.args...)
+	}
+	joined := strings.Join(sqlParts, " UNION ALL ")
+	unionSQL := fmt.Sprintf("SELECT * FROM (%s) u ORDER BY created_at DESC LIMIT ? OFFSET ?", joined)
+	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM (%s) u", joined)
 
 	var total int64
-	countArgs := unionArgs
-	if includeEvents && includeExpenses {
-		countArgs = append(args, expArgs...)
-	}
-	if err := db.Raw(countSQL, countArgs...).Scan(&total).Error; err != nil {
+	if err := db.Raw(countSQL, unionArgs...).Scan(&total).Error; err != nil {
 		return nil, 0, fmt.Errorf("count finance events: %w", err)
 	}
 
 	var rows []FinanceEventResponse
-	queryArgs := append(unionArgs, p.Limit, p.Offset())
+	queryArgs := append(append([]interface{}{}, unionArgs...), p.Limit, p.Offset())
 	if err := db.Raw(unionSQL, queryArgs...).Scan(&rows).Error; err != nil {
 		return nil, 0, fmt.Errorf("list finance events: %w", err)
 	}

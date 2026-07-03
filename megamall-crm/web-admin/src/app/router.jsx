@@ -38,6 +38,8 @@ const TeamLeadOrdersPage    = lazy(() => import('../features/team-lead/pages/Tea
 const TeamLeadSellersPage   = lazy(() => import('../features/team-lead/pages/TeamLeadSellersPage'))
 const TeamLeadManagerPage   = lazy(() => import('../features/team-lead/pages/TeamLeadManagerPage'))
 const TeamLeadReportsPage   = lazy(() => import('../features/team-lead/pages/TeamLeadReportsPage'))
+const TeamLeadTeamPage      = lazy(() => import('../features/team-lead/pages/TeamLeadTeamPage'))
+const TeamLeadFinancePage   = lazy(() => import('../features/team-lead/pages/TeamLeadFinancePage'))
 
 // Manager
 const ManagerDashboardPage = lazy(() => import('../features/manager/pages/ManagerDashboardPage'))
@@ -161,6 +163,8 @@ const router = createBrowserRouter([
         { path: 'sellers',  element: <Lazy><TeamLeadSellersPage /></Lazy> },
         { path: 'managers', element: <Lazy><TeamLeadManagerPage /></Lazy> },
         { path: 'reports',  element: <Lazy><TeamLeadReportsPage /></Lazy> },
+        { path: 'team',     element: <Lazy><TeamLeadTeamPage /></Lazy> },
+        { path: 'finance',  element: <Lazy><TeamLeadFinancePage /></Lazy> },
         { path: '*',        element: <ComingSoon /> },
       ],
     }],

@@ -50,7 +50,34 @@ const EVENT_TYPE_OPTIONS = [
   { value: 'cash_collected',                      label: 'Наличные собраны' },
   { value: 'cash_handed_over',                    label: 'Наличные сданы' },
   { value: 'business_expense',                    label: 'Расход' },
+  { value: 'team_lead_payout',                    label: 'Выплата · Тимлид → Менеджер' },
+  { value: 'manager_payout',                      label: 'Выплата · Менеджер → Продавец' },
+  { value: 'owner_payout',                        label: 'Выплата · Владелец' },
 ]
+
+// Payout rows are auto-reconciled from the payouts ledger (never hand-typed),
+// business_expense is the only manually-entered row — the tag makes that
+// distinction visible without the user opening each row.
+const PAYOUT_EVENT_TYPES = new Set(['team_lead_payout', 'manager_payout', 'owner_payout'])
+const PAYER_ROLE_LABEL = { sales_team_lead: 'тимлид', manager: 'менеджер', owner: 'владелец' }
+
+function ReconciliationTag({ eventType }) {
+  if (eventType === 'business_expense') {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+        Вручную
+      </span>
+    )
+  }
+  if (PAYOUT_EVENT_TYPES.has(eventType)) {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600">
+        Авто
+      </span>
+    )
+  }
+  return null
+}
 
 const PAGE_LIMIT = 20
 
@@ -297,9 +324,12 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
                     className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
                   >
                     <td className="py-2.5 pr-3">
-                      <Badge variant={EVENT_TYPE_BADGE[ev.event_type] ?? 'slate'} size="sm">
-                        {EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type}
-                      </Badge>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge variant={EVENT_TYPE_BADGE[ev.event_type] ?? 'slate'} size="sm">
+                          {EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type}
+                        </Badge>
+                        <ReconciliationTag eventType={ev.event_type} />
+                      </div>
                     </td>
                     <td className="py-2.5 pr-3">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -319,6 +349,12 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
                       {ev.user_id && (
                         <p className="text-[10px] text-slate-400">
                           Пользователь: <span className="font-medium text-slate-500">{resolveUserName(ev.user_id)}</span>
+                        </p>
+                      )}
+                      {ev.payer_id && (
+                        <p className="text-[10px] text-slate-400">
+                          от <span className="font-medium text-slate-500">{resolveUserName(ev.payer_id)}</span>
+                          {ev.payer_role && ` (${PAYER_ROLE_LABEL[ev.payer_role] ?? ev.payer_role})`}
                         </p>
                       )}
                     </td>
@@ -350,9 +386,12 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
             {visibleItems.map((ev, i) => (
               <div key={ev.id ?? i} className="card p-4 space-y-2">
                 <div className="flex items-start justify-between gap-2">
-                  <Badge variant={EVENT_TYPE_BADGE[ev.event_type] ?? 'slate'} size="sm">
-                    {EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type}
-                  </Badge>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Badge variant={EVENT_TYPE_BADGE[ev.event_type] ?? 'slate'} size="sm">
+                      {EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type}
+                    </Badge>
+                    <ReconciliationTag eventType={ev.event_type} />
+                  </div>
                   <span className="font-bold text-slate-900 tabular-nums flex-shrink-0">
                     {fmtMoney(ev.amount)}
                   </span>
@@ -373,6 +412,12 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
                 {ev.user_id && (
                   <p className="text-[11px] text-slate-400">
                     Пользователь: <span className="font-medium text-slate-500">{resolveUserName(ev.user_id)}</span>
+                  </p>
+                )}
+                {ev.payer_id && (
+                  <p className="text-[11px] text-slate-400">
+                    от <span className="font-medium text-slate-500">{resolveUserName(ev.payer_id)}</span>
+                    {ev.payer_role && ` (${PAYER_ROLE_LABEL[ev.payer_role] ?? ev.payer_role})`}
                   </p>
                 )}
                 {ev.event_type === 'business_expense' && (

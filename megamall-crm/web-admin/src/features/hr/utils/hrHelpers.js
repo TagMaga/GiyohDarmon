@@ -52,6 +52,9 @@ export const EVENT_TYPE_LABEL = {
   cash_handed_over:                       'Наличные сданы',
   business_expense:                       'Расход',
   manual_expense:                         'Расход', // legacy label, pre-Finance/Budget split
+  team_lead_payout:                       'Выплата · Тимлид → Менеджер',
+  manager_payout:                         'Выплата · Менеджер → Продавец',
+  owner_payout:                           'Выплата · Владелец',
 }
 export const EVENT_TYPE_BADGE = {
   seller_commission_earned:              'indigo',
@@ -73,6 +76,9 @@ export const EVENT_TYPE_BADGE = {
   cash_handed_over:                       'emerald',
   business_expense:                       'rose',
   manual_expense:                         'rose', // legacy badge, pre-Finance/Budget split
+  team_lead_payout:                       'indigo',
+  manager_payout:                         'violet',
+  owner_payout:                           'slate',
 }
 
 // ── Rate source labels ────────────────────────────────────────────────────────

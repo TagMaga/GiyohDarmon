@@ -28,8 +28,8 @@ import (
 	"github.com/megamall/crm/internal/logistics"
 	logistics_settings "github.com/megamall/crm/internal/logistics_settings"
 	"github.com/megamall/crm/internal/orders"
+	"github.com/megamall/crm/internal/payouts"
 	"github.com/megamall/crm/internal/products"
-	seller_payouts "github.com/megamall/crm/internal/seller_payouts"
 	delivery_settings "github.com/megamall/crm/internal/delivery_settings"
 	"github.com/megamall/crm/internal/teams"
 	"github.com/megamall/crm/internal/users"
@@ -246,10 +246,11 @@ func main() {
 		logisticsSettingsHandler := logistics_settings.NewHandler(db)
 		logisticsSettingsHandler.RegisterRoutes(v1)
 
-		// Seller payouts (read-only for sellers; owner creation is a future TODO).
-		sellerPayoutsRepo := seller_payouts.NewRepository(db)
-		sellerPayoutsHandler := seller_payouts.NewHandler(sellerPayoutsRepo)
-		sellerPayoutsHandler.RegisterRoutes(v1.Group("/seller-payouts"))
+		// Payouts: generalized ledger (Team Lead → Manager/Seller, Owner → anyone).
+		payoutsRepo := payouts.NewRepository(db)
+		payoutsSvc := payouts.NewService(payoutsRepo, compensationSvc)
+		payoutsHandler := payouts.NewHandler(payoutsSvc)
+		payoutsHandler.RegisterRoutes(v1.Group("/payouts"))
 
 		// File uploads — saves to ./uploads/ and returns a URL
 		uploadAuth := middleware.RequireAuth()
