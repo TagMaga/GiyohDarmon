@@ -7,7 +7,7 @@ import Alert from '../../../shared/components/Alert'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
 import { fetchReceivingHistory, updateReceiving } from '../api'
-import { fmtDate, fmtMoney, getId, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
+import { fmtDate, fmtMoney, getId, getMovementType, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
 
 function receivingNote(reason) {
   const text = (reason ?? '').trim()
@@ -15,6 +15,11 @@ function receivingNote(reason) {
   if (text === 'Приёмка товара') return ''
   if (text.startsWith('Приёмка товара · ')) return text.replace('Приёмка товара · ', '').trim()
   return text
+}
+
+function movementNote(movement) {
+  if (getMovementType(movement) === 'writeoff') return (movement?.reason ?? movement?.Reason ?? '').trim()
+  return receivingNote(movement?.reason ?? movement?.Reason)
 }
 
 function fmtQty(v) {
@@ -56,13 +61,16 @@ export default function ReceivingEditModal({ movement, products = [], onClose })
   const [quantity, setQuantity] = useState('')
   const [unitCost, setUnitCost] = useState('')
   const [notes, setNotes] = useState('')
+  const movementId = getId(movement)
+  const movementType = getMovementType(movement)
+  const isWriteoff = movementType === 'writeoff'
 
   useEffect(() => {
     if (!movement) return
     setProductId(movement.product_id ?? movement.ProductID ?? '')
     setQuantity(String(movement.quantity ?? movement.Quantity ?? ''))
     setUnitCost(String(movement.batch_unit_cost ?? ''))
-    setNotes(receivingNote(movement.reason ?? movement.Reason))
+    setNotes(movementNote(movement))
   }, [movement])
 
   const validProducts = useMemo(
@@ -71,28 +79,28 @@ export default function ReceivingEditModal({ movement, products = [], onClose })
   )
 
   const { data: history = [], isLoading: historyLoading } = useQuery({
-    queryKey: ['warehouse', 'receiving-history', movement?.id],
-    queryFn: () => fetchReceivingHistory(movement.id),
-    enabled: !!movement?.id,
+    queryKey: ['warehouse', 'receiving-history', movementId],
+    queryFn: () => fetchReceivingHistory(movementId),
+    enabled: !!movementId,
   })
 
   const qty = Number.parseInt(quantity, 10)
   const cost = unitCost === '' ? 0 : Number.parseFloat(unitCost)
-  const canSubmit = isUUID(productId) && qty > 0 && !Number.isNaN(cost) && cost >= 0
+  const canSubmit = isUUID(productId) && qty > 0 && (isWriteoff || (!Number.isNaN(cost) && cost >= 0))
 
   const mutation = useMutation({
-    mutationFn: () => updateReceiving(movement.id, {
+    mutationFn: () => updateReceiving(movementId, {
       product_id: productId,
       quantity: qty,
-      unit_cost: cost,
+      unit_cost: isWriteoff ? 0 : cost,
       notes: notes.trim() || undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.warehouse.inventory })
       qc.invalidateQueries({ queryKey: KEYS.warehouse.movements })
       qc.invalidateQueries({ queryKey: KEYS.warehouse.batchesRoot })
-      qc.invalidateQueries({ queryKey: ['warehouse', 'receiving-history', movement?.id] })
-      toast.success('Приёмка обновлена')
+      qc.invalidateQueries({ queryKey: ['warehouse', 'receiving-history', movementId] })
+      toast.success(isWriteoff ? 'Списание обновлено' : 'Приёмка обновлена')
       onClose()
     },
   })
@@ -108,7 +116,7 @@ export default function ReceivingEditModal({ movement, products = [], onClose })
     <Modal
       open={open}
       onClose={handleClose}
-      title="Редактировать приёмку"
+      title={isWriteoff ? 'Редактировать списание' : 'Редактировать приёмку'}
       description="Все изменения сохраняются в историю"
       size="lg"
       footer={
@@ -125,23 +133,26 @@ export default function ReceivingEditModal({ movement, products = [], onClose })
       <div className="grid gap-4 sm:grid-cols-2">
         <label>
           <span className="input-label">Товар *</span>
-          <select className="input" value={productId} onChange={(e) => setProductId(e.target.value)}>
+          <select className="input" value={productId} onChange={(e) => setProductId(e.target.value)} disabled={isWriteoff}>
             <option value="">Выберите товар</option>
             {validProducts.map((p) => (
               <option key={getId(p)} value={getId(p)}>{getProductName(p)} ({getProductSku(p)})</option>
             ))}
           </select>
+          {isWriteoff && <p className="mt-1 text-[11px] text-slate-400">В списании можно менять количество и комментарий.</p>}
         </label>
         <label>
           <span className="input-label">Количество *</span>
           <input className="input" type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
         </label>
+        {!isWriteoff && (
+          <label>
+            <span className="input-label">Закупочная цена *</span>
+            <input className="input" type="number" min="0" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+          </label>
+        )}
         <label>
-          <span className="input-label">Закупочная цена *</span>
-          <input className="input" type="number" min="0" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
-        </label>
-        <label>
-          <span className="input-label">Примечание</span>
+          <span className="input-label">{isWriteoff ? 'Комментарий' : 'Примечание'}</span>
           <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Необязательно" />
         </label>
       </div>

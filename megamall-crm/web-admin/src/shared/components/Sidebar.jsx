@@ -29,12 +29,11 @@ const NAV = {
     { label: 'Настройки',  icon: Settings,      path: '/owner/settings' },
   ],
   sales_team_lead: [
-    { label: 'Главная',       icon: Home,         path: '/team-lead' },
-    { label: 'Заказы группы', icon: ShoppingCart, path: '/team-lead/orders' },
-    { label: 'Продавцы',      icon: UserCheck,    path: '/team-lead/sellers' },
-    { label: 'Менеджер',      icon: Users,        path: '/team-lead/managers' },
-    { label: 'Доходы',        icon: TrendingUp,   path: '/team-lead/income' },
-    { label: 'Отчёты',        icon: BarChart2,    path: '/team-lead/reports' },
+    { label: 'Dashboard', icon: Home,         path: '/team-lead' },
+    { label: 'Orders',    icon: ShoppingCart, path: '/team-lead/orders' },
+    { label: 'Team',      icon: Users,        path: '/team-lead/team' },
+    { label: 'Finance',   icon: Wallet,       path: '/team-lead/finance' },
+    { label: 'Reports',   icon: BarChart2,    path: '/team-lead/reports' },
   ],
   manager: [
     { label: 'Главная',        icon: Home,          path: '/manager' },

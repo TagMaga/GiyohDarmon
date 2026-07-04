@@ -37,10 +37,10 @@ const ROLE_BADGE = { manager: 'indigo', seller: 'violet' }
 
 function MemberRow({ member, onClick }) {
   return (
-    <div className="card p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
+    <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
       <div
         className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
-        style={{ background: 'linear-gradient(135deg,#4F46E5,#7C3AED)' }}
+        style={{ background: '#111827' }}
       >
         <span className="text-xs font-bold text-white">{initialsOf(member.full_name)}</span>
       </div>
@@ -122,7 +122,7 @@ function MemberDetailSheet({ member, orders, onClose }) {
 }
 
 export default function TeamLeadTeamPage() {
-  const [subTab, setSubTab] = useState('manager')
+  const [subTab, setSubTab] = useState('all')
   const [selected, setSelected] = useState(null)
   const { userId } = useCurrentUser()
 
@@ -134,7 +134,7 @@ export default function TeamLeadTeamPage() {
   const members  = payables?.members ?? []
   const managers = members.filter(m => m.role === 'manager')
   const sellers  = members.filter(m => m.role === 'seller')
-  const list     = subTab === 'manager' ? managers : sellers
+  const list     = subTab === 'manager' ? managers : subTab === 'seller' ? sellers : members
 
   const orderParams = useMemo(() => ({
     team_lead_id: userId, from, to, limit: 500, page: 1,
@@ -142,26 +142,27 @@ export default function TeamLeadTeamPage() {
   const { items: orders = [] } = useOwnerOrders(orderParams)
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-4 bg-[#F4F6F8] min-h-screen">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Моя команда</h1>
-        <p className="text-xs text-slate-400">Видно: только ваша команда · текущий месяц</p>
+        <h1 className="text-xl font-bold text-slate-900">Team</h1>
+        <p className="text-xs text-slate-400">All / Managers / Sellers · your team only · current month</p>
       </div>
 
       <div
-        className="flex gap-1 rounded-2xl p-1"
+        className="flex gap-1 rounded-2xl p-1 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
         style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(226,232,240,0.6)' }}
       >
         {[
-          { id: 'manager', label: `Менеджеры · ${managers.length}` },
-          { id: 'seller',  label: `Продавцы · ${sellers.length}` },
+          { id: 'all',     label: `All · ${members.length}` },
+          { id: 'manager', label: `Managers · ${managers.length}` },
+          { id: 'seller',  label: `Sellers · ${sellers.length}` },
         ].map(t => (
           <button
             key={t.id}
             onClick={() => setSubTab(t.id)}
             className="flex-1 py-2 rounded-xl text-sm font-semibold transition-all"
             style={subTab === t.id
-              ? { background: 'white', color: '#4F46E5', boxShadow: '0 2px 8px rgba(16,24,40,0.08)' }
+              ? { background: '#111827', color: '#fff', boxShadow: '0 8px 18px rgba(15,23,42,0.16)' }
               : { color: '#94A3B8' }}
           >
             {t.label}
@@ -174,7 +175,7 @@ export default function TeamLeadTeamPage() {
       ) : list.length === 0 ? (
         <EmptyState
           icon={<Users size={22} />}
-          title={subTab === 'manager' ? 'Нет менеджеров в команде' : 'Нет продавцов в команде'}
+          title={subTab === 'manager' ? 'Нет менеджеров в команде' : subTab === 'seller' ? 'Нет продавцов в команде' : 'Команда пуста'}
           description="Добавьте сотрудника через HR-панель, чтобы он появился здесь."
         />
       ) : (

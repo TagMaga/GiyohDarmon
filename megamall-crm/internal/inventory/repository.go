@@ -321,6 +321,17 @@ func (r *Repository) UpdateBatch(tx *gorm.DB, ctx context.Context, b *Batch) err
 	return nil
 }
 
+func (r *Repository) GetBatchForUpdate(tx *gorm.DB, ctx context.Context, id uuid.UUID) (*Batch, error) {
+	var b Batch
+	if err := tx.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id).
+		First(&b).Error; err != nil {
+		return nil, fmt.Errorf("lock batch: %w", err)
+	}
+	return &b, nil
+}
+
 func (r *Repository) InsertReceivingEdit(tx *gorm.DB, ctx context.Context, e *ReceivingEdit) error {
 	if err := tx.WithContext(ctx).Create(e).Error; err != nil {
 		return fmt.Errorf("insert receiving edit: %w", err)
@@ -358,6 +369,28 @@ func (r *Repository) InsertBatchConsumptions(tx *gorm.DB, ctx context.Context, c
 	}
 	if err := tx.WithContext(ctx).Create(&cs).Error; err != nil {
 		return fmt.Errorf("insert batch consumptions: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) ListBatchConsumptionsForMovementForUpdate(tx *gorm.DB, ctx context.Context, movementID uuid.UUID) ([]*BatchConsumption, error) {
+	var rows []*BatchConsumption
+	err := tx.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("movement_id = ?", movementID).
+		Order("created_at DESC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("lock batch consumptions: %w", err)
+	}
+	return rows, nil
+}
+
+func (r *Repository) DeleteBatchConsumptionsByMovement(tx *gorm.DB, ctx context.Context, movementID uuid.UUID) error {
+	if err := tx.WithContext(ctx).
+		Where("movement_id = ?", movementID).
+		Delete(&BatchConsumption{}).Error; err != nil {
+		return fmt.Errorf("delete batch consumptions: %w", err)
 	}
 	return nil
 }

@@ -1,17 +1,31 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import Alert from '../../../shared/components/Alert'
-import Button from '../../../shared/components/Button'
 import { useSellerMe, usePatchMe } from '../hooks/useSellerMe'
 import { useToast } from '../../../shared/components/ToastProvider'
-import { MessageCircle, Phone, User2, Shield } from 'lucide-react'
+import { Check, ChevronRight, MessageCircle } from 'lucide-react'
+import { M, Card } from '../components/mobileUi'
+
+function toDateInput(value) {
+  if (!value) return ''
+  return String(value).slice(0, 10)
+}
+
+function initials(name = '') {
+  return name.trim().split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase() || 'SE'
+}
 
 export default function SellerProfileInfoPage() {
   const { data: me, isLoading } = useSellerMe()
   const patch = usePatchMe()
   const toast = useToast()
+  const [fullName, setFullName] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
   const [telegramChatId, setTelegramChatId] = useState('')
 
   useEffect(() => {
+    if (me?.full_name != null) setFullName(me.full_name)
+    if (me?.date_of_birth != null) setDateOfBirth(toDateInput(me.date_of_birth))
     if (me?.telegram_chat_id != null) setTelegramChatId(me.telegram_chat_id)
   }, [me])
 
@@ -25,84 +39,269 @@ export default function SellerProfileInfoPage() {
 
   const errMsg = patch.error?.response?.data?.error?.message ?? patch.error?.message
 
-  function handleSave() {
+  function handleTelegramSave() {
     patch.mutate(
       { telegram_chat_id: telegramChatId.trim() || null },
       { onSuccess: () => toast.success('Сохранено') }
     )
   }
 
+  function handlePersonalSave() {
+    const payload = {
+      full_name: fullName.trim(),
+      ...(dateOfBirth ? { date_of_birth: `${dateOfBirth}T00:00:00Z` } : {}),
+    }
+    patch.mutate(payload, { onSuccess: () => toast.success('Изменения сохранены') })
+  }
+
+  const avatarUrl = me?.avatar_url ? `${me.avatar_url}?t=${me.updated_at ?? ''}` : null
+  const roleLabel = me?.role === 'manager' ? 'Менеджер' : me?.role === 'sales_team_lead' ? 'Тимлид' : 'Продавец'
+  const cityLabel = me?.city_name ?? me?.city ?? me?.address ?? 'Душанбе'
+
+  function handleSaveAll() {
+    handlePersonalSave()
+    if (telegramChatId.trim() !== (me?.telegram_chat_id ?? '')) handleTelegramSave()
+  }
+
   return (
-    <div className="space-y-4 p-6">
-      {/* ── Read-only info ──────────────────────────────────────────────── */}
-      <div className="card p-5 space-y-4">
-        <InfoRow icon={<User2 size={15} className="text-slate-500" />} label="Имя" value={me?.full_name ?? '—'} />
-        <div className="h-px bg-slate-50" />
-        <InfoRow
-          icon={<Phone size={15} className="text-slate-500" />}
-          label="Телефон"
-          value={
-            me?.phone
-              ? <a href={`tel:${me.phone}`} className="text-indigo-600">{me.phone}</a>
-              : '—'
-          }
-        />
-        <div className="h-px bg-slate-50" />
-        <InfoRow
-          icon={<Shield size={15} className="text-slate-500" />}
-          label="Роль"
-          value={
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700">
-              Продавец
-            </span>
-          }
-        />
+    <>
+    <div className="hidden lg:flex flex-col gap-5" style={{ padding: '36px 44px', fontFamily: M.font }}>
+      <div className="flex items-center justify-between">
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0 }}>Личные данные</h1>
+        <button
+          type="button"
+          onClick={handleSaveAll}
+          disabled={patch.isPending || !fullName.trim()}
+          style={{
+            background: 'linear-gradient(135deg,#6366F1,#4F46E5)', color: '#fff', border: 'none',
+            fontFamily: 'inherit', fontSize: 14, fontWeight: 700, padding: '12px 26px', borderRadius: 13,
+            cursor: patch.isPending || !fullName.trim() ? 'not-allowed' : 'pointer',
+            opacity: patch.isPending || !fullName.trim() ? 0.7 : 1,
+            boxShadow: '0 8px 20px rgba(99,102,241,.32)',
+          }}
+        >
+          {patch.isPending ? 'Сохранение...' : 'Сохранить изменения'}
+        </button>
       </div>
 
-      {/* ── Telegram edit ───────────────────────────────────────────────── */}
-      <div className="card p-5 space-y-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-               style={{ background: 'linear-gradient(135deg,#2481CC,#1A6CB0)' }}>
-            <MessageCircle size={15} color="white" />
+      {errMsg && <Alert variant="error">{errMsg}</Alert>}
+
+      <div className="grid gap-5" style={{ gridTemplateColumns: '300px 1fr' }}>
+        {/* avatar column */}
+        <Card style={{ borderRadius: 20, padding: '32px 20px', height: 'fit-content' }} className="flex flex-col items-center text-center">
+          <div className="relative">
+            <div
+              className="flex items-center justify-center overflow-hidden"
+              style={{ width: 96, height: 96, borderRadius: '50%', background: '#E7E5FB', color: M.indigoDeep, fontWeight: 800, fontSize: 32 }}
+            >
+              {avatarUrl ? <img src={avatarUrl} alt={fullName || 'Профиль'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials(fullName)}
+            </div>
           </div>
+          <span style={{ fontSize: 14, fontWeight: 700, color: M.indigo, marginTop: 14, cursor: 'pointer' }}>Изменить фото</span>
+        </Card>
+
+        {/* form column */}
+        <div className="flex flex-col gap-[18px] overflow-hidden">
           <div>
-            <p className="text-sm font-bold text-slate-900">Telegram</p>
-            <p className="text-xs text-slate-400">Для уведомлений о заказах</p>
+            <SectionTitle>Основное</SectionTitle>
+            <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 16, padding: '6px 22px' }} className="grid grid-cols-2">
+              <div style={{ padding: '14px 14px 14px 0', borderBottom: `1px solid ${M.bg}` }}>
+                <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Имя и фамилия</div>
+                <input value={fullName} onChange={e => setFullName(e.target.value)} style={desktopInputStyle} placeholder="Имя и фамилия" />
+              </div>
+              <div style={{ padding: '14px 0 14px 14px', borderBottom: `1px solid ${M.bg}` }}>
+                <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Дата рождения</div>
+                <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} style={desktopInputStyle} />
+              </div>
+              <div style={{ gridColumn: '1 / -1', padding: '14px 0' }}>
+                <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Номер телефона</div>
+                <div className="flex items-center justify-between" style={{ marginTop: 4 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>{me?.phone || '—'}</span>
+                  <span className="inline-flex items-center gap-1" style={{ fontSize: 11, fontWeight: 700, color: M.green, background: M.greenBg, padding: '3px 9px', borderRadius: 7 }}>
+                    <Check size={9} strokeWidth={3.2} />
+                    Подтверждён
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <SectionTitle>Локация и работа</SectionTitle>
+            <Card style={{ borderRadius: 16, overflow: 'hidden' }}>
+              <div className="flex items-center justify-between" style={{ padding: '15px 22px', borderBottom: `1px solid ${M.bg}` }}>
+                <span style={{ fontSize: 14.5, fontWeight: 600, color: M.ink }}>Город</span>
+                <span style={{ fontSize: 14, color: '#76766E', fontWeight: 600 }}>{cityLabel}</span>
+              </div>
+              <div className="flex items-center justify-between" style={{ padding: '15px 22px' }}>
+                <span style={{ fontSize: 14.5, fontWeight: 600, color: M.ink }}>Роль</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#76766E', background: '#F0EFEA', padding: '5px 12px', borderRadius: 7 }}>{roleLabel}</span>
+              </div>
+            </Card>
+          </div>
+
+          <div>
+            <SectionTitle>Telegram</SectionTitle>
+            <Card style={{ borderRadius: 16, padding: '18px 22px' }} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#2481CC,#1A6CB0)' }}>
+                  <MessageCircle size={15} color="white" />
+                </div>
+                <p style={{ fontSize: 12.5, color: M.sub }}>Для уведомлений о заказах</p>
+              </div>
+              <input
+                className="input"
+                placeholder="Chat ID, например -100123456789"
+                value={telegramChatId}
+                onChange={e => setTelegramChatId(e.target.value)}
+              />
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div className="lg:hidden" style={{ minHeight: 'calc(100vh - 7.5rem)', display: 'flex', flexDirection: 'column' }}>
+      <div className="flex items-center gap-3" style={{ padding: '8px 0 14px' }}>
+        <Link
+          to="/seller/profile"
+          aria-label="Назад к профилю"
+          className="flex items-center justify-center active:scale-95 transition-transform"
+          style={{ width: 38, height: 38, borderRadius: 12, background: '#fff', border: `1px solid ${M.borderAlt}`, color: M.ink }}
+        >
+          <ChevronRight size={18} className="rotate-180" />
+        </Link>
+        <h1 style={{ fontSize: 20, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', margin: 0 }}>Личные данные</h1>
+      </div>
+
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        <div className="flex flex-col items-center" style={{ padding: '6px 0 22px' }}>
+          <div className="flex items-center justify-center overflow-hidden" style={{ width: 74, height: 74, borderRadius: '50%', background: '#E7E5FB', color: M.indigoDeep, fontWeight: 800, fontSize: 24 }}>
+            {avatarUrl ? <img src={avatarUrl} alt={fullName || 'Профиль'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials(fullName)}
           </div>
         </div>
 
-        <div>
-          <p className="text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Chat ID</p>
-          <input
-            className="input"
-            placeholder="-100123456789"
-            value={telegramChatId}
-            onChange={e => setTelegramChatId(e.target.value)}
-          />
-          <p className="mt-1.5 text-[11px] text-slate-400">
-            Найдите Chat ID через бота @userinfobot в Telegram
-          </p>
+        <SectionTitle>Основное</SectionTitle>
+        <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 16, overflow: 'hidden' }}>
+          <FieldBlock label="Имя и фамилия">
+            <input
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+              style={mobileInputStyle}
+              placeholder="Имя и фамилия"
+            />
+          </FieldBlock>
+          <FieldBlock label="Номер телефона">
+            <div className="flex items-center justify-between gap-2" style={{ marginTop: 3 }}>
+              <span style={{ fontSize: 14.5, fontWeight: 700, color: M.ink }}>{me?.phone || '—'}</span>
+              <span className="inline-flex items-center gap-1" style={{ fontSize: 10.5, fontWeight: 700, color: M.green, background: M.greenBg, padding: '3px 8px', borderRadius: 7 }}>
+                <Check size={9} strokeWidth={3.2} />
+                Подтверждён
+              </span>
+            </div>
+          </FieldBlock>
+          <FieldBlock label="Дата рождения" last>
+            <input
+              type="date"
+              value={dateOfBirth}
+              onChange={e => setDateOfBirth(e.target.value)}
+              style={mobileInputStyle}
+            />
+          </FieldBlock>
         </div>
 
-        {errMsg && <Alert variant="error">{errMsg}</Alert>}
+        <SectionTitle style={{ marginTop: 18 }}>Локация и работа</SectionTitle>
+        <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 16, overflow: 'hidden' }}>
+          <StaticRow label="Город" value={cityLabel} />
+          <div className="flex items-center justify-between" style={{ padding: '13px 15px' }}>
+            <span style={{ fontSize: 13.5, fontWeight: 600, color: M.ink }}>Роль</span>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#76766E', background: '#F0EFEA', padding: '4px 10px', borderRadius: 7 }}>{roleLabel}</span>
+          </div>
+        </div>
 
-        <Button variant="primary" loading={patch.isPending} onClick={handleSave}>
-          Сохранить
-        </Button>
+        {errMsg && (
+          <div style={{ marginTop: 12 }}>
+            <Alert variant="error">{errMsg}</Alert>
+          </div>
+        )}
       </div>
+
+      <div style={{ flexShrink: 0, background: '#fff', borderTop: `1px solid ${M.border}`, margin: '18px -20px -7.5rem', padding: '14px 20px 22px' }}>
+        <button
+          type="button"
+          onClick={handlePersonalSave}
+          disabled={patch.isPending || !fullName.trim()}
+          style={{
+            width: '100%',
+            background: 'linear-gradient(135deg,#6366F1,#4F46E5)',
+            color: '#fff',
+            border: 'none',
+            fontFamily: 'inherit',
+            fontSize: 14.5,
+            fontWeight: 700,
+            padding: 14,
+            borderRadius: 14,
+            cursor: patch.isPending || !fullName.trim() ? 'not-allowed' : 'pointer',
+            opacity: patch.isPending || !fullName.trim() ? 0.7 : 1,
+            boxShadow: '0 8px 20px rgba(99,102,241,.32)',
+          }}
+        >
+          {patch.isPending ? 'Сохранение...' : 'Сохранить изменения'}
+        </button>
+      </div>
+    </div>
+    </>
+  )
+}
+
+function SectionTitle({ children, style }) {
+  return (
+    <div style={{ fontSize: 12, fontWeight: 700, color: M.muted, letterSpacing: '.04em', textTransform: 'uppercase', margin: '0 4px 10px', ...style }}>
+      {children}
     </div>
   )
 }
 
-function InfoRow({ icon, label, value }) {
+function FieldBlock({ label, children, last = false }) {
   return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2 text-slate-500 min-w-0">
-        {icon}
-        <span className="text-sm text-slate-500">{label}</span>
-      </div>
-      <span className="text-sm font-semibold text-slate-900 text-right">{value}</span>
+    <div style={{ padding: '12px 15px', borderBottom: last ? 'none' : `1px solid ${M.bg}` }}>
+      <div style={{ fontSize: 11, color: M.muted, fontWeight: 600 }}>{label}</div>
+      {children}
     </div>
   )
+}
+
+function StaticRow({ label, value }) {
+  return (
+    <div className="flex items-center justify-between" style={{ padding: '13px 15px', borderBottom: `1px solid ${M.bg}` }}>
+      <span style={{ fontSize: 13.5, fontWeight: 600, color: M.ink }}>{label}</span>
+      <span style={{ fontSize: 13, color: '#76766E', fontWeight: 600 }}>{value}</span>
+    </div>
+  )
+}
+
+const mobileInputStyle = {
+  width: '100%',
+  border: 'none',
+  background: 'transparent',
+  fontFamily: 'inherit',
+  fontSize: 14.5,
+  fontWeight: 700,
+  color: M.ink,
+  outline: 'none',
+  padding: '3px 0 0',
+  margin: 0,
+}
+
+const desktopInputStyle = {
+  width: '100%',
+  border: 'none',
+  background: 'transparent',
+  fontFamily: 'inherit',
+  fontSize: 15,
+  fontWeight: 700,
+  color: M.ink,
+  outline: 'none',
+  padding: '4px 0 0',
+  margin: 0,
 }

@@ -3,13 +3,11 @@ import { Link } from 'react-router-dom'
 import { Plus, Search, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import SellerOrderMobileCard from '../components/SellerOrderMobileCard'
-import { M, MobileShell, Chip } from '../components/mobileUi'
+import { M, MobileShell, Chip, StatusPill } from '../components/mobileUi'
 import OrderDetailBottomSheet from '../components/OrderDetailBottomSheet'
 import SellerOrderDetailPanel from '../components/SellerOrderDetailPanel'
-import Badge from '../../../shared/components/Badge'
 import EmptyState from '../../../shared/components/EmptyState'
-import { CardSkeleton } from '../../../shared/components/Skeleton'
-import { SELLER_STATUS_FILTERS, STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
+import { SELLER_STATUS_FILTERS, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import { KEYS } from '../../../shared/queryKeys'
 import { fetchCities } from '../api'
 import useSellerOrders from '../hooks/useSellerOrders'
@@ -67,36 +65,29 @@ export default function SellerOrders() {
 
   const filtersSection = (
     <div className="space-y-2.5">
-      <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
-        {SELLER_STATUS_FILTERS.map((f) => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setStatusFilter(f.key)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors
-              ${statusFilter === f.key
-                ? 'bg-indigo-600 text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
       <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: M.muted }} />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Поиск по номеру, клиенту, телефону…"
-          className="input pl-9 pr-9"
+          className="w-full outline-none"
+          style={{ border: `1px solid ${M.borderAlt}`, background: '#fff', borderRadius: 12, padding: '9px 32px 9px 32px', fontFamily: 'inherit', fontSize: 13, color: M.ink }}
         />
         {search && (
           <button type="button" onClick={() => setSearch('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+            className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: M.muted }}>
             <X size={14} />
           </button>
         )}
+      </div>
+      <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+        {SELLER_STATUS_FILTERS.map((f) => (
+          <Chip key={f.key} active={statusFilter === f.key} onClick={() => setStatusFilter(f.key)} style={{ padding: '6px 12px', fontSize: 12 }}>
+            {f.label}
+          </Chip>
+        ))}
       </div>
     </div>
   )
@@ -167,30 +158,31 @@ export default function SellerOrders() {
       </MobileShell>
 
       {/* ═══════════════════════════════════════════════════════════
-          DESKTOP MASTER-DETAIL LAYOUT
+          DESKTOP MASTER-DETAIL LAYOUT — Seller Panel Redesign
       ═══════════════════════════════════════════════════════════ */}
       <div
-        className="hidden lg:flex overflow-hidden bg-white rounded-b-none"
-        style={{
-          height: 'calc(100vh - 60px)',
-          borderTop: '1px solid rgba(226,232,240,0.7)',
-        }}
+        className="hidden lg:flex overflow-hidden"
+        style={{ height: '100vh', background: M.bg, fontFamily: M.font }}
       >
         {/* ── Left: order list ── */}
         <div
           className="flex flex-col w-[400px] flex-shrink-0 overflow-hidden"
-          style={{ borderRight: '1px solid rgba(226,232,240,0.7)' }}
+          style={{ borderRight: `1px solid ${M.border}` }}
           ref={listRef}
         >
           {/* List header */}
-          <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(226,232,240,0.7)' }}>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h1 className="text-lg font-bold text-slate-900">Мои заказы</h1>
-                <p className="text-xs text-slate-400 mt-0.5">Всего: {orders.length}</p>
+          <div className="flex-shrink-0" style={{ padding: '28px 24px 18px' }}>
+            <div className="flex items-baseline justify-between mb-4">
+              <div className="flex items-baseline gap-2">
+                <h1 style={{ fontSize: 22, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0 }}>Мои заказы</h1>
+                <span style={{ fontSize: 13, color: M.muted, fontWeight: 600 }}>{orders.length}</span>
               </div>
-              <Link to="/seller/orders/create" className="btn btn-primary btn-sm">
-                <Plus size={14} />
+              <Link
+                to="/seller/orders/create"
+                className="flex items-center gap-1.5 transition-transform active:scale-[0.97]"
+                style={{ background: M.indigo, color: '#fff', fontSize: 12.5, fontWeight: 700, padding: '7px 12px', borderRadius: 10 }}
+              >
+                <Plus size={13} />
                 Новый
               </Link>
             </div>
@@ -198,11 +190,11 @@ export default function SellerOrders() {
           </div>
 
           {/* List body — scrollable */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto" style={{ padding: '0 12px' }}>
             {isLoading && (
-              <div className="p-3 space-y-2">
+              <div className="space-y-2 p-1">
                 {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="h-16 rounded-xl bg-slate-100 animate-pulse" />
+                  <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: M.border }} />
                 ))}
               </div>
             )}
@@ -223,36 +215,36 @@ export default function SellerOrders() {
                 <button
                   key={order.id}
                   onClick={() => setDetailOrder(order)}
-                  className={`w-full text-left px-4 py-3 transition-colors hover:bg-slate-50 relative
-                    ${isSelected ? 'bg-indigo-50/70' : ''}`}
-                  style={{ borderBottom: '1px solid rgba(226,232,240,0.5)' }}
+                  className="w-full text-left transition-colors relative"
+                  style={{
+                    padding: '13px 12px', borderRadius: 14, marginBottom: 4,
+                    background: isSelected ? '#F5F4FE' : 'transparent',
+                  }}
                 >
                   {/* Selected indicator */}
                   {isSelected && (
-                    <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-indigo-600 rounded-r-full" />
+                    <div className="absolute rounded-r-full" style={{ left: 0, top: 8, bottom: 8, width: 3, background: M.indigo }} />
                   )}
                   <div className="flex items-start justify-between gap-2 pl-1">
                     <div className="min-w-0 flex-1">
-                      <p className="font-mono text-[10px] font-bold text-slate-400 leading-none">
+                      <p style={{ fontSize: 11, fontWeight: 700, color: M.faint, fontVariantNumeric: 'tabular-nums', lineHeight: 1 }}>
                         {order.order_number ?? order.id?.slice(0, 8)}
                       </p>
-                      <p className="text-sm font-semibold text-slate-900 mt-1 truncate leading-tight">
+                      <p className="truncate" style={{ fontSize: 14, fontWeight: 700, color: M.ink, marginTop: 4 }}>
                         {order.customer?.full_name ?? '—'}
                       </p>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2" style={{ marginTop: 5 }}>
                         {order.city_id && citiesById[order.city_id] && (
-                          <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                          <span style={{ fontSize: 10.5, color: '#76766E', fontWeight: 600, background: '#F0EFEA', padding: '2px 7px', borderRadius: 6 }}>
                             {citiesById[order.city_id]}
                           </span>
                         )}
-                        <span className="text-[10px] text-slate-400">{fmtDate(order.created_at)}</span>
+                        <span style={{ fontSize: 10.5, color: M.muted }}>{fmtDate(order.created_at)}</span>
                       </div>
                     </div>
                     <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-                      <Badge variant={STATUS_BADGE[order.status] ?? 'slate'} dot>
-                        {STATUS_LABELS[order.status] ?? order.status}
-                      </Badge>
-                      <span className="text-xs font-bold text-slate-800">
+                      <StatusPill status={order.status} />
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: M.ink }}>
                         {fmtAmount(order.total_order_amount ?? order.total_amount)}
                       </span>
                     </div>
@@ -264,8 +256,8 @@ export default function SellerOrders() {
 
           {/* Keyboard hint */}
           {filtered.length > 0 && (
-            <div className="px-4 py-2.5 flex-shrink-0" style={{ borderTop: '1px solid rgba(226,232,240,0.7)' }}>
-              <p className="text-[10px] text-slate-400 text-center">↑ ↓ навигация · Esc закрыть</p>
+            <div className="flex-shrink-0" style={{ padding: '10px 12px', borderTop: `1px solid ${M.border}` }}>
+              <p className="text-center" style={{ fontSize: 10.5, color: M.faint }}>↑ ↓ навигация · Esc закрыть</p>
             </div>
           )}
         </div>

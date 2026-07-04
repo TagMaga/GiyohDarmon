@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { KEYS } from '../../../shared/queryKeys'
-import { fetchMe, patchMe, fetchMyCompensation, fetchMyTeamRank, fetchMyTeam } from '../api'
+import { fetchMe, patchMe, uploadMyAvatar, fetchMyCompensation, fetchMyTeamRank, fetchMyTeam } from '../api'
 
 export function useSellerMe() {
   return useQuery({
@@ -14,6 +14,14 @@ export function usePatchMe() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: patchMe,
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.seller.me }),
+  })
+}
+
+export function useUploadMyAvatar() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: uploadMyAvatar,
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.seller.me }),
   })
 }

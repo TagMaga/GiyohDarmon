@@ -424,8 +424,12 @@ export default function CreateOrder() {
   }
 
   return (
+    <>
+    {/* ═══════════════════════════════════════════════════════════
+        MOBILE LAYOUT — Seller Panel Redesign
+    ═══════════════════════════════════════════════════════════ */}
     <div
-      className="pb-8 min-h-screen"
+      className="lg:hidden pb-8 min-h-screen"
       style={{
         background: M.bg,
         fontFamily: M.font,
@@ -438,14 +442,6 @@ export default function CreateOrder() {
 
         {/* Header */}
         <div className="flex items-center gap-3" style={{ padding: '8px 0 4px' }}>
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="flex items-center justify-center flex-shrink-0 active:scale-95 transition-transform"
-            style={{ width: 38, height: 38, borderRadius: 12, background: '#fff', border: `1px solid ${M.borderAlt}`, color: M.ink, cursor: 'pointer' }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
-          </button>
           <div className="flex-1 min-w-0">
             <h1 style={{ fontSize: 20, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', margin: 0 }}>Новый заказ</h1>
             <div style={{ fontSize: 12, color: M.muted, fontWeight: 500, marginTop: 2 }}>Быстрое оформление</div>
@@ -664,5 +660,224 @@ export default function CreateOrder() {
         </div>
       </div>
     </div>
+
+    {/* ═══════════════════════════════════════════════════════════
+        DESKTOP LAYOUT — Seller Panel Redesign
+    ═══════════════════════════════════════════════════════════ */}
+    <div className="hidden lg:flex flex-col gap-5" style={{ padding: '36px 44px', minHeight: '100vh', background: M.bg, fontFamily: M.font }}>
+      <div className="flex items-center gap-2">
+        <h1 style={{ fontSize: 28, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0 }}>Новый заказ</h1>
+      </div>
+
+      <div className="grid gap-[22px] flex-1 min-h-0" style={{ gridTemplateColumns: '1fr 400px' }}>
+        {/* ── Left column: client + products ── */}
+        <div className="overflow-y-auto flex flex-col gap-4">
+          <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 18, padding: '20px 22px', boxShadow: '0 2px 10px rgba(99,102,241,.07)' }} className="space-y-4 flex-shrink-0">
+            <div className="flex items-center gap-[9px]">
+              <span className="flex items-center justify-center" style={{ width: 26, height: 26, borderRadius: 8, background: M.indigo, color: '#fff', fontSize: 13, fontWeight: 800 }}>1</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>Клиент</span>
+              {form.customerId && (
+                <span className="ml-auto inline-flex items-center gap-[5px]" style={{ fontSize: 11.5, fontWeight: 700, color: M.green, background: M.greenBg, padding: '4px 9px', borderRadius: 7 }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2"><path d="M20 6 9 17l-5-5" /></svg>
+                  Найден
+                </span>
+              )}
+            </div>
+            <PhoneSearchField
+              phone={form.phone}
+              onChange={(v) => setField('phone', v)}
+              customers={customers}
+              selectedId={form.customerId}
+              onSelect={handleSelectCustomer}
+              onClearSelection={() => setField('customerId', null)}
+            />
+            <div className="space-y-2">
+              <label className="input-label">Имя клиента</label>
+              <input type="text" value={form.fullName} onChange={(e) => setField('fullName', e.target.value)}
+                placeholder="Фамилия Имя" className="input" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <label className="input-label">Город доставки *</label>
+                <select
+                  value={form.cityId}
+                  onChange={(e) => {
+                    const id = e.target.value
+                    const name = cities.find((c) => c.id === id)?.name ?? ''
+                    setForm((p) => ({ ...p, cityId: id, city: name }))
+                  }}
+                  className="input"
+                >
+                  <option value="">Выберите город</option>
+                  {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="input-label">Адрес</label>
+                <input type="text" value={form.address} onChange={(e) => setField('address', e.target.value)}
+                  placeholder="ул. Рудаки, 12" className="input" />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 18, padding: '20px 22px', boxShadow: '0 2px 10px rgba(139,92,246,.07)' }} className="space-y-4 flex-1">
+            <div className="flex items-center gap-[9px]">
+              <span className="flex items-center justify-center" style={{ width: 26, height: 26, borderRadius: 8, background: '#8B5CF6', color: '#fff', fontSize: 13, fontWeight: 800 }}>2</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>Товары</span>
+              {cartItems.length > 0 && (
+                <span className="ml-auto" style={{ fontSize: 11.5, fontWeight: 700, color: M.indigoDeep, background: M.indigoBg, padding: '4px 10px', borderRadius: 7 }}>
+                  {cartItems.length} поз.
+                </span>
+              )}
+            </div>
+            <ProductSearch products={products} loading={prodLoading} onAdd={addToCart} />
+            {cartItems.length > 0 && (
+              <div className="border border-slate-100 rounded-xl overflow-hidden">
+                <div className="px-3 py-2 bg-slate-50 border-b border-slate-100">
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Корзина</span>
+                </div>
+                <div className="px-3 divide-y divide-slate-50">
+                  {cartItems.map((item, idx) => (
+                    <CartItemRow key={item.product_id} item={item}
+                      onChange={(updated) => updateCartItem(idx, updated)}
+                      onRemove={() => removeCartItem(idx)} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {cartItems.length === 0 && (
+              <div className="flex items-center gap-2 px-3 py-3 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+                <ShoppingCart size={14} className="text-slate-300 flex-shrink-0" />
+                <p className="text-xs text-slate-400">Выберите товары из списка выше</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Right column: delivery + payment + sticky summary ── */}
+        <div className="overflow-y-auto flex flex-col gap-4">
+          <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 18, padding: '20px 22px', boxShadow: '0 2px 10px rgba(16,185,129,.07)' }} className="flex-shrink-0">
+            <div className="flex items-center gap-[9px] mb-[15px]">
+              <span className="flex items-center justify-center" style={{ width: 26, height: 26, borderRadius: 8, background: '#10B981', color: '#fff', fontSize: 13, fontWeight: 800 }}>3</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>Доставка</span>
+            </div>
+            <div className="flex flex-col gap-[10px]">
+              <DeliveryModeSelector
+                mode={form.deliveryMode}
+                onChange={(v) => setField('deliveryMode', v)}
+                fastFee={fastFee}
+                normalFee={normalFee}
+              />
+            </div>
+          </div>
+
+          <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 18, padding: '20px 22px', boxShadow: '0 2px 10px rgba(245,158,11,.07)' }} className="flex-shrink-0">
+            <div className="flex items-center gap-[9px] mb-[15px]">
+              <span className="flex items-center justify-center" style={{ width: 26, height: 26, borderRadius: 8, background: '#F59E0B', color: '#fff', fontSize: 13, fontWeight: 800 }}>4</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>Оплата</span>
+            </div>
+            <PaymentModeSelector
+              mode={form.payMode}
+              onChange={(v) => setField('payMode', v)}
+              prepayAmount={form.prepayAmount}
+              onPrepayChange={(v) => setField('prepayAmount', v)}
+              prepayReceiver={form.prepayReceiver}
+              onReceiverChange={(v) => setField('prepayReceiver', v)}
+              totalOrderAmount={totalOrderAmount}
+              onFileChange={handleProofFileChange}
+              proofFile={proofFile}
+            />
+          </div>
+
+          <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 18, padding: '20px 22px' }} className="space-y-2 flex-shrink-0">
+            <label style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>Комментарий</label>
+            <textarea value={form.comment} onChange={(e) => setField('comment', e.target.value)}
+              rows={2} placeholder="Особые пожелания…" className="w-full resize-none outline-none"
+              style={{ border: `1px solid ${M.borderAlt}`, borderRadius: 13, padding: '11px 14px', fontFamily: 'inherit', fontSize: 13.5, color: M.ink, background: '#fff' }} />
+          </div>
+
+          {cartItems.length > 0 && (
+            <div className="flex-shrink-0">
+              <CartTotalsBreakdown
+                items={cartItems}
+                productTotal={productTotal}
+                deliveryFee={deliveryFee}
+                prepaymentAmount={prepayAmt}
+                totalPayment={totalOrderAmount}
+                amountToCollect={amountToCollect}
+              />
+            </div>
+          )}
+
+          {submitError && (
+            <div className="flex-shrink-0">
+              <Alert variant="error" title="Ошибка">{submitError}</Alert>
+            </div>
+          )}
+
+          {/* Summary + CTA */}
+          <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 18, padding: '20px 22px', boxShadow: '0 4px 16px rgba(20,20,20,.06)' }} className="flex-shrink-0">
+            <div className="flex items-center justify-between" style={{ paddingBottom: 10, marginBottom: 10, borderBottom: `1px solid ${M.bg}` }}>
+              <span style={{ fontSize: 13, color: M.sub, fontWeight: 600 }}>Товары · Доставка</span>
+              <span style={{ fontSize: 13, color: '#76766E', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                {fmtAmount(productTotal)} с · {formatDeliveryFee(deliveryFee)}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between" style={{ marginBottom: 16 }}>
+              <span style={{ fontSize: 13, color: M.sub, fontWeight: 600 }}>
+                {prepayAmt > 0 ? 'К сбору при получении' : 'К оплате'}
+              </span>
+              <span style={{ fontSize: 28, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', fontVariantNumeric: 'tabular-nums' }}>
+                {fmtAmount(prepayAmt > 0 ? amountToCollect : totalOrderAmount)} с
+              </span>
+            </div>
+            {!canSubmit && cartItems.length === 0 && (
+              <p className="flex items-center gap-1" style={{ fontSize: 11.5, color: M.muted, marginBottom: 10 }}>
+                <AlertCircle size={12} /> Добавьте хотя бы один товар
+              </p>
+            )}
+            {!canSubmit && cartItems.length > 0 && form.payMode === 'prepayment' && prepayAmt > totalOrderAmount && (
+              <p className="flex items-center gap-1" style={{ fontSize: 11.5, color: '#BE123C', marginBottom: 10 }}>
+                <AlertCircle size={12} /> Предоплата не может быть больше итога заказа
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleClear}
+                className="flex items-center justify-center active:scale-95 transition-transform"
+                style={{ width: 52, borderRadius: 14, background: '#fff', border: `1px solid ${M.borderAlt}`, color: '#76766E', cursor: 'pointer' }}
+              >
+                <X size={17} />
+              </button>
+              <button
+                type="button"
+                onClick={() => submitMut.mutate()}
+                disabled={!canSubmit || submitMut.isPending}
+                className="flex-1 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: 'linear-gradient(135deg,#6366F1,#4F46E5)', color: '#fff', border: 'none',
+                  fontFamily: 'inherit', fontSize: 15.5, fontWeight: 700, padding: 16, borderRadius: 14,
+                  cursor: 'pointer', boxShadow: '0 8px 20px rgba(99,102,241,.38)',
+                }}
+              >
+                {submitMut.isPending ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Оформляем…
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart size={18} />
+                    Оформить заказ
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </>
   )
 }

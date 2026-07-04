@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { X, Send, Package, MessageCircle, Clock, Phone, ExternalLink, Calendar, MapPin, User, FileText, Pencil } from 'lucide-react'
-import Badge from '../../../shared/components/Badge'
-import { STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
+import { fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import { useOrderComments, useAddOrderComment } from '../hooks/useOrderComments'
 import { roleLabel } from '../../orders/components/OrderCommentsPanel'
 import { fetchOrderTimeline } from '../../dispatcher/api'
 import { KEYS } from '../../../shared/queryKeys'
+import { M, StatusPill } from './mobileUi'
 
 const EDITABLE_STATUSES = new Set(['new', 'confirmed', 'assigned'])
 
@@ -43,16 +43,12 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
 
   if (!order) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-12 text-center"
-           style={{ background: 'linear-gradient(160deg,#F8FAFF 0%,#F0F4FF 100%)' }}>
-        <div
-          className="w-20 h-20 rounded-3xl flex items-center justify-center mb-5"
-          style={{ background: 'linear-gradient(135deg,#EEF2FF,#E0E7FF)' }}
-        >
-          <Package size={32} className="text-indigo-300" />
+      <div className="h-full flex flex-col items-center justify-center p-12 text-center" style={{ background: M.bg, fontFamily: M.font }}>
+        <div className="w-20 h-20 rounded-3xl flex items-center justify-center mb-5" style={{ background: '#ECEBFE' }}>
+          <Package size={32} style={{ color: M.indigo }} />
         </div>
-        <p className="text-base font-bold text-slate-500">Выберите заказ</p>
-        <p className="text-xs text-slate-400 mt-1.5 max-w-[200px]">
+        <p style={{ fontSize: 15, fontWeight: 700, color: M.sub }}>Выберите заказ</p>
+        <p className="max-w-[200px]" style={{ fontSize: 12, color: M.muted, marginTop: 6 }}>
           Нажмите на строку слева для просмотра деталей
         </p>
       </div>
@@ -71,27 +67,25 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
   }
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col" style={{ background: '#fff', fontFamily: M.font }}>
 
       {/* Header */}
       <div
         className="flex items-start justify-between px-6 py-4 flex-shrink-0"
-        style={{ borderBottom: '1px solid rgba(226,232,240,0.7)' }}
+        style={{ borderBottom: `1px solid ${M.border}` }}
       >
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5 mb-1">
-            <p className="font-mono text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <p style={{ fontSize: 11, fontWeight: 700, color: M.faint, letterSpacing: '.03em', fontVariantNumeric: 'tabular-nums' }}>
               {order.order_number ?? order.id?.slice(0, 8)}
             </p>
-            <Badge variant={STATUS_BADGE[order.status] ?? 'slate'} dot>
-              {STATUS_LABELS[order.status] ?? order.status}
-            </Badge>
+            <StatusPill status={order.status} />
           </div>
-          <p className="text-lg font-black text-slate-900 truncate leading-tight">
+          <p className="truncate" style={{ fontSize: 18, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>
             {order.customer?.full_name ?? '—'}
           </p>
           {order.created_at && (
-            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+            <p className="flex items-center gap-1" style={{ fontSize: 12, color: M.muted, marginTop: 2 }}>
               <Calendar size={11} />
               {fmtDate(order.created_at)}
             </p>
@@ -99,19 +93,20 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
         </div>
         <button
           onClick={onClose}
-          className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors ml-3 flex-shrink-0"
+          className="w-8 h-8 flex items-center justify-center rounded-full transition-colors ml-3 flex-shrink-0"
+          style={{ color: M.muted }}
         >
-          <X size={15} className="text-slate-500" />
+          <X size={15} />
         </button>
       </div>
 
       {/* Contact + edit actions */}
-      <div className="flex gap-2 px-6 py-3 flex-shrink-0" style={{ borderBottom: '1px solid rgba(226,232,240,0.7)' }}>
+      <div className="flex gap-2 px-6 py-3 flex-shrink-0" style={{ borderBottom: `1px solid ${M.border}` }}>
         {phone && (
           <a
             href={`tel:${phone}`}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-opacity hover:opacity-90"
-            style={{ background: 'linear-gradient(135deg,#DCFCE7,#BBF7D0)', color: '#15803D' }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl transition-opacity hover:opacity-90"
+            style={{ background: M.greenBg, color: M.green, fontSize: 12.5, fontWeight: 700 }}
           >
             <Phone size={13} />
             Позвонить
@@ -122,8 +117,8 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
             href={waHref}
             target="_blank"
             rel="noreferrer"
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-opacity hover:opacity-90"
-            style={{ background: 'linear-gradient(135deg,#D1FAE5,#A7F3D0)', color: '#047857' }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl transition-opacity hover:opacity-90"
+            style={{ background: M.greenBg, color: M.green, fontSize: 12.5, fontWeight: 700 }}
           >
             <ExternalLink size={13} />
             WhatsApp
@@ -133,8 +128,8 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
           <button
             type="button"
             onClick={() => navigate(`${editBasePath}/${order.id}/edit`, { state: { order } })}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-opacity hover:opacity-90"
-            style={{ background: 'linear-gradient(135deg,#EEF2FF,#E0E7FF)', color: '#4338CA' }}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl transition-opacity hover:opacity-90"
+            style={{ background: M.indigoBg, color: M.indigoDeep, fontSize: 12.5, fontWeight: 700 }}
           >
             <Pencil size={13} />
             Редактировать
@@ -143,7 +138,7 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-shrink-0 px-5 gap-0.5" style={{ borderBottom: '1px solid rgba(226,232,240,0.7)' }}>
+      <div className="flex flex-shrink-0 px-5 gap-0.5" style={{ borderBottom: `1px solid ${M.border}` }}>
         {[
           { id: 'info',     label: 'Заказ',       icon: Package },
           { id: 'timeline', label: 'Статусы',      icon: Clock },
@@ -152,10 +147,12 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold border-b-2 transition-colors
-              ${activeTab === tab.id
-                ? 'border-indigo-600 text-indigo-600'
-                : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+            className="flex items-center gap-1.5 px-3 py-2.5 transition-colors"
+            style={{
+              fontSize: 12.5, fontWeight: 700,
+              borderBottom: activeTab === tab.id ? `2px solid ${M.indigo}` : '2px solid transparent',
+              color: activeTab === tab.id ? M.indigo : M.muted,
+            }}
           >
             <tab.icon size={12} />
             {tab.label}
@@ -178,19 +175,18 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
                   {order.items.map((item, idx) => (
                     <div key={idx} className="flex items-center gap-4">
                       {item.product_image_url
-                        ? <img src={item.product_image_url} alt="" className="w-14 h-14 rounded-2xl object-cover bg-slate-100 flex-shrink-0" />
+                        ? <img src={item.product_image_url} alt="" className="w-14 h-14 rounded-2xl object-cover flex-shrink-0" style={{ background: '#F0EFEA' }} />
                         : (
-                          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0"
-                               style={{ background: 'linear-gradient(135deg,#F8FAFC,#F1F5F9)' }}>
-                            <Package size={18} className="text-slate-300" />
+                          <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: '#F0EFEA' }}>
+                            <Package size={18} style={{ color: '#C0C0B6' }} />
                           </div>
                         )
                       }
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-900 truncate">{item.product_name ?? '—'}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">{item.quantity} × {fmtAmount(item.unit_price)}</p>
+                        <p className="truncate" style={{ fontSize: 14, fontWeight: 600, color: M.ink }}>{item.product_name ?? '—'}</p>
+                        <p style={{ fontSize: 12, color: M.muted, marginTop: 2 }}>{item.quantity} × {fmtAmount(item.unit_price)}</p>
                       </div>
-                      <p className="text-sm font-bold text-slate-800 whitespace-nowrap flex-shrink-0">
+                      <p className="whitespace-nowrap flex-shrink-0" style={{ fontSize: 14, fontWeight: 800, color: M.ink, fontVariantNumeric: 'tabular-nums' }}>
                         {fmtAmount(item.quantity * item.unit_price)}
                       </p>
                     </div>
@@ -200,32 +196,29 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
             )}
 
             {/* Financial summary */}
-            <section
-              className="rounded-2xl p-5"
-              style={{ background: 'linear-gradient(135deg,#F0F4FF,#E8EEFF)' }}
-            >
+            <section className="rounded-2xl p-5" style={{ background: M.bg }}>
               <div className="space-y-2.5">
                 <FinRow label="Сумма товаров"  value={fmtAmount(order.total_amount)} />
                 <FinRow label="Доставка"        value={fmtAmount(order.delivery_fee)} />
-                <div className="h-px bg-indigo-200/60 my-1" />
+                <div className="h-px my-1" style={{ background: M.border }} />
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-semibold text-slate-700">Итого к оплате</span>
-                  <span className="text-xl font-black text-slate-900">
+                  <span style={{ fontSize: 13.5, fontWeight: 600, color: M.sub }}>Итого к оплате</span>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: M.ink, fontVariantNumeric: 'tabular-nums' }}>
                     {fmtAmount(order.total_order_amount ?? ((order.total_amount ?? 0) + (order.delivery_fee ?? 0)))}
                   </span>
                 </div>
                 {(order.courier_payout ?? 0) > 0 && (
                   <div className="flex justify-between items-center pt-1">
-                    <span className="text-xs font-semibold text-slate-700">Комиссионная база</span>
-                    <span className="text-sm font-bold text-indigo-600">
+                    <span style={{ fontSize: 12, fontWeight: 600, color: M.sub }}>Комиссионная база</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: M.indigoDeep }}>
                       {fmtAmount((order.total_order_amount ?? order.total_amount ?? 0) - (order.courier_payout ?? 0))}
                     </span>
                   </div>
                 )}
                 {order.net_revenue != null && (
                   <div className="flex justify-between items-center pt-1">
-                    <span className="text-xs text-slate-500">Чистая выручка</span>
-                    <span className="text-sm font-bold text-emerald-600">{fmtAmount(order.net_revenue)}</span>
+                    <span style={{ fontSize: 12, color: M.muted }}>Чистая выручка</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: M.green }}>{fmtAmount(order.net_revenue)}</span>
                   </div>
                 )}
               </div>
@@ -234,32 +227,32 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
             {/* Customer */}
             <section>
               <SectionLabel>Клиент</SectionLabel>
-              <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(226,232,240,0.8)' }}>
+              <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${M.border}` }}>
                 {order.customer?.full_name && (
-                  <CustomerRow icon={<User size={13} className="text-slate-400" />} label="Имя">
+                  <CustomerRow icon={<User size={13} style={{ color: M.muted }} />} label="Имя">
                     {order.customer.full_name}
                   </CustomerRow>
                 )}
                 {order.customer?.phone && (
-                  <CustomerRow icon={<Phone size={13} className="text-slate-400" />} label="Телефон">
-                    <a href={`tel:${order.customer.phone}`} className="text-indigo-600 font-semibold">
+                  <CustomerRow icon={<Phone size={13} style={{ color: M.muted }} />} label="Телефон">
+                    <a href={`tel:${order.customer.phone}`} style={{ color: M.indigo, fontWeight: 700 }}>
                       {order.customer.phone}
                     </a>
                   </CustomerRow>
                 )}
                 {order.city_id && citiesById[order.city_id] && (
-                  <CustomerRow icon={<MapPin size={13} className="text-slate-400" />} label="Город">
+                  <CustomerRow icon={<MapPin size={13} style={{ color: M.muted }} />} label="Город">
                     {citiesById[order.city_id]}
                   </CustomerRow>
                 )}
                 {order.delivery_address && (
-                  <CustomerRow icon={<MapPin size={13} className="text-slate-400" />} label="Адрес">
+                  <CustomerRow icon={<MapPin size={13} style={{ color: M.muted }} />} label="Адрес">
                     {order.delivery_address}
                   </CustomerRow>
                 )}
                 {order.customer_note && (
-                  <CustomerRow icon={<FileText size={13} className="text-slate-400" />} label="Примечание">
-                    <span className="text-slate-600 italic">{order.customer_note}</span>
+                  <CustomerRow icon={<FileText size={13} style={{ color: M.muted }} />} label="Примечание">
+                    <span style={{ color: '#76766E', fontStyle: 'italic' }}>{order.customer_note}</span>
                   </CustomerRow>
                 )}
               </div>
@@ -277,26 +270,34 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
                 const event  = timelineEvents.find(e => e.to_status === step.status)
                 const rb = ROLE_BADGE[step.role]
                 return (
-                  <div key={step.status} className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
-                    active ? 'bg-indigo-50 border border-indigo-100' :
-                    done   ? 'bg-slate-50' : 'opacity-40'
-                  }`}>
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold ${
-                      active ? 'bg-indigo-600 text-white' :
-                      done   ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400'
-                    }`}>
+                  <div
+                    key={step.status}
+                    className="flex items-center gap-3 rounded-2xl px-4 py-3 transition-all"
+                    style={{
+                      background: active ? '#F5F4FE' : done ? M.bg : 'transparent',
+                      border: active ? '1px solid #E3E1FB' : '1px solid transparent',
+                      opacity: done || active ? 1 : 0.45,
+                    }}
+                  >
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                      style={{
+                        background: active ? M.indigo : done ? '#10B981' : M.border,
+                        color: active || done ? '#fff' : M.muted,
+                      }}
+                    >
                       {idx + 1}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-semibold ${active ? 'text-indigo-700' : done ? 'text-slate-800' : 'text-slate-400'}`}>
+                      <p style={{ fontSize: 13.5, fontWeight: 700, color: active ? M.indigoDeep : done ? M.ink : M.muted }}>
                         {step.label}
                       </p>
                       {event ? (
-                        <p className="text-xs text-slate-500 mt-0.5 truncate">
+                        <p className="truncate" style={{ fontSize: 12, color: M.sub, marginTop: 2 }}>
                           {event.actor_name} · {fmtDate(event.created_at)}
                         </p>
                       ) : (
-                        <p className="text-xs mt-0.5" style={{ color: rb.color }}>{rb.label}</p>
+                        <p style={{ fontSize: 12, marginTop: 2, color: rb.color }}>{rb.label}</p>
                       )}
                     </div>
                   </div>
@@ -311,20 +312,20 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
           <div className="p-6 space-y-3">
             {comments.length === 0 && (
               <div className="text-center py-8">
-                <MessageCircle size={28} className="mx-auto mb-2 text-slate-200" />
-                <p className="text-xs text-slate-400">Комментариев пока нет</p>
+                <MessageCircle size={28} className="mx-auto mb-2" style={{ color: M.border }} />
+                <p style={{ fontSize: 12, color: M.muted }}>Комментариев пока нет</p>
               </div>
             )}
             {comments.map((c, i) => (
-              <div key={i} className="rounded-xl p-3.5" style={{ background: '#F8FAFC', border: '1px solid rgba(226,232,240,0.6)' }}>
-                <p className="text-xs font-semibold text-slate-700">
+              <div key={i} className="rounded-xl p-3.5" style={{ background: M.bg, border: `1px solid ${M.border}` }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: M.sub }}>
                   {c.author_name ?? '—'}
-                  <span className="ml-2 inline-flex text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                  <span className="ml-2 inline-flex" style={{ fontSize: 10, fontWeight: 700, color: M.indigoDeep, background: M.indigoBg, padding: '2px 8px', borderRadius: 999 }}>
                     {roleLabel(c.author_role)}
                   </span>
                 </p>
-                <p className="text-sm text-slate-600 mt-1">{c.comment}</p>
-                <p className="text-[10px] text-slate-400 mt-1.5">{fmtDate(c.created_at)}</p>
+                <p style={{ fontSize: 13.5, color: '#76766E', marginTop: 4 }}>{c.comment}</p>
+                <p style={{ fontSize: 10, color: M.faint, marginTop: 6 }}>{fmtDate(c.created_at)}</p>
               </div>
             ))}
           </div>
@@ -333,19 +334,21 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
 
       {/* Comment input */}
       {activeTab === 'comments' && (
-        <div className="flex-shrink-0 px-6 py-3 flex gap-2" style={{ borderTop: '1px solid rgba(226,232,240,0.7)' }}>
+        <div className="flex-shrink-0 px-6 py-3 flex gap-2" style={{ borderTop: `1px solid ${M.border}` }}>
           <input
             type="text"
             value={comment}
             onChange={e => setComment(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleSend() }}
             placeholder="Добавить комментарий…"
-            className="input flex-1 text-xs py-2.5 px-3"
+            className="flex-1 outline-none"
+            style={{ border: `1px solid ${M.borderAlt}`, borderRadius: 11, padding: '9px 13px', fontFamily: 'inherit', fontSize: 12.5, color: M.ink }}
           />
           <button
             onClick={handleSend}
             disabled={!comment.trim() || addComment.isPending}
-            className="btn btn-primary btn-sm"
+            className="flex items-center justify-center transition-transform active:scale-95 disabled:opacity-50"
+            style={{ width: 38, borderRadius: 11, background: M.indigo, color: '#fff', border: 'none' }}
           >
             <Send size={13} />
           </button>
@@ -356,27 +359,26 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
 }
 
 function SectionLabel({ children }) {
-  return <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">{children}</p>
+  return <p style={{ fontSize: 11, fontWeight: 700, color: M.muted, letterSpacing: '.04em', textTransform: 'uppercase', marginBottom: 12 }}>{children}</p>
 }
 
 function FinRow({ label, value }) {
   return (
     <div className="flex justify-between items-center">
-      <span className="text-xs text-slate-500">{label}</span>
-      <span className="text-xs font-semibold text-slate-700">{value}</span>
+      <span style={{ fontSize: 12, color: M.sub }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: '#76766E' }}>{value}</span>
     </div>
   )
 }
 
 function CustomerRow({ icon, label, children }) {
   return (
-    <div className="flex items-start justify-between gap-4 px-4 py-3"
-         style={{ borderBottom: '1px solid rgba(226,232,240,0.5)' }}>
+    <div className="flex items-start justify-between gap-4 px-4 py-3" style={{ borderBottom: `1px solid ${M.bg}` }}>
       <div className="flex items-center gap-2 flex-shrink-0">
         {icon}
-        <span className="text-xs text-slate-400">{label}</span>
+        <span style={{ fontSize: 12, color: M.muted }}>{label}</span>
       </div>
-      <span className="text-xs font-semibold text-slate-800 text-right break-words max-w-[60%]">
+      <span className="text-right break-words max-w-[60%]" style={{ fontSize: 12.5, fontWeight: 700, color: M.ink }}>
         {children}
       </span>
     </div>

@@ -16,11 +16,11 @@ import (
 // FinancialEventFilter is passed to all income / event-list repository methods.
 // All fields are optional — zero values are ignored.
 type FinancialEventFilter struct {
-	OrderID        *uuid.UUID
-	UserID         *uuid.UUID
-	EventType      FinancialEventType // "" = no filter
-	From           *time.Time
-	To             *time.Time
+	OrderID   *uuid.UUID
+	UserID    *uuid.UUID
+	EventType FinancialEventType // "" = no filter
+	From      *time.Time
+	To        *time.Time
 	// IncludeCompany: when true the query also returns company_revenue_earned events.
 	// Defaults to false so personal income never includes company events.
 	IncludeCompany bool
@@ -51,6 +51,12 @@ type incomeTotalRow struct {
 	OrdersCount int     `gorm:"column:orders_count"`
 }
 
+type incomeOrderTotalsRow struct {
+	TotalRevenue     float64 `gorm:"column:total_revenue"`
+	TotalDeliveryFee float64 `gorm:"column:total_delivery_fee"`
+	TotalNetRevenue  float64 `gorm:"column:total_net_revenue"`
+}
+
 // incomeEventRow is scanned from the enriched events query (JOIN orders).
 type incomeEventRow struct {
 	ID          uuid.UUID          `gorm:"column:id"`
@@ -62,6 +68,7 @@ type incomeEventRow struct {
 	OrderType   string             `gorm:"column:order_type"`
 	NetRevenue  float64            `gorm:"column:net_revenue"`
 	TotalAmount float64            `gorm:"column:total_amount"`
+	DeliveryFee float64            `gorm:"column:delivery_fee"`
 }
 
 // teamMemberIncomeRow is scanned for the per-member team income breakdown.
@@ -88,21 +95,25 @@ type IncomeEventResponse struct {
 	OrderType   string             `json:"order_type,omitempty"`
 	NetRevenue  float64            `json:"net_revenue,omitempty"`
 	TotalAmount float64            `json:"total_amount,omitempty"`
+	DeliveryFee float64            `json:"delivery_fee,omitempty"`
 }
 
 // IncomeReportResponse is returned by GET /hr/income/me and GET /hr/income/users/:id.
 //
 // orders_count == delivered_count because only delivered orders emit financial events.
 type IncomeReportResponse struct {
-	UserID          uuid.UUID             `json:"user_id"`
-	PeriodStart     time.Time             `json:"period_start"`
-	PeriodEnd       time.Time             `json:"period_end"`
-	TotalIncome     float64               `json:"total_income"`
-	OrdersCount     int                   `json:"orders_count"`
-	DeliveredCount  int                   `json:"delivered_count"`
-	AveragePerOrder float64               `json:"average_per_order"`
-	ByEventType     IncomeByType          `json:"by_event_type"`
-	Events          []IncomeEventResponse `json:"events,omitempty"`
+	UserID           uuid.UUID             `json:"user_id"`
+	PeriodStart      time.Time             `json:"period_start"`
+	PeriodEnd        time.Time             `json:"period_end"`
+	TotalIncome      float64               `json:"total_income"`
+	TotalRevenue     float64               `json:"total_revenue"`
+	TotalDeliveryFee float64               `json:"total_delivery_fee"`
+	NetProfit        float64               `json:"net_profit"`
+	OrdersCount      int                   `json:"orders_count"`
+	DeliveredCount   int                   `json:"delivered_count"`
+	AveragePerOrder  float64               `json:"average_per_order"`
+	ByEventType      IncomeByType          `json:"by_event_type"`
+	Events           []IncomeEventResponse `json:"events,omitempty"`
 }
 
 // TeamMemberIncome is one member's income inside a TeamIncomeResponse.

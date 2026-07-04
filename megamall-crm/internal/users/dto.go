@@ -43,8 +43,8 @@ type ListUsersFilter struct {
 	IsActive *bool       `form:"is_active"`
 	Status   *Status     `form:"status"`
 	Search   string      `form:"search"` // matches phone or full_name
-	IDs      []uuid.UUID `form:"-"`       // parsed manually from repeated ids[] query params
-	TeamID   *uuid.UUID  `form:"-"`       // set internally to scope non-owner callers to their own team
+	IDs      []uuid.UUID `form:"-"`      // parsed manually from repeated ids[] query params
+	TeamID   *uuid.UUID  `form:"-"`      // set internally to scope non-owner callers to their own team
 }
 
 // UserResponse is the public-facing user representation (no password hash).
@@ -68,7 +68,9 @@ type UserResponse struct {
 
 // PatchMeRequest allows a user to update their own editable profile fields.
 type PatchMeRequest struct {
-	TelegramChatID *string `json:"telegram_chat_id" validate:"omitempty,max=100"`
+	FullName       *string    `json:"full_name" validate:"omitempty,min=2,max=255"`
+	DateOfBirth    *time.Time `json:"date_of_birth" validate:"omitempty"`
+	TelegramChatID *string    `json:"telegram_chat_id" validate:"omitempty,max=100"`
 }
 
 // ToResponse converts a User model to a UserResponse DTO.

@@ -119,9 +119,9 @@ func (s *Service) ListEvents(
 // applyEventRoleFilter mutates filter in-place based on the caller's role.
 // Extracted for unit-testability.
 //
-//   owner              → IncludeCompany=true; UserID unchanged (owner can query all)
-//   seller/manager/tl  → UserID forced to actorID; IncludeCompany=false
-//   other              → returns Forbidden error
+//	owner              → IncludeCompany=true; UserID unchanged (owner can query all)
+//	seller/manager/tl  → UserID forced to actorID; IncludeCompany=false
+//	other              → returns Forbidden error
 func applyEventRoleFilter(actorID uuid.UUID, actorRole string, filter *FinancialEventFilter) error {
 	switch actorRole {
 	case "owner":
@@ -218,6 +218,11 @@ func (s *Service) buildIncomeReport(
 		return nil, apperrors.Internal(err)
 	}
 
+	orderTotals, err := s.repo.GetUserIncomeOrderTotals(ctx, userID, filter)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+
 	byType := make(IncomeByType, len(aggRows))
 	for _, row := range aggRows {
 		byType[row.EventType] = row.Total
@@ -229,14 +234,17 @@ func (s *Service) buildIncomeReport(
 	}
 
 	resp := &IncomeReportResponse{
-		UserID:          userID,
-		PeriodStart:     from,
-		PeriodEnd:       to,
-		TotalIncome:     round2(totalIncome),
-		OrdersCount:     ordersCount,
-		DeliveredCount:  ordersCount, // only delivered orders emit financial events
-		AveragePerOrder: avg,
-		ByEventType:     byType,
+		UserID:           userID,
+		PeriodStart:      from,
+		PeriodEnd:        to,
+		TotalIncome:      round2(totalIncome),
+		TotalRevenue:     round2(orderTotals.TotalRevenue),
+		TotalDeliveryFee: round2(orderTotals.TotalDeliveryFee),
+		NetProfit:        round2(totalIncome),
+		OrdersCount:      ordersCount,
+		DeliveredCount:   ordersCount, // only delivered orders emit financial events
+		AveragePerOrder:  avg,
+		ByEventType:      byType,
 	}
 
 	// 3. Optional enriched events list.
@@ -258,6 +266,7 @@ func (s *Service) buildIncomeReport(
 				OrderType:   r.OrderType,
 				NetRevenue:  r.NetRevenue,
 				TotalAmount: r.TotalAmount,
+				DeliveryFee: r.DeliveryFee,
 			}
 		}
 		resp.Events = events
@@ -336,14 +345,17 @@ func buildIncomeReportFromRows(
 	}
 
 	return IncomeReportResponse{
-		UserID:          userID,
-		PeriodStart:     from,
-		PeriodEnd:       to,
-		TotalIncome:     round2(totalIncome),
-		OrdersCount:     ordersCount,
-		DeliveredCount:  ordersCount,
-		AveragePerOrder: avg,
-		ByEventType:     byType,
+		UserID:           userID,
+		PeriodStart:      from,
+		PeriodEnd:        to,
+		TotalIncome:      round2(totalIncome),
+		TotalRevenue:     0,
+		TotalDeliveryFee: 0,
+		NetProfit:        round2(totalIncome),
+		OrdersCount:      ordersCount,
+		DeliveredCount:   ordersCount,
+		AveragePerOrder:  avg,
+		ByEventType:      byType,
 	}
 }
 

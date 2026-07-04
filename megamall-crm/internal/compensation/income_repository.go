@@ -60,6 +60,49 @@ func (r *Repository) GetUserIncomeByType(
 	return rows, nil
 }
 
+func (r *Repository) GetUserIncomeOrderTotals(
+	ctx context.Context,
+	userID uuid.UUID,
+	filter FinancialEventFilter,
+) (incomeOrderTotalsRow, error) {
+	from := filter.From
+	to := filter.To
+	typeWhere := ""
+	typeArgs := []interface{}{}
+	if filter.EventType != "" {
+		typeWhere = "AND fe.event_type = ?"
+		typeArgs = append(typeArgs, filter.EventType)
+	}
+
+	args := []interface{}{userID, from, to}
+	args = append(args, typeArgs...)
+
+	var row incomeOrderTotalsRow
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT
+			COALESCE(SUM(x.total_amount), 0)  AS total_revenue,
+			COALESCE(SUM(x.delivery_fee), 0)  AS total_delivery_fee,
+			COALESCE(SUM(x.net_revenue), 0)   AS total_net_revenue
+		FROM (
+			SELECT DISTINCT ON (o.id)
+				o.id,
+				COALESCE(o.total_amount, 0)  AS total_amount,
+				COALESCE(o.delivery_fee, 0)  AS delivery_fee,
+				COALESCE(o.net_revenue, 0)   AS net_revenue
+			FROM financial_events fe
+			JOIN orders o ON o.id = fe.order_id AND o.deleted_at IS NULL
+			WHERE fe.user_id    = ?
+			  AND fe.created_at >= ?
+			  AND fe.created_at <= ?
+			  `+typeWhere+`
+		) x
+	`, args...).Scan(&row).Error
+	if err != nil {
+		return incomeOrderTotalsRow{}, fmt.Errorf("get user income order totals: %w", err)
+	}
+	return row, nil
+}
+
 // GetUserIncomeEvents returns enriched event rows (joined with orders metadata).
 // Used when include_events=true is requested.
 func (r *Repository) GetUserIncomeEvents(
@@ -101,7 +144,8 @@ func (r *Repository) GetUserIncomeEvents(
 			COALESCE(o.order_number,        '')  AS order_number,
 			COALESCE(o.order_type::text,    '')  AS order_type,
 			COALESCE(o.net_revenue,   0)  AS net_revenue,
-			COALESCE(o.total_amount,  0)  AS total_amount
+			COALESCE(o.total_amount,  0)  AS total_amount,
+			COALESCE(o.delivery_fee,  0)  AS delivery_fee
 		FROM financial_events fe
 		LEFT JOIN orders o ON o.id = fe.order_id
 		WHERE fe.user_id    =  ?

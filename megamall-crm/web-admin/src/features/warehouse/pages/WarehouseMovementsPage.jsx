@@ -9,7 +9,7 @@ import Modal from '../../../shared/components/Modal'
 import { STATUS_LABELS, STATUS_BADGE } from '../../../shared/orderStatusConfig'
 import ReceivingEditModal from '../components/ReceivingEditModal'
 import useWarehouseData from '../hooks/useWarehouseData'
-import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getId, getMovementType, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
+import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getId, getMovementType, getProductImage, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
 
 const TYPES = [
   { value: '', label: 'Все типы' },
@@ -72,9 +72,10 @@ export default function WarehouseMovementsPage() {
   )
 }
 
-export function MovementList({ rows, data, emptyTitle = 'Движения не найдены' }) {
+export function MovementList({ rows, data, emptyTitle = 'Движения не найдены', showEntryActions = false, onlyLatestEntryEditable = false }) {
   const [detailMovement, setDetailMovement] = useState(null)
   const [editReceiving, setEditReceiving] = useState(null)
+  const latestEditableId = onlyLatestEntryEditable ? getId(rows.find(canEditMovement)) : null
   if (!rows.length) return <EmptyState icon={<ArrowLeftRight size={22} />} title={emptyTitle} description="Измените фильтры или выполните складскую операцию." />
   return (
     <>
@@ -90,15 +91,16 @@ export function MovementList({ rows, data, emptyTitle = 'Движения не �
               <th className="px-3 py-2.5 text-left">Пользователь</th>
               <th className="px-3 py-2.5 text-left">Дата</th>
               <th className="px-3 py-2.5 text-left">Комментарий</th>
+              {showEntryActions && <th className="px-3 py-2.5 text-right">Действия</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rows.map((m) => <MovementRow key={getId(m)} m={m} data={data} onOpen={setDetailMovement} />)}
+            {rows.map((m) => <MovementRow key={getId(m)} m={m} data={data} onOpen={setDetailMovement} onEdit={setEditReceiving} showActions={showEntryActions} latestEditableId={latestEditableId} />)}
           </tbody>
         </table>
       </div>
       <div className="space-y-3 lg:hidden">
-        {rows.map((m) => <MovementCard key={getId(m)} m={m} data={data} onOpen={setDetailMovement} />)}
+        {rows.map((m) => <MovementCard key={getId(m)} m={m} data={data} onOpen={setDetailMovement} onEdit={setEditReceiving} showActions={showEntryActions} latestEditableId={latestEditableId} />)}
       </div>
       <MovementDetailModal
         movement={detailMovement}
@@ -133,13 +135,50 @@ function MovementReason({ m, className }) {
   return <span className={className}>{cleanReason(m)}</span>
 }
 
-function MovementRow({ m, data, onOpen }) {
+function canEditMovement(m) {
+  const type = getMovementType(m)
+  return type === 'purchase' || type === 'writeoff'
+}
+
+function ProductThumb({ product }) {
+  const image = getProductImage(product)
+  const name = getProductName(product)
+  const letter = name && name !== '—' ? name[0].toUpperCase() : '•'
+  return (
+    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+      {image ? (
+        <img src={image} alt={name} className="h-full w-full object-cover" loading="lazy" />
+      ) : (
+        <span className="text-sm font-bold text-slate-400">{letter}</span>
+      )}
+    </div>
+  )
+}
+
+function MovementActions({ m, onEdit, latestEditableId }) {
+  if (!canEditMovement(m) || (latestEditableId && getId(m) !== latestEditableId)) return null
+  return (
+    <div className="flex justify-end gap-1.5">
+      <Button size="sm" variant="secondary" icon={<Pencil size={13} />} onClick={(e) => { e.stopPropagation(); onEdit(m) }}>Изменить</Button>
+    </div>
+  )
+}
+
+function MovementRow({ m, data, onOpen, onEdit, showActions, latestEditableId }) {
   const type = getMovementType(m)
   const product = data.productMap[m.product_id ?? m.ProductID]
   return (
     <tr className="cursor-pointer hover:bg-slate-50" onClick={() => onOpen(m)}>
       <td className="px-3 py-2.5"><Badge variant={MOVEMENT_BADGE[type] ?? 'slate'}>{MOVEMENT_LABEL[type] ?? type}</Badge></td>
-      <td className="px-3 py-2.5"><p className="font-bold text-slate-900">{getProductName(product)}</p><p className="font-mono text-xs text-slate-400">{getProductSku(product)}</p></td>
+      <td className="px-3 py-2.5">
+        <div className="flex items-center gap-3">
+          <ProductThumb product={product} />
+          <div className="min-w-0">
+            <p className="truncate font-bold text-slate-900">{getProductName(product)}</p>
+            <p className="font-mono text-xs text-slate-400">{getProductSku(product)}</p>
+          </div>
+        </div>
+      </td>
       <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-950">{m.quantity ?? m.Quantity}</td>
       <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{m.previous_quantity ?? m.PreviousQuantity ?? '—'}</td>
       <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">{m.new_quantity ?? m.NewQuantity ?? '—'}</td>
@@ -148,18 +187,23 @@ function MovementRow({ m, data, onOpen }) {
       <td className="max-w-[220px] px-3 py-2.5 text-xs text-slate-500">
         <MovementReason m={m} className="truncate" />
       </td>
+      {showActions && <td className="px-3 py-2.5 text-right"><MovementActions m={m} onEdit={onEdit} latestEditableId={latestEditableId} /></td>}
     </tr>
   )
 }
 
-function MovementCard({ m, data, onOpen }) {
+function MovementCard({ m, data, onOpen, onEdit, showActions, latestEditableId }) {
   const type = getMovementType(m)
   const product = data.productMap[m.product_id ?? m.ProductID]
   return (
     <article onClick={() => onOpen(m)} className="cursor-pointer rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-slate-950">{getProductName(product)}</p>
+        <div className="flex min-w-0 items-center gap-3">
+          <ProductThumb product={product} />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-slate-950">{getProductName(product)}</p>
+            <p className="font-mono text-xs text-slate-400">{getProductSku(product)}</p>
+          </div>
         </div>
         <Badge variant={MOVEMENT_BADGE[type] ?? 'slate'}>{MOVEMENT_LABEL[type] ?? type}</Badge>
       </div>
@@ -170,6 +214,11 @@ function MovementCard({ m, data, onOpen }) {
       <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
         <MovementReason m={m} />
       </div>
+      {showActions && canEditMovement(m) && (!latestEditableId || getId(m) === latestEditableId) && (
+        <div className="mt-3 flex gap-2">
+          <Button size="sm" variant="secondary" icon={<Pencil size={13} />} onClick={(e) => { e.stopPropagation(); onEdit(m) }}>Изменить</Button>
+        </div>
+      )}
     </article>
   )
 }

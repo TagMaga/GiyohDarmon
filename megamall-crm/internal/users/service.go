@@ -174,6 +174,16 @@ func (s *Service) PatchMe(ctx context.Context, id uuid.UUID, req PatchMeRequest)
 	if u == nil {
 		return nil, apperrors.NotFound("user")
 	}
+	if req.FullName != nil {
+		fullName := strings.TrimSpace(*req.FullName)
+		if fullName == "" {
+			return nil, apperrors.BadRequest("full_name is required")
+		}
+		u.FullName = fullName
+	}
+	if req.DateOfBirth != nil {
+		u.DateOfBirth = req.DateOfBirth
+	}
 	if req.TelegramChatID != nil {
 		u.TelegramChatID = req.TelegramChatID
 	}

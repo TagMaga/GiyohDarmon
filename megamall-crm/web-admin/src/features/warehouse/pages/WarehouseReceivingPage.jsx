@@ -40,7 +40,7 @@ export default function WarehouseReceivingPage() {
           <p className="mt-1 text-xs text-rose-800">Уменьшают доступный остаток и расходуют старые партии.</p>
         </div>
       </section>
-      <MovementList rows={rows} data={data} emptyTitle="Операций пока нет" />
+      <MovementList rows={rows} data={data} emptyTitle="Операций пока нет" showEntryActions onlyLatestEntryEditable />
       <ReceivingModal open={receivingOpen} onClose={() => setReceivingOpen(false)} products={data.products} inventory={data.inventory} />
       <WriteoffModal open={writeoffOpen} onClose={() => setWriteoffOpen(false)} products={data.products} inventory={data.inventory} />
     </div>

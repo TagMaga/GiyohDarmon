@@ -103,6 +103,16 @@ export async function patchMe(payload) {
   return unwrap(res)
 }
 
+/** POST /users/me/avatar */
+export async function uploadMyAvatar(file) {
+  const form = new FormData()
+  form.append('avatar', file)
+  const res = await client.post('/users/me/avatar', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return unwrap(res)
+}
+
 /** GET /hr/compensation/me */
 export async function fetchMyCompensation() {
   const res = await client.get('/hr/compensation/me')

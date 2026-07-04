@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import ProtectedRoute  from '../shared/components/ProtectedRoute'
 import Layout          from '../shared/components/Layout'
+import SellerLayout    from '../features/seller/components/SellerLayout'
 import Login           from '../pages/Login'
 import RootRedirect    from '../shared/components/RootRedirect'
 import ComingSoon      from '../shared/components/ComingSoon'
@@ -160,8 +161,8 @@ const router = createBrowserRouter([
         { index: true,      element: <Lazy><TeamLeadDashboardPage /></Lazy> },
         { path: 'income',   element: <Lazy><TeamLeadIncomePage /></Lazy> },
         { path: 'orders',   element: <Lazy><TeamLeadOrdersPage /></Lazy> },
-        { path: 'sellers',  element: <Lazy><TeamLeadSellersPage /></Lazy> },
-        { path: 'managers', element: <Lazy><TeamLeadManagerPage /></Lazy> },
+        { path: 'sellers',  element: <Navigate to="/team-lead/team" replace /> },
+        { path: 'managers', element: <Navigate to="/team-lead/team" replace /> },
         { path: 'reports',  element: <Lazy><TeamLeadReportsPage /></Lazy> },
         { path: 'team',     element: <Lazy><TeamLeadTeamPage /></Lazy> },
         { path: 'finance',  element: <Lazy><TeamLeadFinancePage /></Lazy> },
@@ -202,7 +203,7 @@ const router = createBrowserRouter([
     element: <ProtectedRoute allowedRole="seller" />,
     children: [{
       path: '/seller',
-      element: <Layout />,
+      element: <SellerLayout />,
       children: [
         {
           element: <Lazy><SellerDashboard /></Lazy>,

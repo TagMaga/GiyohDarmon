@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Clock, Download, FilterX, History, Package, PackagePlus, Pencil, Search, Trash2 } from 'lucide-react'
+import { Clock, Download, FilterX, Package, PackagePlus, Pencil, Search, Trash2 } from 'lucide-react'
 import PageHeader from '../../../shared/components/PageHeader'
 import Button from '../../../shared/components/Button'
 import Badge from '../../../shared/components/Badge'
@@ -73,10 +73,6 @@ export default function WarehouseInventoryPage() {
     setParams({}, { replace: true })
   }
 
-  function openHistory(product) {
-    setDrawerProduct(product)
-  }
-
   return (
     <div className="animate-fade-in p-6 pb-20 lg:pb-6">
       <PageHeader
@@ -122,7 +118,6 @@ export default function WarehouseInventoryPage() {
           onProduct={setDrawerProduct}
           onReceive={setReceiveProduct}
           onWriteoff={setWriteoffProduct}
-          onHistory={openHistory}
           onEdit={setModalProduct}
         />
       </div>
@@ -168,7 +163,7 @@ export default function WarehouseInventoryPage() {
   )
 }
 
-function InventoryTable({ rows, data, onProduct, onReceive, onWriteoff, onHistory, onEdit }) {
+function InventoryTable({ rows, data, onProduct, onReceive, onWriteoff, onEdit }) {
   if (!rows.length) {
     return <EmptyState icon={<Package size={22} />} title="Остатки не найдены" description="Измените поиск или сбросьте фильтры." />
   }
@@ -220,7 +215,6 @@ function InventoryTable({ rows, data, onProduct, onReceive, onWriteoff, onHistor
                   <div className="flex justify-end gap-1">
                     <IconAction title="Приход" icon={<Download size={15} />} onClick={() => onReceive(product)} />
                     <IconAction title="Списание" icon={<Trash2 size={15} />} onClick={() => onWriteoff(product)} danger />
-                    <IconAction title="История" icon={<History size={15} />} onClick={() => onHistory(product)} />
                     <IconAction title="Изменить" icon={<Pencil size={15} />} onClick={() => onEdit(product)} />
                   </div>
                 </td>

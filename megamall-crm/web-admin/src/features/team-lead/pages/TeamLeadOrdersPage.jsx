@@ -10,7 +10,7 @@
  */
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery }                    from '@tanstack/react-query'
-import { Search, X, ClipboardList }    from 'lucide-react'
+import { Search, X, ClipboardList, SlidersHorizontal } from 'lucide-react'
 import PageHeader                      from '../../../shared/components/PageHeader'
 import Badge                           from '../../../shared/components/Badge'
 import EmptyState                      from '../../../shared/components/EmptyState'
@@ -51,6 +51,7 @@ export default function TeamLeadOrdersPage() {
   const [rawSearch,    setRawSearch]    = useState('')
   const [page,         setPage]         = useState(1)
   const [detailOrder,  setDetailOrder]  = useState(null)
+  const [filtersOpen,  setFiltersOpen]  = useState(false)
 
   const search = useDebounce(rawSearch, 400)
 
@@ -269,8 +270,50 @@ export default function TeamLeadOrdersPage() {
           MOBILE
       ═══════════════════════════════════════════════════════════ */}
       <div className="lg:hidden page-container">
-        <PageHeader title="Заказы команды" subtitle={`Всего: ${totalCount}`} />
-        <div className="mb-4">{filtersSection}</div>
+        <PageHeader title="Orders" subtitle={`Team orders only · ${totalCount}`} />
+        <button
+          type="button"
+          onClick={() => setFiltersOpen(true)}
+          className="mb-4 w-full min-h-[44px] rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 flex items-center justify-between text-sm font-bold text-slate-800 shadow-[0_10px_28px_rgba(15,23,42,0.05)]"
+        >
+          <span>Filters</span>
+          <SlidersHorizontal size={17} className="text-slate-500" />
+        </button>
+
+        {filtersOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <button
+              type="button"
+              aria-label="Close filters"
+              onClick={() => setFiltersOpen(false)}
+              className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
+            />
+            <div className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-white p-4 pb-[calc(env(safe-area-inset-bottom,0px)+18px)] shadow-[0_-24px_60px_rgba(15,23,42,0.18)]">
+              <div className="mx-auto mb-4 h-1 w-11 rounded-full bg-slate-200" />
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-base font-black text-slate-950">Filters</p>
+                  <p className="text-xs text-slate-400">Period, status, seller and search</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              {filtersSection}
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(false)}
+                className="mt-4 w-full min-h-[46px] rounded-2xl bg-slate-950 text-white text-sm font-black"
+              >
+                Apply filters
+              </button>
+            </div>
+          </div>
+        )}
 
         {isLoading && (
           <div className="space-y-3">

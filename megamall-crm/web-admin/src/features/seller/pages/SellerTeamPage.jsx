@@ -54,10 +54,12 @@ export default function SellerTeamPage() {
   }
 
   return (
-    <div style={{ fontFamily: M.font }}>
+    <div style={{ fontFamily: M.font }} className="lg:h-full lg:flex lg:flex-col lg:gap-[22px]">
       {/* Header */}
-      <div className="flex items-baseline gap-2" style={{ marginBottom: 14 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', margin: 0 }}>Моя команда</h1>
+      <div className="flex items-baseline gap-2 lg:block" style={{ marginBottom: 14 }}>
+        <h1 className="lg:!text-[28px]" style={{ fontSize: 20, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', margin: 0 }}>
+          Моя команда
+        </h1>
         {myTeam && (
           <span style={{ fontSize: 12, color: M.muted, fontWeight: 500 }}>
             {leadership.length + members.length} участников
@@ -67,7 +69,7 @@ export default function SellerTeamPage() {
 
       {/* Own rank card */}
       {rank !== null && (
-        <Card className="flex items-center gap-3" style={{ padding: '14px 15px', marginBottom: 18 }}>
+        <Card className="flex items-center gap-3 lg:hidden" style={{ padding: '14px 15px', marginBottom: 18 }}>
           <div className="flex items-center justify-center flex-shrink-0" style={{ width: 42, height: 42, borderRadius: 12, background: M.amberBg, color: '#D97706' }}>
             <Trophy size={19} />
           </div>
@@ -86,7 +88,8 @@ export default function SellerTeamPage() {
       {leadership.length > 0 && (
         <>
           <SectionLabel style={{ margin: '0 4px 10px' }}>Руководство</SectionLabel>
-          <Card className="overflow-hidden" style={{ marginBottom: 18 }}>
+          {/* Mobile: stacked list */}
+          <Card className="overflow-hidden lg:hidden" style={{ marginBottom: 18 }}>
             {leadership.map((p, i) => (
               <div
                 key={p.id}
@@ -102,14 +105,28 @@ export default function SellerTeamPage() {
               </div>
             ))}
           </Card>
+          {/* Desktop: 2-col cards */}
+          <div className="hidden lg:grid grid-cols-2 gap-[14px]" style={{ marginBottom: 4 }}>
+            {leadership.map((p, i) => (
+              <Card key={p.id} className="flex items-center gap-[14px]" style={{ padding: '16px 18px' }}>
+                <InitialsAvatar name={p.full_name} size={48} palette={i + 1} />
+                <div className="flex-1 min-w-0">
+                  <div className="truncate" style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>{p.full_name}</div>
+                  <div style={{ fontSize: 12.5, color: M.muted, marginTop: 1 }}>{ROLE_LABEL[p.role] ?? p.role}</div>
+                </div>
+                <CallButton phone={p.phone} />
+              </Card>
+            ))}
+          </div>
         </>
       )}
 
       {/* Sellers */}
       {members.length > 0 && (
         <>
-          <SectionLabel style={{ margin: '0 4px 10px' }}>Продавцы на участке · {members.length}</SectionLabel>
-          <Card className="overflow-hidden" style={{ marginBottom: 14 }}>
+          <SectionLabel style={{ margin: '18px 4px 10px' }}>Продавцы на участке · {members.length}</SectionLabel>
+          {/* Mobile: stacked list */}
+          <Card className="overflow-hidden lg:hidden" style={{ marginBottom: 14 }}>
             {members.map((p, i) => {
               const isMe = p.id === userId
               return (
@@ -131,6 +148,37 @@ export default function SellerTeamPage() {
                     <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>{ROLE_LABEL[p.role] ?? p.role}</div>
                   </div>
                   {!isMe && <CallButton phone={p.phone} />}
+                </div>
+              )
+            })}
+          </Card>
+          {/* Desktop: table-style list */}
+          <Card className="hidden lg:block overflow-hidden lg:flex-1">
+            <div
+              className="grid"
+              style={{ gridTemplateColumns: '1fr 160px 90px', padding: '13px 20px', fontSize: 11, fontWeight: 700, color: M.muted, letterSpacing: '.03em', textTransform: 'uppercase', borderBottom: `1px solid ${M.bg}` }}
+            >
+              <div>Имя</div><div>Роль</div><div className="text-right">Контакт</div>
+            </div>
+            {members.map((p, i) => {
+              const isMe = p.id === userId
+              return (
+                <div
+                  key={p.id}
+                  className="grid items-center"
+                  style={{ gridTemplateColumns: '1fr 160px 90px', padding: '13px 20px', borderBottom: i < members.length - 1 ? `1px solid ${M.bg}` : 'none' }}
+                >
+                  <div className="flex items-center gap-3">
+                    <InitialsAvatar name={p.full_name} size={36} palette={i} />
+                    <span style={{ fontSize: 14, fontWeight: 700, color: M.ink }}>{p.full_name}</span>
+                    {isMe && (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: M.indigoDeep, background: M.indigoBg, padding: '2px 7px', borderRadius: 6 }}>Вы</span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13.5, color: '#76766E', fontWeight: 500 }}>{ROLE_LABEL[p.role] ?? p.role}</div>
+                  <div className="flex justify-end">
+                    {!isMe && <CallButton phone={p.phone} />}
+                  </div>
                 </div>
               )
             })}

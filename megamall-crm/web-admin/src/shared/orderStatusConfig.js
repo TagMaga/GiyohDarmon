@@ -11,7 +11,7 @@ export const STATUS_LABELS = {
   prepayment_pending:   'Ожидает предоплату',
   prepayment_received:  'Предоплата получена',
   assigned:             'Назначен',
-  in_delivery:          'В доставке',
+  in_delivery:          'В пути',
   delivered:            'Доставлен',
   returned:             'Возврат',
   cancelled:            'Отменён',
@@ -37,9 +37,8 @@ export const SELLER_STATUS_FILTERS = [
   { key: 'new',        label: 'Новые'           },
   { key: 'confirmed',  label: 'Подтверждённые'  },
   { key: 'assigned',   label: 'Назначенные'     },
-  { key: 'in_delivery',label: 'В доставке'      },
-  { key: 'delivered',  label: 'Доставленные'    },
-  { key: 'returned',   label: 'Возврат'         },
+  { key: 'in_delivery',label: 'В пути'          },
+  { key: 'delivered',  label: 'Доставлено'      },
   { key: 'cancelled',  label: 'Отменены'        },
 ]
 

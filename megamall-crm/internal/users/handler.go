@@ -260,7 +260,7 @@ func (h *Handler) GetMe(c *gin.Context) {
 }
 
 // PatchMe handles PATCH /users/me — lets any authenticated user edit their own
-// telegram_chat_id. All other fields require owner-level PATCH /users/:id.
+// safe personal profile fields. Administrative fields require owner-level PATCH /users/:id.
 func (h *Handler) PatchMe(c *gin.Context) {
 	var req PatchMeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

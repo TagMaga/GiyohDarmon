@@ -1,13 +1,11 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Phone, Wallet, Clock, ShoppingCart, CheckCircle } from 'lucide-react'
+import { Plus, Phone, Search } from 'lucide-react'
 import { fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
-import KpiCard from '../../../shared/components/KpiCard'
 import useSellerOrders from '../hooks/useSellerOrders'
 import { useSellerCompensation, useSellerTeamRank, useSellerMe } from '../hooks/useSellerMe'
 import OrderDetailBottomSheet from '../components/OrderDetailBottomSheet'
-import SellerOrdersTable from '../components/SellerOrdersTable'
 import { M, MobileShell, Card, DarkCard, StatTile, StatusPill, InitialsAvatar, PrimaryButton } from '../components/mobileUi'
 import { fetchCities } from '../api'
 import { KEYS } from '../../../shared/queryKeys'
@@ -46,73 +44,107 @@ export default function SellerHome() {
   return (
     <>
       {/* ═══════════════════════════════════════════════════════════
-          DESKTOP LAYOUT  (lg and up)
+          DESKTOP LAYOUT  (lg and up) — Seller Panel Redesign
       ═══════════════════════════════════════════════════════════ */}
-      <div className="hidden lg:block p-6">
+      <div className="hidden lg:flex flex-col gap-[22px]" style={{ padding: '36px 44px', fontFamily: M.font }}>
 
-        {/* Greeting header */}
-        <div className="flex items-center justify-between mb-7">
+        {/* Greeting + search */}
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="page-title">
-              {firstName ? `Добрый день, ${firstName}!` : 'Добрый день!'}
-            </h1>
-            <p className="page-subtitle">
-              {isLoading
-                ? 'Загрузка данных…'
-                : `${stats.todayCount} заказов сегодня · ${fmtAmount(stats.todayEarnings)} заработано`}
-            </p>
+            <div style={{ fontSize: 14, color: M.sub, fontWeight: 500 }}>Добрый день,</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', marginTop: 2 }}>
+              {firstName ?? '—'}
+            </div>
+          </div>
+          <div className="relative" style={{ width: 320 }}>
+            <Search size={17} className="absolute left-[14px] top-1/2 -translate-y-1/2" style={{ color: M.muted }} />
+            <input
+              placeholder="Поиск по клиенту, номеру…"
+              className="w-full outline-none"
+              style={{ border: `1px solid ${M.borderAlt}`, background: '#fff', borderRadius: 13, padding: '11px 14px 11px 40px', fontFamily: 'inherit', fontSize: 13.5, color: M.ink }}
+            />
           </div>
         </div>
 
-        {/* 4 KPI cards */}
-        <div className="grid grid-cols-4 gap-5 mb-7">
-          <KpiCard
-            label="Заказов сегодня"
-            value={isLoading ? '—' : String(stats.todayCount)}
-            icon={<ShoppingCart size={20} />}
-            color="sky"
-            loading={isLoading}
-          />
-          <KpiCard
-            label="В работе"
-            value={isLoading ? '—' : String(stats.activeCount)}
-            icon={<Clock size={20} />}
-            color="amber"
-            loading={isLoading}
-          />
-          <KpiCard
-            label="Доставлено"
-            value={isLoading ? '—' : String(stats.deliveredCount)}
-            icon={<CheckCircle size={20} />}
-            color="emerald"
-            loading={isLoading}
-          />
-          <KpiCard
-            label="Заработано сегодня"
-            value={isLoading ? '—' : fmtAmount(stats.todayEarnings)}
-            icon={<Wallet size={20} />}
-            color="violet"
-            loading={isLoading}
-          />
+        {/* Earnings hero + stat tiles */}
+        <div className="grid gap-5" style={{ gridTemplateColumns: '1.6fr 1fr' }}>
+          <DarkCard style={{ padding: '28px 30px' }}>
+            <div className="flex items-center gap-[7px]">
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34D399' }} />
+              <span style={{ fontSize: 12.5, color: M.darkSub, fontWeight: 600, letterSpacing: '.02em' }}>Заработано сегодня</span>
+            </div>
+            <div style={{ fontSize: 52, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', lineHeight: 1, marginTop: 16 }}>
+              {isLoading ? '—' : fmtAmount(stats.todayEarnings)}{' '}
+              <span style={{ fontSize: 28, fontWeight: 600, color: M.darkMuted }}>с</span>
+            </div>
+            <div style={{ fontSize: 13, color: M.darkMuted, marginTop: 12, fontWeight: 500 }}>
+              {isLoading ? 'Загрузка…' : `${stats.todayCount} заказов сегодня · ${stats.deliveredCount} доставлено`}
+            </div>
+          </DarkCard>
+          <div className="grid grid-cols-3 gap-3">
+            <Card style={{ borderRadius: 16, padding: '18px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{isLoading ? '—' : stats.activeCount}</div>
+              <div style={{ fontSize: 12, color: M.sub, fontWeight: 600, marginTop: 3 }}>В работе</div>
+            </Card>
+            <Card style={{ borderRadius: 16, padding: '18px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{isLoading ? '—' : stats.deliveredCount}</div>
+              <div style={{ fontSize: 12, color: M.sub, fontWeight: 600, marginTop: 3 }}>Доставлено</div>
+            </Card>
+            <Card style={{ borderRadius: 16, padding: '18px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color: commissionPct !== null ? M.green : M.ink, letterSpacing: '-.01em' }}>
+                {commissionPct !== null ? `${commissionPct}%` : (rank !== null ? `#${rank}` : '—')}
+              </div>
+              <div style={{ fontSize: 12, color: M.sub, fontWeight: 600, marginTop: 3 }}>{commissionPct !== null ? 'Мой процент' : 'В команде'}</div>
+            </Card>
+          </div>
         </div>
 
-        {/* Recent orders table */}
-        <div className="card overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900">Последние заказы</h2>
-            <Link
-              to="/seller/orders"
-              className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
+        {/* Recent orders */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-[14px]">
+            <span style={{ fontSize: 17, fontWeight: 700, color: M.ink }}>Последние заказы</span>
+            <Link to="/seller/orders" style={{ fontSize: 13.5, fontWeight: 600, color: M.indigo }}>Все заказы →</Link>
+          </div>
+          <Card style={{ borderRadius: 18, overflow: 'hidden' }}>
+            <div
+              className="grid"
+              style={{ gridTemplateColumns: '110px 1.3fr 1fr 1fr 130px 120px', padding: '13px 22px', fontSize: 11.5, fontWeight: 700, color: M.muted, letterSpacing: '.03em', textTransform: 'uppercase', borderBottom: `1px solid ${M.bg}` }}
             >
-              Все заказы →
-            </Link>
-          </div>
-          <SellerOrdersTable
-            orders={recent}
-            loading={isLoading}
-            citiesById={citiesById}
-            onDetail={setDetailOrder}
-          />
+              <div>Номер</div><div>Клиент</div><div>Город</div><div>Время</div><div>Статус</div><div className="text-right">Сумма</div>
+            </div>
+            {isLoading ? (
+              <div className="p-5 space-y-2">
+                {[1, 2, 3].map(i => <div key={i} className="h-10 rounded-xl bg-slate-100 animate-pulse" />)}
+              </div>
+            ) : recent.length === 0 ? (
+              <div className="p-10 text-center">
+                <p style={{ fontSize: 13, color: M.muted, marginBottom: 14 }}>Заказов нет. Создайте первый!</p>
+                <Link to="/seller/orders/create" className="inline-block">
+                  <PrimaryButton as="span" style={{ pointerEvents: 'none' }}>Создать заказ</PrimaryButton>
+                </Link>
+              </div>
+            ) : recent.map((order, i) => (
+              <div
+                key={order.id}
+                className="grid items-center cursor-pointer hover:bg-slate-50/60 transition-colors"
+                style={{ gridTemplateColumns: '110px 1.3fr 1fr 1fr 130px 120px', padding: '16px 22px', borderBottom: i < recent.length - 1 ? `1px solid ${M.bg}` : 'none' }}
+                onClick={() => setDetailOrder(order)}
+              >
+                <div style={{ fontSize: 12, fontWeight: 700, color: M.faint, fontVariantNumeric: 'tabular-nums' }}>
+                  {order.order_number ?? order.id?.slice(0, 8)}
+                </div>
+                <div style={{ fontSize: 14.5, fontWeight: 700, color: M.ink }} className="truncate pr-2">
+                  {order.customer?.full_name ?? '—'}
+                </div>
+                <div style={{ fontSize: 13, color: '#76766E', fontWeight: 500 }}>{citiesById[order.city_id] ?? '—'}</div>
+                <div style={{ fontSize: 13, color: M.muted, fontWeight: 500 }}>{fmtDate(order.created_at)}</div>
+                <div><StatusPill status={order.status} /></div>
+                <div className="text-right" style={{ fontSize: 15, fontWeight: 800, color: M.ink, fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtAmount(order.total_order_amount ?? order.total_amount)} с
+                </div>
+              </div>
+            ))}
+          </Card>
         </div>
       </div>
 

@@ -13,7 +13,7 @@ import { useState, useMemo }   from 'react'
 import { useNavigate }         from 'react-router-dom'
 import {
   ShoppingCart, Package, PackageCheck, TrendingUp, Users,
-  BarChart2, ChevronRight, RefreshCw, Users2, Medal,
+  BarChart2, ChevronRight, RefreshCw, Users2, Medal, AlertTriangle,
 } from 'lucide-react'
 import Badge                   from '../../../shared/components/Badge'
 import EmptyState              from '../../../shared/components/EmptyState'
@@ -52,18 +52,18 @@ function resolveCustomer(o) {
 // ── KPI tile ──────────────────────────────────────────────────────────────────
 
 const ACCENT = {
-  indigo:  { tile: 'bg-indigo-50  border-indigo-100',  icon: 'bg-indigo-100  text-indigo-600',  val: 'text-indigo-700'  },
-  emerald: { tile: 'bg-emerald-50 border-emerald-100', icon: 'bg-emerald-100 text-emerald-600', val: 'text-emerald-700' },
-  violet:  { tile: 'bg-violet-50  border-violet-100',  icon: 'bg-violet-100  text-violet-600',  val: 'text-violet-700'  },
-  amber:   { tile: 'bg-amber-50   border-amber-100',   icon: 'bg-amber-100   text-amber-600',   val: 'text-amber-700'   },
-  sky:     { tile: 'bg-sky-50     border-sky-100',     icon: 'bg-sky-100     text-sky-600',     val: 'text-sky-700'     },
-  rose:    { tile: 'bg-rose-50    border-rose-100',    icon: 'bg-rose-100    text-rose-600',    val: 'text-rose-700'    },
+  indigo:  { tile: 'bg-white/85 border-slate-200/80', icon: 'bg-slate-950 text-white',        val: 'text-slate-950' },
+  emerald: { tile: 'bg-white/85 border-slate-200/80', icon: 'bg-emerald-50 text-emerald-700', val: 'text-slate-950' },
+  violet:  { tile: 'bg-white/85 border-slate-200/80', icon: 'bg-indigo-50 text-indigo-700',   val: 'text-slate-950' },
+  amber:   { tile: 'bg-white/85 border-slate-200/80', icon: 'bg-amber-50 text-amber-700',     val: 'text-slate-950' },
+  sky:     { tile: 'bg-white/85 border-slate-200/80', icon: 'bg-sky-50 text-sky-700',         val: 'text-slate-950' },
+  rose:    { tile: 'bg-white/85 border-slate-200/80', icon: 'bg-rose-50 text-rose-700',       val: 'text-slate-950' },
 }
 
 function KpiTile({ icon, label, value, accent = 'indigo', loading, sub }) {
   const a = ACCENT[accent] ?? ACCENT.indigo
   return (
-    <div className={`rounded-2xl border p-4 flex flex-col gap-2 ${a.tile}`}>
+    <div className={`rounded-2xl border p-4 flex flex-col gap-2 shadow-[0_10px_30px_rgba(15,23,42,0.04)] backdrop-blur ${a.tile}`}>
       <div className="flex items-center gap-2">
         <span className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${a.icon}`}>
           {icon}
@@ -89,7 +89,7 @@ function KpiTile({ icon, label, value, accent = 'indigo', loading, sub }) {
 
 function SectionCard({ title, action, children, loading, emptyTitle, emptyDesc, isEmpty }) {
   return (
-    <div className="card p-5 flex flex-col gap-4 h-full">
+    <div className="rounded-2xl border border-slate-200/80 bg-white/85 p-5 flex flex-col gap-4 h-full shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur">
       <div className="flex items-center justify-between">
         <p className="text-sm font-bold text-slate-800">{title}</p>
         {action}
@@ -100,6 +100,60 @@ function SectionCard({ title, action, children, loading, emptyTitle, emptyDesc, 
           ? <EmptyState icon={<ShoppingCart size={18}/>} title={emptyTitle ?? 'Нет данных'} description={emptyDesc} />
           : children
       }
+    </div>
+  )
+}
+
+function AttentionNeeded({ orders, userMap, onOpenOrders }) {
+  const rows = useMemo(() => {
+    const flaggedStatuses = new Set(['cancelled', 'returned', 'issue', 'prepayment_pending'])
+    return orders.filter(o => flaggedStatuses.has(o.status ?? o.Status)).slice(0, 5)
+  }, [orders])
+
+  return (
+    <div className="rounded-2xl border border-slate-900 bg-slate-950 text-white p-5 shadow-[0_24px_55px_rgba(15,23,42,0.18)]">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <span className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center">
+            <AlertTriangle size={16} />
+          </span>
+          <div>
+            <p className="text-sm font-bold">Attention needed</p>
+            <p className="text-[11px] text-slate-400">Risk orders from your team only</p>
+          </div>
+        </div>
+        <button onClick={onOpenOrders} className="text-xs font-semibold text-white/80 hover:text-white min-h-[32px]">
+          Review
+        </button>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+          <p className="text-sm font-semibold text-white">No urgent risks</p>
+          <p className="text-xs text-slate-400 mt-1">Cancelled, returned, issue and prepayment-pending orders will appear here.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((order, i) => {
+            const status = order.status ?? order.Status ?? ''
+            const sellerId = order.seller_id ?? order.SellerID
+            const seller = sellerId ? (userMap[sellerId]?.full_name ?? userMap[sellerId]?.FullName ?? '—') : '—'
+            return (
+              <button
+                key={getOrderId(order) ?? i}
+                onClick={onOpenOrders}
+                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left hover:bg-white/[0.07] transition-colors"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-mono font-bold text-white">{formatOrderLabel(order)}</span>
+                  <span className="text-[11px] font-semibold text-amber-200">{STATUS_LABELS[status] ?? status}</span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 truncate">{resolveCustomer(order)} · {seller}</p>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -391,7 +445,7 @@ export default function TeamLeadDashboardPage() {
   const dataLoading = teamLoading || membersLoading || periodLoading
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
+    <div className="p-4 md:p-6 space-y-5 bg-[#F4F6F8] min-h-screen">
 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3">
@@ -403,7 +457,7 @@ export default function TeamLeadDashboardPage() {
             <h1 className="text-xl font-bold text-slate-900">
               {team?.name ?? 'Моя команда'}
             </h1>
-            <p className="text-xs text-slate-400">Панель руководителя · текущий месяц</p>
+            <p className="text-xs text-slate-400">Team sales, orders, weak spots and payouts · current month</p>
           </div>
         </div>
         <button
@@ -416,6 +470,12 @@ export default function TeamLeadDashboardPage() {
           <span className="hidden sm:inline">Обновить</span>
         </button>
       </div>
+
+      <AttentionNeeded
+        orders={myPeriodOrders}
+        userMap={userMap}
+        onOpenOrders={() => navigate('/team-lead/orders')}
+      />
 
       {/* ── KPI row ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -481,14 +541,14 @@ export default function TeamLeadDashboardPage() {
 
         {/* Team performance */}
         <SectionCard
-          title="Рейтинг продавцов"
+          title="Team ranking"
           loading={dataLoading}
           isEmpty={!dataLoading && myPeriodOrders.length === 0}
           emptyTitle="Нет данных"
           emptyDesc="Статистика появится после первых заказов."
           action={
             <button
-              onClick={() => navigate('/team-lead/sellers')}
+              onClick={() => navigate('/team-lead/team')}
               className="flex items-center gap-0.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors min-h-[32px]"
             >
               Подробнее <ChevronRight size={12}/>
@@ -514,7 +574,7 @@ export default function TeamLeadDashboardPage() {
         </SectionCard>
 
         {/* Team snapshot */}
-        <div className="card p-5 flex flex-col gap-4">
+        <div className="rounded-2xl border border-slate-200/80 bg-white/85 p-5 flex flex-col gap-4 shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur">
           <p className="text-sm font-bold text-slate-800">Команда</p>
           <TeamSnapshot
             team={team}
@@ -525,10 +585,10 @@ export default function TeamLeadDashboardPage() {
           />
           <div className="flex gap-2 flex-wrap mt-auto">
             <button
-              onClick={() => navigate('/team-lead/sellers')}
+              onClick={() => navigate('/team-lead/team')}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors min-h-[36px]"
             >
-              <Users size={13}/> Продавцы
+              <Users size={13}/> Team
             </button>
             <button
               onClick={() => navigate('/team-lead/reports')}

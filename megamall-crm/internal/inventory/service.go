@@ -142,8 +142,12 @@ func (s *Service) UpdateReceiving(ctx context.Context, actorID, movementID uuid.
 		if err != nil {
 			return err
 		}
-		if m.MovementType != MovementPurchase {
-			return apperrors.BadRequest("only receiving movements can be edited")
+		if m.MovementType != MovementPurchase && m.MovementType != MovementWriteoff {
+			return apperrors.BadRequest("only receiving and writeoff movements can be edited")
+		}
+		if m.MovementType == MovementWriteoff {
+			resp, err = s.updateWriteoffMovement(tx, ctx, actorID, m, req)
+			return err
 		}
 
 		b, err := s.repo.GetBatchByMovementForUpdate(tx, ctx, movementID)
@@ -266,6 +270,112 @@ func (s *Service) UpdateReceiving(ctx context.Context, actorID, movementID uuid.
 		return nil, txErr
 	}
 	return resp, nil
+}
+
+func (s *Service) updateWriteoffMovement(tx *gorm.DB, ctx context.Context, actorID uuid.UUID, m *Movement, req UpdateReceivingRequest) (*ReceivingResponse, error) {
+	if req.ProductID != m.ProductID {
+		return nil, apperrors.BadRequest("writeoff product cannot be changed")
+	}
+
+	oldProductID := m.ProductID
+	oldQuantity := m.Quantity
+	oldNote := derefString(m.Reason)
+	newNote := strings.TrimSpace(derefString(req.Notes))
+	if newNote == "" {
+		newNote = "Списание товара"
+	}
+
+	inv, err := s.repo.GetOrCreateForUpdate(tx, ctx, oldProductID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.restoreFIFOConsumption(tx, ctx, m.ID); err != nil {
+		return nil, err
+	}
+
+	restoredQty := inv.Quantity + oldQuantity
+	availableAfterRestore := restoredQty - inv.ReservedQuantity
+	if availableAfterRestore < req.Quantity {
+		return nil, apperrors.BadRequest(fmt.Sprintf(
+			"insufficient available stock after restoring writeoff: have %d, need %d",
+			availableAfterRestore,
+			req.Quantity,
+		))
+	}
+
+	newQty := restoredQty - req.Quantity
+	if err := s.repo.UpdateQuantity(tx, ctx, inv.ID, newQty); err != nil {
+		return nil, err
+	}
+
+	m.Quantity = req.Quantity
+	m.PreviousQuantity = restoredQty
+	m.NewQuantity = newQty
+	m.Reason = &newNote
+	if err := s.repo.UpdateMovement(tx, ctx, m); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.repo.ConsumeFIFO(tx, ctx, oldProductID, req.Quantity, m.ID); err != nil {
+		return nil, fmt.Errorf("writeoff edit FIFO consume: %w", err)
+	}
+
+	edit := &ReceivingEdit{
+		ID:           uuid.New(),
+		MovementID:   m.ID,
+		EditedBy:     actorID,
+		OldProductID: oldProductID,
+		NewProductID: oldProductID,
+		OldQuantity:  oldQuantity,
+		NewQuantity:  req.Quantity,
+		OldUnitCost:  0,
+		NewUnitCost:  0,
+		OldNote:      oldNote,
+		NewNote:      newNote,
+	}
+	if err := s.repo.InsertReceivingEdit(tx, ctx, edit); err != nil {
+		return nil, err
+	}
+
+	if err := s.logger.LogSync(tx, activity.Entry{
+		ActorID:    &actorID,
+		Action:     "edit_writeoff",
+		EntityType: "inventory_movement",
+		EntityID:   &m.ID,
+		BeforeState: map[string]interface{}{
+			"product_id": oldProductID,
+			"quantity":   oldQuantity,
+			"reason":     oldNote,
+		},
+		AfterState: map[string]interface{}{
+			"product_id": oldProductID,
+			"quantity":   req.Quantity,
+			"reason":     newNote,
+		},
+		Reason: &newNote,
+	}); err != nil {
+		return nil, err
+	}
+
+	return &ReceivingResponse{MovementID: m.ID}, nil
+}
+
+func (s *Service) restoreFIFOConsumption(tx *gorm.DB, ctx context.Context, movementID uuid.UUID) error {
+	consumptions, err := s.repo.ListBatchConsumptionsForMovementForUpdate(tx, ctx, movementID)
+	if err != nil {
+		return err
+	}
+	for _, consumption := range consumptions {
+		batch, err := s.repo.GetBatchForUpdate(tx, ctx, consumption.BatchID)
+		if err != nil {
+			return err
+		}
+		if err := s.repo.UpdateBatchRemaining(tx, ctx, batch.ID, batch.RemainingQuantity+consumption.Quantity); err != nil {
+			return err
+		}
+	}
+	return s.repo.DeleteBatchConsumptionsByMovement(tx, ctx, movementID)
 }
 
 func receivingReason(note string) string {

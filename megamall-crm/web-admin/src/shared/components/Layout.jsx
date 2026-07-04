@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Home, ShoppingCart, Plus, Wallet, User, Users, TrendingUp, Truck, MoreHorizontal, Package, PackagePlus, BarChart3 } from 'lucide-react'
 import Sidebar from './Sidebar'
-import Topbar from './Topbar'
 import useAuthStore from '../store/authStore'
 import BottomNav from '../../features/seller/components/BottomNav'
 
@@ -31,11 +30,10 @@ const WAREHOUSE_TABS = [
 ]
 
 const TEAM_LEAD_TABS = [
-  { label: 'Главная',      icon: Home,           path: '/team-lead',         end: true  },
-  { label: 'Заказы',       icon: ShoppingCart,    path: '/team-lead/orders',  end: false },
-  { label: 'Моя команда',  icon: Users,           path: '/team-lead/team',    end: false },
-  { label: 'Финансы',      icon: Wallet,          path: '/team-lead/finance', end: false },
-  { label: 'Ещё',          icon: MoreHorizontal,  path: '/team-lead/more',    end: false },
+  { label: 'Dashboard', icon: Home,         path: '/team-lead',         end: true  },
+  { label: 'Orders',    icon: ShoppingCart, path: '/team-lead/orders',  end: false },
+  { label: 'Team',      icon: Users,        path: '/team-lead/team',    end: false },
+  { label: 'Finance',   icon: Wallet,       path: '/team-lead/finance', end: false },
 ]
 
 export default function Layout() {
@@ -68,8 +66,6 @@ export default function Layout() {
       )}
 
       <div className="flex flex-col min-h-screen lg:pl-[260px]">
-        <Topbar onMenuClick={() => setSidebarOpen(true)} />
-
         {/* Extra bottom padding on mobile for roles with BottomNav so content clears it */}
         <main className={`flex-1 p-0 ${hasMobileNav ? 'pb-20' : ''}`}>
           <Outlet />

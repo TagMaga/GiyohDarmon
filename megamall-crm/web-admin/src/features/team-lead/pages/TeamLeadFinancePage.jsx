@@ -12,13 +12,14 @@
  * by TeamLeadTeamPage's detail sheet.
  */
 import { useState, useEffect, useMemo } from 'react'
-import { Check } from 'lucide-react'
+import { Check, History } from 'lucide-react'
 import Badge           from '../../../shared/components/Badge'
 import Modal            from '../../../shared/components/Modal'
 import { CardSkeleton } from '../../../shared/components/Skeleton'
 import { useToast }     from '../../../shared/components/ToastProvider'
 import { fmtAmount }    from '../../../shared/orderStatusConfig'
 import useCurrentUser   from '../../../shared/hooks/useCurrentUser'
+import useMyPayouts     from '../../../shared/hooks/useMyPayouts'
 import usePayables       from '../hooks/usePayables'
 import useCreatePayouts  from '../hooks/useCreatePayouts'
 
@@ -52,6 +53,7 @@ export default function TeamLeadFinancePage() {
   const to   = toYMD(now)
 
   const { data: payables, isLoading } = usePayables(userId, { from, to })
+  const { data: payoutHistory = [], isLoading: historyLoading } = useMyPayouts()
   const members = payables?.members ?? []
 
   const [selected, setSelected] = useState(() => new Set())
@@ -121,10 +123,10 @@ export default function TeamLeadFinancePage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 pb-24">
+    <div className="p-4 md:p-6 space-y-4 pb-24 bg-[#F4F6F8] min-h-screen">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Финансы команды</h1>
-        <p className="text-xs text-slate-400">Выплаты — только участникам вашей команды</p>
+        <h1 className="text-xl font-bold text-slate-900">Finance</h1>
+        <p className="text-xs text-slate-400">My income, team income, payables and payout history · your team only</p>
       </div>
 
       {isLoading ? (
@@ -132,19 +134,14 @@ export default function TeamLeadFinancePage() {
       ) : (
         <div
           className="rounded-[28px] p-6 relative overflow-hidden"
-          style={{ background: '#fff', border: '1px solid #E3DBFF', boxShadow: '0 16px 34px rgba(79,70,229,.15)' }}
+          style={{ background: '#fff', border: '1px solid #DDE3EA', boxShadow: '0 18px 45px rgba(15,23,42,.08)' }}
         >
-          <div className="text-[11px] font-black uppercase tracking-wide" style={{ color: '#7C3AED' }}>
+          <div className="text-[11px] font-black uppercase tracking-wide" style={{ color: '#475569' }}>
             Ваш личный доход за период
           </div>
           <div
             className="text-[42px] font-black tracking-tight my-2 leading-none"
-            style={{
-              background: 'linear-gradient(135deg,#4F46E5,#7C3AED)',
-              WebkitBackgroundClip: 'text',
-              backgroundClip: 'text',
-              color: 'transparent',
-            }}
+            style={{ color: '#111827' }}
           >
             {fmtRu(payables?.personal_net)} сомони
           </div>
@@ -159,7 +156,7 @@ export default function TeamLeadFinancePage() {
             <span className="text-slate-400">−</span>
             <span style={{ color: '#B45309' }}>{fmtRu(payables?.team_paid)}</span>
             <span className="text-slate-400">=</span>
-            <span className="text-indigo-600">{fmtRu(payables?.team_remaining)}</span>
+            <span className="text-slate-950">{fmtRu(payables?.team_remaining)}</span>
           </div>
           <p className="text-center text-slate-400 font-bold text-xs mt-3">
             Доход команды − Уже выплачено = Осталось выплатить
@@ -189,7 +186,7 @@ export default function TeamLeadFinancePage() {
                 onClick={() => toggle(m.payee_id)}
                 className="w-[22px] h-[22px] rounded-lg border-2 flex items-center justify-center flex-shrink-0 mt-0.5"
                 style={isChecked
-                  ? { background: 'linear-gradient(135deg,#4F46E5,#6D28D9)', borderColor: '#4F46E5' }
+                  ? { background: '#111827', borderColor: '#111827' }
                   : { borderColor: '#CBD5E1', background: '#fff' }}
               >
                 {isChecked && <Check size={13} className="text-white" />}
@@ -198,7 +195,7 @@ export default function TeamLeadFinancePage() {
                 <div className="flex items-center gap-2 mb-1.5">
                   <div
                     className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'linear-gradient(135deg,#4F46E5,#7C3AED)' }}
+                    style={{ background: '#111827' }}
                   >
                     <span className="text-[11px] font-bold text-white">{initialsOf(m.full_name)}</span>
                   </div>
@@ -251,7 +248,7 @@ export default function TeamLeadFinancePage() {
           </div>
           <button
             className="rounded-xl px-5 py-3 text-white font-black text-sm disabled:opacity-40"
-            style={{ background: 'linear-gradient(135deg,#4F46E5,#6D28D9)', boxShadow: '0 8px 18px rgba(79,70,229,.3)' }}
+            style={{ background: '#111827', boxShadow: '0 8px 18px rgba(15,23,42,.2)' }}
             disabled={hasInvalidSelected}
             onClick={() => setConfirmOpen(true)}
           >
@@ -259,6 +256,35 @@ export default function TeamLeadFinancePage() {
           </button>
         </div>
       )}
+
+      <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-[0_14px_35px_rgba(15,23,42,0.05)]">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+            <History size={15} />
+          </span>
+          <div>
+            <h2 className="text-sm font-black text-slate-900">Payout history</h2>
+            <p className="text-[11px] text-slate-400">Payments received by you, scoped by backend permissions</p>
+          </div>
+        </div>
+        {historyLoading ? (
+          <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-12 rounded-xl bg-slate-100 animate-pulse" />)}</div>
+        ) : payoutHistory.length === 0 ? (
+          <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-400">No payout history yet.</p>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {payoutHistory.slice(0, 6).map(p => (
+              <div key={p.id} className="py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-800">{p.method ?? 'payout'} · {p.status ?? 'paid'}</p>
+                  <p className="text-[11px] text-slate-400 truncate">{p.period_start} → {p.period_end}</p>
+                </div>
+                <span className="text-sm font-black text-slate-950 whitespace-nowrap">{fmtAmount(p.amount)} сомони</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <Modal
         open={confirmOpen}
@@ -295,7 +321,7 @@ export default function TeamLeadFinancePage() {
         </div>
         <button
           className="w-full rounded-2xl py-3.5 text-white font-black text-sm disabled:opacity-50"
-          style={{ background: 'linear-gradient(135deg,#4F46E5,#6D28D9)' }}
+          style={{ background: '#111827' }}
           disabled={createPayouts.isPending || hasInvalidSelected}
           onClick={handleConfirm}
         >
