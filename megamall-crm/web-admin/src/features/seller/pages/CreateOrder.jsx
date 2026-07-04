@@ -423,12 +423,6 @@ export default function CreateOrder() {
     )
   }
 
-  const stepsDone = [
-    Boolean(form.phone.trim() && form.cityId),
-    cartItems.length > 0,
-    Boolean(form.deliveryMode),
-    form.payMode !== 'prepayment' || prepayAmt > 0,
-  ]
   return (
     <div
       className="pb-8 min-h-screen"
@@ -437,7 +431,7 @@ export default function CreateOrder() {
         fontFamily: M.font,
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)',
         paddingLeft: 16, paddingRight: 16,
-        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 280px)',
+        paddingBottom: '8rem',
       }}
     >
       <div className="max-w-xl mx-auto">
@@ -456,13 +450,6 @@ export default function CreateOrder() {
             <h1 style={{ fontSize: 20, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', margin: 0 }}>Новый заказ</h1>
             <div style={{ fontSize: 12, color: M.muted, fontWeight: 500, marginTop: 2 }}>Быстрое оформление</div>
           </div>
-        </div>
-
-        {/* Step progress */}
-        <div className="flex items-center gap-[6px]" style={{ padding: '10px 0 14px' }}>
-          {stepsDone.map((done, i) => (
-            <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: done ? M.indigo : M.borderAlt }} />
-          ))}
         </div>
 
         <div className="space-y-3">
@@ -609,16 +596,11 @@ export default function CreateOrder() {
         )}
         </div>
 
-        {/* ── Fixed total + CTA (always reachable, independent of page length) ── */}
+        {/* ── Total + CTA — flows at the end of the page, right after the comment card ── */}
         <div
-          className="fixed left-0 right-0 z-30 px-4"
-          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)' }}
-        >
-        <div
-          className="max-w-xl mx-auto"
           style={{
             background: '#fff', border: `1px solid ${M.border}`,
-            borderRadius: 20, padding: '14px 18px 16px',
+            borderRadius: 20, padding: '14px 18px 16px', marginTop: 14,
             boxShadow: '0 -8px 24px rgba(20,20,20,.05), 0 10px 28px rgba(20,20,20,.10)',
           }}
         >
@@ -679,7 +661,6 @@ export default function CreateOrder() {
               )}
             </button>
           </div>
-        </div>
         </div>
       </div>
     </div>
