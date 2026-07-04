@@ -21,6 +21,14 @@ package-lock.json
 # Uploads (runtime data)
 megamall-crm/uploads/
 
+# Backups (local snapshots, never committed)
+backups/
+
+# Design-sync tool caches
+megamall-crm/web-admin/.design-sync/
+megamall-crm/web-admin/.ds-sync/
+megamall-crm/web-admin/ds-bundle/
+
 # IDE / Claude internals
 .claude/
 megamall-crm/.claude/
