@@ -10,7 +10,7 @@ const SELLER_TABS = [
 ]
 
 export default function BottomNav({ tabs = SELLER_TABS, variant }) {
-  if (variant === 'seller') return <SellerBottomNav tabs={tabs} />
+  if (variant === 'seller' || variant === 'teamlead') return <SellerBottomNav tabs={tabs} />
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-40 lg:hidden flex items-end justify-around px-3"

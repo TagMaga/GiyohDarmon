@@ -21,6 +21,13 @@ export async function fetchPayables(teamLeadId, params = {}) {
   return unwrap(res)
 }
 
+/** GET /payouts/payee/:payeeId — payout history for one team member, as paid by the caller. */
+export async function fetchPayeePayoutHistory(payeeId) {
+  const res = await client.get(`/payouts/payee/${payeeId}`)
+  const data = unwrap(res)
+  return Array.isArray(data) ? data : []
+}
+
 /** POST /payouts — bulk "Выплатить" action. */
 export async function createPayouts(payload) {
   const res = await client.post('/payouts', payload)

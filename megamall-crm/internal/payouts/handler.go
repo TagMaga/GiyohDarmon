@@ -45,6 +45,23 @@ func (h *Handler) GetPayablesForTeamLead(c *gin.Context) {
 	response.OK(c, out)
 }
 
+// GetPayeePayoutHistory handles GET /payouts/payee/:payeeId — payout history
+// for one team member, scoped to payouts the calling team lead made.
+func (h *Handler) GetPayeePayoutHistory(c *gin.Context) {
+	claims := middleware.ClaimsFromContext(c)
+	payeeID, err := uuid.Parse(c.Param("payeeId"))
+	if err != nil {
+		response.Error(c, apperrors.BadRequest("invalid payee id"))
+		return
+	}
+	out, err := h.svc.GetPayeePayoutHistory(c.Request.Context(), claims.UserID, claims.Role, payeeID)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, out)
+}
+
 // CreatePayouts handles POST /payouts — bulk "Выплатить" action.
 func (h *Handler) CreatePayouts(c *gin.Context) {
 	var req CreatePayoutsRequest

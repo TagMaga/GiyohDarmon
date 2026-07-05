@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react'
 import ProtectedRoute  from '../shared/components/ProtectedRoute'
 import Layout          from '../shared/components/Layout'
 import SellerLayout    from '../features/seller/components/SellerLayout'
+import TeamLeadLayout  from '../features/team-lead/components/TeamLeadLayout'
 import Login           from '../pages/Login'
 import RootRedirect    from '../shared/components/RootRedirect'
 import ComingSoon      from '../shared/components/ComingSoon'
@@ -41,6 +42,8 @@ const TeamLeadManagerPage   = lazy(() => import('../features/team-lead/pages/Tea
 const TeamLeadReportsPage   = lazy(() => import('../features/team-lead/pages/TeamLeadReportsPage'))
 const TeamLeadTeamPage      = lazy(() => import('../features/team-lead/pages/TeamLeadTeamPage'))
 const TeamLeadFinancePage   = lazy(() => import('../features/team-lead/pages/TeamLeadFinancePage'))
+const TeamLeadProfilePage             = lazy(() => import('../features/team-lead/pages/TeamLeadProfilePage'))
+const TeamLeadSellerFinanceDetailPage = lazy(() => import('../features/team-lead/pages/TeamLeadSellerFinanceDetailPage'))
 
 // Manager
 const ManagerDashboardPage = lazy(() => import('../features/manager/pages/ManagerDashboardPage'))
@@ -156,16 +159,26 @@ const router = createBrowserRouter([
     element: <ProtectedRoute allowedRole="sales_team_lead" />,
     children: [{
       path: '/team-lead',
-      element: <Layout />,
+      element: <TeamLeadLayout />,
       children: [
         { index: true,      element: <Lazy><TeamLeadDashboardPage /></Lazy> },
         { path: 'income',   element: <Lazy><TeamLeadIncomePage /></Lazy> },
-        { path: 'orders',   element: <Lazy><TeamLeadOrdersPage /></Lazy> },
+        { path: 'orders',              element: <Lazy><TeamLeadOrdersPage /></Lazy> },
+        { path: 'orders/create',       element: <Lazy><CreateOrder /></Lazy> },
         { path: 'sellers',  element: <Navigate to="/team-lead/team" replace /> },
         { path: 'managers', element: <Navigate to="/team-lead/team" replace /> },
         { path: 'reports',  element: <Lazy><TeamLeadReportsPage /></Lazy> },
-        { path: 'team',     element: <Lazy><TeamLeadTeamPage /></Lazy> },
+        { path: 'team',              element: <Lazy><TeamLeadTeamPage /></Lazy> },
+        { path: 'team/:payeeId',     element: <Lazy><TeamLeadSellerFinanceDetailPage /></Lazy> },
         { path: 'finance',  element: <Lazy><TeamLeadFinancePage /></Lazy> },
+        {
+          path: 'profile',
+          element: <Lazy><TeamLeadProfilePage /></Lazy>,
+          children: [
+            { index: true,  element: <Navigate to="info" replace /> },
+            { path: 'info', element: <Lazy><SellerProfileInfoPage /></Lazy> },
+          ],
+        },
         { path: '*',        element: <ComingSoon /> },
       ],
     }],

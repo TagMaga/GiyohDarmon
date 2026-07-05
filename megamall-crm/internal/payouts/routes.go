@@ -16,5 +16,6 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	payerRoles := middleware.RequireRoles("owner", "sales_team_lead")
 	rg.POST("", payerRoles, h.CreatePayouts)
 	rg.GET("/payables/team-lead/:id", payerRoles, h.GetPayablesForTeamLead)
+	rg.GET("/payee/:payeeId", payerRoles, h.GetPayeePayoutHistory)
 	rg.POST("/:id/void", payerRoles, h.VoidPayout)
 }

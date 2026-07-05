@@ -30,6 +30,8 @@ import useTeams                from '../../people/hooks/useTeams'
 import useTeamIncome           from '../../hr/hooks/useTeamIncome'
 import { buildUserMap }        from '../../people/utils/peopleHelpers'
 import useOwnerOrders          from '../../orders/hooks/useOwnerOrders'
+import useProfile              from '../../../shared/hooks/useProfile'
+import { M, MobileShell, DarkCard, Card, InitialsAvatar } from '../../seller/components/mobileUi'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -444,8 +446,113 @@ export default function TeamLeadDashboardPage() {
 
   const dataLoading = teamLoading || membersLoading || periodLoading
 
+  // ── Mobile-only derived values (Teamlead Panel Redesign home screen) ──────
+  const { fullName: profileFullName } = useProfile()
+  const todaySalesSum = useMemo(
+    () => myTodayOrders.reduce((sum, o) => sum + Number(o.total_order_amount ?? o.total_amount ?? o.amount ?? 0), 0),
+    [myTodayOrders]
+  )
+  const activeSellersToday = useMemo(
+    () => new Set(myTodayOrders.map(o => o.seller_id ?? o.SellerID).filter(Boolean)).size,
+    [myTodayOrders]
+  )
+  const deliveredToday = myTodayOrders.filter(o => (o.status ?? o.Status) === 'delivered').length
+  const topSellers = useMemo(() => {
+    const s = {}
+    myPeriodOrders.forEach(o => {
+      const id = o.seller_id ?? o.SellerID
+      if (!id) return
+      if (!s[id]) s[id] = { orders: 0, revenue: 0 }
+      s[id].orders++
+      s[id].revenue += Number(o.total_order_amount ?? o.total_amount ?? o.amount ?? 0)
+    })
+    return Object.entries(s)
+      .map(([id, v]) => ({ id, name: userMap[id]?.full_name ?? userMap[id]?.FullName ?? id.slice(0, 8), ...v }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 3)
+  }, [myPeriodOrders, userMap])
+
   return (
-    <div className="p-4 md:p-6 space-y-5 bg-[#F4F6F8] min-h-screen">
+    <>
+    {/* ═══════════════════════════════════════════════════════════
+        MOBILE LAYOUT — Teamlead Panel Redesign
+    ═══════════════════════════════════════════════════════════ */}
+    <MobileShell>
+      <div className="px-5">
+        <div className="flex items-center justify-between" style={{ padding: '8px 4px 16px' }}>
+          <div>
+            <div style={{ fontSize: 13, color: M.sub, fontWeight: 500 }}>Добрый день,</div>
+            <div style={{ fontSize: 21, fontWeight: 700, color: M.ink, letterSpacing: '-.01em', marginTop: 1 }}>
+              {profileFullName?.split(' ')[0] ?? leadName?.split(' ')[0] ?? 'Тимлид'}
+            </div>
+          </div>
+          <InitialsAvatar name={profileFullName ?? leadName ?? ''} size={42} radius={14} />
+        </div>
+
+        <DarkCard>
+          <div className="flex items-center gap-[7px]">
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34D399' }} />
+            <span style={{ fontSize: 12.5, color: M.darkSub, fontWeight: 600, letterSpacing: '.02em' }}>Продажи команды сегодня</span>
+          </div>
+          <div style={{ fontSize: 42, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', lineHeight: 1, marginTop: 12 }}>
+            {todayLoading ? '…' : fmtAmount(todaySalesSum)} <span style={{ fontSize: 24, fontWeight: 600, color: M.darkMuted }}>с</span>
+          </div>
+          <div style={{ fontSize: 12.5, color: M.darkMuted, marginTop: 9, fontWeight: 500 }}>
+            {myTodayOrders.length} заказ{myTodayOrders.length === 1 ? '' : 'ов'} · {activeSellersToday} продавц{activeSellersToday === 1 ? 'ец' : 'ов'} активно
+          </div>
+        </DarkCard>
+
+        <div className="grid grid-cols-3 gap-[9px]" style={{ marginTop: 14 }}>
+          <Card style={{ borderRadius: 15, padding: '13px 12px' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{todayLoading ? '…' : myTodayOrders.length}</div>
+            <div style={{ fontSize: 11.5, color: M.sub, fontWeight: 600, marginTop: 2 }}>Заказов</div>
+          </Card>
+          <Card style={{ borderRadius: 15, padding: '13px 12px' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{membersLoading ? '…' : `${activeSellersToday}/${sellers.length}`}</div>
+            <div style={{ fontSize: 11.5, color: M.sub, fontWeight: 600, marginTop: 2 }}>Активны</div>
+          </Card>
+          <Card style={{ borderRadius: 15, padding: '13px 12px' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{todayLoading ? '…' : deliveredToday}</div>
+            <div style={{ fontSize: 11.5, color: M.sub, fontWeight: 600, marginTop: 2 }}>Доставлено</div>
+          </Card>
+        </div>
+
+        <div className="flex items-center justify-between" style={{ margin: '22px 4px 12px' }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>Топ продавцов</span>
+          <button type="button" onClick={() => navigate('/team-lead/team')} style={{ fontSize: 13, fontWeight: 600, color: M.indigo, background: 'none', border: 'none' }}>Все →</button>
+        </div>
+
+        {dataLoading ? (
+          <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-14 rounded-2xl animate-pulse" style={{ background: M.border }} />)}</div>
+        ) : topSellers.length === 0 ? (
+          <Card style={{ padding: 20, textAlign: 'center' }}><p style={{ fontSize: 13, color: M.muted }}>Нет данных за период</p></Card>
+        ) : (
+          <Card style={{ overflow: 'hidden' }}>
+            {topSellers.map((s, i) => (
+              <div key={s.id} className="flex items-center gap-[11px]" style={{ padding: '13px 15px', borderBottom: i < topSellers.length - 1 ? `1px solid ${M.bg}` : 'none' }}>
+                <span
+                  className="flex items-center justify-center flex-shrink-0"
+                  style={{ width: 22, height: 22, borderRadius: 7, fontSize: 12, fontWeight: 800, background: i === 0 ? '#FEF3C7' : '#F0EFEA', color: i === 0 ? '#B45309' : '#76766E' }}
+                >
+                  {i + 1}
+                </span>
+                <InitialsAvatar name={s.name} size={36} palette={i} />
+                <div className="flex-1 min-w-0">
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }} className="truncate">{s.name}</div>
+                  <div style={{ fontSize: 11.5, color: M.faint, marginTop: 1 }}>{s.orders} заказ{s.orders === 1 ? '' : 'ов'}</div>
+                </div>
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: M.ink, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmtAmount(s.revenue)} с</span>
+              </div>
+            ))}
+          </Card>
+        )}
+      </div>
+    </MobileShell>
+
+    {/* ═══════════════════════════════════════════════════════════
+        DESKTOP LAYOUT
+    ═══════════════════════════════════════════════════════════ */}
+    <div className="hidden lg:block p-4 md:p-6 space-y-5 bg-[#F4F6F8] min-h-screen">
 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3">
@@ -600,5 +707,6 @@ export default function TeamLeadDashboardPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }

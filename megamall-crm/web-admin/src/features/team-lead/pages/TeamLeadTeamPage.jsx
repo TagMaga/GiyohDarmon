@@ -1,26 +1,28 @@
 /**
- * TeamLeadTeamPage — /team-lead/team ("Моя команда")
+ * TeamLeadTeamPage — /team-lead/team ("Команда")
  *
- * Merges the previously-separate Managers/Sellers pages into one view with
- * Менеджеры/Продавцы sub-tabs. Row stats and the detail sheet both source
- * from usePayables() (GET /payouts/payables/team-lead/:id) — the same
- * server-computed numbers the Финансы screen uses for payouts, so this page
- * and the payout flow never disagree on "how much has this person earned."
+ * Teamlead Panel Redesign: mobile shows a single flat ranking list (matching
+ * the mockup, reached via Профиль → Команда); desktop keeps the existing
+ * Менеджеры/Продавцы sub-tabs since it has room for them and they're useful
+ * filtering, not just visual — dropping them would be a functionality
+ * regression the mockup never asked for (its mock scenario simply has no
+ * manager).
+ *
+ * Row tap now navigates to /team-lead/team/:payeeId (TeamLeadSellerFinanceDetailPage)
+ * instead of opening the old MemberDetailSheet modal — same usePayables()
+ * source of truth, just a real page instead of a sheet.
  */
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Users, ChevronRight } from 'lucide-react'
 import Badge             from '../../../shared/components/Badge'
-import Modal              from '../../../shared/components/Modal'
-import EmptyState         from '../../../shared/components/EmptyState'
-import { CardSkeleton }   from '../../../shared/components/Skeleton'
-import { fmtAmount, fmtDate, STATUS_BADGE } from '../../../shared/orderStatusConfig'
-import useCurrentUser     from '../../../shared/hooks/useCurrentUser'
-import usePayables        from '../hooks/usePayables'
-import useOwnerOrders     from '../../orders/hooks/useOwnerOrders'
-import { formatOrderLabel, getOrderId } from '../../dispatcher/utils/orderHelpers'
+import EmptyState        from '../../../shared/components/EmptyState'
+import { CardSkeleton }  from '../../../shared/components/Skeleton'
+import { fmtAmount }     from '../../../shared/orderStatusConfig'
+import useCurrentUser    from '../../../shared/hooks/useCurrentUser'
+import usePayables       from '../hooks/usePayables'
+import { M, MobileShell, Card, InitialsAvatar, SectionLabel } from '../../seller/components/mobileUi'
 
-// Local Y/M/D, not toISOString() — that converts to UTC first and can shift
-// the calendar date by a day depending on timezone/time-of-day.
 function toYMD(d) {
   const year = d.getFullYear()
   const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -28,22 +30,53 @@ function toYMD(d) {
   return `${year}-${month}-${day}`
 }
 
-function initialsOf(name) {
-  return (name ?? '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()
-}
-
 const ROLE_LABEL = { manager: 'Менеджер', seller: 'Продавец' }
 const ROLE_BADGE = { manager: 'indigo', seller: 'violet' }
 
-function MemberRow({ member, onClick }) {
+function RankBadge({ rank }) {
+  const isFirst = rank === 1
+  return (
+    <span
+      className="flex items-center justify-center flex-shrink-0"
+      style={{
+        width: 22, height: 22, borderRadius: 7, fontSize: 12, fontWeight: 800,
+        background: isFirst ? '#FEF3C7' : '#F0EFEA',
+        color: isFirst ? '#B45309' : '#76766E',
+      }}
+    >
+      {rank}
+    </span>
+  )
+}
+
+function MobileMemberRow({ member, rank, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center gap-[11px] text-left"
+      style={{ padding: '13px 15px' }}
+    >
+      <RankBadge rank={rank} />
+      <InitialsAvatar name={member.full_name} size={36} palette={rank - 1} />
+      <div className="flex-1 min-w-0">
+        <div style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>{member.full_name}</div>
+        <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>
+          {ROLE_LABEL[member.role] ?? member.role} · {member.orders_count} заказ{member.orders_count === 1 ? '' : 'ов'}
+        </div>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <span style={{ fontSize: 12.5, fontWeight: 700, color: M.ink }}>{fmtAmount(member.earned)} с</span>
+      </div>
+      <ChevronRight size={16} style={{ color: '#C7C5BC' }} className="flex-shrink-0" />
+    </button>
+  )
+}
+
+function DesktopMemberRow({ member, onClick }) {
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
-      <div
-        className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
-        style={{ background: '#111827' }}
-      >
-        <span className="text-xs font-bold text-white">{initialsOf(member.full_name)}</span>
-      </div>
+      <InitialsAvatar name={member.full_name} size={44} radius={16} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-bold text-slate-900 truncate">{member.full_name}</p>
@@ -58,73 +91,10 @@ function MemberRow({ member, onClick }) {
   )
 }
 
-function MemberDetailSheet({ member, orders, onClose }) {
-  const myOrders = useMemo(() => {
-    if (!member) return []
-    return orders
-      .filter(o => (o.seller_id ?? o.SellerID) === member.payee_id || (o.manager_id ?? o.ManagerID) === member.payee_id)
-      .slice(0, 20)
-  }, [orders, member?.payee_id])
-
-  const formula = member?.role === 'manager'
-    ? 'Свой заказ × 20% + остальные заказы × 3% = Доход'
-    : '(Сумма заказов − Доставка) × 10% = Доход'
-
-  return (
-    <Modal
-      open={!!member}
-      onClose={onClose}
-      title={member?.full_name ?? ''}
-      description={ROLE_LABEL[member?.role] ?? member?.role}
-    >
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        <div className="bg-slate-50 rounded-2xl p-3 text-center">
-          <p className="text-sm font-black text-slate-900">{fmtAmount(member?.gross_amount)}</p>
-          <p className="text-[10px] text-slate-400 uppercase mt-0.5">Сумма заказов</p>
-        </div>
-        <div className="bg-slate-50 rounded-2xl p-3 text-center">
-          <p className="text-sm font-black text-slate-900">{fmtAmount(member?.earned)}</p>
-          <p className="text-[10px] text-slate-400 uppercase mt-0.5">Доход</p>
-        </div>
-        <div className="bg-slate-50 rounded-2xl p-3 text-center">
-          <p className="text-sm font-black text-indigo-600">{fmtAmount(member?.remaining)}</p>
-          <p className="text-[10px] text-slate-400 uppercase mt-0.5">Нужно выплатить</p>
-        </div>
-      </div>
-      <div className="rounded-2xl px-4 py-3 mb-5 text-center text-xs font-bold text-violet-700" style={{ background: '#F6F5FF' }}>
-        {formula}
-      </div>
-      <p className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-3">Недавние заказы</p>
-      {myOrders.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-6">Нет заказов за период</p>
-      ) : (
-        <div className="space-y-2">
-          {myOrders.map((o, i) => {
-            const status = o.status ?? o.Status ?? ''
-            const amount = Number(o.total_amount ?? o.amount ?? 0)
-            return (
-              <div key={getOrderId(o) ?? i} className="flex items-center justify-between gap-2 py-2 border-b border-slate-50 last:border-0">
-                <div className="min-w-0">
-                  <p className="text-xs font-mono font-semibold text-indigo-700">{formatOrderLabel(o)}</p>
-                  <p className="text-[11px] text-slate-400">{fmtDate(o.created_at ?? o.CreatedAt)}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs font-semibold text-slate-700">{fmtAmount(amount)} сомони</span>
-                  <Badge variant={STATUS_BADGE[status] ?? 'slate'} size="sm">{status}</Badge>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </Modal>
-  )
-}
-
 export default function TeamLeadTeamPage() {
   const [subTab, setSubTab] = useState('all')
-  const [selected, setSelected] = useState(null)
   const { userId } = useCurrentUser()
+  const navigate = useNavigate()
 
   const now  = new Date()
   const from = toYMD(new Date(now.getFullYear(), now.getMonth(), 1))
@@ -136,57 +106,92 @@ export default function TeamLeadTeamPage() {
   const sellers  = members.filter(m => m.role === 'seller')
   const list     = subTab === 'manager' ? managers : subTab === 'seller' ? sellers : members
 
-  const orderParams = useMemo(() => ({
-    team_lead_id: userId, from, to, limit: 500, page: 1,
-  }), [userId, from, to])
-  const { items: orders = [] } = useOwnerOrders(orderParams)
+  const ranked = useMemo(
+    () => [...members].sort((a, b) => (b.orders_count ?? 0) - (a.orders_count ?? 0)),
+    [members]
+  )
+
+  function openDetail(payeeId) {
+    navigate(`/team-lead/team/${payeeId}`)
+  }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 bg-[#F4F6F8] min-h-screen">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Team</h1>
-        <p className="text-xs text-slate-400">All / Managers / Sellers · your team only · current month</p>
-      </div>
+    <>
+      {/* ═══════════════════════════════════════════════════════════
+          DESKTOP LAYOUT
+      ═══════════════════════════════════════════════════════════ */}
+      <div className="hidden lg:block p-4 md:p-6 space-y-4 min-h-screen" style={{ background: M.bg, fontFamily: M.font }}>
+        <div>
+          <h1 className="text-xl font-bold" style={{ color: M.ink }}>Команда</h1>
+          <p className="text-xs" style={{ color: M.muted }}>Все / Менеджеры / Продавцы · только ваша команда · текущий месяц</p>
+        </div>
 
-      <div
-        className="flex gap-1 rounded-2xl p-1 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
-        style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(226,232,240,0.6)' }}
-      >
-        {[
-          { id: 'all',     label: `All · ${members.length}` },
-          { id: 'manager', label: `Managers · ${managers.length}` },
-          { id: 'seller',  label: `Sellers · ${sellers.length}` },
-        ].map(t => (
-          <button
-            key={t.id}
-            onClick={() => setSubTab(t.id)}
-            className="flex-1 py-2 rounded-xl text-sm font-semibold transition-all"
-            style={subTab === t.id
-              ? { background: '#111827', color: '#fff', boxShadow: '0 8px 18px rgba(15,23,42,0.16)' }
-              : { color: '#94A3B8' }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-3">{[1, 2, 3].map(i => <CardSkeleton key={i} />)}</div>
-      ) : list.length === 0 ? (
-        <EmptyState
-          icon={<Users size={22} />}
-          title={subTab === 'manager' ? 'Нет менеджеров в команде' : subTab === 'seller' ? 'Нет продавцов в команде' : 'Команда пуста'}
-          description="Добавьте сотрудника через HR-панель, чтобы он появился здесь."
-        />
-      ) : (
-        <div className="space-y-3">
-          {list.map(m => (
-            <MemberRow key={m.payee_id} member={m} onClick={() => setSelected(m)} />
+        <div
+          className="flex gap-1 rounded-2xl p-1 shadow-[0_10px_30px_rgba(15,23,42,0.04)]"
+          style={{ background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(226,232,240,0.6)' }}
+        >
+          {[
+            { id: 'all',     label: `Все · ${members.length}` },
+            { id: 'manager', label: `Менеджеры · ${managers.length}` },
+            { id: 'seller',  label: `Продавцы · ${sellers.length}` },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setSubTab(t.id)}
+              className="flex-1 py-2 rounded-xl text-sm font-semibold transition-all"
+              style={subTab === t.id
+                ? { background: M.dark, color: '#fff', boxShadow: '0 8px 18px rgba(15,23,42,0.16)' }
+                : { color: '#94A3B8' }}
+            >
+              {t.label}
+            </button>
           ))}
         </div>
-      )}
 
-      <MemberDetailSheet member={selected} orders={orders} onClose={() => setSelected(null)} />
-    </div>
+        {isLoading ? (
+          <div className="space-y-3">{[1, 2, 3].map(i => <CardSkeleton key={i} />)}</div>
+        ) : list.length === 0 ? (
+          <EmptyState
+            icon={<Users size={22} />}
+            title={subTab === 'manager' ? 'Нет менеджеров в команде' : subTab === 'seller' ? 'Нет продавцов в команде' : 'Команда пуста'}
+            description="Добавьте сотрудника через HR-панель, чтобы он появился здесь."
+          />
+        ) : (
+          <div className="space-y-3">
+            {list.map(m => (
+              <DesktopMemberRow key={m.payee_id} member={m} onClick={() => openDetail(m.payee_id)} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          MOBILE LAYOUT — Teamlead Panel Redesign
+      ═══════════════════════════════════════════════════════════ */}
+      <MobileShell>
+        <div className="px-5">
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', margin: 0, paddingTop: 8 }}>Команда</h1>
+          <div style={{ fontSize: 12, color: M.muted, fontWeight: 500, marginTop: 2 }}>{members.length} участников</div>
+
+          <SectionLabel style={{ margin: '18px 4px 10px' }}>Рейтинг команды</SectionLabel>
+
+          {isLoading ? (
+            <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="h-16 rounded-2xl animate-pulse" style={{ background: M.border }} />)}</div>
+          ) : ranked.length === 0 ? (
+            <Card style={{ padding: 24, textAlign: 'center' }}>
+              <p style={{ fontSize: 13, color: M.muted }}>Команда пуста</p>
+            </Card>
+          ) : (
+            <Card style={{ overflow: 'hidden' }}>
+              {ranked.map((m, i) => (
+                <div key={m.payee_id} style={{ borderBottom: i < ranked.length - 1 ? `1px solid ${M.bg}` : 'none' }}>
+                  <MobileMemberRow member={m} rank={i + 1} onClick={() => openDetail(m.payee_id)} />
+                </div>
+              ))}
+            </Card>
+          )}
+        </div>
+      </MobileShell>
+    </>
   )
 }

@@ -123,5 +123,6 @@ export const KEYS = {
   payouts: {
     me:       ['payouts', 'me'],
     payables: (teamLeadId, params) => ['payouts', 'payables', teamLeadId, params ?? {}],
+    byPayee:  (payeeId) => ['payouts', 'payee', payeeId],
   },
 }

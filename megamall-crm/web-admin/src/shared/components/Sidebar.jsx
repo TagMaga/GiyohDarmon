@@ -28,13 +28,6 @@ const NAV = {
     { label: 'Команда',    icon: BookUser,      path: '/owner/team-directory' },
     { label: 'Настройки',  icon: Settings,      path: '/owner/settings' },
   ],
-  sales_team_lead: [
-    { label: 'Dashboard', icon: Home,         path: '/team-lead' },
-    { label: 'Orders',    icon: ShoppingCart, path: '/team-lead/orders' },
-    { label: 'Team',      icon: Users,        path: '/team-lead/team' },
-    { label: 'Finance',   icon: Wallet,       path: '/team-lead/finance' },
-    { label: 'Reports',   icon: BarChart2,    path: '/team-lead/reports' },
-  ],
   manager: [
     { label: 'Главная',        icon: Home,          path: '/manager' },
     { label: 'Заказы команды', icon: ShoppingCart,  path: '/manager/orders' },

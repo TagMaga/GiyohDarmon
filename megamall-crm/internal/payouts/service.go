@@ -188,6 +188,28 @@ func validatePayoutItems(items []CreatePayoutItem, allowed map[uuid.UUID]Payable
 	return nil
 }
 
+// GetPayeePayoutHistory returns payout history for one payee, restricted to
+// payouts the calling team lead actually made (never another payer's records)
+// — mirrors the "your own team only" restriction already applied in
+// CreatePayouts/validatePayoutItems. Owner sees everything for the payee.
+func (s *Service) GetPayeePayoutHistory(ctx context.Context, actorID uuid.UUID, actorRole string, payeeID uuid.UUID) ([]PayoutResponse, error) {
+	if actorRole != "owner" && actorRole != "sales_team_lead" {
+		return nil, apperrors.Forbidden("only a team lead or owner can view payout history")
+	}
+	rows, err := s.repo.ListByPayee(ctx, payeeID)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+	out := make([]PayoutResponse, 0, len(rows))
+	for i := range rows {
+		if actorRole == "sales_team_lead" && rows[i].PayerID != actorID {
+			continue
+		}
+		out = append(out, ToResponse(&rows[i]))
+	}
+	return out, nil
+}
+
 // CreatePayouts validates and bulk-inserts a Team Lead's "Выплатить" action.
 // Scope: only sales_team_lead (paying their own team) and owner (unrestricted)
 // may create payouts today — manager-pays-seller is left for a future pass:
