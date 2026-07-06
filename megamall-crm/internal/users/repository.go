@@ -210,6 +210,102 @@ func (r *Repository) ShareTeam(ctx context.Context, a uuid.UUID, b uuid.UUID) (b
 	return count > 0, nil
 }
 
+func (r *Repository) CreateDocument(ctx context.Context, doc *UserDocument) error {
+	if err := r.db.WithContext(ctx).Create(doc).Error; err != nil {
+		return fmt.Errorf("create user document: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) ListDocuments(ctx context.Context, userID uuid.UUID) ([]UserDocument, error) {
+	var docs []UserDocument
+	if err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Find(&docs).Error; err != nil {
+		return nil, fmt.Errorf("list user documents: %w", err)
+	}
+	return docs, nil
+}
+
+func (r *Repository) GetDocument(ctx context.Context, userID uuid.UUID, documentID uuid.UUID) (*UserDocument, error) {
+	var doc UserDocument
+	err := r.db.WithContext(ctx).
+		Where("id = ? AND user_id = ?", documentID, userID).
+		First(&doc).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get user document: %w", err)
+	}
+	return &doc, nil
+}
+
+func (r *Repository) UpdateDocumentStatus(ctx context.Context, userID uuid.UUID, documentID uuid.UUID, status string) (*UserDocument, error) {
+	var doc UserDocument
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("id = ? AND user_id = ?", documentID, userID).First(&doc).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("user document not found")
+			}
+			return fmt.Errorf("get user document: %w", err)
+		}
+		doc.VerificationStatus = status
+		if err := tx.Save(&doc).Error; err != nil {
+			return fmt.Errorf("update user document status: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &doc, nil
+}
+
+func (r *Repository) DeleteDocument(ctx context.Context, userID uuid.UUID, documentID uuid.UUID) error {
+	res := r.db.WithContext(ctx).
+		Where("id = ? AND user_id = ?", documentID, userID).
+		Delete(&UserDocument{})
+	if res.Error != nil {
+		return fmt.Errorf("delete user document: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return fmt.Errorf("user document not found")
+	}
+	return nil
+}
+
+func (r *Repository) CreateHistory(ctx context.Context, item *UserHistory) error {
+	if err := r.db.WithContext(ctx).Create(item).Error; err != nil {
+		return fmt.Errorf("create user history: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) ListHistory(ctx context.Context, userID uuid.UUID) ([]UserHistory, error) {
+	var history []UserHistory
+	if err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Limit(100).
+		Find(&history).Error; err != nil {
+		return nil, fmt.Errorf("list user history: %w", err)
+	}
+	return history, nil
+}
+
+func (r *Repository) ListAllHistory(ctx context.Context) ([]UserHistory, error) {
+	var history []UserHistory
+	if err := r.db.WithContext(ctx).
+		Order("created_at DESC").
+		Limit(200).
+		Find(&history).Error; err != nil {
+		return nil, fmt.Errorf("list all user history: %w", err)
+	}
+	return history, nil
+}
+
 func isDuplicateKeyError(err error, constraint string) bool {
 	return err != nil && strings.Contains(err.Error(), constraint)
 }

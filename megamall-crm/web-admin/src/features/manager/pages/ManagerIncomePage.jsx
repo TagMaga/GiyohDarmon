@@ -20,6 +20,7 @@ import IncomeEventsTable     from '../../hr/components/IncomeEventsTable'
 import useMyIncome           from '../../hr/hooks/useMyIncome'
 import useMyPayouts          from '../../../shared/hooks/useMyPayouts'
 import { fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
+import { M }                  from '../../seller/components/mobileUi'
 
 function currentMonthDefault() {
   const now   = new Date()
@@ -70,7 +71,7 @@ export default function ManagerIncomePage() {
   )
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6 pb-28 lg:pb-6" style={{ background: M.bg, fontFamily: M.font, minHeight: '100vh' }}>
       {/* Header */}
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center text-violet-600">

@@ -1,8 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Truck, Settings, Users, ChevronRight } from 'lucide-react'
-import useDeliverySettings from '../../seller/hooks/useDeliverySettings'
-
-const fmtMoney = (n) => (n == null ? '—' : `${(+n || 0).toLocaleString('ru-RU')} с`)
+import { Settings, Users, ChevronRight } from 'lucide-react'
 
 function SettingsCard({ icon: Icon, title, description, action, onClick, children }) {
   return (
@@ -33,50 +30,14 @@ function SettingsCard({ icon: Icon, title, description, action, onClick, childre
 export default function OwnerSettingsPage() {
   const navigate = useNavigate()
 
-  const { data: settings, isLoading: settingsLoading } = useDeliverySettings()
-
   return (
     <div className="p-4 md:p-6 space-y-6">
 
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Настройки</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Управление доставкой, тарифами и городами</p>
+        <p className="text-sm text-slate-500 mt-0.5">Управление тарифами и командами</p>
       </div>
-
-      {/* Delivery fees */}
-      <SettingsCard
-        icon={Truck}
-        title="Настройки доставки"
-        description="Стоимость доставки для клиента"
-        action="Изменить"
-        onClick={() => navigate('/owner/settings/delivery')}
-      >
-        {settingsLoading ? (
-          <p className="text-sm text-slate-400">Загрузка...</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                Обычная доставка
-              </p>
-              <p className="text-[22px] font-bold text-slate-900 tracking-tight">
-                {settings?.normal_fee === 0 ? 'Бесплатно' : fmtMoney(settings?.normal_fee)}
-              </p>
-              <p className="text-[11px] text-slate-400">для клиента</p>
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-                Быстрая доставка
-              </p>
-              <p className="text-[22px] font-bold text-slate-900 tracking-tight">
-                {fmtMoney(settings?.fast_fee)}
-              </p>
-              <p className="text-[11px] text-slate-400">для клиента</p>
-            </div>
-          </div>
-        )}
-      </SettingsCard>
 
       {/* Courier payouts */}
       <SettingsCard

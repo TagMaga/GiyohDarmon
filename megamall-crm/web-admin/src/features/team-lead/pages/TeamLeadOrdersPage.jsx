@@ -13,6 +13,7 @@ import { useQuery }                    from '@tanstack/react-query'
 import { Search, X, ClipboardList, SlidersHorizontal } from 'lucide-react'
 import Badge                           from '../../../shared/components/Badge'
 import EmptyState                      from '../../../shared/components/EmptyState'
+import DesktopDateRangePicker          from '../../../shared/components/DesktopDateRangePicker'
 import SellerOrderDetailPanel          from '../../seller/components/SellerOrderDetailPanel'
 import OrderDetailBottomSheet          from '../../seller/components/OrderDetailBottomSheet'
 import { KEYS }                        from '../../../shared/queryKeys'
@@ -152,8 +153,15 @@ export default function TeamLeadOrdersPage() {
 
   const advancedFilters = (
     <div className="flex gap-2 flex-wrap">
-      <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="input flex-1 min-w-[120px]" />
-      <input type="date" value={dateTo}   onChange={e => setDateTo(e.target.value)}   className="input flex-1 min-w-[120px]" />
+      <DesktopDateRangePicker
+        from={dateFrom}
+        to={dateTo}
+        onChange={(range) => { setDateFrom(range.from); setDateTo(range.to) }}
+      />
+      <div className="grid w-full grid-cols-2 gap-2 md:hidden">
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="input min-w-0" />
+        <input type="date" value={dateTo}   onChange={e => setDateTo(e.target.value)}   className="input min-w-0" />
+      </div>
       {sellers.length > 0 && (
         <select value={sellerId} onChange={e => setSellerId(e.target.value)} className="input flex-1 min-w-[140px]">
           <option value="">Все продавцы</option>

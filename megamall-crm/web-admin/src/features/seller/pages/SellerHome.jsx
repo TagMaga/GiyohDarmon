@@ -36,7 +36,7 @@ export default function SellerHome() {
 
   const citiesById = useMemo(() => Object.fromEntries(cities.map(c => [c.id, c.name])), [cities])
   const stats = useMemo(() => calcStats(orders), [orders])
-  const commissionPct = compensation?.commission_percent ?? null
+  const commissionPct = compensation?.commission_rate != null ? +(compensation.commission_rate * 100).toFixed(1) : null
   const rank = rankData?.rank ?? null
   const recent = orders.slice(0, 5)
   const firstName = me?.full_name?.split(' ')[0] ?? null

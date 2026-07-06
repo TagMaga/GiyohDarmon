@@ -2,22 +2,21 @@
  * CashHandoversPage — Owner Logistics → "Передачи" tab
  *
  * Features:
- *  • KPI strip (expected / confirmed / pending / difference)
- *  • Searchable, filterable table with receipt thumbnails
+ *  • Date-filtered table with receipt thumbnails
  *  • Verification modal: full image + all details + confirm/reject actions
  *  • Reject requires admin_note (mandatory)
  */
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import {
-  Plus, RefreshCw, CheckCircle2, XCircle, Trash2,
+  CheckCircle2, XCircle, Trash2,
   Image as ImageIcon, FileText, AlertTriangle, Eye,
-  ChevronLeft, ChevronRight, Search,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
-import { useHandovers, useCreateHandover, useUpdateHandover, useDeleteHandover } from '../hooks/useHandovers'
+import { useHandovers, useUpdateHandover, useDeleteHandover } from '../hooks/useHandovers'
 import useLogisticsCouriers from '../hooks/useLogisticsCouriers'
 import Badge   from '../../../shared/components/Badge'
 import Modal   from '../../../shared/components/Modal'
+import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -117,45 +116,6 @@ function ReceiptThumb({ proofUrl, attachmentsJson, onClick }) {
       <FileText size={12} />
       <span>{urls.length}</span>
     </button>
-  )
-}
-
-// ── KPI strip ────────────────────────────────────────────────────────────────
-
-function HandoverKpis({ items }) {
-  const expected  = items.filter(r => r.status === 'pending')
-                         .reduce((s, r) => s + r.total_to_return, 0)
-  const confirmed = items.filter(r => r.status === 'confirmed')
-                         .reduce((s, r) => s + (r.actual_returned ?? r.total_to_return), 0)
-  const pending   = items.filter(r => r.status === 'pending').length
-  const diff      = confirmed - items.filter(r => r.status === 'confirmed')
-                                      .reduce((s, r) => s + r.total_to_return, 0)
-
-  const kpis = [
-    { label: 'Ожидаем получить', value: `${fmtMoney(expected)} сом`,   color: 'text-amber-700',   bg: 'bg-amber-50',   icon: '💰' },
-    { label: 'Подтверждено',     value: `${fmtMoney(confirmed)} сом`,  color: 'text-emerald-700', bg: 'bg-emerald-50', icon: '✓'  },
-    { label: 'Ожидает проверки', value: String(pending),               color: 'text-indigo-700',  bg: 'bg-indigo-50',  icon: '⏳' },
-    {
-      label: 'Разница (подтв.)',
-      value: `${diff >= 0 ? '+' : ''}${fmtMoney(diff)} сом`,
-      color: Math.abs(diff) < 0.01 ? 'text-emerald-700' : diff < 0 ? 'text-rose-700' : 'text-amber-700',
-      bg:    Math.abs(diff) < 0.01 ? 'bg-emerald-50'    : diff < 0 ? 'bg-rose-50'    : 'bg-amber-50',
-      icon: '⚖️',
-    },
-  ]
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {kpis.map(k => (
-        <div key={k.label} className={`rounded-2xl ${k.bg} border border-white/60 p-4`}>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-base">{k.icon}</span>
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{k.label}</p>
-          </div>
-          <p className={`text-xl font-black ${k.color} tabular-nums leading-tight`}>{k.value}</p>
-        </div>
-      ))}
-    </div>
   )
 }
 
@@ -436,11 +396,7 @@ function VerifyModal({ row, open, onClose, onConfirm, onReject, onDelete, updati
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function CashHandoversPage({ courierId } = {}) {
-  const qc = useQueryClient()
-
   // ── Filters ──
-  const [statusFilter, setStatusFilter] = useState('')
-  const [search, setSearch]             = useState('')
   const [fromDate, setFromDate]         = useState('')
   const [toDate, setToDate]             = useState('')
   const [page, setPage]                 = useState(1)
@@ -449,7 +405,6 @@ export default function CashHandoversPage({ courierId } = {}) {
     limit: 50,
     page,
     ...(courierId ? { courier_id: courierId } : {}),
-    ...(statusFilter ? { status: statusFilter } : {}),
     ...(fromDate ? { from: fromDate } : {}),
     ...(toDate   ? { to:   toDate   } : {}),
   }
@@ -457,21 +412,10 @@ export default function CashHandoversPage({ courierId } = {}) {
   const { data, isLoading } = useHandovers(params)
   const items = data?.items ?? []
 
-  // Client-side search filter (name/phone)
-  const filtered = useMemo(() => {
-    if (!search.trim()) return items
-    const q = search.toLowerCase()
-    return items.filter(r =>
-      r.courier_name?.toLowerCase().includes(q) ||
-      r.courier_phone?.toLowerCase().includes(q)
-    )
-  }, [items, search])
-
   const { mutate: updateHandover, isPending: updating } = useUpdateHandover()
   const { mutate: deleteHandover, isPending: deleting } = useDeleteHandover()
 
   // ── Modals ──
-  const [createOpen, setCreateOpen]   = useState(false)
   const [verifyRow, setVerifyRow]     = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
 
@@ -502,75 +446,25 @@ export default function CashHandoversPage({ courierId } = {}) {
     deleteHandover(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) })
   }
 
-  // ── Import CashHandoverModal lazily ──
-  const [CashHandoverModal, setCashHandoverModal] = useState(null)
-  const openCreate = async () => {
-    if (!CashHandoverModal) {
-      const mod = await import('./CashHandoverModal')
-      setCashHandoverModal(() => mod.default)
-    }
-    setCreateOpen(true)
-  }
-
   const meta = data?.meta
 
   return (
     <div className="space-y-4">
-
-      {/* KPI strip */}
-      <HandoverKpis items={filtered} />
-
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-
-        {/* Search */}
-        <div className="relative flex-1 min-w-[160px]">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Поиск курьера…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="input pl-8 h-9 text-sm"
-          />
-        </div>
-
-        {/* Status filter */}
-        <select
-          value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
-          className="input h-9 text-sm w-auto pr-8"
-        >
-          <option value="">Все статусы</option>
-          <option value="pending">Ожидает</option>
-          <option value="confirmed">Подтверждено</option>
-          <option value="rejected">Отклонено</option>
-          <option value="disputed">Спор</option>
-        </select>
-
         {/* Date range */}
-        {!courierId && (
-          <>
-            <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setPage(1) }}
-              className="input h-9 text-sm w-auto" title="С даты" />
-            <input type="date" value={toDate}   onChange={e => { setToDate(e.target.value);   setPage(1) }}
-              className="input h-9 text-sm w-auto" title="По дату" />
-          </>
-        )}
-
-        <button
-          onClick={() => qc.invalidateQueries({ queryKey: ['logistics', 'handovers'] })}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all h-9"
-        >
-          <RefreshCw size={13} />
-          <span className="hidden sm:inline">Обновить</span>
-        </button>
-
-        {!courierId && (
-          <button onClick={openCreate} className="btn btn-sm btn-primary h-9">
-            <Plus size={14} /> Записать
-          </button>
-        )}
+        <DesktopDateRangePicker
+          from={fromDate}
+          to={toDate}
+          onChange={(range) => { setFromDate(range.from); setToDate(range.to); setPage(1) }}
+          align="right"
+        />
+        <div className="grid w-full grid-cols-2 gap-2 md:hidden">
+          <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); setPage(1) }}
+            className="input h-9 min-w-0 text-sm" title="С даты" />
+          <input type="date" value={toDate}   onChange={e => { setToDate(e.target.value);   setPage(1) }}
+            className="input h-9 min-w-0 text-sm" title="По дату" />
+        </div>
       </div>
 
       {/* Table */}
@@ -579,7 +473,7 @@ export default function CashHandoversPage({ courierId } = {}) {
           <div className="p-6 space-y-3">
             {[1,2,3,4].map(i => <div key={i} className="skeleton w-full h-14 rounded-xl" />)}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="py-16 text-center">
             <ImageIcon size={32} className="mx-auto text-slate-200 mb-3" />
             <p className="text-sm text-slate-400">Передач не найдено</p>
@@ -599,7 +493,7 @@ export default function CashHandoversPage({ courierId } = {}) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {filtered.map(row => {
+                  {items.map(row => {
                     const sc = STATUS_CFG[row.status] ?? STATUS_CFG.pending
                     const isPending = row.status === 'pending' || row.status === 'disputed'
                     return (
@@ -681,7 +575,7 @@ export default function CashHandoversPage({ courierId } = {}) {
 
             {/* ── Mobile cards ── */}
             <div className="md:hidden divide-y divide-slate-50">
-              {filtered.map(row => {
+              {items.map(row => {
                 const sc = STATUS_CFG[row.status] ?? STATUS_CFG.pending
                 const isPending = row.status === 'pending' || row.status === 'disputed'
                 const urls = parseAttachments(row.proof_url, row.attachments_json)
@@ -757,11 +651,6 @@ export default function CashHandoversPage({ courierId } = {}) {
         updating={updating}
         deleting={deleting}
       />
-
-      {/* Create modal (lazy loaded) */}
-      {CashHandoverModal && (
-        <CashHandoverModal open={createOpen} onClose={() => setCreateOpen(false)} />
-      )}
 
       {/* Delete confirmation */}
       <Modal

@@ -2,11 +2,10 @@
  * OwnerFinancePage — /owner/finance
  *
  * Full owner finance dashboard. Layout:
- *   1. Header (icon + title + subtitle + refresh)
- *   2. Period filter
- *   3. 6 KPI tiles (from /finance/summary)
- *   4. Two-col on md+: RevenueBreakdownCard | CommissionsBreakdown
- *   5. FinanceEventsTable (paginated ledger)
+ *   1. Header (icon + title + subtitle + period filter + refresh)
+ *   2. 6 KPI tiles (from /finance/summary)
+ *   3. Two-col on md+: RevenueBreakdownCard | CommissionsBreakdown
+ *   4. FinanceEventsTable (paginated ledger)
  *
  * All monetary figures come from the backend — zero client-side aggregation.
  */
@@ -202,7 +201,7 @@ export default function OwnerFinancePage() {
     <div className="p-4 md:p-6 space-y-6">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0">
             <TrendingUp size={22} />
@@ -213,25 +212,24 @@ export default function OwnerFinancePage() {
           </div>
         </div>
 
-        {/* Refresh button */}
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-h-[44px] flex-shrink-0"
-          title="Обновить данные"
-        >
-          <RefreshCw size={13} className={isFetching ? 'animate-spin' : ''} />
-          <span className="hidden sm:inline">Обновить</span>
-        </button>
-      </div>
+        <div className="flex flex-wrap items-start justify-end gap-2">
+          <IncomePeriodFilter
+            from={from}
+            to={to}
+            onChange={handlePeriodChange}
+          />
 
-      {/* ── Period filter ───────────────────────────────────────────────────── */}
-      <div className="card p-4">
-        <IncomePeriodFilter
-          from={from}
-          to={to}
-          onChange={handlePeriodChange}
-        />
+          {/* Refresh button */}
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-h-[44px] flex-shrink-0"
+            title="Обновить данные"
+          >
+            <RefreshCw size={13} className={isFetching ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Обновить</span>
+          </button>
+        </div>
       </div>
 
       {/* ── Error alert ─────────────────────────────────────────────────────── */}

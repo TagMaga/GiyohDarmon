@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { Home, ShoppingCart, Plus, Wallet, User, Users, TrendingUp, Truck, MoreHorizontal, Package, PackagePlus, BarChart3 } from 'lucide-react'
+import { Home, ShoppingCart, Plus, Wallet, User, Users, TrendingUp, Truck, Package, PackagePlus, BarChart3 } from 'lucide-react'
 import Sidebar from './Sidebar'
 import useAuthStore from '../store/authStore'
 import BottomNav from '../../features/seller/components/BottomNav'
@@ -18,7 +18,6 @@ const OWNER_TABS = [
   { label: 'Заказы',   icon: ShoppingCart, path: '/owner/orders',    end: false },
   { label: 'Финансы',  icon: TrendingUp,   path: '/owner/finance',   end: false },
   { label: 'Логист.',  icon: Truck,        path: '/owner/logistics', end: false },
-  { label: 'Ещё',      icon: MoreHorizontal, path: '/owner/settings', end: false },
 ]
 
 const WAREHOUSE_TABS = [
@@ -31,6 +30,7 @@ const WAREHOUSE_TABS = [
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const location = useLocation()
   const { role } = useAuthStore()
   const isDispatcherBoard = location.pathname.startsWith('/dispatcher')
@@ -47,7 +47,12 @@ export default function Layout() {
   return (
     <div className="min-h-screen" style={{ background: '#F2F4F7' }}>
       {/* Sidebar — hidden on mobile for seller (replaced by BottomNav) */}
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
+      />
 
       {/* Mobile backdrop */}
       {sidebarOpen && (
@@ -57,7 +62,7 @@ export default function Layout() {
         />
       )}
 
-      <div className="flex flex-col min-h-screen lg:pl-[260px]">
+      <div className={`flex flex-col min-h-screen transition-[padding] duration-300 ease-in-out ${sidebarCollapsed ? 'lg:pl-[76px]' : 'lg:pl-[260px]'}`}>
         {/* Extra bottom padding on mobile for roles with BottomNav so content clears it */}
         <main className={`flex-1 p-0 ${hasMobileNav ? 'pb-20' : ''}`}>
           <Outlet />

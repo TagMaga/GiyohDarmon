@@ -161,7 +161,87 @@
   }
 }
 
+@layer utilities {
+  .group-card-motion {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+    animation: groupCardIn 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    animation-delay: var(--motion-delay, 0ms);
+  }
+
+  .group-icon-motion {
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
+  }
+  .group-card-motion:hover .group-icon-motion {
+    transform: translateY(-2px) rotate(-2deg) scale(1.04);
+    box-shadow: 0 16px 28px rgba(15, 23, 42, 0.18);
+  }
+
+  .group-chart-line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: groupChartDraw 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation-delay: calc(var(--motion-delay, 0ms) + 120ms);
+  }
+
+  .group-chart-area {
+    opacity: 0;
+    animation: groupChartFade 0.65s ease forwards;
+    animation-delay: calc(var(--motion-delay, 0ms) + 260ms);
+  }
+
+  .group-chart-dot {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: groupDotPop 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation-delay: calc(var(--motion-delay, 0ms) + 720ms);
+  }
+
+  .chart-point .chart-point-ui {
+    opacity: 0;
+    transition: opacity 0.14s ease;
+  }
+  .chart-point:hover .chart-point-ui {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .group-card-motion,
+    .group-chart-line,
+    .group-chart-area,
+    .group-chart-dot {
+      animation: none;
+      opacity: 1;
+      transform: none;
+      stroke-dashoffset: 0;
+    }
+    .group-icon-motion,
+    .chart-point .chart-point-ui {
+      transition: none;
+    }
+  }
+}
+
 /* ── Account menu dropdown animation ─────────────────────────────────────── */
+@keyframes groupCardIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+@keyframes groupChartDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes groupChartFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes groupDotPop {
+  from { opacity: 0; transform: scale(0.45); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
 @keyframes accountMenuIn {
   from { opacity: 0; transform: translateY(-6px) scale(0.97); }
   to   { opacity: 1; transform: translateY(0)    scale(1);    }

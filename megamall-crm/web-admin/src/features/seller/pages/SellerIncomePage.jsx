@@ -124,7 +124,7 @@ export default function SellerIncomePage() {
   const { orders = [], isLoading: ordersLoading } = useSellerOrders()
   const { data: compensation } = useSellerCompensation()
 
-  const commissionPct = compensation?.commission_percent ?? null
+  const commissionPct = compensation?.commission_rate != null ? +(compensation.commission_rate * 100).toFixed(1) : null
   const pendingPayout = payouts
     .filter(p => p.status === 'pending')
     .reduce((s, p) => s + (p.amount ?? 0), 0)

@@ -1,14 +1,14 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import {
-  Wallet, ArrowDownCircle, ArrowUpCircle, ChevronRight,
-  TrendingUp, CalendarDays, X, Check, Search, Pencil,
+  ArrowDownCircle, ArrowUpCircle,
+  X, Check, Pencil,
 } from 'lucide-react'
 import useBudgetSummary from '../hooks/useBudgetSummary'
 import useBudgetTransactions from '../hooks/useBudgetTransactions'
-import useBudgetCreators from '../hooks/useBudgetCreators'
 import { postBudgetIncome, postBudgetWithdrawal } from '../api'
 import EditBudgetTransactionModal from '../components/EditBudgetTransactionModal'
+import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 const fmt = (v) => Number(v || 0).toLocaleString('ru-RU', { maximumFractionDigits: 0 })
@@ -16,24 +16,13 @@ const fmt = (v) => Number(v || 0).toLocaleString('ru-RU', { maximumFractionDigit
 // ── Type config — Company Budget only ever shows top-ups and owner withdrawals ─
 const TYPE_CFG = {
   manual_income:    { label: 'Пополнение',           badge: 'bg-emerald-50 text-emerald-700', amtClass: 'text-emerald-600', sign: '+' },
-  owner_withdrawal: { label: 'Списание владельцем',  badge: 'bg-red-50 text-red-700',         amtClass: 'text-red-600',     sign: '-' },
+  owner_withdrawal: { label: 'Списание',             badge: 'bg-red-50 text-red-700',         amtClass: 'text-rose-600',    sign: '-' },
 }
 
 const TYPE_CHIPS = [
   { key: '',                 label: 'Все' },
   { key: 'manual_income',    label: 'Пополнения' },
   { key: 'owner_withdrawal', label: 'Списания' },
-]
-
-// ── Date range presets ─────────────────────────────────────────────────────────
-const DATE_PRESETS = [
-  { key: 'today',      label: 'Сегодня' },
-  { key: 'yesterday',  label: 'Вчера' },
-  { key: '7d',         label: '7 дней' },
-  { key: '30d',        label: '30 дней' },
-  { key: 'this_month', label: 'Этот месяц' },
-  { key: 'prev_month', label: 'Прошлый месяц' },
-  { key: 'custom',     label: 'Период' },
 ]
 
 function toYMD(date) {
@@ -72,53 +61,17 @@ function computePresetRange(key) {
   }
 }
 
-// ── Date range filter ─────────────────────────────────────────────────────────
-function DateRangeFilter({ preset, onPresetChange, customFrom, customTo, onCustomFromChange, onCustomToChange }) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="flex flex-wrap gap-1 bg-slate-50 rounded-[10px] p-[3px]">
-        {DATE_PRESETS.map((p) => (
-          <button
-            key={p.key}
-            onClick={() => onPresetChange(p.key)}
-            className={`px-3 py-1.5 rounded-[7px] text-[11.5px] font-semibold transition-all whitespace-nowrap ${
-              preset === p.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-      {preset === 'custom' && (
-        <div className="flex items-center gap-1.5">
-          <input
-            type="date"
-            value={customFrom}
-            onChange={(e) => onCustomFromChange(e.target.value)}
-            className="px-2.5 py-1.5 rounded-[9px] border-[1.5px] border-slate-200 focus:border-indigo-400 outline-none text-[11.5px] text-slate-600 bg-white w-[130px] transition-colors"
-          />
-          <span className="text-slate-300 text-[11px]">—</span>
-          <input
-            type="date"
-            value={customTo}
-            onChange={(e) => onCustomToChange(e.target.value)}
-            className="px-2.5 py-1.5 rounded-[9px] border-[1.5px] border-slate-200 focus:border-indigo-400 outline-none text-[11.5px] text-slate-600 bg-white w-[130px] transition-colors"
-          />
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── KPI card ──────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, sub, subColor = 'text-slate-400', icon: Icon, topColor }) {
+function KpiCard({ label, value, sub, valueClass = 'text-slate-900', subColor = 'text-slate-400', featured = false }) {
   return (
-    <div className={`bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-5 ${topColor ? `border-t-[3px] ${topColor}` : ''}`}>
-      <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-        {Icon && <Icon size={12} />}{label}
+    <div className={`${featured ? 'bg-indigo-50 border-indigo-100' : 'bg-white border-slate-100'} rounded-[16px] border px-5 py-5 sm:px-6`}>
+      <p className={`text-[11px] font-bold uppercase tracking-[0.06em] mb-3 ${featured ? 'text-indigo-600' : 'text-slate-400'}`}>
+        {label}
       </p>
-      <p className="text-[22px] font-bold text-slate-900 tracking-tight leading-none">{value}</p>
-      {sub && <p className={`text-[10.5px] font-medium mt-1.5 ${subColor}`}>{sub}</p>}
+      <p className={`${featured ? 'text-[36px]' : 'text-[24px]'} font-extrabold tracking-tight leading-none tabular-nums ${valueClass}`}>
+        {value}
+      </p>
+      {sub && <p className={`text-[12px] font-semibold mt-2 ${subColor}`}>{sub}</p>}
     </div>
   )
 }
@@ -228,16 +181,10 @@ function EditedMarker({ tx }) {
 export default function BudgetCompanyPage() {
   const qc = useQueryClient()
 
-  // Date range
-  const [preset, setPreset]       = useState('30d')
-  const [customFrom, setCustomFrom] = useState('')
-  const [customTo, setCustomTo]     = useState('')
-  const range = preset === 'custom' ? { from: customFrom, to: customTo } : computePresetRange(preset)
+  const [range, setRange] = useState(() => computePresetRange('this_month'))
 
   // Other filters
   const [typeFilter, setTypeFilter]   = useState('')
-  const [search, setSearch]           = useState('')
-  const [ownerFilter, setOwnerFilter] = useState('')
   const [page, setPage]               = useState(1)
 
   // Modals
@@ -248,23 +195,28 @@ export default function BudgetCompanyPage() {
   const sharedParams = {
     ...(range?.from && { from: range.from }),
     ...(range?.to   && { to: range.to }),
-    ...(ownerFilter && { created_by: ownerFilter }),
   }
 
   const txParams = {
     ...sharedParams,
     ...(typeFilter && { type: typeFilter }),
-    ...(search     && { search }),
     page, limit: 50,
   }
+  const incomeCountParams = { ...sharedParams, type: 'manual_income', page: 1, limit: 1 }
+  const withdrawalCountParams = { ...sharedParams, type: 'owner_withdrawal', page: 1, limit: 1 }
 
   const { data: summary, isLoading: sumLoading } = useBudgetSummary(sharedParams)
+  const { data: allTimeSummary, isLoading: allTimeSumLoading } = useBudgetSummary()
   const { data: txData,  isLoading: txLoading  } = useBudgetTransactions(txParams)
-  const { data: creators = [] } = useBudgetCreators()
+  const { data: incomeTxData } = useBudgetTransactions(incomeCountParams)
+  const { data: withdrawalTxData } = useBudgetTransactions(withdrawalCountParams)
 
   const balance = summary?.balance ?? 0
+  const allTimeProfit = allTimeSummary?.profit_from_finance ?? 0
   const items   = txData?.items ?? []
   const meta    = txData?.meta  ?? {}
+  const incomeCount = incomeTxData?.meta?.total ?? 0
+  const withdrawalCount = withdrawalTxData?.meta?.total ?? 0
 
   const invalidate = useCallback(() => {
     qc.invalidateQueries({ queryKey: ['budget'] })
@@ -273,114 +225,64 @@ export default function BudgetCompanyPage() {
   const incomeMut     = useMutation({ mutationFn: postBudgetIncome,     onSuccess: () => { setIncomeOpen(false); invalidate() } })
   const withdrawalMut = useMutation({ mutationFn: postBudgetWithdrawal, onSuccess: () => { setWithdrawalOpen(false); invalidate() } })
 
-  const todayPos = (summary?.today_change ?? 0) >= 0
-
-  const ownerName = useMemo(
-    () => creators.find((c) => c.id === ownerFilter)?.full_name,
-    [creators, ownerFilter],
-  )
-
-  function handlePresetChange(key) {
-    setPreset(key)
-    setPage(1)
-  }
-
   return (
-    <div className="animate-fade-in space-y-6 p-6 pb-16">
+    <div className="animate-fade-in bg-slate-100/70 rounded-[22px] p-6 pb-8 space-y-7">
 
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Бюджет компании</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Доступные средства компании</p>
+          <h1 className="text-[28px] font-extrabold text-slate-950 tracking-tight leading-tight">Бюджет компании</h1>
+          <p className="text-[15px] font-semibold text-slate-400 mt-1">Баланс, пополнения и списания владельца</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <DesktopDateRangePicker
+            from={range?.from ?? ''}
+            to={range?.to ?? ''}
+            onChange={(nextRange) => { setRange({ from: nextRange.from, to: nextRange.to }); setPage(1) }}
+            align="right"
+          />
           <button
             onClick={() => setWithdrawalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-red-500 hover:bg-red-600 text-white text-[12.5px] font-semibold shadow-[0_4px_10px_rgba(239,68,68,.25)] transition-all"
+            className="min-h-10 px-5 rounded-[10px] border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[15px] font-bold transition-all shadow-sm"
           >
-            <ArrowUpCircle size={14} />Списание владельцем
+            - Списать
           </button>
           <button
             onClick={() => setIncomeOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white text-[12.5px] font-semibold shadow-[0_4px_10px_rgba(16,185,129,.25)] transition-all"
+            className="min-h-10 px-5 rounded-[10px] border-none bg-indigo-600 hover:bg-indigo-700 text-white text-[15px] font-bold transition-all shadow-sm"
           >
-            <ArrowDownCircle size={14} />Пополнение
+            + Пополнить
           </button>
         </div>
       </div>
 
-      {/* Hero balance card — Company/Current Balance is always all-time, unaffected by the date filter */}
-      <div className="relative overflow-hidden rounded-[20px] bg-indigo-600 px-7 py-6 text-white">
-        <div className="absolute right-[-30px] top-[-30px] w-40 h-40 rounded-full bg-white/[.06]" />
-        <div className="absolute left-[40px] bottom-[-50px] w-28 h-28 rounded-full bg-white/[.05]" />
-        <div className="relative flex items-start justify-between">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-white/60 mb-1.5">
-              Баланс компании · Текущий баланс
-            </p>
-            {sumLoading ? (
-              <div className="h-10 w-48 bg-white/20 rounded-xl animate-pulse" />
-            ) : (
-              <p className="text-[36px] font-bold tracking-tight leading-none">
-                {fmt(balance)} <span className="text-[18px] opacity-60 font-medium">TJS</span>
-              </p>
-            )}
-            <p className={`mt-2 text-[12px] font-medium flex items-center gap-1 ${todayPos ? 'text-emerald-300' : 'text-red-300'}`}>
-              <ChevronRight size={12} className={todayPos ? 'rotate-90' : '-rotate-90'} />
-              {todayPos ? '+' : ''}{fmt(summary?.today_change ?? 0)} TJS сегодня
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-white/50 mb-1">Авто-прибыль из Финансов</p>
-            <p className="text-[14px] font-bold text-sky-300">{fmt(summary?.profit_from_finance ?? 0)} TJS</p>
-            <p className="text-[10px] text-white/40 mt-0.5">за выбранный период</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Date range filter */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-3">
-        <DateRangeFilter
-          preset={preset}
-          onPresetChange={handlePresetChange}
-          customFrom={customFrom}
-          customTo={customTo}
-          onCustomFromChange={(v) => { setCustomFrom(v); setPage(1) }}
-          onCustomToChange={(v) => { setCustomTo(v); setPage(1) }}
-        />
-      </div>
-
-      {/* KPI grid — all scoped to the selected date range */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* KPI grid — balance is all-time, other cards are scoped to the selected date range */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.4fr_1fr_1fr_1fr] gap-3">
         <KpiCard
-          label="Всего пришло"
-          value={sumLoading ? '—' : `${fmt(summary?.total_received)} TJS`}
-          sub="прибыль + пополнения"
+          label="Баланс сейчас"
+          value={sumLoading ? '—' : `${fmt(balance)} с`}
+          sub={sumLoading || allTimeSumLoading ? '—' : `${fmt(allTimeProfit)} с из чистой прибыли за всё время`}
           subColor="text-emerald-500"
-          icon={ArrowDownCircle}
-          topColor="border-t-emerald-400"
-        />
-        <KpiCard
-          label="Прибыль из Финансов"
-          value={sumLoading ? '—' : `${fmt(summary?.profit_from_finance)} TJS`}
-          sub="авто-перенос"
-          icon={TrendingUp}
-          topColor="border-t-indigo-400"
+          valueClass="text-indigo-950"
+          featured
         />
         <KpiCard
           label="Пополнения"
-          value={sumLoading ? '—' : `${fmt(summary?.manual_top_ups)} TJS`}
-          subColor="text-emerald-500"
-          icon={ArrowDownCircle}
-          topColor="border-t-emerald-400"
+          value={sumLoading ? '—' : `+${fmt(summary?.manual_top_ups)} с`}
+          sub={`${incomeCount} ${incomeCount === 1 ? 'операция' : 'операции'}`}
+          valueClass="text-emerald-600"
         />
         <KpiCard
-          label="Списания владельцем"
-          value={sumLoading ? '—' : `${fmt(summary?.owner_withdrawals)} TJS`}
-          subColor="text-red-500"
-          icon={ArrowUpCircle}
-          topColor="border-t-red-400"
+          label="Списания"
+          value={sumLoading ? '—' : `-${fmt(summary?.owner_withdrawals)} с`}
+          sub={`${withdrawalCount} ${withdrawalCount === 1 ? 'операция' : 'операции'}`}
+          valueClass="text-rose-600"
+        />
+        <KpiCard
+          label="Прибыль за период"
+          value={sumLoading ? '—' : `${fmt(summary?.profit_from_finance)} с`}
+          sub="из финансов"
+          valueClass="text-slate-950"
         />
       </div>
 
@@ -388,25 +290,17 @@ export default function BudgetCompanyPage() {
       <div className="bg-white rounded-[16px] border border-slate-100 shadow-sm overflow-hidden">
 
         {/* Table header + filters */}
-        <div className="px-5 pt-4 pb-0">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[13px] font-bold text-slate-900 flex items-center gap-2">
-              <Wallet size={14} className="text-slate-400" />История транзакций
+        <div className="px-5 sm:px-6 pt-5 pb-0">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
+            <h2 className="text-[19px] font-bold text-slate-950">
+              История операций
             </h2>
-            <span className="text-[11px] text-slate-400 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-full">
-              {meta?.total ?? items.length} операций
-            </span>
-          </div>
-
-          {/* Filter bar */}
-          <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-slate-50">
-            {/* Type chips */}
-            <div className="flex gap-1 bg-slate-50 rounded-[10px] p-[3px]">
+            <div className="inline-flex self-start sm:self-auto gap-1 bg-slate-100 rounded-[10px] p-[3px]">
               {TYPE_CHIPS.map(c => (
                 <button
                   key={c.key}
                   onClick={() => { setTypeFilter(c.key); setPage(1) }}
-                  className={`px-3 py-1.5 rounded-[7px] text-[11.5px] font-semibold transition-all whitespace-nowrap ${
+                  className={`px-3 py-1.5 rounded-[7px] text-[13px] font-bold transition-all whitespace-nowrap ${
                     typeFilter === c.key
                       ? 'bg-white text-slate-900 shadow-sm'
                       : 'text-slate-500 hover:text-slate-700'
@@ -416,36 +310,7 @@ export default function BudgetCompanyPage() {
                 </button>
               ))}
             </div>
-
-            {/* Owner filter */}
-            <select
-              value={ownerFilter}
-              onChange={(e) => { setOwnerFilter(e.target.value); setPage(1) }}
-              className="px-2.5 py-1.5 rounded-[9px] border-[1.5px] border-slate-200 focus:border-indigo-400 outline-none text-[11.5px] font-medium text-slate-600 bg-white transition-colors"
-            >
-              <option value="">Все сотрудники</option>
-              {creators.map((c) => (
-                <option key={c.id} value={c.id}>{c.full_name}</option>
-              ))}
-            </select>
-
-            {/* Search */}
-            <div className="flex items-center gap-2 flex-1 min-w-[140px] relative">
-              <Search size={13} className="absolute left-3 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Поиск по примечанию…"
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-                className="w-full pl-8 pr-3 py-1.5 rounded-[9px] border-[1.5px] border-slate-200 focus:border-indigo-400 outline-none text-[12px] bg-white transition-colors"
-              />
-            </div>
           </div>
-          {ownerName && (
-            <p className="text-[11px] text-slate-400 pt-2">
-              Показаны операции сотрудника: <span className="font-semibold text-slate-600">{ownerName}</span>
-            </p>
-          )}
         </div>
 
         {/* Table */}
@@ -453,8 +318,8 @@ export default function BudgetCompanyPage() {
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                {['Дата','Тип','Сумма','Примечание','Создал','Изменено',''].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 border-b border-slate-100">
+                {['Дата','Заметка','Тип','Сумма',''].map(h => (
+                  <th key={h} className={`px-5 sm:px-6 py-3 text-[12px] font-extrabold text-slate-400 uppercase tracking-wide border-y border-slate-100 ${h === 'Сумма' || h === '' ? 'text-right' : 'text-left'}`}>
                     {h}
                   </th>
                 ))}
@@ -464,16 +329,16 @@ export default function BudgetCompanyPage() {
               {txLoading ? (
                 [...Array(6)].map((_, i) => (
                   <tr key={i} className="border-b border-slate-50">
-                    {[...Array(7)].map((__, j) => (
-                      <td key={j} className="px-4 py-3">
-                        <div className="h-4 bg-slate-100 rounded animate-pulse" style={{ width: j === 2 ? '80px' : j === 3 ? '140px' : '60px' }} />
+                    {[...Array(5)].map((__, j) => (
+                      <td key={j} className="px-5 sm:px-6 py-4">
+                        <div className="h-4 bg-slate-100 rounded animate-pulse" style={{ width: j === 1 ? '180px' : j === 3 ? '90px' : '70px' }} />
                       </td>
                     ))}
                   </tr>
                 ))
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-[12px] text-slate-400">
+                  <td colSpan={5} className="px-5 sm:px-6 py-12 text-center text-[13px] text-slate-400">
                     Транзакции не найдены
                   </td>
                 </tr>
@@ -481,30 +346,29 @@ export default function BudgetCompanyPage() {
                 items.map((t) => {
                   const cfg = TYPE_CFG[t.transaction_type] ?? TYPE_CFG.manual_income
                   const date = new Date(t.created_at)
-                  const dateStr = date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })
-                  const timeStr = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+                  const dateStr = date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
                   return (
                     <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
-                      <td className="px-4 py-3 text-[11.5px] text-slate-400 whitespace-nowrap">
-                        {dateStr}<br/><span className="text-[10.5px] text-slate-300">{timeStr}</span>
+                      <td className="px-5 sm:px-6 py-4 text-[15px] text-slate-500 whitespace-nowrap tabular-nums">
+                        {dateStr}
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-semibold ${cfg.badge}`}>
+                      <td className="px-5 sm:px-6 py-4 text-[15px] font-medium text-slate-900 min-w-[260px]">
+                        <span>{t.note || '—'}</span>
+                        <span className="ml-2"><EditedMarker tx={t} /></span>
+                        {t.created_by_name && <span className="block text-[11px] font-semibold text-slate-300 mt-1">{t.created_by_name}</span>}
+                      </td>
+                      <td className="px-5 sm:px-6 py-4">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold ${cfg.badge}`}>
                           {cfg.label}
                         </span>
                       </td>
-                      <td className={`px-4 py-3 text-[12.5px] font-bold whitespace-nowrap tabular-nums ${cfg.amtClass}`}>
-                        {cfg.sign}{fmt(t.amount)} TJS
+                      <td className={`px-5 sm:px-6 py-4 text-[15px] font-extrabold whitespace-nowrap tabular-nums text-right ${cfg.amtClass}`}>
+                        {cfg.sign}{fmt(t.amount)} с
                       </td>
-                      <td className="px-4 py-3 text-[12px] text-slate-500 max-w-[180px] truncate">{t.note || '—'}</td>
-                      <td className="px-4 py-3 text-[11.5px] text-slate-400">{t.created_by_name || 'Авто'}</td>
-                      <td className="px-4 py-3">
-                        <EditedMarker tx={t} />
-                      </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-5 sm:px-6 py-4 text-right">
                         <button
                           onClick={() => setEditingTx(t)}
-                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-indigo-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"
+                          className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-indigo-100 inline-flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"
                           title="Редактировать"
                         >
                           <Pencil size={12} />

@@ -73,6 +73,45 @@ type PatchMeRequest struct {
 	TelegramChatID *string    `json:"telegram_chat_id" validate:"omitempty,max=100"`
 }
 
+// CreateUserDocumentRequest stores metadata for a file already uploaded via
+// POST /uploads.
+type CreateUserDocumentRequest struct {
+	FileURL          string     `json:"file_url" validate:"required,max=1000"`
+	OriginalFilename string     `json:"original_filename" validate:"required,max=255"`
+	ContentType      *string    `json:"content_type" validate:"omitempty,max=120"`
+	SizeBytes        *int64     `json:"size_bytes" validate:"omitempty,gte=0"`
+	DocumentType     *string    `json:"document_type" validate:"omitempty,max=80"`
+	ExpiresAt        *time.Time `json:"expires_at" validate:"omitempty"`
+}
+
+type UpdateUserDocumentStatusRequest struct {
+	VerificationStatus string `json:"verification_status" validate:"required,oneof=uploaded verified rejected"`
+}
+
+type UserDocumentResponse struct {
+	ID                 uuid.UUID  `json:"id"`
+	UserID             uuid.UUID  `json:"user_id"`
+	FileURL            string     `json:"file_url"`
+	OriginalFilename   string     `json:"original_filename"`
+	ContentType        *string    `json:"content_type,omitempty"`
+	SizeBytes          *int64     `json:"size_bytes,omitempty"`
+	DocumentType       string     `json:"document_type"`
+	ExpiresAt          *time.Time `json:"expires_at,omitempty"`
+	VerificationStatus string     `json:"verification_status"`
+	UploadedBy         *uuid.UUID `json:"uploaded_by,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+}
+
+type UserHistoryResponse struct {
+	ID        uuid.UUID  `json:"id"`
+	UserID    uuid.UUID  `json:"user_id"`
+	FieldName string     `json:"field_name"`
+	OldValue  *string    `json:"old_value,omitempty"`
+	NewValue  *string    `json:"new_value,omitempty"`
+	ChangedBy *uuid.UUID `json:"changed_by,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
 // ToResponse converts a User model to a UserResponse DTO.
 func ToResponse(u *User) UserResponse {
 	return UserResponse{
@@ -99,6 +138,50 @@ func ToResponseList(users []User) []UserResponse {
 	out := make([]UserResponse, len(users))
 	for i := range users {
 		out[i] = ToResponse(&users[i])
+	}
+	return out
+}
+
+func ToDocumentResponse(d *UserDocument) UserDocumentResponse {
+	return UserDocumentResponse{
+		ID:                 d.ID,
+		UserID:             d.UserID,
+		FileURL:            d.FileURL,
+		OriginalFilename:   d.OriginalFilename,
+		ContentType:        d.ContentType,
+		SizeBytes:          d.SizeBytes,
+		DocumentType:       d.DocumentType,
+		ExpiresAt:          d.ExpiresAt,
+		VerificationStatus: d.VerificationStatus,
+		UploadedBy:         d.UploadedBy,
+		CreatedAt:          d.CreatedAt,
+	}
+}
+
+func ToDocumentResponseList(docs []UserDocument) []UserDocumentResponse {
+	out := make([]UserDocumentResponse, len(docs))
+	for i := range docs {
+		out[i] = ToDocumentResponse(&docs[i])
+	}
+	return out
+}
+
+func ToHistoryResponse(h *UserHistory) UserHistoryResponse {
+	return UserHistoryResponse{
+		ID:        h.ID,
+		UserID:    h.UserID,
+		FieldName: h.FieldName,
+		OldValue:  h.OldValue,
+		NewValue:  h.NewValue,
+		ChangedBy: h.ChangedBy,
+		CreatedAt: h.CreatedAt,
+	}
+}
+
+func ToHistoryResponseList(history []UserHistory) []UserHistoryResponse {
+	out := make([]UserHistoryResponse, len(history))
+	for i := range history {
+		out[i] = ToHistoryResponse(&history[i])
 	}
 	return out
 }

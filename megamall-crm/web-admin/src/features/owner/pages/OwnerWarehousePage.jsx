@@ -1,173 +1,527 @@
-import { useState } from 'react'
-import { Package, AlertTriangle, Archive, RefreshCw, Layers } from 'lucide-react'
-import KpiCard          from '../../../shared/components/KpiCard'
-import useWarehouseData from '../../warehouse/hooks/useWarehouseData'
+import { useMemo, useState } from 'react'
 import {
-  getStockStatus, STOCK_STATUS_LABEL,
-  getProductName, getProductSku,
+  Download,
+  FilterX,
+  Package,
+  PackagePlus,
+  RefreshCw,
+  Search,
+  Trash2,
+} from 'lucide-react'
+import Alert from '../../../shared/components/Alert'
+import Badge from '../../../shared/components/Badge'
+import Button from '../../../shared/components/Button'
+import ProductModal from '../../warehouse/components/ProductModal'
+import ReceivingModal from '../../warehouse/components/ReceivingModal'
+import WriteoffModal from '../../warehouse/components/WriteoffModal'
+import useWarehouseData from '../../warehouse/hooks/useWarehouseData'
+import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'
+import {
+  STOCK_STATUS_BADGE,
+  STOCK_STATUS_LABEL,
+  fmtMoney,
+  getAvailableQty,
   getId,
+  getLastMovementForProduct,
+  getMovementType,
+  getProductBarcode,
+  getProductImage,
+  getProductName,
+  getProductSku,
+  getPurchasePrice,
+  getQuantity,
+  getReservedQty,
+  getSalePrice,
+  getStockStatus,
+  isProductActive,
+  isUUID,
 } from '../../warehouse/utils/warehouseHelpers'
 
-const FILTERS = [
-  { key: '',              label: 'Все' },
-  { key: 'low_stock',    label: 'Мало' },
-  { key: 'out_of_stock', label: 'Нет в наличии' },
+const TABS = [
+  { id: 'dashboard', label: 'Дашборд' },
+  { id: 'inventory', label: 'Остатки и товары' },
+  { id: 'receiving', label: 'Приёмка и списания' },
+  { id: 'movements', label: 'Движение товара' },
 ]
 
-const STATUS_STYLE = {
-  in_stock:     'bg-emerald-100 text-emerald-700',
-  low_stock:    'bg-amber-100  text-amber-700',
-  out_of_stock: 'bg-rose-100   text-rose-700',
-}
+const STATUS_OPTIONS = [
+  { value: '', label: 'Все статусы' },
+  { value: 'in_stock', label: 'В наличии' },
+  { value: 'low_stock', label: 'Мало' },
+  { value: 'out_of_stock', label: 'Нет в наличии' },
+]
 
-const ROW_STYLE = {
-  in_stock:     '',
-  low_stock:    'bg-amber-50/20',
-  out_of_stock: 'bg-rose-50/30',
-}
+const MOVEMENT_TYPES = [
+  { value: '', label: 'Все типы' },
+  { value: 'purchase', label: 'Приход' },
+  { value: 'adjustment', label: 'Корректировка' },
+  { value: 'writeoff', label: 'Списание' },
+  { value: 'sale', label: 'Продажа' },
+  { value: 'return', label: 'Возврат' },
+]
 
 export default function OwnerWarehousePage() {
-  const [filter, setFilter] = useState('')
+  const [tab, setTab] = useState('dashboard')
+  const [inventorySearch, setInventorySearch] = useState('')
+  const [inventoryStatus, setInventoryStatus] = useState('')
+  const [movementSearch, setMovementSearch] = useState('')
+  const [movementType, setMovementType] = useState('')
+  const [movementProductId, setMovementProductId] = useState('')
+  const [showProduct, setShowProduct] = useState(false)
+  const [editingProduct, setEditingProduct] = useState(null)
+  const [receiveProduct, setReceiveProduct] = useState(undefined)
+  const [writeoffProduct, setWriteoffProduct] = useState(null)
+  const data = useWarehouseData()
 
-  const { inventory, productMap, loading, refetchAll } = useWarehouseData()
+  const inventoryByProduct = useMemo(
+    () => new Map(data.inventory.map((inv) => [inv.product_id ?? inv.ProductID, inv])),
+    [data.inventory]
+  )
 
-  const totalProducts = inventory.length
-  const totalUnits    = inventory.reduce((s, i) => s + (i.available_quantity ?? i.AvailableQuantity ?? 0), 0)
-  const lowStock      = inventory.filter(i => getStockStatus(i) === 'low_stock').length
-  const outOfStock    = inventory.filter(i => getStockStatus(i) === 'out_of_stock').length
+  const inventoryRows = useMemo(() => {
+    const q = inventorySearch.trim().toLowerCase()
+    return data.products.map((product) => {
+      const inv = inventoryByProduct.get(getId(product)) ?? null
+      return { product, inv }
+    }).filter(({ product, inv }) => {
+      const status = getStockStatus(inv)
+      if (inventoryStatus && status !== inventoryStatus) return false
+      if (!q) return true
+      return (
+        getProductName(product).toLowerCase().includes(q) ||
+        getProductSku(product).toLowerCase().includes(q) ||
+        getProductBarcode(product).toLowerCase().includes(q)
+      )
+    })
+  }, [data.products, inventoryByProduct, inventorySearch, inventoryStatus])
 
-  const filtered = filter
-    ? inventory.filter(i => getStockStatus(i) === filter)
-    : inventory
+  const stockAlerts = useMemo(() => data.inventory
+    .filter((inv) => {
+      const status = getStockStatus(inv)
+      return status === 'low_stock' || status === 'out_of_stock'
+    })
+    .slice(0, 6), [data.inventory])
+
+  const receivingRows = useMemo(() => data.movements.filter((m) => {
+    const type = getMovementType(m)
+    return type === 'purchase' || type === 'adjustment' || type === 'writeoff'
+  }), [data.movements])
+
+  const movementRows = useMemo(() => {
+    const q = movementSearch.trim().toLowerCase()
+    return data.movements.filter((m) => {
+      const product = data.productMap[m.product_id ?? m.ProductID]
+      if (movementType && getMovementType(m) !== movementType) return false
+      if (movementProductId && (m.product_id ?? m.ProductID) !== movementProductId) return false
+      if (!q) return true
+      return (
+        getProductName(product).toLowerCase().includes(q) ||
+        getProductSku(product).toLowerCase().includes(q) ||
+        (m.reason ?? m.Reason ?? '').toLowerCase().includes(q) ||
+        (m.created_by_name ?? m.CreatedByName ?? '').toLowerCase().includes(q)
+      )
+    })
+  }, [data.movements, data.productMap, movementProductId, movementSearch, movementType])
+
+  const validProducts = data.products.filter((p) => isUUID(getId(p)))
+
+  function clearInventoryFilters() {
+    setInventorySearch('')
+    setInventoryStatus('')
+  }
+
+  function clearMovementFilters() {
+    setMovementSearch('')
+    setMovementType('')
+    setMovementProductId('')
+  }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 space-y-5">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Склад</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Остатки в реальном времени</p>
+          <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Склад</h1>
+          <p className="text-[12.5px] text-slate-400 mt-0.5">Остатки, товары, приёмка, списания и движение товара</p>
         </div>
         <button
-          onClick={refetchAll}
-          className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+          onClick={data.refetchAll}
+          className="flex min-h-[44px] flex-shrink-0 items-center gap-2 rounded-[10px] bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 transition-all hover:bg-slate-200"
         >
-          <RefreshCw size={18} />
+          <RefreshCw size={14} />
+          <span className="hidden sm:inline">Обновить</span>
         </button>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <KpiCard
-          label="Позиций"
-          value={totalProducts}
-          icon={<Package size={22} />}
-          color="indigo"
-          loading={loading}
-        />
-        <KpiCard
-          label="Ед. на складе"
-          value={totalUnits.toLocaleString('ru-RU')}
-          icon={<Layers size={22} />}
-          color="sky"
-          loading={loading}
-        />
-        <KpiCard
-          label="Мало"
-          value={lowStock}
-          icon={<AlertTriangle size={22} />}
-          color="amber"
-          loading={loading}
-        />
-        <KpiCard
-          label="Нет в наличии"
-          value={outOfStock}
-          icon={<Archive size={22} />}
-          color="rose"
-          loading={loading}
-        />
-      </div>
-
-      {/* Filter pills */}
-      <div className="flex gap-2 flex-wrap">
-        {FILTERS.map(f => {
-          const count = f.key
-            ? inventory.filter(i => getStockStatus(i) === f.key).length
-            : totalProducts
+      <div className="inline-flex max-w-full overflow-x-auto rounded-[10px] bg-slate-100 p-[3px]">
+        {TABS.map((item) => {
+          const active = tab === item.id
           return (
             <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`px-3.5 py-1.5 rounded-lg text-[13px] font-medium transition-colors ${
-                filter === f.key
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
-              }`}
+              key={item.id}
+              onClick={() => setTab(item.id)}
+              className={[
+                'flex items-center gap-1.5 rounded-[7px] px-3.5 py-1.5 text-[12.5px] font-semibold whitespace-nowrap transition-all duration-150',
+                active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+              ].join(' ')}
             >
-              {f.label} ({count})
+              {item.label}
             </button>
           )
         })}
       </div>
 
-      {/* Inventory table */}
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="p-10 text-center text-slate-400 text-sm">Загрузка...</div>
-        ) : filtered.length === 0 ? (
-          <div className="p-10 text-center text-slate-400 text-sm">Нет товаров в выбранном фильтре</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="border-b border-slate-100">
-                  {['Товар', 'Остаток', 'Мин. порог', 'Статус'].map(h => (
-                    <th
-                      key={h}
-                      className="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((item) => {
-                  const st        = getStockStatus(item)
-                  const productId = item.product_id ?? item.ProductID
-                  const product   = productMap[productId]
-                  return (
-                    <tr
-                      key={getId(item) ?? productId}
-                      className={`border-b border-slate-50 ${ROW_STYLE[st] ?? ''}`}
-                    >
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-slate-900">
-                          {product ? getProductName(product) : '—'}
-                        </p>
-                        {product && getProductSku(product) && (
-                          <p className="text-slate-400 text-[11px]">{getProductSku(product)}</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-slate-900 tabular-nums">
-                        {(item.available_quantity ?? item.AvailableQuantity ?? 0).toLocaleString('ru-RU')} шт.
-                      </td>
-                      <td className="px-4 py-3 text-slate-400 tabular-nums">
-                        {item.low_stock_threshold ?? item.LowStockThreshold ?? '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ${STATUS_STYLE[st] ?? STATUS_STYLE.in_stock}`}>
-                          {STOCK_STATUS_LABEL[st] ?? 'В наличии'}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+      {data.error && (
+        <Alert variant="error" title="Ошибка загрузки данных">
+          {data.error?.response?.data?.error?.message ?? data.error?.message}
+        </Alert>
+      )}
+
+      {tab === 'dashboard' && (
+        <div className="animate-fade-in space-y-4">
+          <DashboardToolbar
+            query={inventorySearch}
+            onQuery={setInventorySearch}
+            onSearch={() => setTab('inventory')}
+            onReceive={() => setReceiveProduct(null)}
+            onWriteoff={() => setWriteoffProduct(null)}
+            onProduct={() => setShowProduct(true)}
+          />
+          <MetricsStrip products={data.products} inventory={data.inventory} movements={data.movements} batches={data.batches} loading={data.loading} />
+          <AttentionPanel
+            alerts={stockAlerts}
+            data={data}
+            onOpen={(product) => {
+              setInventorySearch(getProductSku(product))
+              setTab('inventory')
+            }}
+            onReceive={setReceiveProduct}
+          />
+          <section>
+            <div className="mb-3">
+              <h2 className="text-sm font-bold text-slate-950">Движения</h2>
+              <p className="mt-1 text-xs text-slate-400">Полная лента операций склада.</p>
+            </div>
+            <MovementList rows={data.movements} data={data} />
+          </section>
+        </div>
+      )}
+
+      {tab === 'inventory' && (
+        <div className="animate-fade-in space-y-4">
+          <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] lg:grid-cols-[1fr_170px_auto_auto]">
+            <label className="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
+              <Search size={17} className="text-slate-400" />
+              <input
+                value={inventorySearch}
+                onChange={(e) => setInventorySearch(e.target.value)}
+                placeholder="Поиск по товару, SKU или штрихкоду…"
+                className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+              />
+            </label>
+            <select className="input py-2" value={inventoryStatus} onChange={(e) => setInventoryStatus(e.target.value)}>
+              {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <Button icon={<FilterX size={15} />} onClick={clearInventoryFilters}>Сбросить</Button>
+            <Button variant="primary" icon={<Download size={15} />} onClick={() => setReceiveProduct(null)}>Новая приёмка</Button>
           </div>
-        )}
+          <InventoryTable
+            rows={inventoryRows}
+            data={data}
+            onReceive={setReceiveProduct}
+            onWriteoff={setWriteoffProduct}
+            onEdit={setEditingProduct}
+          />
+        </div>
+      )}
+
+      {tab === 'receiving' && (
+        <div className="animate-fade-in space-y-4">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="primary" icon={<PackagePlus size={15} />} onClick={() => setReceiveProduct(null)}>Новая приёмка</Button>
+            <Button variant="danger" icon={<Trash2 size={15} />} onClick={() => setWriteoffProduct(null)}>Новое списание</Button>
+          </div>
+          <section className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p className="text-sm font-bold text-emerald-900">Приёмка</p>
+              <p className="mt-1 text-xs text-emerald-800">Создаёт FIFO-партию с фиксированной закупочной ценой.</p>
+            </div>
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+              <p className="text-sm font-bold text-rose-900">Списания</p>
+              <p className="mt-1 text-xs text-rose-800">Уменьшают доступный остаток и расходуют старые партии.</p>
+            </div>
+          </section>
+          <MovementList rows={receivingRows} data={data} emptyTitle="Операций пока нет" showEntryActions onlyLatestEntryEditable />
+        </div>
+      )}
+
+      {tab === 'movements' && (
+        <div className="animate-fade-in space-y-4">
+          <section className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] xl:grid-cols-[1fr_160px_210px_auto]">
+            <label className="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
+              <Search size={17} className="text-slate-400" />
+              <input
+                value={movementSearch}
+                onChange={(e) => setMovementSearch(e.target.value)}
+                placeholder="Поиск по товару, пользователю или комментарию…"
+                className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+              />
+            </label>
+            <select className="input py-2" value={movementType} onChange={(e) => setMovementType(e.target.value)}>
+              {MOVEMENT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <select className="input py-2" value={movementProductId} onChange={(e) => setMovementProductId(e.target.value)}>
+              <option value="">Все товары</option>
+              {validProducts.map((product) => <option key={getId(product)} value={getId(product)}>{getProductName(product)}</option>)}
+            </select>
+            <Button icon={<FilterX size={15} />} onClick={clearMovementFilters}>Сбросить</Button>
+          </section>
+          <MovementList rows={movementRows} data={data} />
+        </div>
+      )}
+
+      <ProductModal open={showProduct} onClose={() => setShowProduct(false)} suppliers={data.suppliers} />
+      <ProductModal open={Boolean(editingProduct)} onClose={() => setEditingProduct(null)} product={editingProduct} suppliers={data.suppliers} />
+      <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={data.products} inventory={data.inventory} />
+      <WriteoffModal open={writeoffProduct !== null} onClose={() => setWriteoffProduct(null)} products={writeoffProduct ? [writeoffProduct] : data.products} inventory={data.inventory} />
+    </div>
+  )
+}
+
+function DashboardToolbar({ query, onQuery, onSearch, onReceive, onWriteoff, onProduct }) {
+  function submit(e) {
+    e.preventDefault()
+    onSearch()
+  }
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <form onSubmit={submit} className="flex min-h-[42px] gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
+          <div className="flex flex-1 items-center gap-2">
+            <Search size={17} className="text-slate-400" />
+            <input
+              value={query}
+              onChange={(e) => onQuery(e.target.value)}
+              placeholder="Поиск по товару, SKU или штрихкоду…"
+              className="h-10 w-full border-0 bg-transparent text-sm outline-none placeholder:text-slate-400"
+            />
+          </div>
+          <button type="submit" className="text-sm font-semibold text-indigo-700 hover:text-indigo-900">Найти</button>
+        </form>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="primary" icon={<Download size={14} />} onClick={onReceive}>Новый приход</Button>
+          <Button size="sm" icon={<Trash2 size={14} />} onClick={onWriteoff}>Списание</Button>
+          <Button size="sm" icon={<PackagePlus size={14} />} onClick={onProduct}>Добавить товар</Button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function MetricsStrip({ products = [], inventory = [], movements = [], batches = [], loading = false }) {
+  const totalUnits = inventory.reduce((sum, inv) => sum + getQuantity(inv), 0)
+  const stockValue = batches.reduce(
+    (sum, batch) => sum + (batch.remaining_quantity ?? batch.RemainingQuantity ?? 0) * (batch.unit_cost ?? batch.UnitCost ?? 0),
+    0
+  )
+  const lowStock = inventory.filter((inv) => getStockStatus(inv) === 'low_stock').length
+  const outStock = inventory.filter((inv) => getStockStatus(inv) === 'out_of_stock').length
+  const today = new Date().toDateString()
+  const movementsToday = movements.filter((m) => {
+    const date = m.created_at ?? m.CreatedAt
+    if (!date) return false
+    try { return new Date(date).toDateString() === today } catch { return false }
+  }).length
+
+  const items = [
+    { label: 'Товаров', value: products.length.toLocaleString('ru-RU') },
+    { label: 'Единиц', value: totalUnits.toLocaleString('ru-RU') },
+    { label: 'Мало', value: lowStock.toLocaleString('ru-RU'), tone: lowStock ? 'amber' : 'slate' },
+    { label: 'Нет', value: outStock.toLocaleString('ru-RU'), tone: outStock ? 'rose' : 'slate' },
+    { label: 'Стоимость', value: fmtMoney(stockValue) },
+    { label: 'Сегодня', value: movementsToday.toLocaleString('ru-RU') },
+  ]
+
+  return (
+    <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] sm:grid-cols-3 xl:grid-cols-6">
+      {items.map((item) => (
+        <div key={item.label} className="border-b border-r border-slate-100 px-3 py-3 last:border-r-0 sm:[&:nth-child(3n)]:border-r-0 xl:border-b-0 xl:[&:nth-child(3n)]:border-r xl:[&:nth-child(6n)]:border-r-0">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{item.label}</p>
+          <p className={`mt-1 truncate text-base font-bold tabular-nums ${item.tone === 'amber' ? 'text-amber-700' : item.tone === 'rose' ? 'text-rose-700' : 'text-slate-950'}`}>
+            {loading ? '—' : item.value}
+          </p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function AttentionPanel({ alerts, data, onOpen, onReceive }) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-bold text-slate-950">Требует внимания</h2>
+          <p className="mt-1 text-xs text-slate-400">Товары с низким остатком и отсутствующие позиции.</p>
+        </div>
+      </div>
+      {alerts.length === 0 ? (
+        <CompactEmpty icon={<Package size={18} />} title="Критичных остатков нет" description="Низкие остатки появятся здесь." />
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-slate-200">
+          {alerts.map((inv) => {
+            const product = data.productMap[inv.product_id ?? inv.ProductID]
+            return (
+              <ProblemProductRow
+                key={getId(inv)}
+                inventory={inv}
+                product={product}
+                onOpen={() => onOpen(product)}
+                onReceive={() => onReceive(product ?? null)}
+              />
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function ProblemProductRow({ inventory, product, onOpen, onReceive }) {
+  const status = getStockStatus(inventory)
+  return (
+    <div className="grid gap-3 border-b border-slate-100 px-3 py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_96px_116px_auto] md:items-center">
+      <button onClick={onOpen} className="flex min-w-0 items-center gap-3 text-left">
+        <ProductThumb product={product} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold text-slate-950">{getProductName(product)}</p>
+          <p className="mt-0.5 truncate font-mono text-xs text-slate-400">{getProductSku(product)}</p>
+        </div>
+      </button>
+      <div className="flex gap-4 text-xs md:block md:text-right">
+        <span className="text-slate-500">Склад <b className="text-slate-950">{getQuantity(inventory)}</b></span>
+        <span className="text-slate-500 md:mt-1 md:block">Доступ <b className="text-emerald-700">{getAvailableQty(inventory)}</b></span>
+      </div>
+      <div className="md:text-right">
+        <Badge variant={STOCK_STATUS_BADGE[status]} dot>{STOCK_STATUS_LABEL[status]}</Badge>
+      </div>
+      <button onClick={onReceive} className="inline-flex min-h-[34px] items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
+        Пополнить
+      </button>
+    </div>
+  )
+}
+
+function InventoryTable({ rows, data, onReceive, onWriteoff, onEdit }) {
+  if (!rows.length) {
+    return <CompactEmpty icon={<Package size={18} />} title="Остатки не найдены" description="Измените поиск или сбросьте фильтры." />
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
+      <table className="w-full min-w-[960px] text-sm">
+        <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          <tr>
+            <th className="px-3 py-2.5 text-left">Товар</th>
+            <th className="px-3 py-2.5 text-right">На складе</th>
+            <th className="px-3 py-2.5 text-right">Доступно</th>
+            <th className="px-3 py-2.5 text-right">Резерв</th>
+            <th className="px-3 py-2.5 text-right">Закупка</th>
+            <th className="px-3 py-2.5 text-right">Продажа</th>
+            <th className="px-3 py-2.5 text-right">Стоимость</th>
+            <th className="px-3 py-2.5 text-left">Статус</th>
+            <th className="px-3 py-2.5 text-right">Операции</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.map(({ product, inv }) => {
+            const status = getStockStatus(inv)
+            const last = getLastMovementForProduct(getId(product), data.movements)
+            const stockValue = getInventoryFifoValue(inv, data.batches)
+            return (
+              <tr key={getId(product)} className="hover:bg-slate-50">
+                <td className="px-3 py-2.5">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <ProductThumb product={product} />
+                    <span className="min-w-0">
+                      <span className="block truncate font-bold text-slate-900">{getProductName(product)}</span>
+                      <span className="block font-mono text-xs text-slate-400">{getProductSku(product)}</span>
+                    </span>
+                  </div>
+                </td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-950">{getQuantity(inv)}</td>
+                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-emerald-700">{getAvailableQty(inv)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-amber-700">{getReservedQty(inv)}</td>
+                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-600">{fmtMoney(getPurchasePrice(product))}</td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums text-indigo-700">{fmtMoney(getSalePrice(product))}</td>
+                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-700">{fmtMoney(stockValue)}</td>
+                <td className="px-3 py-2.5">
+                  <div className="flex flex-col gap-1.5">
+                    <Badge variant={isProductActive(product) ? STOCK_STATUS_BADGE[status] : 'slate'}>{isProductActive(product) ? STOCK_STATUS_LABEL[status] : 'Неактивен'}</Badge>
+                    <span className="text-xs text-slate-400">{last ? 'Обновлено' : 'Нет движений'}</span>
+                  </div>
+                </td>
+                <td className="px-3 py-2.5">
+                  <div className="flex justify-end gap-1">
+                    <IconAction title="Приход" icon={<Download size={15} />} onClick={() => onReceive(product)} />
+                    <IconAction title="Списание" icon={<Trash2 size={15} />} onClick={() => onWriteoff(product)} danger />
+                    <IconAction title="Изменить" icon={<PackagePlus size={15} />} onClick={() => onEdit(product)} />
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function getInventoryFifoValue(inv, batches = []) {
+  if (!inv) return 0
+  const productId = inv.product_id ?? inv.ProductID
+  return batches
+    .filter((batch) => (batch.product_id ?? batch.ProductID) === productId)
+    .reduce((sum, batch) => sum + (batch.remaining_quantity ?? batch.RemainingQuantity ?? 0) * (batch.unit_cost ?? batch.UnitCost ?? 0), 0)
+}
+
+function ProductThumb({ product }) {
+  const image = getProductImage(product)
+  if (image) {
+    return (
+      <img
+        src={image}
+        alt={getProductName(product)}
+        className="h-10 w-10 flex-shrink-0 rounded-lg border border-slate-200 object-cover"
+      />
+    )
+  }
+  return (
+    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400">
+      <Package size={16} />
+    </div>
+  )
+}
+
+function IconAction({ title, icon, onClick, danger = false }) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      className={`flex min-h-[34px] min-w-[34px] items-center justify-center rounded-lg transition-colors ${danger ? 'text-rose-600 hover:bg-rose-50' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`}
+    >
+      {icon}
+    </button>
+  )
+}
+
+function CompactEmpty({ icon, title, description }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white px-4 py-5 text-left">
+      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">{icon}</div>
+      <div>
+        <p className="text-sm font-bold text-slate-800">{title}</p>
+        <p className="mt-0.5 text-xs text-slate-400">{description}</p>
       </div>
     </div>
   )

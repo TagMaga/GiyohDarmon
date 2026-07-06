@@ -1,11 +1,11 @@
 /**
  * OrdersFilters — filter bar for Owner Orders Center.
  *
- * Filters: date range, status, team, seller, manager, courier, product, search.
+ * Filters: status, team, seller, search.
  * Search is debounced 400ms. All filter changes call onChange({ ...filters }).
  */
 import { useState, useEffect, useRef } from 'react'
-import { Search, X } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { STATUS_LABELS } from '../../../shared/orderStatusConfig'
 
 const ALL_STATUSES = Object.entries(STATUS_LABELS)
@@ -24,9 +24,6 @@ export default function OrdersFilters({
   onChange,
   teams    = [],
   sellers  = [],
-  managers = [],
-  couriers = [],
-  products = [],
 }) {
   const [searchRaw, setSearchRaw] = useState(filters.search ?? '')
   const search = useDebounce(searchRaw, 400)
@@ -44,71 +41,29 @@ export default function OrdersFilters({
     onChange({ ...filters, [key]: value, page: 1 })
   }
 
-  function clearAll() {
-    setSearchRaw('')
-    onChange({ page: 1, limit: filters.limit ?? 25 })
-  }
-
-  const hasActive = !!(
-    filters.status || filters.team_id || filters.seller_id ||
-    filters.manager_id || filters.courier_id || filters.no_courier ||
-    filters.from || filters.to || (filters.search ?? '').trim()
-  )
-
   return (
-    <div className="card p-4 space-y-3">
-      {/* Row 1: search + date range */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+    <div className="card">
+      <div className="flex items-center gap-2 px-6 py-3.5 border-b border-slate-50 flex-wrap">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
             type="text"
             value={searchRaw}
             onChange={e => setSearchRaw(e.target.value)}
-            placeholder="Номер заказа, клиент, телефон…"
-            className="input pl-8 w-full"
+            placeholder="Поиск по № заказа, клиенту, телефону…"
+            className="w-full rounded-[10px] border-0 bg-slate-50 py-2 pl-8 pr-3 text-[12.5px] font-medium text-slate-700 outline-none placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-100"
           />
-          {searchRaw && (
-            <button
-              onClick={() => setSearchRaw('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 min-h-[28px] min-w-[28px] flex items-center justify-center"
-            >
-              <X size={13} />
-            </button>
-          )}
         </div>
 
-        {/* Date from */}
-        <input
-          type="date"
-          value={filters.from ?? ''}
-          onChange={e => set('from', e.target.value)}
-          className="input sm:w-36"
-          title="Дата от"
-        />
-
-        {/* Date to */}
-        <input
-          type="date"
-          value={filters.to ?? ''}
-          onChange={e => set('to', e.target.value)}
-          className="input sm:w-36"
-          title="Дата до"
-        />
-      </div>
-
-      {/* Row 2: dropdowns */}
-      <div className="flex flex-wrap gap-3">
         {/* Status */}
         <select
           value={filters.status ?? ''}
           onChange={e => set('status', e.target.value)}
-          className="input flex-1 min-w-[140px]"
+          className="min-h-[38px] rounded-[10px] border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-700 outline-none transition-colors hover:bg-slate-50 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
         >
-          <option value="">Все статусы</option>
+          <option value="">Статус: Все</option>
           {ALL_STATUSES.map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
+            <option key={key} value={key}>Статус: {label}</option>
           ))}
         </select>
 
@@ -117,11 +72,11 @@ export default function OrdersFilters({
           <select
             value={filters.team_id ?? ''}
             onChange={e => set('team_id', e.target.value)}
-            className="input flex-1 min-w-[140px]"
+            className="min-h-[38px] rounded-[10px] border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-700 outline-none transition-colors hover:bg-slate-50 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
           >
-            <option value="">Все команды</option>
+            <option value="">Команда: Все</option>
             {teams.map(t => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+              <option key={t.id} value={t.id}>Команда: {t.name}</option>
             ))}
           </select>
         )}
@@ -131,70 +86,13 @@ export default function OrdersFilters({
           <select
             value={filters.seller_id ?? ''}
             onChange={e => set('seller_id', e.target.value)}
-            className="input flex-1 min-w-[140px]"
+            className="min-h-[38px] rounded-[10px] border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-700 outline-none transition-colors hover:bg-slate-50 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
           >
-            <option value="">Все продавцы</option>
+            <option value="">Продавец: Все</option>
             {sellers.map(u => (
-              <option key={u.id} value={u.id}>{u.full_name ?? u.FullName ?? u.id}</option>
+              <option key={u.id} value={u.id}>Продавец: {u.full_name ?? u.FullName ?? u.id}</option>
             ))}
           </select>
-        )}
-
-        {/* Manager */}
-        {managers.length > 0 && (
-          <select
-            value={filters.manager_id ?? ''}
-            onChange={e => set('manager_id', e.target.value)}
-            className="input flex-1 min-w-[140px]"
-          >
-            <option value="">Все менеджеры</option>
-            {managers.map(u => (
-              <option key={u.id} value={u.id}>{u.full_name ?? u.FullName ?? u.id}</option>
-            ))}
-          </select>
-        )}
-
-        {/* Courier */}
-        {couriers.length > 0 && (
-          <select
-            value={filters.no_courier ? '__none__' : (filters.courier_id ?? '')}
-            onChange={e => {
-              const value = e.target.value
-              if (value === '__none__') {
-                onChange({ ...filters, courier_id: '', no_courier: true, page: 1 })
-              } else {
-                onChange({ ...filters, courier_id: value, no_courier: false, page: 1 })
-              }
-            }}
-            className="input flex-1 min-w-[140px]"
-          >
-            <option value="">Все курьеры</option>
-            <option value="__none__">Без курьера</option>
-            {couriers.map(c => (
-              <option key={c.courier_id} value={c.courier_id}>{c.full_name ?? c.phone ?? c.courier_id}</option>
-            ))}
-          </select>
-        )}
-
-        {/* Page size */}
-        <select
-          value={filters.limit ?? 25}
-          onChange={e => onChange({ ...filters, limit: Number(e.target.value), page: 1 })}
-          className="input w-24 flex-shrink-0"
-        >
-          <option value={25}>25</option>
-          <option value={50}>50</option>
-          <option value={100}>100</option>
-        </select>
-
-        {/* Clear */}
-        {hasActive && (
-          <button
-            onClick={clearAll}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors min-h-[44px] flex-shrink-0"
-          >
-            <X size={13} /> Сбросить
-          </button>
         )}
       </div>
     </div>

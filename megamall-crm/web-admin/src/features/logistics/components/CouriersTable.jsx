@@ -1,11 +1,12 @@
 /**
  * CouriersTable — full courier list with operational stats.
- * Clicking a row navigates to /owner/logistics/couriers/:id
  */
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Search, ChevronRight, Clock } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Search, Clock, Pencil, DollarSign, Power } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
+import { KEYS } from '../../../shared/queryKeys'
+import { EditCourierModal, TariffsModal, ToggleActiveModal } from '../../dispatcher/components/CourierManageModals'
 
 const fmtMoney = (n) =>
   n == null ? '—' : Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 0 })
@@ -33,15 +34,82 @@ const STATUS_CONFIG = {
   inactive: { label: 'Неактивен', badge: 'slate'   },
 }
 
+const AVATAR_COLORS = ['#10b981', '#38bdf8', '#f43f5e', '#f59e0b', '#8b5cf6', '#14b8a6', '#6366f1']
+function avatarColor(name = '') {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffffffff
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
+}
+function initials(name = '') {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return (parts[0]?.[0] ?? '?').toUpperCase()
+  return (parts[0][0] + parts[1][0]).toUpperCase()
+}
+
+function CourierAvatar({ name }) {
+  return (
+    <span
+      className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
+      style={{ background: avatarColor(name ?? '') }}
+    >
+      {initials(name ?? '')}
+    </span>
+  )
+}
+
 export default function CouriersTable({ couriers = [], loading }) {
-  const navigate = useNavigate()
+  const qc = useQueryClient()
   const [search, setSearch] = useState('')
+  const [editTarget, setEditTarget] = useState(null)
+  const [tariffsTarget, setTariffsTarget] = useState(null)
+  const [toggleTarget, setToggleTarget] = useState(null)
 
   const filtered = couriers.filter(c =>
     !search ||
     c.full_name?.toLowerCase().includes(search.toLowerCase()) ||
     c.phone?.includes(search)
   )
+
+  const refreshCouriers = () => {
+    qc.invalidateQueries({ queryKey: KEYS.logistics.couriers })
+  }
+
+  const ActionButtons = ({ courier }) => {
+    const active = courier.is_active !== false
+    return (
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          title="Изменить"
+          onClick={() => setEditTarget(courier)}
+          className="inline-flex items-center justify-center rounded-[7px] bg-violet-500/10 text-violet-600 hover:bg-violet-500/20 transition-colors px-2 py-1.5"
+        >
+          <Pencil size={14} />
+        </button>
+        <button
+          type="button"
+          title="Тарифы"
+          onClick={() => setTariffsTarget(courier)}
+          className="inline-flex items-center justify-center rounded-[7px] bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 transition-colors px-2 py-1.5"
+        >
+          <DollarSign size={14} />
+        </button>
+        <button
+          type="button"
+          title={active ? 'Выключить' : 'Включить'}
+          onClick={() => setToggleTarget({ ...courier, is_active: active })}
+          className={[
+            'inline-flex items-center justify-center rounded-[7px] transition-colors px-2 py-1.5',
+            active
+              ? 'bg-rose-500/10 text-rose-600 hover:bg-rose-500/20'
+              : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20',
+          ].join(' ')}
+        >
+          <Power size={14} />
+        </button>
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -61,6 +129,7 @@ export default function CouriersTable({ couriers = [], loading }) {
   }
 
   return (
+    <>
     <div className="card overflow-hidden">
       {/* Toolbar */}
       <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
@@ -100,14 +169,15 @@ export default function CouriersTable({ couriers = [], loading }) {
             {filtered.map(c => {
               const sc = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.free
               return (
-                <tr
-                  key={c.courier_id}
-                  className="hover:bg-slate-50/70 cursor-pointer transition-colors"
-                  onClick={() => navigate(`/owner/logistics/couriers/${c.courier_id}`)}
-                >
+                <tr key={c.courier_id} className="hover:bg-slate-50/70 transition-colors">
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-slate-900">{c.full_name}</p>
-                    <p className="text-[11px] text-slate-400">{c.phone}</p>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <CourierAvatar name={c.full_name} />
+                      <div className="min-w-0">
+                        <p className="font-semibold text-slate-900 truncate">{c.full_name}</p>
+                        <p className="text-[11px] text-slate-400">{c.phone}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <Badge variant={sc.badge}>{sc.label}</Badge>
@@ -144,7 +214,7 @@ export default function CouriersTable({ couriers = [], loading }) {
                   <td className="px-4 py-3 text-slate-700 tabular-nums text-xs">{fmtMoney(c.earnings)} сом</td>
                   <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">{fmtDate(c.last_activity_at)}</td>
                   <td className="px-4 py-3">
-                    <ChevronRight size={14} className="text-slate-300" />
+                    <ActionButtons courier={c} />
                   </td>
                 </tr>
               )
@@ -161,15 +231,17 @@ export default function CouriersTable({ couriers = [], loading }) {
         {filtered.map(c => {
           const sc = STATUS_CONFIG[c.status] ?? STATUS_CONFIG.free
           return (
-            <button
+            <div
               key={c.courier_id}
               className="w-full text-left px-5 py-4 hover:bg-slate-50 transition-colors"
-              onClick={() => navigate(`/owner/logistics/couriers/${c.courier_id}`)}
             >
               <div className="flex items-start justify-between gap-2 mb-2">
-                <div>
-                  <p className="font-semibold text-slate-900">{c.full_name}</p>
-                  <p className="text-xs text-slate-400">{c.phone}</p>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <CourierAvatar name={c.full_name} />
+                  <div className="min-w-0">
+                    <p className="font-semibold text-slate-900 truncate">{c.full_name}</p>
+                    <p className="text-xs text-slate-400">{c.phone}</p>
+                  </div>
                 </div>
                 <Badge variant={sc.badge}>{sc.label}</Badge>
               </div>
@@ -189,10 +261,37 @@ export default function CouriersTable({ couriers = [], loading }) {
                   </p>
                 </div>
               </div>
-            </button>
+              <div className="mt-3 flex justify-end">
+                <ActionButtons courier={c} />
+              </div>
+            </div>
           )
         })}
       </div>
     </div>
+    {editTarget && (
+      <EditCourierModal
+        courier={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSuccess={() => {
+          setEditTarget(null)
+          refreshCouriers()
+        }}
+      />
+    )}
+    {tariffsTarget && (
+      <TariffsModal courier={tariffsTarget} onClose={() => setTariffsTarget(null)} />
+    )}
+    {toggleTarget && (
+      <ToggleActiveModal
+        courier={toggleTarget}
+        onClose={() => setToggleTarget(null)}
+        onSuccess={() => {
+          setToggleTarget(null)
+          refreshCouriers()
+        }}
+      />
+    )}
+    </>
   )
 }

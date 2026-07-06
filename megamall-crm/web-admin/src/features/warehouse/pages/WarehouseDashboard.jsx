@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowLeftRight, ClipboardCheck, Download, Package, PackagePlus, RefreshCw, Search, Trash2, Warehouse } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, Download, Package, PackagePlus, RefreshCw, Search, Trash2, Warehouse } from 'lucide-react'
 import PageHeader from '../../../shared/components/PageHeader'
 import Button from '../../../shared/components/Button'
 import Alert from '../../../shared/components/Alert'
@@ -90,7 +90,6 @@ export default function WarehouseDashboard() {
             onReceive={() => setReceiveProduct(null)}
             onWriteoff={() => setShowWriteoff(true)}
             onProduct={() => setShowProduct(true)}
-            onCount={() => navigate('/warehouse/inventory?status=low_stock')}
           />
         </div>
       </section>
@@ -146,13 +145,12 @@ function Panel({ title, subtitle, children }) {
   )
 }
 
-function ActionToolbar({ onReceive, onWriteoff, onProduct, onCount }) {
+function ActionToolbar({ onReceive, onWriteoff, onProduct }) {
   return (
     <div className="flex flex-wrap gap-2">
       <Button size="sm" variant="primary" icon={<Download size={14} />} onClick={onReceive}>Новый приход</Button>
       <Button size="sm" icon={<Trash2 size={14} />} onClick={onWriteoff}>Списание</Button>
       <Button size="sm" icon={<PackagePlus size={14} />} onClick={onProduct}>Добавить товар</Button>
-      <Button size="sm" icon={<ClipboardCheck size={14} />} onClick={onCount}>Инвентаризация</Button>
     </div>
   )
 }

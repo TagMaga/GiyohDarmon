@@ -25,6 +25,7 @@ import useManagerOrders    from '../hooks/useManagerOrders'
 import useManagerPersonalOrders from '../hooks/useManagerPersonalOrders'
 import useMyIncome         from '../../hr/hooks/useMyIncome'
 import { fmtMoney }        from '../../hr/utils/hrHelpers'
+import { M }               from '../../seller/components/mobileUi'
 
 function toYMD(d) { return d.toISOString().slice(0, 10) }
 
@@ -163,7 +164,7 @@ export default function ManagerDashboardPage() {
   const loading = teamLoading || membersLoading || ordersLoading
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
+    <div className="p-4 md:p-6 space-y-5 pb-28 lg:pb-6" style={{ background: M.bg, fontFamily: M.font, minHeight: '100vh' }}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

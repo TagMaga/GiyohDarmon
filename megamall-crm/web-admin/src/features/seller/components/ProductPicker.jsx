@@ -1,6 +1,15 @@
 import { useState, useMemo } from 'react'
 import { Search, Package, CheckCircle2, X } from 'lucide-react'
 
+function getProductImageUrl(product) {
+  if (!product) return ''
+  const direct = product.product_image_url ?? product.ProductImageURL ?? product.image_url ?? product.ImageURL ?? product.image ?? product.Image
+  if (direct) return direct
+  const images = Array.isArray(product.images) ? product.images : (Array.isArray(product.Images) ? product.Images : [])
+  const primary = images.find((img) => img.is_primary ?? img.IsPrimary) ?? images[0]
+  return primary?.image_url ?? primary?.ImageURL ?? primary?.url ?? primary?.URL ?? ''
+}
+
 /**
  * ProductPicker — searchable product grid.
  *
@@ -92,9 +101,9 @@ export default function ProductPicker({ products = [], loading = false, selected
                   className="text-left rounded-xl border border-slate-200 hover:border-indigo-300
                              hover:bg-indigo-50 transition-colors group overflow-hidden"
                 >
-                  {(p.product_image_url || p.ProductImageURL || p.image_url || p.ImageURL) ? (
+                  {getProductImageUrl(p) ? (
                     <img
-                      src={p.product_image_url || p.ProductImageURL || p.image_url || p.ImageURL}
+                      src={getProductImageUrl(p)}
                       alt={p.name}
                       className="w-full aspect-square object-cover"
                     />

@@ -413,11 +413,23 @@ func (h *Handler) GetMyCompensation(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
-	if ec == nil {
+	if ec != nil {
+		response.OK(c, ToCompensationResponse(ec))
+		return
+	}
+
+	// No fixed salary/percent record set — fall back to the caller's
+	// CommissionConfig rate (the one owners actually set from the team directory).
+	resolved, err := h.svc.GetMyResolvedRate(c.Request.Context(), claims.UserID, claims.TeamID, claims.Role)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	if resolved == nil {
 		response.OK(c, nil)
 		return
 	}
-	response.OK(c, ToCompensationResponse(ec))
+	response.OK(c, ToResolvedRateResponse(resolved))
 }
 
 // TeamRankResponse is the payload for GET /hr/income/me/team-rank.

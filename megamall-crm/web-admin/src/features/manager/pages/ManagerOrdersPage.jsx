@@ -10,12 +10,13 @@
  */
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery }                    from '@tanstack/react-query'
-import { Search, X, ClipboardList }    from 'lucide-react'
-import PageHeader                      from '../../../shared/components/PageHeader'
+import { Search, X, ClipboardList, SlidersHorizontal } from 'lucide-react'
 import Badge                           from '../../../shared/components/Badge'
 import EmptyState                      from '../../../shared/components/EmptyState'
+import DesktopDateRangePicker          from '../../../shared/components/DesktopDateRangePicker'
 import SellerOrderDetailPanel          from '../../seller/components/SellerOrderDetailPanel'
 import OrderDetailBottomSheet          from '../../seller/components/OrderDetailBottomSheet'
+import { M, InitialsAvatar, StatusPill, Chip } from '../../seller/components/mobileUi'
 import { KEYS }                        from '../../../shared/queryKeys'
 import { fetchCities }                 from '../../seller/api'
 import { SELLER_STATUS_FILTERS, STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
@@ -51,6 +52,7 @@ export default function ManagerOrdersPage() {
   const [rawSearch,    setRawSearch]    = useState('')
   const [page,         setPage]         = useState(1)
   const [detailOrder,  setDetailOrder]  = useState(null)
+  const [filtersOpen,  setFiltersOpen]  = useState(false)
 
   const search = useDebounce(rawSearch, 400)
 
@@ -114,64 +116,70 @@ export default function ManagerOrdersPage() {
     return () => window.removeEventListener('keydown', handleKey)
   }, [items, detailOrder])
 
-  // ── Filter section (same visual pattern as SellerOrders) ─────────────────
-  const filtersSection = (
+  // ── Filters (same split pattern as TeamLeadOrders) ────────────────────────
+  const quickFilters = (
     <div className="space-y-2.5">
-      {/* Status pills */}
-      <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
-        {SELLER_STATUS_FILTERS.map(f => (
-          <button
-            key={f.key}
-            type="button"
-            onClick={() => setStatusFilter(f.key)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors
-              ${statusFilter === f.key
-                ? 'bg-indigo-600 text-white'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Search */}
       <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: M.muted }} />
         <input
           type="text"
           value={rawSearch}
           onChange={e => setRawSearch(e.target.value)}
-          placeholder="Поиск по номеру, клиенту, телефону…"
-          className="input pl-9 pr-9"
+          placeholder="Поиск по продавцу, клиенту…"
+          className="w-full outline-none"
+          style={{ border: `1px solid ${M.borderAlt}`, background: '#fff', borderRadius: 13, padding: '11px 14px 11px 40px', fontFamily: 'inherit', fontSize: 13.5, color: M.ink }}
         />
         {rawSearch && (
           <button type="button" onClick={() => setRawSearch('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+            className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: M.muted }}>
             <X size={14} />
           </button>
         )}
       </div>
 
-      {/* Date range + seller filter */}
-      <div className="flex gap-2 flex-wrap">
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="input flex-1 min-w-[120px]" />
-        <input type="date" value={dateTo}   onChange={e => setDateTo(e.target.value)}   className="input flex-1 min-w-[120px]" />
-        {sellers.length > 0 && (
-          <select value={sellerId} onChange={e => setSellerId(e.target.value)} className="input flex-1 min-w-[140px]">
-            <option value="">Все продавцы</option>
-            {sellers.map(u => <option key={u.id} value={u.id}>{u.full_name ?? u.id}</option>)}
-          </select>
-        )}
-        {(statusFilter !== 'all' || rawSearch || sellerId) && (
-          <button
-            type="button"
-            onClick={() => { setStatusFilter('all'); setRawSearch(''); setSellerId('') }}
-            className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors"
-          >
-            <X size={12} /> Сбросить
-          </button>
-        )}
+      <div className="flex gap-[7px] overflow-x-auto scrollbar-none pb-0.5">
+        {SELLER_STATUS_FILTERS.map(f => (
+          <Chip key={f.key} active={statusFilter === f.key} onClick={() => setStatusFilter(f.key)}>
+            {f.label}
+          </Chip>
+        ))}
       </div>
+    </div>
+  )
+
+  const advancedFilters = (
+    <div className="flex gap-2 flex-wrap">
+      <DesktopDateRangePicker
+        from={dateFrom}
+        to={dateTo}
+        onChange={(range) => { setDateFrom(range.from); setDateTo(range.to) }}
+      />
+      <div className="grid w-full grid-cols-2 gap-2 md:hidden">
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="input min-w-0" />
+        <input type="date" value={dateTo}   onChange={e => setDateTo(e.target.value)}   className="input min-w-0" />
+      </div>
+      {sellers.length > 0 && (
+        <select value={sellerId} onChange={e => setSellerId(e.target.value)} className="input flex-1 min-w-[140px]">
+          <option value="">Все продавцы</option>
+          {sellers.map(u => <option key={u.id} value={u.id}>{u.full_name ?? u.id}</option>)}
+        </select>
+      )}
+      {(statusFilter !== 'all' || rawSearch || sellerId) && (
+        <button
+          type="button"
+          onClick={() => { setStatusFilter('all'); setRawSearch(''); setSellerId('') }}
+          className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors"
+        >
+          <X size={12} /> Сбросить
+        </button>
+      )}
+    </div>
+  )
+
+  const filtersSection = (
+    <div className="space-y-2.5">
+      {quickFilters}
+      {advancedFilters}
     </div>
   )
 
@@ -180,7 +188,7 @@ export default function ManagerOrdersPage() {
     const isSelected = detailOrder?.id === order.id
     const status = order.status ?? ''
     const amount = order.total_order_amount ?? order.total_amount ?? 0
-    const sellerName = userMap[order.seller_id]?.full_name ?? null
+    const sellerName = userMap[order.seller_id]?.full_name ?? order.seller?.full_name ?? null
     return (
       <button
         onClick={() => setDetailOrder(order)}
@@ -219,41 +227,46 @@ export default function ManagerOrdersPage() {
   function MobileCard({ order }) {
     const status     = order.status ?? ''
     const amount     = order.total_order_amount ?? order.total_amount ?? 0
-    const sellerName = userMap[order.seller_id]?.full_name ?? null
+    const sellerName = userMap[order.seller_id]?.full_name ?? order.seller?.full_name ?? null
     const phone      = order.customer?.phone ?? order.customer_phone ?? null
     return (
       <div
-        className="card p-4 active:scale-[0.99] transition-transform"
-        style={{ boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 8px 24px rgba(16,24,40,0.06)' }}
+        className="active:scale-[0.99] transition-transform"
+        style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 16, padding: 15 }}
       >
-        <div className="flex items-start justify-between gap-2 mb-2.5">
+        {sellerName && (
+          <div className="flex items-center gap-[6px] mb-[9px]">
+            <InitialsAvatar name={sellerName} size={20} radius={6} />
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: '#76766E' }}>{sellerName}</span>
+          </div>
+        )}
+        <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0">
-            <p className="font-mono text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <p style={{ fontSize: 11, fontWeight: 700, color: M.faint, fontVariantNumeric: 'tabular-nums' }}>
               {order.order_number ?? order.id?.slice(0, 8)}
             </p>
-            <p className="text-[15px] font-bold text-slate-900 mt-0.5 leading-tight truncate">
+            <p style={{ fontSize: 15, fontWeight: 700, color: M.ink, marginTop: 3 }} className="truncate">
               {order.customer?.full_name ?? order.customer_name ?? '—'}
             </p>
-            {sellerName && <p className="text-xs text-indigo-500 mt-0.5">{sellerName}</p>}
+            <p style={{ fontSize: 12, color: M.muted, marginTop: 3 }}>{fmtDate(order.created_at)}</p>
           </div>
-          <Badge variant={STATUS_BADGE[status] ?? 'slate'} dot size="md">
-            {STATUS_LABELS[status] ?? status}
-          </Badge>
+          <div className="text-right flex-shrink-0">
+            <StatusPill status={status} />
+            <div style={{ fontSize: 16, fontWeight: 800, color: M.ink, marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>{fmtAmount(amount)} с</div>
+          </div>
         </div>
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <span className="text-xs text-slate-400">{fmtDate(order.created_at)}</span>
-          <span className="text-sm font-black text-slate-900">{fmtAmount(amount)}</span>
-        </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2" style={{ marginTop: 13 }}>
           {phone && (
             <a href={`tel:${phone}`}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-semibold min-h-[40px] active:scale-95 transition-transform">
+              className="flex-1 flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+              style={{ background: M.greenBg, color: M.green, fontSize: 13, fontWeight: 700, padding: 10, borderRadius: 11, minHeight: 40 }}>
               Позвонить
             </a>
           )}
           <button onClick={() => setDetailOrder(order)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-semibold min-h-[40px] active:scale-95 transition-transform">
-            Детали
+            className="flex-1 flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+            style={{ background: M.indigoBg, color: M.indigoDeep, fontSize: 13, fontWeight: 700, padding: 10, borderRadius: 11, minHeight: 40, border: 'none' }}>
+            Детали →
           </button>
         </div>
       </div>
@@ -268,35 +281,87 @@ export default function ManagerOrdersPage() {
       {/* ═══════════════════════════════════════════════════════════
           MOBILE
       ═══════════════════════════════════════════════════════════ */}
-      <div className="lg:hidden page-container">
-        <PageHeader title="Заказы команды" subtitle={`Всего: ${totalCount}`} />
-        <div className="mb-4">{filtersSection}</div>
+      <div className="lg:hidden" style={{ background: M.bg, fontFamily: M.font, minHeight: '100vh', padding: '8px 20px 7.5rem' }}>
+        <div className="flex items-baseline gap-[9px]">
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0 }}>Заказы команды</h1>
+          <span style={{ fontSize: 14, color: M.muted, fontWeight: 600 }}>{totalCount}</span>
+        </div>
 
-        {isLoading && (
-          <div className="space-y-3">
+        <div style={{ marginTop: 14 }} className="space-y-3">
+          {quickFilters}
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(true)}
+            className="w-full min-h-[40px] flex items-center justify-between active:scale-[0.99] transition-transform"
+            style={{ background: '#fff', border: `1px solid ${M.borderAlt}`, borderRadius: 12, padding: '9px 14px', fontSize: 13, fontWeight: 700, color: M.ink }}
+          >
+            <span>Период и продавец</span>
+            <SlidersHorizontal size={15} style={{ color: M.muted }} />
+          </button>
+        </div>
+
+        {filtersOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <button
+              type="button"
+              aria-label="Close filters"
+              onClick={() => setFiltersOpen(false)}
+              className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
+            />
+            <div className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-white p-4 pb-[calc(env(safe-area-inset-bottom,0px)+18px)] shadow-[0_-24px_60px_rgba(15,23,42,0.18)]">
+              <div className="mx-auto mb-4 h-1 w-11 rounded-full bg-slate-200" />
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-base font-black text-slate-950">Период и продавец</p>
+                  <p className="text-xs text-slate-400">Диапазон дат и конкретный продавец</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              {advancedFilters}
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(false)}
+                className="mt-4 w-full min-h-[46px] rounded-2xl bg-slate-950 text-white text-sm font-black"
+              >
+                Применить
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginTop: 14 }} className="space-y-2.5">
+          {isLoading && (
+            <div className="space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="h-28 rounded-2xl bg-slate-100 animate-pulse" />
             ))}
-          </div>
-        )}
-        {!isLoading && items.length === 0 && (
-          <div className="card"><EmptyState icon={<ClipboardList size={24} />} title="Нет заказов" description="Заказы вашей команды появятся здесь." /></div>
-        )}
-        {!isLoading && items.map(o => <MobileCard key={o.id} order={o} />)}
+            </div>
+          )}
+          {!isLoading && items.length === 0 && (
+            <div className="card"><EmptyState icon={<ClipboardList size={24} />} title="Нет заказов" description="Заказы вашей команды появятся здесь." /></div>
+          )}
+          {!isLoading && items.map(o => <MobileCard key={o.id} order={o} />)}
 
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-3 mt-4">
-            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">
-              ← Назад
-            </button>
-            <span className="text-xs text-slate-500">{page} / {totalPages}</span>
-            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">
-              Вперёд →
-            </button>
-          </div>
-        )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-3 mt-4">
+              <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
+                className="px-4 py-2 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                ← Назад
+              </button>
+              <span className="text-xs text-slate-500">{page} / {totalPages}</span>
+              <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
+                className="px-4 py-2 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">
+                Вперёд →
+              </button>
+            </div>
+          )}
+        </div>
 
         <OrderDetailBottomSheet
           order={detailOrder}
@@ -312,7 +377,7 @@ export default function ManagerOrdersPage() {
       ═══════════════════════════════════════════════════════════ */}
       <div
         className="hidden lg:flex overflow-hidden bg-white rounded-b-none"
-        style={{ height: 'calc(100vh - 60px)', borderTop: '1px solid rgba(226,232,240,0.7)' }}
+        style={{ height: '100vh' }}
       >
         {/* ── Left: order list ── */}
         <div

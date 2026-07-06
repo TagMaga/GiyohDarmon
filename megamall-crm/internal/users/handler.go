@@ -34,11 +34,17 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 
 	rg.POST("", middleware.RequireRoles(string(RoleOwner)), h.Create)
 	rg.GET("", middleware.RequireRoles(string(RoleOwner), string(RoleManager), string(RoleSalesTeamLead)), h.List)
+	rg.GET("/history", middleware.RequireRoles(string(RoleOwner)), h.ListAllHistory)
+	rg.GET("/:id/history", middleware.RequireRoles(string(RoleOwner)), h.ListHistory)
 	rg.GET("/:id", middleware.RequireAuth(), h.GetByID)
 	rg.PATCH("/:id", middleware.RequireRoles(string(RoleOwner)), h.Update)
 	rg.DELETE("/:id", middleware.RequireRoles(string(RoleOwner)), h.Delete)
 	rg.PATCH("/:id/password", middleware.RequireAuth(), h.ChangePassword)
 	rg.POST("/:id/avatar", middleware.RequireRoles(string(RoleOwner)), h.UploadAvatar)
+	rg.GET("/:id/documents", middleware.RequireRoles(string(RoleOwner)), h.ListDocuments)
+	rg.POST("/:id/documents", middleware.RequireRoles(string(RoleOwner)), h.CreateDocument)
+	rg.PATCH("/:id/documents/:document_id/status", middleware.RequireRoles(string(RoleOwner)), h.UpdateDocumentStatus)
+	rg.DELETE("/:id/documents/:document_id", middleware.RequireRoles(string(RoleOwner)), h.DeleteDocument)
 }
 
 // Create handles POST /users
@@ -137,12 +143,37 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 
-	u, err := h.svc.Update(c.Request.Context(), id, req)
+	claims := middleware.ClaimsFromContext(c)
+	u, err := h.svc.Update(c.Request.Context(), id, req, claims.UserID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
 	response.OK(c, ToResponse(u))
+}
+
+// ListHistory handles GET /users/:id/history.
+func (h *Handler) ListHistory(c *gin.Context) {
+	id, ok := parseUUID(c, "id")
+	if !ok {
+		return
+	}
+	history, err := h.svc.ListHistory(c.Request.Context(), id)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, ToHistoryResponseList(history))
+}
+
+// ListAllHistory handles GET /users/history.
+func (h *Handler) ListAllHistory(c *gin.Context) {
+	history, err := h.svc.ListAllHistory(c.Request.Context())
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, ToHistoryResponseList(history))
 }
 
 // Delete handles DELETE /users/:id
@@ -196,17 +227,98 @@ func (h *Handler) UploadAvatar(c *gin.Context) {
 	if !ok {
 		return
 	}
-	h.uploadAvatar(c, id)
+	claims := middleware.ClaimsFromContext(c)
+	h.uploadAvatar(c, id, claims.UserID)
 }
 
 // UploadMyAvatar handles POST /users/me/avatar — lets any authenticated user
 // (e.g. a courier) upload their own profile photo.
 func (h *Handler) UploadMyAvatar(c *gin.Context) {
 	claims := middleware.ClaimsFromContext(c)
-	h.uploadAvatar(c, claims.UserID)
+	h.uploadAvatar(c, claims.UserID, claims.UserID)
 }
 
-func (h *Handler) uploadAvatar(c *gin.Context, id uuid.UUID) {
+func (h *Handler) ListDocuments(c *gin.Context) {
+	id, ok := parseUUID(c, "id")
+	if !ok {
+		return
+	}
+	docs, err := h.svc.ListDocuments(c.Request.Context(), id)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, ToDocumentResponseList(docs))
+}
+
+func (h *Handler) CreateDocument(c *gin.Context) {
+	id, ok := parseUUID(c, "id")
+	if !ok {
+		return
+	}
+	var req CreateUserDocumentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	doc, err := h.svc.CreateDocument(c.Request.Context(), id, claims.UserID, req)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.Created(c, ToDocumentResponse(doc))
+}
+
+func (h *Handler) DeleteDocument(c *gin.Context) {
+	id, ok := parseUUID(c, "id")
+	if !ok {
+		return
+	}
+	documentID, ok := parseUUID(c, "document_id")
+	if !ok {
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	if err := h.svc.DeleteDocument(c.Request.Context(), id, documentID, claims.UserID); err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.NoContent(c)
+}
+
+func (h *Handler) UpdateDocumentStatus(c *gin.Context) {
+	id, ok := parseUUID(c, "id")
+	if !ok {
+		return
+	}
+	documentID, ok := parseUUID(c, "document_id")
+	if !ok {
+		return
+	}
+	var req UpdateUserDocumentStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	doc, err := h.svc.UpdateDocumentStatus(c.Request.Context(), id, documentID, claims.UserID, req)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, ToDocumentResponse(doc))
+}
+
+func (h *Handler) uploadAvatar(c *gin.Context, id uuid.UUID, actorID uuid.UUID) {
 	file, err := c.FormFile("avatar")
 	if err != nil {
 		response.Error(c, apperrors.BadRequest("avatar file is required"))
@@ -240,7 +352,7 @@ func (h *Handler) uploadAvatar(c *gin.Context, id uuid.UUID) {
 	}
 
 	avatarURL := "/uploads/avatars/" + filename
-	u, err := h.svc.Update(c.Request.Context(), id, UpdateUserRequest{AvatarURL: &avatarURL})
+	u, err := h.svc.Update(c.Request.Context(), id, UpdateUserRequest{AvatarURL: &avatarURL}, actorID)
 	if err != nil {
 		response.HandleError(c, err)
 		return

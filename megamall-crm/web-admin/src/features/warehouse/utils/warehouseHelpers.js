@@ -90,10 +90,13 @@ export function getProductSupplierId(p) {
 }
 
 export function getProductImage(p) {
-  const images = p?.images ?? p?.Images ?? []
+  if (!p) return null
+  const direct = p.product_image_url ?? p.ProductImageURL ?? p.image_url ?? p.ImageURL ?? p.image ?? p.Image
+  if (direct) return direct
+  const images = Array.isArray(p.images) ? p.images : (Array.isArray(p.Images) ? p.Images : [])
   const primary = images.find((img) => img.is_primary ?? img.IsPrimary)
   const image = primary ?? images[0]
-  return image?.image_url ?? image?.ImageURL ?? null
+  return image?.image_url ?? image?.ImageURL ?? image?.url ?? image?.URL ?? null
 }
 
 export function getSupplierName(supplier) {
@@ -177,4 +180,3 @@ export function buildProductMap(products) {
   }
   return map
 }
-

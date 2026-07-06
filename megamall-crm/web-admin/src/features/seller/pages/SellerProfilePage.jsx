@@ -47,7 +47,7 @@ export default function SellerProfilePage() {
   const fullName = me?.full_name ?? ''
   const initials = fullName.split(' ').map(n => n[0] ?? '').join('').slice(0, 2).toUpperCase() || 'SE'
   const avatarUrl = me?.avatar_url ? `${me.avatar_url}?t=${me.updated_at ?? ''}` : null
-  const commissionPct = compensation?.commission_percent ?? null
+  const commissionPct = compensation?.commission_rate != null ? +(compensation.commission_rate * 100).toFixed(1) : null
   const rank = rankData?.rank ?? null
   const totalMembers = rankData?.total_members ?? null
   const tenure = monthsOnline(me?.hire_date ?? me?.created_at)

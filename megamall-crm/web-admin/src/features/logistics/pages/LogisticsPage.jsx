@@ -4,19 +4,24 @@
  * Tabbed logistics hub:
  *   0. Курьеры — full courier table
  *   1. Передачи — cash handovers CRUD
+ *   2. Настройки доставки — client delivery fees
  */
 import { useState } from 'react'
-import { Truck, RefreshCw, Users, Banknote } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import Alert from '../../../shared/components/Alert'
+import { KEYS }                  from '../../../shared/queryKeys'
 import useLogisticsCouriers    from '../hooks/useLogisticsCouriers'
+import { useHandovers }        from '../hooks/useHandovers'
 import CouriersTable           from '../components/CouriersTable'
-import CashHandoversPage       from '../components/CashHandoversPage'
+import CashCenterTab           from '../components/CashCenterTab'
+import DeliverySettingsTab     from '../components/DeliverySettingsTab'
 
 const TABS = [
-  { id: 'couriers',  label: 'Курьеры',   icon: Users },
-  { id: 'handovers', label: 'Передачи',  icon: Banknote },
+  { id: 'couriers',          label: 'Курьеры' },
+  { id: 'handovers',         label: 'Передачи кассы' },
+  { id: 'delivery-settings', label: 'Настройки доставки' },
 ]
 
 export default function LogisticsPage() {
@@ -29,8 +34,12 @@ export default function LogisticsPage() {
     isError: couriersError,
   } = useLogisticsCouriers()
 
+  const { data: pendingHandovers } = useHandovers({ status: 'pending', limit: 1 })
+  const pendingCount = pendingHandovers?.meta?.total ?? 0
+
   function refresh() {
     qc.invalidateQueries({ queryKey: ['logistics'] })
+    qc.invalidateQueries({ queryKey: KEYS.settings.delivery })
   }
 
   return (
@@ -38,19 +47,14 @@ export default function LogisticsPage() {
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0">
-            <Truck size={22} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Логистика</h1>
-            <p className="text-xs text-slate-400">Курьеры, доставки и передачи наличных</p>
-          </div>
+        <div>
+          <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Логистика</h1>
+          <p className="text-[12.5px] text-slate-400 mt-0.5">Курьеры, доставки и передачи наличных</p>
         </div>
 
         <button
           onClick={refresh}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all min-h-[44px] flex-shrink-0"
+          className="flex items-center gap-2 px-3 py-2 rounded-[10px] text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all min-h-[44px] flex-shrink-0"
         >
           <RefreshCw size={14} />
           <span className="hidden sm:inline">Обновить</span>
@@ -58,26 +62,31 @@ export default function LogisticsPage() {
       </div>
 
       {/* ── Tabs ───────────────────────────────────────────────────────── */}
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-2xl w-fit">
-        {TABS.map(t => {
-          const Icon = t.icon
-          const active = tab === t.id
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={[
-                'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150',
-                active
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700',
-              ].join(' ')}
-            >
-              <Icon size={15} />
-              <span className="hidden sm:inline">{t.label}</span>
-            </button>
-          )
-        })}
+      <div className="max-w-full overflow-x-auto">
+        <div className="inline-flex bg-slate-100 rounded-[10px] p-[3px]">
+          {TABS.map(t => {
+            const active = tab === t.id
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={[
+                  'flex items-center gap-1.5 px-3.5 py-1.5 rounded-[7px] text-[12.5px] font-semibold transition-all duration-150 whitespace-nowrap',
+                  active
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700',
+                ].join(' ')}
+              >
+                {t.label}
+                {t.id === 'handovers' && pendingCount > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[16px] h-[16px] rounded-full bg-rose-500 text-white text-[10px] font-bold px-1">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* ── Errors ─────────────────────────────────────────────────────── */}
@@ -92,10 +101,17 @@ export default function LogisticsPage() {
         </div>
       )}
 
-      {/* ── Tab: Handovers ─────────────────────────────────────────────── */}
+      {/* ── Tab: Cash center ───────────────────────────────────────────── */}
       {tab === 'handovers' && (
         <div className="animate-fade-in">
-          <CashHandoversPage />
+          <CashCenterTab />
+        </div>
+      )}
+
+      {/* ── Tab: Client delivery settings ─────────────────────────────── */}
+      {tab === 'delivery-settings' && (
+        <div className="animate-fade-in">
+          <DeliverySettingsTab />
         </div>
       )}
     </div>

@@ -342,6 +342,19 @@ func ToCompensationResponse(ec *EmployeeCompensation) EmployeeCompensationRespon
 	}
 }
 
+// ToResolvedRateResponse maps a CommissionConfig-resolved rate into the same
+// response shape as a fixed EmployeeCompensation record, so the frontend can
+// consume either source through one field (commission_rate).
+func ToResolvedRateResponse(r *ResolvedRate) EmployeeCompensationResponse {
+	rate := r.Rate
+	return EmployeeCompensationResponse{
+		CompensationType: CompensationKindPercent,
+		CommissionRate:   &rate,
+		EffectiveFrom:    r.EffectiveFrom,
+		IsActive:         true,
+	}
+}
+
 // isValid returns true if the CompensationKind is a known value.
 func (k CompensationKind) isValid() bool {
 	switch k {

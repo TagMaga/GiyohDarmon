@@ -4,6 +4,7 @@ import ProtectedRoute  from '../shared/components/ProtectedRoute'
 import Layout          from '../shared/components/Layout'
 import SellerLayout    from '../features/seller/components/SellerLayout'
 import TeamLeadLayout  from '../features/team-lead/components/TeamLeadLayout'
+import ManagerLayout   from '../features/manager/components/ManagerLayout'
 import Login           from '../pages/Login'
 import RootRedirect    from '../shared/components/RootRedirect'
 import ComingSoon      from '../shared/components/ComingSoon'
@@ -20,7 +21,6 @@ const BudgetCompanyPage       = lazy(() => import('../features/budget/pages/Budg
 const OwnerOrdersPage         = lazy(() => import('../features/orders/pages/OwnerOrdersPage'))
 const LogisticsPage           = lazy(() => import('../features/logistics/pages/LogisticsPage'))
 const CourierProfilePage      = lazy(() => import('../features/logistics/pages/CourierProfilePage'))
-const DeliverySettingsPage    = lazy(() => import('../features/owner/pages/DeliverySettingsPage'))
 const OwnerCouriersPage       = lazy(() => import('../features/owner/pages/OwnerCouriersPage'))
 const OwnerWarehousePage      = lazy(() => import('../features/owner/pages/OwnerWarehousePage'))
 const OwnerHRPage             = lazy(() => import('../features/owner/pages/OwnerHRPage'))
@@ -139,9 +139,8 @@ const router = createBrowserRouter([
         { path: 'hr',        element: <Lazy><OwnerHRPage /></Lazy> },
         { path: 'reports',   element: <Lazy><OwnerReportsPage /></Lazy> },
 
-        // Settings hub + delivery sub-page
-        { path: 'settings',          element: <Lazy><OwnerSettingsPage /></Lazy> },
-        { path: 'settings/delivery', element: <Lazy><DeliverySettingsPage /></Lazy> },
+        // Settings hub
+        { path: 'settings', element: <Lazy><OwnerSettingsPage /></Lazy> },
 
         // Dispatch board accessible to owner (owner has dispatcherRoles on backend)
         { path: 'dispatch', element: <Lazy><DispatcherDashboard /></Lazy> },
@@ -189,7 +188,7 @@ const router = createBrowserRouter([
     element: <ProtectedRoute allowedRole="manager" />,
     children: [{
       path: '/manager',
-      element: <Layout />,
+      element: <ManagerLayout />,
       children: [
         { index: true,        element: <Lazy><ManagerDashboardPage /></Lazy> },
         { path: 'income',     element: <Lazy><ManagerIncomePage /></Lazy> },

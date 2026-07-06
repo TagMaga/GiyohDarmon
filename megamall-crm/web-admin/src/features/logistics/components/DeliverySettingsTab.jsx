@@ -5,7 +5,7 @@ import useDeliverySettings from '../../seller/hooks/useDeliverySettings'
 import { updateDeliverySettings } from '../../seller/api'
 import { KEYS } from '../../../shared/queryKeys'
 
-export default function DeliverySettingsPage() {
+export default function DeliverySettingsTab() {
   const qc = useQueryClient()
   const { data, isLoading } = useDeliverySettings()
 
@@ -38,9 +38,9 @@ export default function DeliverySettingsPage() {
   }
 
   return (
-    <div className="max-w-lg space-y-6 animate-fade-in">
+    <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Настройки доставки</h1>
+        <h2 className="text-xl font-bold text-slate-900">Настройки доставки</h2>
         <p className="text-sm text-slate-500 mt-1">
           Тарифы доставки показываются продавцам при оформлении заказа. Введите 0 для бесплатной доставки.
         </p>
@@ -52,7 +52,6 @@ export default function DeliverySettingsPage() {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Normal delivery */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
@@ -85,7 +84,6 @@ export default function DeliverySettingsPage() {
             </div>
           </div>
 
-          {/* Express delivery */}
           <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
@@ -118,7 +116,6 @@ export default function DeliverySettingsPage() {
             </div>
           </div>
 
-          {/* Summary preview */}
           <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 flex items-center justify-between text-sm">
             <span className="text-slate-500">Обычная</span>
             <span className="font-bold text-slate-700">

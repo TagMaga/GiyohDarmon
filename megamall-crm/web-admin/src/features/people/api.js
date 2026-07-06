@@ -117,6 +117,13 @@ export async function fetchEmployeeConfigs(userId) {
   return toArray(unwrap(res))
 }
 
+export async function fetchEmployeeConfigHistory(userId) {
+  const res = await client.get('/hr/compensation/history', {
+    params: { scope: 'employee', user_id: userId, limit: 50 },
+  })
+  return toArray(unwrap(res))
+}
+
 export async function fetchTeamConfigs(teamId) {
   const res = await client.get(`/hr/compensation/teams/${teamId}`)
   return toArray(unwrap(res))
@@ -177,6 +184,46 @@ export async function uploadUserAvatar(userId, file) {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return unwrap(res)
+}
+
+export async function uploadFile(file) {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await client.post('/uploads', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return unwrap(res)
+}
+
+export async function fetchUserDocuments(userId) {
+  const res = await client.get(`/users/${userId}/documents`)
+  return toArray(unwrap(res))
+}
+
+export async function createUserDocument(userId, payload) {
+  const res = await client.post(`/users/${userId}/documents`, payload)
+  return unwrap(res)
+}
+
+export async function deleteUserDocument(userId, documentId) {
+  await client.delete(`/users/${userId}/documents/${documentId}`)
+}
+
+export async function updateUserDocumentStatus(userId, documentId, verificationStatus) {
+  const res = await client.patch(`/users/${userId}/documents/${documentId}/status`, {
+    verification_status: verificationStatus,
+  })
+  return unwrap(res)
+}
+
+export async function fetchUserHistory(userId) {
+  const res = await client.get(`/users/${userId}/history`)
+  return toArray(unwrap(res))
+}
+
+export async function fetchAllUserHistory() {
+  const res = await client.get('/users/history')
+  return toArray(unwrap(res))
 }
 
 // ── Employee compensation (fixed salary) ──────────────────────────────────────

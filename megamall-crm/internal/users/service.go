@@ -13,6 +13,9 @@ import (
 )
 
 const bcryptCost = 12
+const documentStatusUploaded = "uploaded"
+const documentStatusVerified = "verified"
+const documentStatusRejected = "rejected"
 
 // Service encapsulates all user business logic.
 type Service struct {
@@ -108,7 +111,7 @@ func (s *Service) List(ctx context.Context, actorID uuid.UUID, actorRole string,
 	return list, total, nil
 }
 
-func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateUserRequest) (*User, error) {
+func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateUserRequest, actorIDs ...uuid.UUID) (*User, error) {
 	u, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, apperrors.Internal(err)
@@ -117,6 +120,7 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateUserReques
 		return nil, apperrors.NotFound("user")
 	}
 
+	before := *u
 	if req.Phone != nil {
 		u.Phone = *req.Phone
 	}
@@ -162,7 +166,98 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateUserReques
 		return nil, apperrors.Internal(err)
 	}
 
+	if err := s.recordProfileHistory(ctx, &before, u, req, actorIDs...); err != nil {
+		return nil, err
+	}
+
 	return u, nil
+}
+
+func (s *Service) recordProfileHistory(ctx context.Context, before *User, after *User, req UpdateUserRequest, actorIDs ...uuid.UUID) error {
+	var changedBy *uuid.UUID
+	if len(actorIDs) > 0 {
+		changedBy = &actorIDs[0]
+	}
+	changes := make([]UserHistory, 0, 8)
+	add := func(field string, oldValue *string, newValue *string) {
+		if stringPtrValue(oldValue) == stringPtrValue(newValue) {
+			return
+		}
+		changes = append(changes, UserHistory{
+			ID:        uuid.New(),
+			UserID:    after.ID,
+			FieldName: field,
+			OldValue:  oldValue,
+			NewValue:  newValue,
+			ChangedBy: changedBy,
+		})
+	}
+
+	if req.FullName != nil {
+		add("full_name", stringPtr(before.FullName), stringPtr(after.FullName))
+	}
+	if req.Phone != nil {
+		add("phone", stringPtr(before.Phone), stringPtr(after.Phone))
+	}
+	if req.Role != nil {
+		add("role", stringPtr(string(before.Role)), stringPtr(string(after.Role)))
+	}
+	if req.IsActive != nil {
+		add("is_active", stringPtr(fmt.Sprintf("%t", before.IsActive)), stringPtr(fmt.Sprintf("%t", after.IsActive)))
+	}
+	if req.AvatarURL != nil {
+		add("avatar_url", before.AvatarURL, after.AvatarURL)
+	}
+	if req.Status != nil {
+		add("status", stringPtr(string(before.Status)), stringPtr(string(after.Status)))
+	}
+	if req.HireDate != nil {
+		add("hire_date", datePtrValue(before.HireDate), datePtrValue(after.HireDate))
+	}
+	if req.DateOfBirth != nil {
+		add("date_of_birth", datePtrValue(before.DateOfBirth), datePtrValue(after.DateOfBirth))
+	}
+	if req.Address != nil {
+		add("address", before.Address, after.Address)
+	}
+
+	for i := range changes {
+		if err := s.repo.CreateHistory(ctx, &changes[i]); err != nil {
+			return apperrors.Internal(err)
+		}
+	}
+	return nil
+}
+
+func stringPtr(value string) *string {
+	v := value
+	return &v
+}
+
+func stringPtrValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func datePtrValue(value *time.Time) *string {
+	if value == nil {
+		return nil
+	}
+	return stringPtr(value.Format("2006-01-02"))
+}
+
+func normalizedDocumentType(value *string) string {
+	if value == nil {
+		return "other"
+	}
+	switch strings.TrimSpace(*value) {
+	case "passport", "contract", "certificate", "diploma", "medical", "other":
+		return strings.TrimSpace(*value)
+	default:
+		return "other"
+	}
 }
 
 // PatchMe updates only the fields a user is allowed to edit for themselves.
@@ -228,6 +323,156 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 		if err.Error() == "user not found" {
 			return apperrors.NotFound("user")
 		}
+		return apperrors.Internal(err)
+	}
+	return nil
+}
+
+func (s *Service) ListDocuments(ctx context.Context, userID uuid.UUID) ([]UserDocument, error) {
+	u, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+	if u == nil {
+		return nil, apperrors.NotFound("user")
+	}
+	if u.Role == RoleOwner {
+		return []UserDocument{}, nil
+	}
+	docs, err := s.repo.ListDocuments(ctx, userID)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+	return docs, nil
+}
+
+func (s *Service) CreateDocument(ctx context.Context, userID uuid.UUID, uploadedBy uuid.UUID, req CreateUserDocumentRequest) (*UserDocument, error) {
+	u, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+	if u == nil {
+		return nil, apperrors.NotFound("user")
+	}
+	if u.Role == RoleOwner {
+		return nil, apperrors.BadRequest("owner documents are not supported")
+	}
+	fileURL := strings.TrimSpace(req.FileURL)
+	filename := strings.TrimSpace(req.OriginalFilename)
+	if fileURL == "" || filename == "" {
+		return nil, apperrors.BadRequest("file_url and original_filename are required")
+	}
+	doc := &UserDocument{
+		ID:                 uuid.New(),
+		UserID:             userID,
+		FileURL:            fileURL,
+		OriginalFilename:   filename,
+		ContentType:        req.ContentType,
+		SizeBytes:          req.SizeBytes,
+		DocumentType:       normalizedDocumentType(req.DocumentType),
+		ExpiresAt:          req.ExpiresAt,
+		VerificationStatus: documentStatusUploaded,
+		UploadedBy:         &uploadedBy,
+	}
+	if err := s.repo.CreateDocument(ctx, doc); err != nil {
+		return nil, apperrors.Internal(err)
+	}
+	if err := s.createHistory(ctx, userID, "document_uploaded", nil, stringPtr(doc.OriginalFilename), &uploadedBy); err != nil {
+		return nil, err
+	}
+	return doc, nil
+}
+
+func (s *Service) UpdateDocumentStatus(ctx context.Context, userID uuid.UUID, documentID uuid.UUID, actorID uuid.UUID, req UpdateUserDocumentStatusRequest) (*UserDocument, error) {
+	nextStatus := strings.TrimSpace(req.VerificationStatus)
+	if nextStatus != documentStatusUploaded && nextStatus != documentStatusVerified && nextStatus != documentStatusRejected {
+		return nil, apperrors.BadRequest("invalid document status")
+	}
+	current, err := s.repo.GetDocument(ctx, userID, documentID)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+	if current == nil {
+		return nil, apperrors.NotFound("user document")
+	}
+	if current.VerificationStatus == nextStatus {
+		return current, nil
+	}
+	updated, err := s.repo.UpdateDocumentStatus(ctx, userID, documentID, nextStatus)
+	if err != nil {
+		if err.Error() == "user document not found" {
+			return nil, apperrors.NotFound("user document")
+		}
+		return nil, apperrors.Internal(err)
+	}
+	field := "document_status"
+	if nextStatus == documentStatusVerified {
+		field = "document_verified"
+	}
+	if nextStatus == documentStatusRejected {
+		field = "document_rejected"
+	}
+	if err := s.createHistory(ctx, userID, field, stringPtr(current.VerificationStatus), stringPtr(updated.OriginalFilename), &actorID); err != nil {
+		return nil, err
+	}
+	return updated, nil
+}
+
+func (s *Service) DeleteDocument(ctx context.Context, userID uuid.UUID, documentID uuid.UUID, actorIDs ...uuid.UUID) error {
+	doc, err := s.repo.GetDocument(ctx, userID, documentID)
+	if err != nil {
+		return apperrors.Internal(err)
+	}
+	if err := s.repo.DeleteDocument(ctx, userID, documentID); err != nil {
+		if err.Error() == "user document not found" {
+			return apperrors.NotFound("user document")
+		}
+		return apperrors.Internal(err)
+	}
+	if doc != nil {
+		var changedBy *uuid.UUID
+		if len(actorIDs) > 0 {
+			changedBy = &actorIDs[0]
+		}
+		if err := s.createHistory(ctx, userID, "document_deleted", stringPtr(doc.OriginalFilename), nil, changedBy); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) ListHistory(ctx context.Context, userID uuid.UUID) ([]UserHistory, error) {
+	u, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+	if u == nil {
+		return nil, apperrors.NotFound("user")
+	}
+	history, err := s.repo.ListHistory(ctx, userID)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+	return history, nil
+}
+
+func (s *Service) ListAllHistory(ctx context.Context) ([]UserHistory, error) {
+	history, err := s.repo.ListAllHistory(ctx)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+	return history, nil
+}
+
+func (s *Service) createHistory(ctx context.Context, userID uuid.UUID, field string, oldValue *string, newValue *string, changedBy *uuid.UUID) error {
+	if err := s.repo.CreateHistory(ctx, &UserHistory{
+		ID:        uuid.New(),
+		UserID:    userID,
+		FieldName: field,
+		OldValue:  oldValue,
+		NewValue:  newValue,
+		ChangedBy: changedBy,
+	}); err != nil {
 		return apperrors.Internal(err)
 	}
 	return nil

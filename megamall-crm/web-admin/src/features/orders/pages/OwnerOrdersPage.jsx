@@ -18,7 +18,7 @@
  */
 import { useState, useMemo }  from 'react'
 import { useSearchParams }    from 'react-router-dom'
-import { ClipboardList, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 
 import Alert from '../../../shared/components/Alert'
 import useOwnerOrders              from '../hooks/useOwnerOrders'
@@ -29,8 +29,8 @@ import OrderDetailsDrawer          from '../components/OrderDetailsDrawer'
 
 import useEmployees  from '../../people/hooks/useEmployees'
 import useTeams      from '../../people/hooks/useTeams'
-import useLogisticsCouriers from '../../logistics/hooks/useLogisticsCouriers'
 import { buildUserMap } from '../../people/utils/peopleHelpers'
+import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -64,7 +64,6 @@ export default function OwnerOrdersPage() {
   // ── People data ──────────────────────────────────────────────────────────
   const { data: allEmployees = [] } = useEmployees()
   const { data: allTeams     = [] } = useTeams()
-  const { data: couriers     = [] } = useLogisticsCouriers()
 
   const userMap = useMemo(() => buildUserMap(allEmployees), [allEmployees])
   const teamMap = useMemo(() => {
@@ -121,25 +120,45 @@ export default function OwnerOrdersPage() {
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 flex-shrink-0">
-            <ClipboardList size={22} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Заказы</h1>
-            <p className="text-xs text-slate-400">Аналитика и история заказов</p>
-          </div>
+        <div>
+          <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Заказы</h1>
+          <p className="text-[12.5px] text-slate-400 mt-0.5">Аналитика и история заказов</p>
         </div>
 
-        <button
-          onClick={() => refetch()}
-          disabled={isFetching}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 transition-all min-h-[44px] flex-shrink-0"
-          title="Обновить"
-        >
-          <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
-          <span className="hidden sm:inline">Обновить</span>
-        </button>
+        <div className="flex flex-wrap items-start justify-end gap-2">
+          <DesktopDateRangePicker
+            from={filters.from ?? ''}
+            to={filters.to ?? ''}
+            onChange={(range) => setFilters(f => ({ ...f, from: range.from, to: range.to, page: 1 }))}
+            align="right"
+            buttonClassName="min-h-[44px] rounded-[10px]"
+          />
+          <div className="grid grid-cols-2 gap-2 md:hidden">
+            <input
+              type="date"
+              value={filters.from ?? ''}
+              onChange={e => setFilters(f => ({ ...f, from: e.target.value, page: 1 }))}
+              className="input min-w-0"
+              title="Дата от"
+            />
+            <input
+              type="date"
+              value={filters.to ?? ''}
+              onChange={e => setFilters(f => ({ ...f, to: e.target.value, page: 1 }))}
+              className="input min-w-0"
+              title="Дата до"
+            />
+          </div>
+          <button
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-2 px-3 py-2 rounded-[10px] text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 transition-all min-h-[44px] flex-shrink-0"
+            title="Обновить"
+          >
+            <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Обновить</span>
+          </button>
+        </div>
       </div>
 
       {/* ── Error ───────────────────────────────────────────────────────── */}
@@ -159,7 +178,6 @@ export default function OwnerOrdersPage() {
         teams={allTeams}
         sellers={sellers}
         managers={managers}
-        couriers={couriers}
       />
 
       {/* ── Table ───────────────────────────────────────────────────────── */}

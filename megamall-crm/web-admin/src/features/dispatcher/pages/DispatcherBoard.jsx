@@ -11,6 +11,7 @@ import useAuthStore   from '../../../shared/store/authStore'
 import { useToast }   from '../../../shared/components/ToastProvider'
 import { KEYS }       from '../../../shared/queryKeys'
 import AccountMenu    from '../../../shared/components/AccountMenu'
+import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
 
 import CreateOfficeOrderModal from '../components/CreateOfficeOrderModal'
 import AssignCourierModal    from '../components/AssignCourierModal'
@@ -1480,10 +1481,20 @@ function CashRangePicker({ range, open, onOpen, onRange }) {
   const activeLabel = cashRangeLabel(range)
   const fromRef = useRef(null)
   const toRef = useRef(null)
+  const desktopPresetMap = {
+    maximum: 'all',
+    last_7d: 'last7',
+    this_month: 'month',
+  }
 
   function applyPreset(value) {
     onRange(cashPresetRange(value, range))
     if (value !== 'custom') onOpen(false)
+  }
+
+  function applyDesktopRange(nextRange) {
+    const preset = desktopPresetMap[nextRange.preset] ?? nextRange.preset ?? 'custom'
+    onRange({ preset, from: nextRange.from, to: nextRange.to })
   }
 
   function applyCustomRange() {
@@ -1496,14 +1507,22 @@ function CashRangePicker({ range, open, onOpen, onRange }) {
 
   return (
     <div className="dv2-cash-range">
-      <button className="dv2-cash-range-btn" onClick={() => onOpen(!open)} aria-expanded={open}>
+      <DesktopDateRangePicker
+        from={range.from}
+        to={range.to}
+        onChange={applyDesktopRange}
+        buttonClassName="dv2-cash-range-btn"
+        timezoneLabel="Часовой пояс: локальное время"
+      />
+
+      <button className="dv2-cash-range-btn md:hidden" onClick={() => onOpen(!open)} aria-expanded={open}>
         <CalendarDays size={15} />
         <span>{activeLabel}</span>
         <ChevronDown size={14} />
       </button>
 
       {open && (
-        <div className="dv2-cash-range-popover">
+        <div className="dv2-cash-range-popover md:hidden">
           <div className="dv2-cash-presets">
             {CASH_PRESETS.map((preset) => (
               <button

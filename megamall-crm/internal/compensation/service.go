@@ -855,6 +855,33 @@ func (s *Service) GetEmployeeCompensation(ctx context.Context, userID uuid.UUID)
 	return ec, nil
 }
 
+// roleCommissionType maps a caller's role to the CommissionConfig rate that
+// represents their own earnings percentage, used as a fallback in
+// GetMyResolvedRate when no fixed EmployeeCompensation record is set.
+var roleCommissionType = map[string]CommissionType{
+	"seller":          CommissionTypeSellerRate,
+	"manager":         CommissionTypeManagerPersonalRate,
+	"sales_team_lead": CommissionTypeTeamLeadPoolRate,
+}
+
+// GetMyResolvedRate resolves the caller's current commission rate straight from
+// CommissionConfig (employee -> team -> global fallback), based on their role.
+// Returns nil if the role has no applicable rate or none is configured.
+func (s *Service) GetMyResolvedRate(ctx context.Context, userID uuid.UUID, teamID *uuid.UUID, role string) (*ResolvedRate, error) {
+	ct, ok := roleCommissionType[role]
+	if !ok {
+		return nil, nil
+	}
+	rate, err := s.resolver.Resolve(ctx, &userID, teamID, ct, time.Now())
+	if err != nil {
+		if errors.Is(err, ErrNoRateConfigured) {
+			return nil, nil
+		}
+		return nil, apperrors.Internal(err)
+	}
+	return rate, nil
+}
+
 // ListEmployeeCompensations returns full compensation history for a user.
 func (s *Service) ListEmployeeCompensations(ctx context.Context, userID uuid.UUID) ([]EmployeeCompensation, error) {
 	rows, err := s.repo.ListEmployeeCompensations(ctx, userID)

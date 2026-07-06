@@ -22,6 +22,7 @@ import useCurrentUser               from '../../../shared/hooks/useCurrentUser'
 import useEmployeesByIds            from '../../people/hooks/useEmployeesByIds'
 import useTeams                     from '../../people/hooks/useTeams'
 import { buildUserMap }             from '../../people/utils/peopleHelpers'
+import { M }                        from '../../seller/components/mobileUi'
 
 function toYMD(d) { return d.toISOString().slice(0, 10) }
 function currentMonthDefault() {
@@ -176,7 +177,7 @@ export default function ManagerMyOrdersPage() {
     useManagerPersonalOrders(filters)
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
+    <div className="p-4 md:p-6 space-y-5 pb-28 lg:pb-6" style={{ background: M.bg, fontFamily: M.font, minHeight: '100vh' }}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-sky-50 flex items-center justify-center text-sky-600 flex-shrink-0">

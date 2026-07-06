@@ -3,9 +3,10 @@ import {
   Home, ShoppingCart, TrendingUp, Users, Users2,
   UserCheck, BarChart2, ClipboardList, Wallet,
   LayoutDashboard, PlusCircle, LogOut, ShoppingBag,
-  Truck, Settings,
+  Truck,
   Package, PackagePlus,
   Building2, User, BookUser,
+  PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import useAuthStore from '../store/authStore'
 import useProfile   from '../hooks/useProfile'
@@ -26,7 +27,6 @@ const NAV = {
     { label: 'Сотрудники', icon: Users,         path: '/owner/employees' },
     { label: 'Склад',      icon: Building2,     path: '/owner/warehouse' },
     { label: 'Команда',    icon: BookUser,      path: '/owner/team-directory' },
-    { label: 'Настройки',  icon: Settings,      path: '/owner/settings' },
   ],
   manager: [
     { label: 'Главная',        icon: Home,          path: '/manager' },
@@ -66,7 +66,7 @@ const ROLE_LABELS = {
 }
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-export default function Sidebar({ open, onClose }) {
+export default function Sidebar({ open, onClose, collapsed = false, onToggleCollapsed }) {
   const { clearAuth }                    = useAuthStore()
   const { fullName, initials, phone, role } = useProfile()
   const navigate  = useNavigate()
@@ -84,20 +84,30 @@ export default function Sidebar({ open, onClose }) {
         className={[
           // Base styles — mobile: 85vw up to 300px; desktop: fixed 260px
           'fixed inset-y-0 left-0 z-40 flex flex-col',
-          'w-[85vw] max-w-[300px] lg:w-[260px]',
+          `w-[85vw] max-w-[300px] ${collapsed ? 'lg:w-[76px]' : 'lg:w-[260px]'}`,
           'bg-sidebar-bg border-r border-sidebar-border',
-          'transition-transform duration-300 ease-in-out',
+          'transition-[width,transform] duration-300 ease-in-out',
           // Desktop: always visible; mobile: slide in/out
           'lg:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full',
         ].join(' ')}
       >
         {/* ── Logo ─────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-800/60">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="hidden lg:flex absolute right-[-14px] top-8 z-50 h-7 w-7 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-300 shadow-lg shadow-slate-950/30 transition-colors hover:border-indigo-400 hover:bg-indigo-600 hover:text-white"
+          title={collapsed ? 'Открыть меню' : 'Свернуть меню'}
+          aria-label={collapsed ? 'Открыть меню' : 'Свернуть меню'}
+        >
+          {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+        </button>
+
+        <div className={`flex items-center gap-3 px-5 py-5 border-b border-slate-800/60 ${collapsed ? 'lg:justify-center lg:px-2' : ''}`}>
           <div className="flex-shrink-0 w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
             <ShoppingBag size={16} className="text-white" />
           </div>
-          <div>
+          <div className={`min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
             <span className="text-sm font-bold text-white tracking-tight leading-none">
               MegaMall
             </span>
@@ -108,7 +118,7 @@ export default function Sidebar({ open, onClose }) {
         </div>
 
         {/* ── Navigation ───────────────────────────────────────────── */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+        <nav className={`flex-1 overflow-y-auto px-3 py-4 space-y-0.5 ${collapsed ? 'lg:px-2' : ''}`}>
           {items.map((item) => (
             <NavLink
               key={item.path}
@@ -116,25 +126,26 @@ export default function Sidebar({ open, onClose }) {
               end={item.path.split('/').length === 2}
               onClick={onClose}
               className={({ isActive }) =>
-                `nav-item min-h-[44px] ${isActive ? 'active' : ''}`
+                `nav-item min-h-[44px] ${collapsed ? 'lg:justify-center lg:px-0' : ''} ${isActive ? 'active' : ''}`
               }
+              title={collapsed ? item.label : undefined}
             >
               <item.icon size={17} className="flex-shrink-0" />
-              <span className="truncate">{item.label}</span>
+              <span className={`truncate ${collapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
         {/* ── User footer ──────────────────────────────────────────── */}
-        <div className="px-3 py-4 border-t border-slate-800/60">
+        <div className={`px-3 py-4 border-t border-slate-800/60 ${collapsed ? 'lg:px-2' : ''}`}>
           {/* User info */}
-          <div className="flex items-center gap-3 px-3 py-2.5 mb-1">
+          <div className={`flex items-center gap-3 px-3 py-2.5 mb-1 ${collapsed ? 'lg:justify-center lg:gap-0 lg:px-0' : ''}`}>
             <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
               <span className="text-xs font-bold text-white uppercase">
                 {initials}
               </span>
             </div>
-            <div className="min-w-0">
+            <div className={`min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
               <p className="text-[13px] font-medium text-white truncate leading-none mb-0.5">
                 {fullName ?? phone ?? 'Пользователь'}
               </p>
@@ -150,11 +161,12 @@ export default function Sidebar({ open, onClose }) {
           {/* Logout */}
           <button
             onClick={handleLogout}
-            className="nav-item min-h-[44px] w-full text-red-400 hover:text-red-300 mt-1"
+            className={`nav-item min-h-[44px] w-full text-red-400 hover:text-red-300 mt-1 ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
             style={{ background: 'transparent' }}
+            title={collapsed ? 'Выйти из системы' : undefined}
           >
             <LogOut size={16} className="flex-shrink-0" />
-            <span>Выйти из системы</span>
+            <span className={collapsed ? 'lg:hidden' : ''}>Выйти из системы</span>
           </button>
         </div>
       </aside>

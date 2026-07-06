@@ -96,9 +96,11 @@ function calcPayloadUnitPrice(item) {
 }
 function getProductImageUrl(product) {
   if (!product) return ''
+  const direct = product.product_image_url ?? product.ProductImageURL ?? product.image_url ?? product.ImageURL ?? product.image ?? product.Image
+  if (direct) return direct
   const images = Array.isArray(product.images) ? product.images : (Array.isArray(product.Images) ? product.Images : [])
   const primary = images.find((img) => img.is_primary ?? img.IsPrimary) ?? images[0]
-  return product.product_image_url ?? product.ProductImageURL ?? product.image_url ?? product.ImageURL ?? primary?.image_url ?? primary?.ImageURL ?? ''
+  return primary?.image_url ?? primary?.ImageURL ?? primary?.url ?? primary?.URL ?? ''
 }
 function formatDeliveryFee(fee) {
   return fee <= 0 ? 'Бесплатно' : `${fee.toLocaleString('ru-RU')} с`

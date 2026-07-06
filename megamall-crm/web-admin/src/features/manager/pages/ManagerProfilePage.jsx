@@ -24,7 +24,7 @@ export default function ManagerProfilePage() {
 
   const fullName = me?.full_name ?? ''
   const initials = fullName.split(' ').map(n => n[0] ?? '').join('').slice(0, 2).toUpperCase() || 'MG'
-  const commissionPct = compensation?.commission_percent ?? null
+  const commissionPct = compensation?.commission_rate != null ? +(compensation.commission_rate * 100).toFixed(1) : null
 
   return (
     <>

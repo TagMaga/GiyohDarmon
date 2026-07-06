@@ -8,6 +8,7 @@
  */
 import { useState } from 'react'
 import { CalendarDays } from 'lucide-react'
+import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
 
 function toYMD(date) {
   const year = date.getFullYear()
@@ -78,8 +79,14 @@ export default function IncomePeriodFilter({ from, to, onChange }) {
 
   return (
     <div className="space-y-2">
+      <DesktopDateRangePicker
+        from={from ?? ''}
+        to={to ?? ''}
+        onChange={(range) => onChange(range.from, range.to)}
+      />
+
       {/* Preset chips */}
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap gap-2 items-center md:hidden">
         {PRESETS.map(p => (
           <button
             key={p.label}
@@ -110,14 +117,14 @@ export default function IncomePeriodFilter({ from, to, onChange }) {
 
       {/* Current range label */}
       {from && to && (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-400 md:hidden">
           {formatYMD(from)} — {formatYMD(to)}
         </p>
       )}
 
       {/* Custom date inputs */}
       {showCustom && (
-        <div className="flex flex-wrap gap-2 items-end pt-1">
+        <div className="flex flex-wrap gap-2 items-end pt-1 md:hidden">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-slate-500">С</label>
             <input
