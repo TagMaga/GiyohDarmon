@@ -225,7 +225,7 @@ export default function ManagerSellersPage() {
           {/* Podium top 3 */}
           {podium.length > 0 && (
             <div className="grid grid-cols-3 gap-3 md:gap-4 items-end" style={{ marginBottom: 22 }}>
-              {podiumOrder.map((u, i) => (
+              {podiumOrder.map(u => (
                 <PodiumCard key={u.id} user={u} medal={MEDAL_KEYS[podium.indexOf(u)]} onClick={() => setSelected(u)} />
               ))}
             </div>
