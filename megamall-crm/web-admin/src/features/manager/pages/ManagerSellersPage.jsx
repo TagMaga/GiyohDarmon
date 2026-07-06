@@ -1,13 +1,13 @@
 /**
  * ManagerSellersPage — /manager/sellers
  *
- * Sellers from manager's team. Heavily reuses TeamLeadSellersPage structure.
+ * Sellers from manager's team, ranked by current-month revenue (podium + list).
  * Stats derived from current-month orders. Click seller → drawer with recent orders.
  */
 import { useState, useMemo }  from 'react'
 import {
-  Users, X, ChevronRight,
-  Package, PackageCheck, TrendingUp, BarChart2,
+  Users, X, ChevronRight, Crown, Medal,
+  Package, PackageCheck, TrendingUp,
 } from 'lucide-react'
 import Badge                  from '../../../shared/components/Badge'
 import EmptyState             from '../../../shared/components/EmptyState'
@@ -20,7 +20,16 @@ import useTeamMembers         from '../../people/hooks/useTeamMembers'
 import useEmployeesByIds      from '../../people/hooks/useEmployeesByIds'
 import { buildUserMap }       from '../../people/utils/peopleHelpers'
 import useOwnerOrders         from '../../orders/hooks/useOwnerOrders'
-import { M }                  from '../../seller/components/mobileUi'
+import { M, Card, SectionLabel, InitialsAvatar } from '../../seller/components/mobileUi'
+
+const MONTH_LABEL = new Date().toLocaleDateString('ru-RU', { month: 'long' })
+
+const MEDAL_KEYS = ['gold', 'silver', 'bronze']
+const MEDAL_STYLE = {
+  gold:   { icon: Crown, ring: '#F0D48A', shadow: '0 18px 34px -14px rgba(224,169,59,.5)',  badgeBg: '#FBEFD6', badgeColor: '#B45309', lift: 0,  size: 64, font: 20, place: '1' },
+  silver: { icon: Medal, ring: '#DBDDE2', shadow: '0 12px 26px -14px rgba(20,20,25,.28)',   badgeBg: '#EDEEF1', badgeColor: '#5B6068', lift: 24, size: 54, font: 17, place: '2' },
+  bronze: { icon: Medal, ring: '#E4CDBB', shadow: '0 12px 26px -14px rgba(20,20,25,.28)',   badgeBg: '#F3E7DD', badgeColor: '#9A5B2E', lift: 24, size: 54, font: 17, place: '3' },
+}
 
 function buildStats(orders) {
   const s = {}
@@ -111,48 +120,30 @@ function SellerDrawer({ seller, orders, onClose }) {
   )
 }
 
-// ── Seller card ───────────────────────────────────────────────────────────────
+// ── Podium (top 3 by revenue) ─────────────────────────────────────────────────
 
-function SellerCard({ user, stats, onClick }) {
-  const { total = 0, delivered = 0, revenue = 0 } = stats ?? {}
-  const conv     = total > 0 ? ((delivered / total) * 100).toFixed(0) : '0'
-  const initials = (user.full_name ?? '?').trim().split(/\s+/).map(w => w[0]).slice(0,2).join('').toUpperCase()
-
+function PodiumCard({ user, medal, onClick }) {
+  const cfg  = MEDAL_STYLE[medal]
+  const Icon = cfg.icon
   return (
-    <div className="card p-4 space-y-3 hover:shadow-md transition-shadow cursor-pointer" onClick={onClick}>
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0">
-          <span className="text-xs font-bold text-white">{initials}</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-slate-900 truncate">{user.full_name ?? '—'}</p>
-          {user.phone && <p className="text-xs text-slate-400">{user.phone}</p>}
-        </div>
-        <Badge variant={user.is_active !== false ? 'emerald' : 'slate'} size="sm">
-          {user.is_active !== false ? 'Активен' : 'Неактивен'}
-        </Badge>
+    <div
+      onClick={onClick}
+      className="cursor-pointer text-center relative"
+      style={{ background: '#fff', border: `1px solid ${cfg.ring}`, borderRadius: 18, padding: '20px 10px 16px', marginTop: cfg.lift, boxShadow: cfg.shadow }}
+    >
+      <div
+        className="absolute left-1/2 -translate-x-1/2"
+        style={{ top: -14, width: 30, height: 30, borderRadius: 10, background: cfg.badgeBg, color: cfg.badgeColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Icon size={16} />
       </div>
-
-      <div className="grid grid-cols-4 gap-2 pt-1 border-t border-slate-50">
-        {[
-          { label: 'Заказов',  value: total,                      color: 'text-indigo-600',  icon: <Package size={12}/> },
-          { label: 'Сдано',    value: delivered,                   color: 'text-emerald-600', icon: <PackageCheck size={12}/> },
-          { label: 'Выручка',  value: `${fmtAmount(revenue)} сомони`, color: 'text-violet-600',  icon: <TrendingUp size={12}/> },
-          { label: 'Конверс.', value: `${conv}%`,                 color: 'text-amber-600',   icon: <BarChart2 size={12}/> },
-        ].map(({ label, value, color, icon }) => (
-          <div key={label} className="text-center">
-            <div className={`flex items-center justify-center mb-0.5 ${color}`}>{icon}</div>
-            <p className="text-sm font-bold text-slate-800">{value}</p>
-            <p className="text-[10px] text-slate-400">{label}</p>
-          </div>
-        ))}
+      <div className="mx-auto" style={{ width: cfg.size, marginTop: 8, marginBottom: 10, borderRadius: '50%', border: `3px solid ${cfg.ring}`, display: 'inline-flex' }}>
+        <InitialsAvatar name={user.full_name} size={cfg.size - 6} palette={MEDAL_KEYS.indexOf(medal)} />
       </div>
-
-      <div className="flex items-center justify-end">
-        <span className="text-[11px] text-indigo-600 font-semibold flex items-center gap-0.5">
-          Подробнее <ChevronRight size={11}/>
-        </span>
-      </div>
+      <div className="truncate" style={{ fontSize: 14, fontWeight: 800, color: M.ink, maxWidth: 130, marginLeft: 'auto', marginRight: 'auto' }}>{user.full_name}</div>
+      <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>{cfg.place} место</div>
+      <div style={{ fontSize: 17, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', marginTop: 10 }}>{fmtAmount(user.stats.revenue)}</div>
+      <div style={{ fontSize: 10.5, color: M.faint, fontWeight: 600 }}>сомони</div>
     </div>
   )
 }
@@ -186,30 +177,95 @@ export default function ManagerSellersPage() {
   const stats = useMemo(() => buildStats(orders), [orders])
   const loading = teamLoading || membersLoading
 
+  const ranked = useMemo(() =>
+    sellers
+      .map(u => ({ ...u, stats: stats[u.id] ?? { total: 0, delivered: 0, revenue: 0 } }))
+      .sort((a, b) => b.stats.revenue - a.stats.revenue),
+    [sellers, stats]
+  )
+  const podium      = ranked.slice(0, 3)
+  const podiumOrder = podium.length === 3 ? [podium[1], podium[0], podium[2]] : podium
+  const rest         = ranked.slice(3)
+  const topRevenue    = podium[0]?.stats.revenue ?? 0
+  const totalRevenue = ranked.reduce((s, u) => s + u.stats.revenue, 0)
+
   return (
-    <div className="p-4 md:p-6 space-y-5 pb-28 lg:pb-6" style={{ background: M.bg, fontFamily: M.font, minHeight: '100vh' }}>
-      <div className="flex items-center gap-3">
-        <div className="w-11 h-11 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0">
-          <Users size={22} />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Продавцы</h1>
-          <p className="text-xs text-slate-400">Ваша команда · текущий месяц</p>
-        </div>
+    <div style={{ fontFamily: M.font, background: M.bg, minHeight: '100vh' }} className="p-4 md:p-6 lg:p-[44px] space-y-0 pb-28 lg:pb-[44px]">
+      <div className="flex items-baseline gap-2" style={{ marginBottom: 20 }}>
+        <h1 className="lg:!text-[28px]" style={{ fontSize: 20, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', margin: 0 }}>Продавцы</h1>
+        <span style={{ fontSize: 12, color: M.muted, fontWeight: 500 }}>Ваша команда · {ranked.length} продавцов</span>
       </div>
 
-      {loading
-        ? <div className="space-y-3">{[1,2,3].map(i=><CardSkeleton key={i}/>)}</div>
-        : sellers.length === 0
-          ? <EmptyState icon={<Users size={22}/>} title="Продавцы не назначены" description="В вашей команде пока нет продавцов. Обратитесь к руководителю." />
-          : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {sellers.map(u => (
-                <SellerCard key={u.id} user={u} stats={stats[u.id]} onClick={() => setSelected(u)} />
+      {loading ? (
+        <div className="space-y-3">{[1,2,3].map(i=><CardSkeleton key={i}/>)}</div>
+      ) : sellers.length === 0 ? (
+        <EmptyState icon={<Users size={22}/>} title="Продавцы не назначены" description="В вашей команде пока нет продавцов. Обратитесь к руководителю." />
+      ) : (
+        <>
+          {/* Dark hero: team revenue + leader */}
+          <div
+            className="lg:!rounded-[22px] lg:!p-[26px]"
+            style={{ background: 'linear-gradient(135deg,#20202A,#17171C)', borderRadius: 20, padding: 20, color: '#fff', position: 'relative', overflow: 'hidden', marginBottom: 18 }}
+          >
+            <div style={{ position: 'absolute', right: -30, top: -40, width: 170, height: 170, borderRadius: '50%', background: 'radial-gradient(circle,rgba(99,102,241,.35),transparent 70%)' }} />
+            <div style={{ position: 'relative' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: '#9A99C4' }}>Команда · {MONTH_LABEL}</div>
+              <div className="flex items-baseline gap-3" style={{ marginTop: 8 }}>
+                <span className="lg:!text-[44px]" style={{ fontSize: 36, fontWeight: 900, letterSpacing: '-.03em', lineHeight: 1 }}>{fmtAmount(totalRevenue)}</span>
+                <span style={{ fontSize: 13, color: '#8E8DA0', fontWeight: 600 }}>сомони выручки</span>
+              </div>
+              {podium[0] && (
+                <div style={{ fontSize: 12, color: '#8E8DA0', fontWeight: 500, marginTop: 10 }}>
+                  Лидер месяца — <span style={{ color: '#fff', fontWeight: 700 }}>{podium[0].full_name}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Podium top 3 */}
+          {podium.length > 0 && (
+            <div className="grid grid-cols-3 gap-3 md:gap-4 items-end" style={{ marginBottom: 22 }}>
+              {podiumOrder.map((u, i) => (
+                <PodiumCard key={u.id} user={u} medal={MEDAL_KEYS[podium.indexOf(u)]} onClick={() => setSelected(u)} />
               ))}
             </div>
-          )
-      }
+          )}
+
+          {/* Rest of ranking */}
+          {rest.length > 0 && (
+            <Card className="overflow-hidden">
+              <div style={{ padding: '14px 20px', fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: M.muted, borderBottom: `1px solid ${M.bg}` }}>
+                Остальные продавцы
+              </div>
+              {rest.map((u, i) => {
+                const pct = topRevenue > 0 ? Math.round(u.stats.revenue / topRevenue * 100) : 0
+                return (
+                  <div
+                    key={u.id}
+                    onClick={() => setSelected(u)}
+                    className="flex items-center gap-3 md:gap-[14px] cursor-pointer hover:bg-[#FAFAF7] transition-colors"
+                    style={{ padding: '12px 20px', borderBottom: i < rest.length - 1 ? `1px solid ${M.bg}` : 'none' }}
+                  >
+                    <div style={{ width: 24, textAlign: 'center', fontSize: 14, fontWeight: 800, color: M.muted, flexShrink: 0 }}>{i + 4}</div>
+                    <InitialsAvatar name={u.full_name} size={36} palette={i} />
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate" style={{ fontSize: 14, fontWeight: 700, color: M.ink }}>{u.full_name}</div>
+                      <div style={{ height: 5, borderRadius: 3, background: '#F0EFEA', marginTop: 8, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: M.indigo, borderRadius: 3 }} />
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div style={{ fontSize: 14, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{fmtAmount(u.stats.revenue)}</div>
+                      <div style={{ fontSize: 10.5, color: M.faint, fontWeight: 600 }}>сомони</div>
+                    </div>
+                    <ChevronRight size={16} style={{ color: M.faint, flexShrink: 0 }} />
+                  </div>
+                )
+              })}
+            </Card>
+          )}
+        </>
+      )}
 
       <SellerDrawer seller={selected} orders={orders} onClose={() => setSelected(null)} />
     </div>

@@ -1,7 +1,9 @@
-import { Trophy, Phone, Users } from 'lucide-react'
+import { Phone, Users } from 'lucide-react'
 import { useSellerTeamRank, useMyTeam } from '../hooks/useSellerMe'
 import useCurrentUser from '../../../shared/hooks/useCurrentUser'
 import { M, Card, SectionLabel, InitialsAvatar } from '../components/mobileUi'
+
+const MONTH_LABEL = new Date().toLocaleDateString('ru-RU', { month: 'long' })
 
 const ROLE_LABEL = {
   manager:         'Ваш менеджер',
@@ -32,7 +34,7 @@ export default function SellerTeamPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-3" style={{ fontFamily: M.font }}>
+      <div className="space-y-3 lg:p-[44px]" style={{ fontFamily: M.font }}>
         <Card className="h-28 animate-pulse" />
         <Card className="h-40 animate-pulse" />
       </div>
@@ -46,7 +48,7 @@ export default function SellerTeamPage() {
 
   if (!leadership.length && !members.length && rank === null) {
     return (
-      <Card className="p-10 text-center" style={{ fontFamily: M.font }}>
+      <Card className="p-10 text-center lg:m-[44px]" style={{ fontFamily: M.font }}>
         <Users size={30} className="mx-auto mb-3" style={{ color: M.borderAlt }} />
         <p style={{ fontSize: 13, color: M.muted, margin: 0 }}>Вы пока не состоите в команде</p>
       </Card>
@@ -54,7 +56,7 @@ export default function SellerTeamPage() {
   }
 
   return (
-    <div style={{ fontFamily: M.font }} className="lg:h-full lg:flex lg:flex-col lg:gap-[22px]">
+    <div style={{ fontFamily: M.font }} className="lg:h-full lg:flex lg:flex-col lg:gap-[22px] lg:p-[44px]">
       {/* Header */}
       <div className="flex items-baseline gap-2 lg:block" style={{ marginBottom: 14 }}>
         <h1 className="lg:!text-[28px]" style={{ fontSize: 20, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', margin: 0 }}>
@@ -67,21 +69,36 @@ export default function SellerTeamPage() {
         )}
       </div>
 
-      {/* Own rank card */}
+      {/* Own rank — dark hero */}
       {rank !== null && (
-        <Card className="flex items-center gap-3 lg:hidden" style={{ padding: '14px 15px', marginBottom: 18 }}>
-          <div className="flex items-center justify-center flex-shrink-0" style={{ width: 42, height: 42, borderRadius: 12, background: M.amberBg, color: '#D97706' }}>
-            <Trophy size={19} />
-          </div>
-          <div className="flex-1">
-            <div style={{ fontSize: 14, fontWeight: 700, color: M.ink }}>
-              Вы #{rank} в команде{totalMembers ? ` из ${totalMembers}` : ''}
+        <div
+          className="lg:!rounded-[22px] lg:!p-[26px]"
+          style={{
+            background: 'linear-gradient(135deg,#20202A,#17171C)',
+            borderRadius: 20,
+            padding: 20,
+            color: '#fff',
+            position: 'relative',
+            overflow: 'hidden',
+            marginBottom: 18,
+          }}
+        >
+          <div style={{ position: 'absolute', right: -30, top: -40, width: 170, height: 170, borderRadius: '50%', background: 'radial-gradient(circle,rgba(99,102,241,.35),transparent 70%)' }} />
+          <div style={{ position: 'relative' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: '#9A99C4' }}>
+              Ваша позиция · {MONTH_LABEL}
             </div>
-            <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>
+            <div className="flex items-baseline gap-[10px] lg:!gap-3" style={{ marginTop: 6 }}>
+              <span className="lg:!text-[44px]" style={{ fontSize: 36, fontWeight: 900, letterSpacing: '-.03em', lineHeight: 1 }}>#{rank}</span>
+              {totalMembers != null && (
+                <span style={{ fontSize: 13, color: '#8E8DA0', fontWeight: 600 }}>из {totalMembers} продавцов</span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: '#8E8DA0', fontWeight: 500, marginTop: 10 }}>
               Рейтинг по чистой выручке за текущий месяц
             </div>
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Leadership */}

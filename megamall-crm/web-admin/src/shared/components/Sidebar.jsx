@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  Home, ShoppingCart, TrendingUp, Users, Users2,
+  Home, ShoppingCart, TrendingUp,
   UserCheck, BarChart2, ClipboardList, Wallet,
   LayoutDashboard, PlusCircle, LogOut, ShoppingBag,
   Truck,
@@ -23,8 +23,6 @@ const NAV = {
     { label: 'Логистика',  icon: Truck,         path: '/owner/logistics' },
     { label: 'Финансы',         icon: TrendingUp, path: '/owner/finance' },
     { label: 'Бюджет компании', icon: Wallet,     path: '/owner/budget' },
-    { label: 'Команды',         icon: Users2,     path: '/owner/teams' },
-    { label: 'Сотрудники', icon: Users,         path: '/owner/employees' },
     { label: 'Склад',      icon: Building2,     path: '/owner/warehouse' },
     { label: 'Команда',    icon: BookUser,      path: '/owner/team-directory' },
   ],
