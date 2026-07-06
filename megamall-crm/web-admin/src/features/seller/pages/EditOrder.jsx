@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShoppingCart, AlertCircle, ArrowLeft } from 'lucide-react'
+import { ShoppingCart, ArrowLeft } from 'lucide-react'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
 import { fetchOrder, updateOrder } from '../api'
@@ -461,49 +461,6 @@ export default function EditOrder() {
         </div>
       )}
 
-      {/* ── Sticky bottom bar ── */}
-      {!isTerminal && (
-        <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-sm
-                        border-t border-slate-200 px-4 py-3">
-          <div className="max-w-xl mx-auto">
-            {totalAmount > 0 && (
-              <div className="flex items-center gap-3 mb-2 text-xs text-slate-500 flex-wrap">
-                <span>Товары: <strong className="text-slate-700">{fmtAmount(productTotal)}</strong></span>
-                <span>+ Доставка: <strong className={deliveryFee > 0 ? 'text-amber-600' : 'text-emerald-600'}>
-                  {formatDeliveryFee(deliveryFee)}
-                </strong></span>
-                <span className="ml-auto font-bold text-sm text-slate-900">
-                  Итого: {fmtAmount(totalAmount)}
-                </span>
-              </div>
-            )}
-            {!canSubmit && cartItems.length === 0 && (
-              <p className="text-[10px] text-slate-400 mb-1 flex items-center gap-1">
-                <AlertCircle size={10} /> Добавьте хотя бы один товар
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => submitMut.mutate()}
-              disabled={!canSubmit || submitMut.isPending}
-              className="btn btn-primary btn-md w-full flex items-center justify-center gap-2
-                         disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitMut.isPending ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Сохраняем…
-                </>
-              ) : (
-                <>
-                  <ShoppingCart size={16} />
-                  Сохранить изменения
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
