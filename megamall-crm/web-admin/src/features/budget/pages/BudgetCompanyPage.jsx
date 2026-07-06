@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import {
   ArrowDownCircle, ArrowUpCircle,
-  X, Check, Pencil,
+  X, Check, Pencil, Plus, Minus,
 } from 'lucide-react'
 import useBudgetSummary from '../hooks/useBudgetSummary'
 import useBudgetTransactions from '../hooks/useBudgetTransactions'
@@ -177,6 +177,152 @@ function EditedMarker({ tx }) {
   )
 }
 
+// ── Mobile view (< lg) ──────────────────────────────────────────────────────────
+const MOBILE_TYPE_CHIPS = [
+  { key: '',                 label: 'Все',       Icon: null  },
+  { key: 'manual_income',    label: 'Пополнения', Icon: Plus  },
+  { key: 'owner_withdrawal', label: 'Списания',   Icon: Minus },
+]
+
+function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+
+function MobileTxRow({ tx, onClick }) {
+  const cfg = TYPE_CFG[tx.transaction_type] ?? TYPE_CFG.manual_income
+  const isIncome = tx.transaction_type === 'manual_income'
+  const date = new Date(tx.created_at)
+  const timeStr = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  const dateStr = date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-3 border-b border-slate-50 px-4 py-3 text-left last:border-b-0 min-h-[44px]"
+    >
+      <span className={`flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-full ${isIncome ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-rose-600'}`}>
+        {isIncome ? <ArrowDownCircle size={17} /> : <ArrowUpCircle size={17} />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-[13.5px] font-semibold text-slate-900">{tx.note || cfg.label}</span>
+          <EditedMarker tx={tx} />
+        </div>
+        <div className="mt-0.5 text-[11px] font-medium text-slate-400">
+          {isSameDay(date, new Date()) ? timeStr : dateStr}{tx.created_by_name ? ` · ${tx.created_by_name}` : ''}
+        </div>
+      </div>
+      <span className={`whitespace-nowrap text-[14.5px] font-extrabold tabular-nums ${cfg.amtClass}`}>
+        {cfg.sign}{fmt(tx.amount)} с
+      </span>
+    </button>
+  )
+}
+
+function MobileBudgetView({
+  balance, sumLoading, allTimeProfit, allTimeSumLoading, summary,
+  incomeCount, withdrawalCount, items, txLoading,
+  typeFilter, onTypeFilter, onIncome, onWithdrawal, onEditTx,
+}) {
+  const today = new Date()
+  const todayItems = items.filter((t) => isSameDay(new Date(t.created_at), today))
+  const earlierItems = items.filter((t) => !isSameDay(new Date(t.created_at), today))
+  const todayLabel = `Сегодня, ${today.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`
+
+  return (
+    <div className="p-4 pb-8 space-y-3.5" style={{ background: '#F2F4F7' }}>
+      <div className="flex items-center justify-between">
+        <h1 className="text-[22px] font-extrabold tracking-tight text-slate-950">Бюджет</h1>
+      </div>
+
+      {/* Hero balance card */}
+      <div
+        className="rounded-[24px] px-5 pt-[22px] pb-[18px]"
+        style={{ background: 'linear-gradient(135deg,#4f46e5,#4338ca)', boxShadow: '0 12px 32px rgba(79,70,229,.28)' }}
+      >
+        <div className="text-[11px] font-bold uppercase tracking-[.08em] text-indigo-100/85">Баланс сейчас</div>
+        <div className="mt-2 text-[40px] font-extrabold leading-none tracking-tight text-white tabular-nums">
+          {sumLoading ? '—' : fmt(balance)} <span className="text-[22px] font-bold text-indigo-100/80">с</span>
+        </div>
+        <div className="mt-2 text-[12px] font-semibold text-emerald-300">
+          {allTimeSumLoading ? '—' : `↗ ${fmt(allTimeProfit)} с из чистой прибыли за всё время`}
+        </div>
+        <div className="mt-[18px] flex gap-2.5">
+          <button
+            onClick={onIncome}
+            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full bg-white text-[13.5px] font-bold text-indigo-700"
+          >
+            <Plus size={16} strokeWidth={2.4} />Пополнить
+          </button>
+          <button
+            onClick={onWithdrawal}
+            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-white/35 bg-white/10 text-[13.5px] font-bold text-white"
+          >
+            <Minus size={16} strokeWidth={2.4} />Списать
+          </button>
+        </div>
+      </div>
+
+      {/* Mini KPIs */}
+      <div className="grid grid-cols-3 gap-2.5">
+        <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Пополнения</div>
+          <div className="mt-1.5 text-[16px] font-extrabold tabular-nums text-emerald-600">{sumLoading ? '—' : `+${fmt(summary?.manual_top_ups)}`}</div>
+          <div className="mt-0.5 text-[10.5px] font-semibold text-slate-400">{incomeCount} {incomeCount === 1 ? 'операция' : 'операции'}</div>
+        </div>
+        <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Списания</div>
+          <div className="mt-1.5 text-[16px] font-extrabold tabular-nums text-rose-600">{sumLoading ? '—' : `-${fmt(summary?.owner_withdrawals)}`}</div>
+          <div className="mt-0.5 text-[10.5px] font-semibold text-slate-400">{withdrawalCount} {withdrawalCount === 1 ? 'операция' : 'операции'}</div>
+        </div>
+        <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Прибыль</div>
+          <div className="mt-1.5 text-[16px] font-extrabold tabular-nums text-slate-950">{sumLoading ? '—' : fmt(summary?.profit_from_finance)}</div>
+          <div className="mt-0.5 text-[10.5px] font-semibold text-slate-400">из финансов</div>
+        </div>
+      </div>
+
+      {/* Operations list */}
+      <div className="overflow-hidden rounded-[20px] border border-slate-100 bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-4">
+          <span className="text-[16px] font-extrabold text-slate-950">История операций</span>
+          <div className="inline-flex gap-[3px] rounded-full bg-slate-100 p-[3px]">
+            {MOBILE_TYPE_CHIPS.map((c) => (
+              <button
+                key={c.key}
+                onClick={() => onTypeFilter(c.key)}
+                className={`rounded-full px-2.5 py-1 text-[11.5px] font-bold transition-all ${typeFilter === c.key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+              >
+                {c.Icon ? <c.Icon size={12} strokeWidth={3} /> : c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {txLoading ? (
+          <div className="px-4 py-8 text-center text-[12.5px] text-slate-400">Загрузка…</div>
+        ) : items.length === 0 ? (
+          <div className="px-4 py-8 text-center text-[12.5px] text-slate-400">Транзакции не найдены</div>
+        ) : (
+          <>
+            {todayItems.length > 0 && (
+              <>
+                <div className="px-4 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">{todayLabel}</div>
+                {todayItems.map((t) => <MobileTxRow key={t.id} tx={t} onClick={() => onEditTx(t)} />)}
+              </>
+            )}
+            {earlierItems.length > 0 && (
+              <>
+                <div className="px-4 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wide text-slate-400">Ранее</div>
+                {earlierItems.map((t) => <MobileTxRow key={t.id} tx={t} onClick={() => onEditTx(t)} />)}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function BudgetCompanyPage() {
   const qc = useQueryClient()
@@ -226,7 +372,28 @@ export default function BudgetCompanyPage() {
   const withdrawalMut = useMutation({ mutationFn: postBudgetWithdrawal, onSuccess: () => { setWithdrawalOpen(false); invalidate() } })
 
   return (
-    <div className="animate-fade-in bg-slate-100/70 rounded-[22px] p-6 pb-8 space-y-7">
+    <>
+      {/* Mobile-first view (< lg) */}
+      <div className="lg:hidden">
+        <MobileBudgetView
+          balance={balance}
+          sumLoading={sumLoading}
+          allTimeProfit={allTimeProfit}
+          allTimeSumLoading={allTimeSumLoading}
+          summary={summary}
+          incomeCount={incomeCount}
+          withdrawalCount={withdrawalCount}
+          items={items}
+          txLoading={txLoading}
+          typeFilter={typeFilter}
+          onTypeFilter={(key) => { setTypeFilter(key); setPage(1) }}
+          onIncome={() => setIncomeOpen(true)}
+          onWithdrawal={() => setWithdrawalOpen(true)}
+          onEditTx={setEditingTx}
+        />
+      </div>
+
+    <div className="hidden lg:block animate-fade-in bg-slate-100/70 rounded-[22px] p-6 pb-8 space-y-7">
 
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -407,6 +574,7 @@ export default function BudgetCompanyPage() {
           </div>
         )}
       </div>
+    </div>
 
       {/* Add top-up modal */}
       <Modal
@@ -444,6 +612,6 @@ export default function BudgetCompanyPage() {
         onClose={() => setEditingTx(null)}
         onSuccess={invalidate}
       />
-    </div>
+    </>
   )
 }

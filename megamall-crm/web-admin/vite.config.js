@@ -42,7 +42,6 @@ export default defineConfig({
             './src/features/orders/pages/OwnerOrdersPage.jsx',
             './src/features/people/pages/TeamsHub.jsx',
             './src/features/people/pages/TeamProfilePage.jsx',
-            './src/features/people/pages/EmployeeProfilePage.jsx',
           ],
           'feature-team-lead': [
             './src/features/team-lead/pages/TeamLeadDashboardPage.jsx',

@@ -83,7 +83,7 @@ function DesktopMemberRow({ member, onClick }) {
           <Badge variant={ROLE_BADGE[member.role] ?? 'slate'} size="sm">{ROLE_LABEL[member.role] ?? member.role}</Badge>
         </div>
         <p className="text-xs text-slate-400 mt-0.5">
-          Заказов: <b className="text-slate-600">{member.orders_count}</b> · Доход за период: <b className="text-slate-600">{fmtAmount(member.earned)} сомони</b>
+          Заказов: <b className="text-slate-600">{member.orders_count}</b> · Доход за период: <b className="text-slate-600">{fmtAmount(member.earned)} смн</b>
         </p>
       </div>
       <ChevronRight size={16} className="text-slate-300 flex-shrink-0" />

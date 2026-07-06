@@ -1,5 +1,5 @@
 import { useState, useMemo }  from 'react'
-import { useSearchParams, useLocation } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useQueryClient, useQueries } from '@tanstack/react-query'
 import { RefreshCw, Plus }    from 'lucide-react'
 
@@ -102,12 +102,9 @@ function CompensationTab({ employees, teams }) {
 // ── Main TeamsHub ──────────────────────────────────────────────────────────────
 export default function TeamsHub() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const location = useLocation()
   const qc = useQueryClient()
 
-  // /owner/employees → default to employees tab
-  const pathDefaultTab = location.pathname.includes('/employees') ? 'employees' : 'teams'
-  const initialTab  = searchParams.get('tab') || pathDefaultTab
+  const initialTab  = searchParams.get('tab') || 'teams'
   const initialRole = searchParams.get('role') || ''
 
   const [tab,              setTab]           = useState(initialTab)

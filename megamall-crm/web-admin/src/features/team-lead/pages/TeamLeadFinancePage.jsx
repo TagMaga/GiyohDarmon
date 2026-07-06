@@ -256,7 +256,7 @@ function OverviewTab() {
                     />
                     {isChecked && isAmountInvalid(m) && (
                       <p className="text-[10px] font-bold text-right mt-1" style={{ color: '#DC2626' }}>
-                        Не более {fmtAmount(m.remaining)} сомони
+                        Не более {fmtAmount(m.remaining)} смн
                       </p>
                     )}
                   </>
@@ -327,7 +327,7 @@ function OverviewTab() {
           {selectedMembers.map(m => (
             <div key={m.payee_id} className="flex items-center justify-between px-4 py-3">
               <span className="text-sm font-semibold text-slate-700">{m.full_name} · {ROLE_LABEL[m.role] ?? m.role}</span>
-              <span className="text-sm font-black text-slate-900">{fmtAmount(amounts[m.payee_id])} сомони</span>
+              <span className="text-sm font-black text-slate-900">{fmtAmount(amounts[m.payee_id])} смн</span>
             </div>
           ))}
         </div>
@@ -348,7 +348,7 @@ function OverviewTab() {
         </div>
         <div className="flex items-center justify-between py-3 border-t border-slate-100 mb-4">
           <span className="text-sm font-bold text-slate-500">Итого к выплате</span>
-          <span className="text-lg font-black text-indigo-600">{fmtRu(total)} сомони</span>
+          <span className="text-lg font-black text-indigo-600">{fmtRu(total)} смн</span>
         </div>
         <button
           className="w-full rounded-2xl py-3.5 text-white font-black text-sm disabled:opacity-50"

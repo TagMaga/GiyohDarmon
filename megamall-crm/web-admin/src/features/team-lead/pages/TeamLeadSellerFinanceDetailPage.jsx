@@ -198,7 +198,7 @@ export default function TeamLeadSellerFinanceDetailPage() {
       open={confirmOpen}
       onClose={() => setConfirmOpen(false)}
       title="Подтвердите выплату"
-      description={`${member.full_name} получит ${fmtRu(member.remaining)} сомони`}
+      description={`${member.full_name} получит ${fmtRu(member.remaining)} смн`}
     >
       <p className="text-[11px] font-bold text-slate-400 uppercase mb-2">Способ выплаты</p>
       <div className="flex gap-2 mb-5">

@@ -42,40 +42,51 @@ export default function BottomNav({ tabs = SELLER_TABS, variant }) {
             >
               <Plus size={24} strokeWidth={2.5} />
             </NavLink>
-          ) : (
+          ) : tab.path ? (
             <NavLink
               key={tab.path}
               to={tab.path}
               end={tab.end}
               className="flex flex-col items-center justify-center gap-0.5 flex-1 py-2 min-h-[52px] rounded-2xl transition-all duration-200"
             >
-              {({ isActive }) => (
-                <div
-                  className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all duration-200"
-                  style={isActive ? {
-                    background: 'linear-gradient(135deg,#EEF2FF,#E0E7FF)',
-                  } : {}}
-                >
-                  <tab.icon
-                    size={20}
-                    strokeWidth={isActive ? 2.5 : 1.8}
-                    className={isActive ? 'text-indigo-600' : 'text-slate-400'}
-                  />
-                  {tab.label && (
-                    <span
-                      className="text-[10px] font-semibold leading-none"
-                      style={{ color: isActive ? '#4F46E5' : '#94A3B8' }}
-                    >
-                      {tab.label}
-                    </span>
-                  )}
-                </div>
-              )}
+              {({ isActive }) => <TabContent tab={tab} isActive={isActive} />}
             </NavLink>
+          ) : (
+            <button
+              key={tab.label}
+              type="button"
+              onClick={tab.onClick}
+              className="flex flex-col items-center justify-center gap-0.5 flex-1 py-2 min-h-[52px] rounded-2xl transition-all duration-200"
+            >
+              <TabContent tab={tab} isActive={Boolean(tab.active)} />
+            </button>
           )
         )}
       </div>
     </nav>
+  )
+}
+
+function TabContent({ tab, isActive }) {
+  return (
+    <div
+      className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all duration-200"
+      style={isActive ? { background: 'linear-gradient(135deg,#EEF2FF,#E0E7FF)' } : {}}
+    >
+      <tab.icon
+        size={20}
+        strokeWidth={isActive ? 2.5 : 1.8}
+        className={isActive ? 'text-indigo-600' : 'text-slate-400'}
+      />
+      {tab.label && (
+        <span
+          className="text-[10px] font-semibold leading-none"
+          style={{ color: isActive ? '#4F46E5' : '#94A3B8' }}
+        >
+          {tab.label}
+        </span>
+      )}
+    </div>
   )
 }
 

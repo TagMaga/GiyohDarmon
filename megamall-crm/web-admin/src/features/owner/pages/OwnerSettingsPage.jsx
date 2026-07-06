@@ -45,7 +45,7 @@ export default function OwnerSettingsPage() {
         title="Тарифы выплат курьерам"
         description="Индивидуальные тарифы на нормальную и быструю доставку"
         action="Перейти"
-        onClick={() => navigate('/owner/couriers')}
+        onClick={() => navigate('/owner/logistics')}
       >
         <p className="text-[13px] text-slate-500 leading-relaxed">
           Выплаты курьерам настраиваются индивидуально для каждого курьера

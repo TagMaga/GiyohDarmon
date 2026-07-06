@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { Home, ShoppingCart, Plus, Wallet, User, Users, TrendingUp, Truck, Package, PackagePlus, BarChart3 } from 'lucide-react'
+import { Home, ShoppingCart, Plus, Wallet, User, Users, TrendingUp, Package, PackagePlus, BarChart3, LayoutGrid } from 'lucide-react'
 import Sidebar from './Sidebar'
 import useAuthStore from '../store/authStore'
 import BottomNav from '../../features/seller/components/BottomNav'
+import OwnerMoreSheet from '../../features/owner/components/OwnerMoreSheet'
 
 const MANAGER_TABS = [
   { label: 'Главная',  icon: Home,         path: '/manager',              end: true  },
@@ -13,12 +14,14 @@ const MANAGER_TABS = [
   { label: 'Профиль',  icon: User,         path: '/manager/profile',      end: false },
 ]
 
-const OWNER_TABS = [
+const OWNER_BASE_TABS = [
   { label: 'Главная',  icon: Home,         path: '/owner',           end: true  },
   { label: 'Заказы',   icon: ShoppingCart, path: '/owner/orders',    end: false },
   { label: 'Финансы',  icon: TrendingUp,   path: '/owner/finance',   end: false },
-  { label: 'Логист.',  icon: Truck,        path: '/owner/logistics', end: false },
+  { label: 'Склад',    icon: Package,      path: '/owner/warehouse', end: false },
 ]
+
+const OWNER_MORE_PATHS = ['/owner/budget', '/owner/logistics', '/owner/team-directory', '/owner/settings']
 
 const WAREHOUSE_TABS = [
   { label: 'Главная', icon: Home,        path: '/warehouse',           end: true },
@@ -31,6 +34,7 @@ const WAREHOUSE_TABS = [
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [ownerMoreOpen, setOwnerMoreOpen] = useState(false)
   const location = useLocation()
   const { role } = useAuthStore()
   const isDispatcherBoard = location.pathname.startsWith('/dispatcher')
@@ -76,7 +80,22 @@ export default function Layout() {
       </div>
 
       {/* Mobile bottom navigation */}
-      {isOwner   && <BottomNav tabs={OWNER_TABS} />}
+      {isOwner && (
+        <>
+          <BottomNav
+            tabs={[
+              ...OWNER_BASE_TABS,
+              {
+                label: 'Ещё',
+                icon: LayoutGrid,
+                active: ownerMoreOpen || OWNER_MORE_PATHS.some((p) => location.pathname.startsWith(p)),
+                onClick: () => setOwnerMoreOpen(true),
+              },
+            ]}
+          />
+          <OwnerMoreSheet open={ownerMoreOpen} onClose={() => setOwnerMoreOpen(false)} />
+        </>
+      )}
       {isSeller  && <BottomNav variant="seller" />}
       {isManager && <BottomNav tabs={MANAGER_TABS} />}
       {isWarehouse && <BottomNav tabs={WAREHOUSE_TABS} />}

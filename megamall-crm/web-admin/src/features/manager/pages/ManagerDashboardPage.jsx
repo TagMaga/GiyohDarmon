@@ -88,7 +88,7 @@ function MiniOrderRow({ order, userMap }) {
           {seller} · {fmtDate(order.created_at ?? order.CreatedAt)}
         </p>
       </div>
-      <span className="text-sm font-bold text-slate-800 flex-shrink-0">{fmtAmount(amount)} сомони</span>
+      <span className="text-sm font-bold text-slate-800 flex-shrink-0">{fmtAmount(amount)} смн</span>
     </div>
   )
 }

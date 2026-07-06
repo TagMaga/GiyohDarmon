@@ -173,7 +173,7 @@ export function isTomorrow(dateStr) {
   return sameDay(new Date(dateStr), t)
 }
 
-/** Format currency (no symbol — caller appends "сомони"). */
+/** Format currency (no symbol — caller appends "смн"). */
 export function fmt(val) {
   if (val == null) return '—'
   return Number(val).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })

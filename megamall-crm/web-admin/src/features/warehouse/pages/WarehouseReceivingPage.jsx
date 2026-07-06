@@ -30,16 +30,6 @@ export default function WarehouseReceivingPage() {
           </div>
         }
       />
-      <section className="mb-4 grid gap-3 md:grid-cols-2">
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <p className="text-sm font-bold text-emerald-900">Приёмка</p>
-          <p className="mt-1 text-xs text-emerald-800">Создаёт FIFO-партию с фиксированной закупочной ценой.</p>
-        </div>
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
-          <p className="text-sm font-bold text-rose-900">Списания</p>
-          <p className="mt-1 text-xs text-rose-800">Уменьшают доступный остаток и расходуют старые партии.</p>
-        </div>
-      </section>
       <MovementList rows={rows} data={data} emptyTitle="Операций пока нет" showEntryActions onlyLatestEntryEditable />
       <ReceivingModal open={receivingOpen} onClose={() => setReceivingOpen(false)} products={data.products} inventory={data.inventory} />
       <WriteoffModal open={writeoffOpen} onClose={() => setWriteoffOpen(false)} products={data.products} inventory={data.inventory} />

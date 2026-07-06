@@ -84,7 +84,7 @@ function SellerDrawer({ seller, orders, onClose }) {
           {[
             { label: 'Всего', value: myOrders.length, icon: <Package size={14} />, accent: 'text-indigo-600 bg-indigo-50' },
             { label: 'Доставлено', value: delivered, icon: <PackageCheck size={14} />, accent: 'text-emerald-600 bg-emerald-50' },
-            { label: 'Выручка', value: `${fmtAmount(revenue)} сомони`, icon: <TrendingUp size={14} />, accent: 'text-violet-600 bg-violet-50' },
+            { label: 'Выручка', value: `${fmtAmount(revenue)} смн`, icon: <TrendingUp size={14} />, accent: 'text-violet-600 bg-violet-50' },
           ].map(({ label, value, icon, accent }) => (
             <div key={label} className="text-center">
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center mx-auto mb-1 ${accent}`}>{icon}</div>
@@ -113,7 +113,7 @@ function SellerDrawer({ seller, orders, onClose }) {
                       <p className="text-[11px] text-slate-400">{fmtDate(o.created_at ?? o.CreatedAt)}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs font-semibold text-slate-700">{fmtAmount(amount)} сомони</span>
+                      <span className="text-xs font-semibold text-slate-700">{fmtAmount(amount)} смн</span>
                       <Badge variant={STATUS_BADGE[status] ?? 'slate'} size="sm">{status}</Badge>
                     </div>
                   </div>
@@ -155,7 +155,7 @@ function SellerCard({ user, stats, onClick }) {
         {[
           { label: 'Заказов', value: total,                     icon: <Package size={12}/>,      color: 'text-indigo-600' },
           { label: 'Сдано',   value: delivered,                  icon: <PackageCheck size={12}/>, color: 'text-emerald-600' },
-          { label: 'Выручка', value: `${fmtAmount(revenue)} сомони`, icon: <TrendingUp size={12}/>,  color: 'text-violet-600' },
+          { label: 'Выручка', value: `${fmtAmount(revenue)} смн`, icon: <TrendingUp size={12}/>,  color: 'text-violet-600' },
           { label: 'Конверс.', value: `${conversion}%`,         icon: <BarChart2 size={12}/>,    color: 'text-amber-600' },
         ].map(({ label, value, icon, color }) => (
           <div key={label} className="text-center">

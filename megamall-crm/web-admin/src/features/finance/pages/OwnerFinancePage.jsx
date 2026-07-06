@@ -2,7 +2,7 @@
  * OwnerFinancePage — /owner/finance
  *
  * Full owner finance dashboard. Layout:
- *   1. Header (icon + title + subtitle + period filter + refresh)
+ *   1. Header (icon + title + subtitle)
  *   2. 6 KPI tiles (from /finance/summary)
  *   3. Two-col on md+: RevenueBreakdownCard | CommissionsBreakdown
  *   4. FinanceEventsTable (paginated ledger)
@@ -11,9 +11,8 @@
  */
 import { useState }              from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, PlusCircle, RefreshCw, TrendingUp, X } from 'lucide-react'
+import { Check, PlusCircle, TrendingUp, X } from 'lucide-react'
 import Alert                     from '../../../shared/components/Alert'
-import IncomePeriodFilter        from '../../hr/components/IncomePeriodFilter'
 import { postFinanceExpense }    from '../api'
 import FinanceSummaryKpis        from '../components/FinanceSummaryKpis'
 import RevenueBreakdownCard      from '../components/RevenueBreakdownCard'
@@ -168,9 +167,7 @@ function AddExpenseModal({ open, onClose, onSubmit, loading, error }) {
 
 export default function OwnerFinancePage() {
   const queryClient = useQueryClient()
-  const def = last30DaysDefault()
-  const [from, setFrom] = useState(def.from)
-  const [to,   setTo]   = useState(def.to)
+  const [{ from, to }] = useState(() => last30DaysDefault())
   const [expenseOpen, setExpenseOpen] = useState(false)
 
   const summaryParams = { from, to }
@@ -179,8 +176,6 @@ export default function OwnerFinancePage() {
     isLoading: summaryLoading,
     isError:   summaryError,
     error:     summaryErr,
-    refetch,
-    isFetching,
   } = useFinanceSummary(summaryParams)
 
   const expenseMut = useMutation({
@@ -191,11 +186,6 @@ export default function OwnerFinancePage() {
       queryClient.invalidateQueries({ queryKey: ['budget'] }) // Finance profit feeds Budget's live balance
     },
   })
-
-  function handlePeriodChange(f, t) {
-    setFrom(f)
-    setTo(t)
-  }
 
   return (
     <div className="p-4 md:p-6 space-y-6">
@@ -212,24 +202,6 @@ export default function OwnerFinancePage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-start justify-end gap-2">
-          <IncomePeriodFilter
-            from={from}
-            to={to}
-            onChange={handlePeriodChange}
-          />
-
-          {/* Refresh button */}
-          <button
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-h-[44px] flex-shrink-0"
-            title="Обновить данные"
-          >
-            <RefreshCw size={13} className={isFetching ? 'animate-spin' : ''} />
-            <span className="hidden sm:inline">Обновить</span>
-          </button>
-        </div>
       </div>
 
       {/* ── Error alert ─────────────────────────────────────────────────────── */}

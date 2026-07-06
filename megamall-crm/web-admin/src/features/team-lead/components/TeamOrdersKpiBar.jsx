@@ -54,7 +54,7 @@ export default function TeamOrdersKpiBar({ orders = [], loading }) {
       <KpiTile icon={<Loader2      size={16} />} label="В доставке" value={inDelivery}              accent="amber"   loading={loading} />
       <KpiTile icon={<PackageCheck size={16} />} label="Доставлено" value={delivered}               accent="emerald" loading={loading} />
       <KpiTile icon={<PackageX     size={16} />} label="Отменено"   value={cancelled}               accent="rose"    loading={loading} />
-      <KpiTile icon={<TrendingUp   size={16} />} label="Выручка"    value={`${fmtAmount(revenue)} сомони`} accent="violet" loading={loading} />
+      <KpiTile icon={<TrendingUp   size={16} />} label="Выручка"    value={`${fmtAmount(revenue)} смн`} accent="violet" loading={loading} />
     </div>
   )
 }

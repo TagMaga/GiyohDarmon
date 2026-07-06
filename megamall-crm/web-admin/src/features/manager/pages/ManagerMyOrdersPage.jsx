@@ -51,8 +51,8 @@ function DesktopRow({ order, onView, onEdit }) {
       <td className="px-4 py-3 text-xs font-mono font-semibold text-indigo-700">{formatOrderLabel(order)}</td>
       <td className="px-4 py-3 text-xs text-slate-800 max-w-[120px] truncate">{name}</td>
       <td className="px-4 py-3 text-xs text-slate-700 max-w-[120px] truncate">{product}</td>
-      <td className="px-4 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap text-right">{fmtAmount(amount)} сомони</td>
-      <td className="px-4 py-3 text-xs font-semibold text-emerald-700 whitespace-nowrap text-right">{fmtAmount(net)} сомони</td>
+      <td className="px-4 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap text-right">{fmtAmount(amount)} смн</td>
+      <td className="px-4 py-3 text-xs font-semibold text-emerald-700 whitespace-nowrap text-right">{fmtAmount(net)} смн</td>
       <td className="px-4 py-3"><Badge variant={STATUS_BADGE[status]??'slate'} size="sm">{STATUS_LABELS[status]??status}</Badge></td>
       <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{fmtDate(order.created_at??order.CreatedAt)}</td>
       <td className="px-4 py-3">
@@ -90,7 +90,7 @@ function MobileCard({ order, onView, onEdit }) {
       </div>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-slate-400">{fmtDate(order.created_at??order.CreatedAt)}</span>
-        <span className="text-sm font-bold text-slate-800">{fmtAmount(amount)} сомони</span>
+        <span className="text-sm font-bold text-slate-800">{fmtAmount(amount)} смн</span>
       </div>
       <div className="flex gap-2">
         {canEdit && (
@@ -139,7 +139,7 @@ function PersonalKpiBar({ orders, loading }) {
         {[
           { label: 'Всего', value: total },
           { label: 'Доставлено', value: delivered, cls: 'text-emerald-700' },
-          { label: 'Выручка', value: `${fmtAmount(revenue)} сомони`, cls: 'text-violet-700' },
+          { label: 'Выручка', value: `${fmtAmount(revenue)} смн`, cls: 'text-violet-700' },
           { label: 'Конверсия', value: `${conv}%`, cls: 'text-amber-700' },
         ].map(({ label, value, cls }) => (
           <div key={label}>

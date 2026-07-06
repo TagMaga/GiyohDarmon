@@ -19,7 +19,7 @@ export default function EmployeeCard({ user, teamMap = {}, teamId = null }) {
 
   return (
     <button
-      onClick={() => navigate(`/owner/employees/${user.id}`)}
+      onClick={() => navigate('/owner/team-directory')}
       className="card p-4 text-left w-full hover:shadow-md transition-shadow group flex items-center gap-3"
     >
       {/* Avatar */}

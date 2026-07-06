@@ -127,10 +127,10 @@ function DesktopRow({ order, userMap, teamMap, onView }) {
       </td>
       <td className="px-4 py-3 text-xs text-center text-slate-600">{qty}</td>
       <td className="px-4 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap text-right">
-        {fmtAmount(amount)} сомони
+        {fmtAmount(amount)} смн
       </td>
       <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap text-right">
-        {delivery ? `${fmtAmount(delivery)} сомони` : '—'}
+        {delivery ? `${fmtAmount(delivery)} смн` : '—'}
       </td>
       <td className="px-4 py-3">
         <Badge variant={STATUS_BADGE[status] ?? 'slate'} size="sm">
@@ -188,7 +188,7 @@ function MobileCard({ order, userMap, teamMap, onView }) {
 
       <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
         <ProductCell product={product} />
-        <span className="font-bold text-slate-800">{fmtAmount(amount)} сомони</span>
+        <span className="font-bold text-slate-800">{fmtAmount(amount)} смн</span>
       </div>
 
       <div className="flex items-center justify-between gap-2">

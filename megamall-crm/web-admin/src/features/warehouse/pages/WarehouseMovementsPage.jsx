@@ -56,7 +56,7 @@ export default function WarehouseMovementsPage() {
       <PageHeader title="Движения" subtitle="История операций по остаткам." icon={<ArrowLeftRight size={20} />} />
       {data.error && <Alert variant="error" title="Ошибка загрузки данных" className="mb-5">{data.error?.message}</Alert>}
 
-      <section className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] xl:grid-cols-[1fr_160px_210px_auto]">
+      <section className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] lg:grid-cols-[minmax(0,1fr)_160px_210px_auto]">
         <label className="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
           <Search size={17} className="text-slate-400" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по товару, пользователю или комментарию…" className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400" />

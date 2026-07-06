@@ -188,7 +188,7 @@ function RecentOrderRow({ order, userMap }) {
       </div>
       {/* Amount */}
       <span className="text-xs font-bold text-slate-800 flex-shrink-0 whitespace-nowrap">
-        {fmtAmount(amount)} сомони
+        {fmtAmount(amount)} смн
       </span>
     </div>
   )
@@ -258,7 +258,7 @@ function PerformanceRanking({ orders, userMap }) {
                 />
               </div>
               <p className="text-[10px] text-slate-400 mt-0.5">
-                {s.delivered} сдано · {conv}% конв. · {fmtAmount(s.revenue)} сомони
+                {s.delivered} сдано · {conv}% конв. · {fmtAmount(s.revenue)} смн
               </p>
             </div>
           </div>

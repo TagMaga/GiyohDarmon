@@ -21,16 +21,13 @@ const BudgetCompanyPage       = lazy(() => import('../features/budget/pages/Budg
 const OwnerOrdersPage         = lazy(() => import('../features/orders/pages/OwnerOrdersPage'))
 const LogisticsPage           = lazy(() => import('../features/logistics/pages/LogisticsPage'))
 const CourierProfilePage      = lazy(() => import('../features/logistics/pages/CourierProfilePage'))
-const OwnerCouriersPage       = lazy(() => import('../features/owner/pages/OwnerCouriersPage'))
 const OwnerWarehousePage      = lazy(() => import('../features/owner/pages/OwnerWarehousePage'))
-const OwnerHRPage             = lazy(() => import('../features/owner/pages/OwnerHRPage'))
 const OwnerSettingsPage       = lazy(() => import('../features/owner/pages/OwnerSettingsPage'))
 const OwnerReportsPage        = lazy(() => import('../features/owner/pages/OwnerReportsPage'))
 
 // People / HR (owner sub-pages)
 const TeamsHub              = lazy(() => import('../features/people/pages/TeamsHub'))
 const TeamProfilePage       = lazy(() => import('../features/people/pages/TeamProfilePage'))
-const EmployeeProfilePage   = lazy(() => import('../features/people/pages/EmployeeProfilePage'))
 const TeamDirectoryPage     = lazy(() => import('../features/people/pages/TeamDirectoryPage'))
 
 // Team Lead
@@ -120,9 +117,7 @@ const router = createBrowserRouter([
         { index: true, element: <Lazy><OwnerDashboard /></Lazy> },
 
         { path: 'teams',             element: <Lazy><TeamsHub /></Lazy> },
-        { path: 'teams/:teamId',     element: <Lazy><TeamProfilePage /></Lazy> },
-        { path: 'employees',         element: <Lazy><TeamsHub /></Lazy> },
-        { path: 'employees/:userId', element: <Lazy><EmployeeProfilePage /></Lazy> },
+        { path: 'teams/:teamName',   element: <Lazy><TeamProfilePage /></Lazy> },
         { path: 'team-directory',    element: <Lazy><TeamDirectoryPage /></Lazy> },
 
         { path: 'finance', element: <Lazy><OwnerFinancePage /></Lazy> },
@@ -134,24 +129,16 @@ const router = createBrowserRouter([
         { path: 'logistics/couriers/:id',   element: <Lazy><CourierProfilePage /></Lazy> },
 
         // Dedicated owner sections
-        { path: 'couriers',  element: <Lazy><OwnerCouriersPage /></Lazy> },
         { path: 'warehouse', element: <Lazy><OwnerWarehousePage /></Lazy> },
-        { path: 'hr',        element: <Lazy><OwnerHRPage /></Lazy> },
         { path: 'reports',   element: <Lazy><OwnerReportsPage /></Lazy> },
 
         // Settings hub
         { path: 'settings', element: <Lazy><OwnerSettingsPage /></Lazy> },
 
-        // Dispatch board accessible to owner (owner has dispatcherRoles on backend)
-        { path: 'dispatch', element: <Lazy><DispatcherDashboard /></Lazy> },
-
         { path: '*', element: <ComingSoon /> },
       ],
     }],
   },
-
-  { path: '/hr',   element: <Navigate to="/owner/hr"  replace /> },
-  { path: '/hr/*', element: <Navigate to="/owner/hr"  replace /> },
 
   // ── Team Lead ───────────────────────────────────────────────────────────
   {

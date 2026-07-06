@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import Alert from '../../../shared/components/Alert'
 import { useSellerMe, usePatchMe } from '../hooks/useSellerMe'
 import { useToast } from '../../../shared/components/ToastProvider'
-import { Check, ChevronRight, MessageCircle } from 'lucide-react'
+import { Check, MessageCircle } from 'lucide-react'
 import { M, Card } from '../components/mobileUi'
 
 function toDateInput(value) {
@@ -65,7 +64,97 @@ export default function SellerProfileInfoPage() {
 
   return (
     <>
-    <div className="hidden lg:flex flex-col gap-5" style={{ padding: '36px 44px', fontFamily: M.font }}>
+      {/* ═══ MOBILE ═══ */}
+      <div className="lg:hidden flex flex-col gap-4" style={{ fontFamily: M.font }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0 }}>Личные данные</h1>
+
+        {errMsg && <Alert variant="error">{errMsg}</Alert>}
+
+        <Card className="flex flex-col items-center text-center" style={{ borderRadius: 20, padding: '24px 18px' }}>
+          <div
+            className="flex items-center justify-center overflow-hidden"
+            style={{ width: 84, height: 84, borderRadius: '50%', background: '#E7E5FB', color: M.indigoDeep, fontWeight: 800, fontSize: 28 }}
+          >
+            {avatarUrl ? <img src={avatarUrl} alt={fullName || 'Профиль'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials(fullName)}
+          </div>
+          <span style={{ fontSize: 13.5, fontWeight: 700, color: M.indigo, marginTop: 12 }}>Изменить фото</span>
+        </Card>
+
+        <div>
+          <SectionTitle>Основное</SectionTitle>
+          <Card style={{ borderRadius: 16, padding: '4px 16px' }}>
+            <div style={{ padding: '13px 0', borderBottom: `1px solid ${M.bg}` }}>
+              <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Имя и фамилия</div>
+              <input value={fullName} onChange={e => setFullName(e.target.value)} style={desktopInputStyle} placeholder="Имя и фамилия" />
+            </div>
+            <div style={{ padding: '13px 0', borderBottom: `1px solid ${M.bg}` }}>
+              <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Дата рождения</div>
+              <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} style={desktopInputStyle} />
+            </div>
+            <div style={{ padding: '13px 0' }}>
+              <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Номер телефона</div>
+              <div className="flex items-center justify-between" style={{ marginTop: 4 }}>
+                <span style={{ fontSize: 14.5, fontWeight: 700, color: M.ink }}>{me?.phone || '—'}</span>
+                <span className="inline-flex items-center gap-1" style={{ fontSize: 11, fontWeight: 700, color: M.green, background: M.greenBg, padding: '3px 9px', borderRadius: 7 }}>
+                  <Check size={9} strokeWidth={3.2} />
+                  Подтверждён
+                </span>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div>
+          <SectionTitle>Локация и работа</SectionTitle>
+          <Card style={{ borderRadius: 16, overflow: 'hidden' }}>
+            <div className="flex items-center justify-between" style={{ padding: '14px 16px', borderBottom: `1px solid ${M.bg}` }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: M.ink }}>Город</span>
+              <span style={{ fontSize: 13.5, color: '#76766E', fontWeight: 600 }}>{cityLabel}</span>
+            </div>
+            <div className="flex items-center justify-between" style={{ padding: '14px 16px' }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: M.ink }}>Роль</span>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: '#76766E', background: '#F0EFEA', padding: '4px 11px', borderRadius: 7 }}>{roleLabel}</span>
+            </div>
+          </Card>
+        </div>
+
+        <div>
+          <SectionTitle>Telegram</SectionTitle>
+          <Card style={{ borderRadius: 16, padding: '16px' }} className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg,#2481CC,#1A6CB0)' }}>
+                <MessageCircle size={15} color="white" />
+              </div>
+              <p style={{ fontSize: 12, color: M.sub }}>Для уведомлений о заказах</p>
+            </div>
+            <input
+              className="input"
+              placeholder="Chat ID, например -100123456789"
+              value={telegramChatId}
+              onChange={e => setTelegramChatId(e.target.value)}
+            />
+          </Card>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSaveAll}
+          disabled={patch.isPending || !fullName.trim()}
+          className="active:scale-[0.98] transition-transform"
+          style={{
+            background: 'linear-gradient(135deg,#6366F1,#4F46E5)', color: '#fff', border: 'none',
+            fontFamily: 'inherit', fontSize: 14.5, fontWeight: 700, padding: '13px 20px', borderRadius: 14,
+            cursor: patch.isPending || !fullName.trim() ? 'not-allowed' : 'pointer',
+            opacity: patch.isPending || !fullName.trim() ? 0.7 : 1,
+            boxShadow: '0 8px 20px rgba(99,102,241,.32)',
+          }}
+        >
+          {patch.isPending ? 'Сохранение...' : 'Сохранить изменения'}
+        </button>
+      </div>
+
+      {/* ═══ DESKTOP ═══ */}
+      <div className="hidden lg:flex flex-col gap-5" style={{ padding: '36px 44px', fontFamily: M.font }}>
       <div className="flex items-center justify-between">
         <h1 style={{ fontSize: 28, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0 }}>Личные данные</h1>
         <button
@@ -160,96 +249,6 @@ export default function SellerProfileInfoPage() {
         </div>
       </div>
     </div>
-
-    <div className="lg:hidden" style={{ minHeight: 'calc(100vh - 7.5rem)', display: 'flex', flexDirection: 'column' }}>
-      <div className="flex items-center gap-3" style={{ padding: '8px 0 14px' }}>
-        <Link
-          to="/seller/profile"
-          aria-label="Назад к профилю"
-          className="flex items-center justify-center active:scale-95 transition-transform"
-          style={{ width: 38, height: 38, borderRadius: 12, background: '#fff', border: `1px solid ${M.borderAlt}`, color: M.ink }}
-        >
-          <ChevronRight size={18} className="rotate-180" />
-        </Link>
-        <h1 style={{ fontSize: 20, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', margin: 0 }}>Личные данные</h1>
-      </div>
-
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        <div className="flex flex-col items-center" style={{ padding: '6px 0 22px' }}>
-          <div className="flex items-center justify-center overflow-hidden" style={{ width: 74, height: 74, borderRadius: '50%', background: '#E7E5FB', color: M.indigoDeep, fontWeight: 800, fontSize: 24 }}>
-            {avatarUrl ? <img src={avatarUrl} alt={fullName || 'Профиль'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials(fullName)}
-          </div>
-        </div>
-
-        <SectionTitle>Основное</SectionTitle>
-        <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 16, overflow: 'hidden' }}>
-          <FieldBlock label="Имя и фамилия">
-            <input
-              value={fullName}
-              onChange={e => setFullName(e.target.value)}
-              style={mobileInputStyle}
-              placeholder="Имя и фамилия"
-            />
-          </FieldBlock>
-          <FieldBlock label="Номер телефона">
-            <div className="flex items-center justify-between gap-2" style={{ marginTop: 3 }}>
-              <span style={{ fontSize: 14.5, fontWeight: 700, color: M.ink }}>{me?.phone || '—'}</span>
-              <span className="inline-flex items-center gap-1" style={{ fontSize: 10.5, fontWeight: 700, color: M.green, background: M.greenBg, padding: '3px 8px', borderRadius: 7 }}>
-                <Check size={9} strokeWidth={3.2} />
-                Подтверждён
-              </span>
-            </div>
-          </FieldBlock>
-          <FieldBlock label="Дата рождения" last>
-            <input
-              type="date"
-              value={dateOfBirth}
-              onChange={e => setDateOfBirth(e.target.value)}
-              style={mobileInputStyle}
-            />
-          </FieldBlock>
-        </div>
-
-        <SectionTitle style={{ marginTop: 18 }}>Локация и работа</SectionTitle>
-        <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 16, overflow: 'hidden' }}>
-          <StaticRow label="Город" value={cityLabel} />
-          <div className="flex items-center justify-between" style={{ padding: '13px 15px' }}>
-            <span style={{ fontSize: 13.5, fontWeight: 600, color: M.ink }}>Роль</span>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: '#76766E', background: '#F0EFEA', padding: '4px 10px', borderRadius: 7 }}>{roleLabel}</span>
-          </div>
-        </div>
-
-        {errMsg && (
-          <div style={{ marginTop: 12 }}>
-            <Alert variant="error">{errMsg}</Alert>
-          </div>
-        )}
-      </div>
-
-      <div style={{ flexShrink: 0, background: '#fff', borderTop: `1px solid ${M.border}`, margin: '18px -20px -7.5rem', padding: '14px 20px 22px' }}>
-        <button
-          type="button"
-          onClick={handlePersonalSave}
-          disabled={patch.isPending || !fullName.trim()}
-          style={{
-            width: '100%',
-            background: 'linear-gradient(135deg,#6366F1,#4F46E5)',
-            color: '#fff',
-            border: 'none',
-            fontFamily: 'inherit',
-            fontSize: 14.5,
-            fontWeight: 700,
-            padding: 14,
-            borderRadius: 14,
-            cursor: patch.isPending || !fullName.trim() ? 'not-allowed' : 'pointer',
-            opacity: patch.isPending || !fullName.trim() ? 0.7 : 1,
-            boxShadow: '0 8px 20px rgba(99,102,241,.32)',
-          }}
-        >
-          {patch.isPending ? 'Сохранение...' : 'Сохранить изменения'}
-        </button>
-      </div>
-    </div>
     </>
   )
 }
@@ -260,37 +259,6 @@ function SectionTitle({ children, style }) {
       {children}
     </div>
   )
-}
-
-function FieldBlock({ label, children, last = false }) {
-  return (
-    <div style={{ padding: '12px 15px', borderBottom: last ? 'none' : `1px solid ${M.bg}` }}>
-      <div style={{ fontSize: 11, color: M.muted, fontWeight: 600 }}>{label}</div>
-      {children}
-    </div>
-  )
-}
-
-function StaticRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between" style={{ padding: '13px 15px', borderBottom: `1px solid ${M.bg}` }}>
-      <span style={{ fontSize: 13.5, fontWeight: 600, color: M.ink }}>{label}</span>
-      <span style={{ fontSize: 13, color: '#76766E', fontWeight: 600 }}>{value}</span>
-    </div>
-  )
-}
-
-const mobileInputStyle = {
-  width: '100%',
-  border: 'none',
-  background: 'transparent',
-  fontFamily: 'inherit',
-  fontSize: 14.5,
-  fontWeight: 700,
-  color: M.ink,
-  outline: 'none',
-  padding: '3px 0 0',
-  margin: 0,
 }
 
 const desktopInputStyle = {

@@ -51,11 +51,6 @@ export async function fetchTeams(params = {}) {
   return toArray(unwrap(res))
 }
 
-export async function fetchTeam(teamId) {
-  const res = await client.get(`/teams/${teamId}`)
-  return unwrap(res)
-}
-
 export async function createTeam(payload) {
   const res = await client.post('/teams', payload)
   return unwrap(res)

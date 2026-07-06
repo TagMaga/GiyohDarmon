@@ -82,7 +82,7 @@ function SellerDrawer({ seller, orders, onClose }) {
           {[
             { label: 'Всего',     value: myOrders.length, icon: <Package size={14}/>,      cls: 'text-indigo-600 bg-indigo-50' },
             { label: 'Сдано',     value: delivered,        icon: <PackageCheck size={14}/>, cls: 'text-emerald-600 bg-emerald-50' },
-            { label: 'Выручка',   value: `${fmtAmount(revenue)} сомони`, icon: <TrendingUp size={14}/>, cls: 'text-violet-600 bg-violet-50' },
+            { label: 'Выручка',   value: `${fmtAmount(revenue)} смн`, icon: <TrendingUp size={14}/>, cls: 'text-violet-600 bg-violet-50' },
           ].map(({ label, value, icon, cls }) => (
             <div key={label} className="text-center">
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center mx-auto mb-1 ${cls}`}>{icon}</div>
@@ -107,7 +107,7 @@ function SellerDrawer({ seller, orders, onClose }) {
                       <p className="text-[11px] text-slate-400">{fmtDate(o.created_at ?? o.CreatedAt)}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs font-semibold text-slate-700">{fmtAmount(Number(o.total_amount ?? o.amount ?? 0))} сомони</span>
+                      <span className="text-xs font-semibold text-slate-700">{fmtAmount(Number(o.total_amount ?? o.amount ?? 0))} смн</span>
                       <Badge variant={STATUS_BADGE[status] ?? 'slate'} size="sm">{status}</Badge>
                     </div>
                   </div>
@@ -143,7 +143,7 @@ function PodiumCard({ user, medal, onClick }) {
       <div className="truncate" style={{ fontSize: 14, fontWeight: 800, color: M.ink, maxWidth: 130, marginLeft: 'auto', marginRight: 'auto' }}>{user.full_name}</div>
       <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>{cfg.place} место</div>
       <div style={{ fontSize: 17, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', marginTop: 10 }}>{fmtAmount(user.stats.revenue)}</div>
-      <div style={{ fontSize: 10.5, color: M.faint, fontWeight: 600 }}>сомони</div>
+      <div style={{ fontSize: 10.5, color: M.faint, fontWeight: 600 }}>смн</div>
     </div>
   )
 }
@@ -212,7 +212,7 @@ export default function ManagerSellersPage() {
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: '#9A99C4' }}>Команда · {MONTH_LABEL}</div>
               <div className="flex items-baseline gap-3" style={{ marginTop: 8 }}>
                 <span className="lg:!text-[44px]" style={{ fontSize: 36, fontWeight: 900, letterSpacing: '-.03em', lineHeight: 1 }}>{fmtAmount(totalRevenue)}</span>
-                <span style={{ fontSize: 13, color: '#8E8DA0', fontWeight: 600 }}>сомони выручки</span>
+                <span style={{ fontSize: 13, color: '#8E8DA0', fontWeight: 600 }}>смн выручки</span>
               </div>
               {podium[0] && (
                 <div style={{ fontSize: 12, color: '#8E8DA0', fontWeight: 500, marginTop: 10 }}>
@@ -256,7 +256,7 @@ export default function ManagerSellersPage() {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <div style={{ fontSize: 14, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{fmtAmount(u.stats.revenue)}</div>
-                      <div style={{ fontSize: 10.5, color: M.faint, fontWeight: 600 }}>сомони</div>
+                      <div style={{ fontSize: 10.5, color: M.faint, fontWeight: 600 }}>смн</div>
                     </div>
                     <ChevronRight size={16} style={{ color: M.faint, flexShrink: 0 }} />
                   </div>

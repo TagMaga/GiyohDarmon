@@ -18,7 +18,7 @@ export default function TeamCard({ team, userMap = {}, memberCount = 0 }) {
 
   return (
     <button
-      onClick={() => navigate(`/owner/teams/${team.id}`)}
+      onClick={() => navigate(`/owner/teams/${encodeURIComponent(team.name)}`)}
       className="card p-4 text-left w-full hover:shadow-md transition-shadow group"
     >
       <div className="flex items-start justify-between gap-2 mb-3">

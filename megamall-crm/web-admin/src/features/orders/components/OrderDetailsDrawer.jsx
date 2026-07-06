@@ -144,22 +144,22 @@ function OrderContent({ orderId, userMap, teamMap }) {
               <Row
                 key={it.id ?? i}
                 label={`${it.product_name ?? '—'} × ${it.quantity}`}
-                value={`${fmtAmount(it.total_price)} сомони`}
+                value={`${fmtAmount(it.total_price)} смн`}
               />
             ))
           : null}
-        <Row label="Сумма товаров"  value={`${fmtAmount(field('total_amount', 'TotalAmount') ?? 0)} сомони`} accent="text-slate-900 font-bold" />
-        {deliveryFee > 0 && <Row label="Доставка"       value={`${fmtAmount(deliveryFee)} сомони`} />}
-        {courierPayout > 0 && <Row label="Тариф курьера" value={`${fmtAmount(courierPayout)} сомони`} />}
+        <Row label="Сумма товаров"  value={`${fmtAmount(field('total_amount', 'TotalAmount') ?? 0)} смн`} accent="text-slate-900 font-bold" />
+        {deliveryFee > 0 && <Row label="Доставка"       value={`${fmtAmount(deliveryFee)} смн`} />}
+        {courierPayout > 0 && <Row label="Тариф курьера" value={`${fmtAmount(courierPayout)} смн`} />}
         {courierPayout > 0 && (
           <Row
             label="Комиссионная база"
-            value={`${fmtAmount(Number(total) - Number(courierPayout))} сомони`}
+            value={`${fmtAmount(Number(total) - Number(courierPayout))} смн`}
             accent="text-indigo-700"
           />
         )}
-        <Row label="Итого к оплате" value={`${fmtAmount(total)} сомони`} accent="text-slate-900 font-bold" />
-        <Row label="Чистая выручка" value={`${fmtAmount(netRevenue)} сомони`} accent="text-emerald-700" />
+        <Row label="Итого к оплате" value={`${fmtAmount(total)} смн`} accent="text-slate-900 font-bold" />
+        <Row label="Чистая выручка" value={`${fmtAmount(netRevenue)} смн`} accent="text-emerald-700" />
       </Section>
 
       {/* Assignment */}
@@ -183,7 +183,7 @@ function OrderContent({ orderId, userMap, teamMap }) {
               <Row
                 key={e.id ?? i}
                 label={EVENT_LABEL[e.event_type] ?? e.event_type}
-                value={`${fmtAmount(e.amount)} сомони`}
+                value={`${fmtAmount(e.amount)} смн`}
                 accent={e.amount >= 0 ? 'text-emerald-700' : 'text-rose-600'}
               />
             ))

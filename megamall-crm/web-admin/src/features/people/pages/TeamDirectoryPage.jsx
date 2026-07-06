@@ -2189,7 +2189,7 @@ export default function TeamDirectoryPage() {
                   members={members}
                   orders={teamOrdersMap[team.id] ?? []}
                   leaderName={leader}
-                  onClick={() => navigate(`/owner/teams/${team.id}`)}
+                  onClick={() => navigate(`/owner/teams/${encodeURIComponent(team.name)}`)}
                 />
               )
             })}

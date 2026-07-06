@@ -16,6 +16,7 @@ import ReceivingModal from '../../warehouse/components/ReceivingModal'
 import WriteoffModal from '../../warehouse/components/WriteoffModal'
 import useWarehouseData from '../../warehouse/hooks/useWarehouseData'
 import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'
+import OwnerWarehouseMobile from '../components/OwnerWarehouseMobile'
 import {
   STOCK_STATUS_BADGE,
   STOCK_STATUS_LABEL,
@@ -44,13 +45,6 @@ const TABS = [
   { id: 'movements', label: 'Движение товара' },
 ]
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'Все статусы' },
-  { value: 'in_stock', label: 'В наличии' },
-  { value: 'low_stock', label: 'Мало' },
-  { value: 'out_of_stock', label: 'Нет в наличии' },
-]
-
 const MOVEMENT_TYPES = [
   { value: '', label: 'Все типы' },
   { value: 'purchase', label: 'Приход' },
@@ -63,7 +57,6 @@ const MOVEMENT_TYPES = [
 export default function OwnerWarehousePage() {
   const [tab, setTab] = useState('dashboard')
   const [inventorySearch, setInventorySearch] = useState('')
-  const [inventoryStatus, setInventoryStatus] = useState('')
   const [movementSearch, setMovementSearch] = useState('')
   const [movementType, setMovementType] = useState('')
   const [movementProductId, setMovementProductId] = useState('')
@@ -84,8 +77,6 @@ export default function OwnerWarehousePage() {
       const inv = inventoryByProduct.get(getId(product)) ?? null
       return { product, inv }
     }).filter(({ product, inv }) => {
-      const status = getStockStatus(inv)
-      if (inventoryStatus && status !== inventoryStatus) return false
       if (!q) return true
       return (
         getProductName(product).toLowerCase().includes(q) ||
@@ -93,7 +84,7 @@ export default function OwnerWarehousePage() {
         getProductBarcode(product).toLowerCase().includes(q)
       )
     })
-  }, [data.products, inventoryByProduct, inventorySearch, inventoryStatus])
+  }, [data.products, inventoryByProduct, inventorySearch])
 
   const stockAlerts = useMemo(() => data.inventory
     .filter((inv) => {
@@ -125,11 +116,6 @@ export default function OwnerWarehousePage() {
 
   const validProducts = data.products.filter((p) => isUUID(getId(p)))
 
-  function clearInventoryFilters() {
-    setInventorySearch('')
-    setInventoryStatus('')
-  }
-
   function clearMovementFilters() {
     setMovementSearch('')
     setMovementType('')
@@ -137,7 +123,39 @@ export default function OwnerWarehousePage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-5">
+    <>
+      <div className="lg:hidden">
+        <OwnerWarehouseMobile
+          tab={tab}
+          onTab={setTab}
+          data={data}
+          inventorySearch={inventorySearch}
+          onInventorySearch={setInventorySearch}
+          movementSearch={movementSearch}
+          onMovementSearch={setMovementSearch}
+          movementType={movementType}
+          onMovementType={setMovementType}
+          movementProductId={movementProductId}
+          onMovementProductId={setMovementProductId}
+          clearMovementFilters={clearMovementFilters}
+          inventoryRows={inventoryRows}
+          stockAlerts={stockAlerts}
+          receivingRows={receivingRows}
+          movementRows={movementRows}
+          validProducts={validProducts}
+          onReceive={setReceiveProduct}
+          onWriteoff={setWriteoffProduct}
+          onEdit={setEditingProduct}
+          onProduct={() => setShowProduct(true)}
+          onOpenAlert={(product) => {
+            setInventorySearch(getProductSku(product))
+            setTab('inventory')
+          }}
+          onRefresh={data.refetchAll}
+        />
+      </div>
+
+    <div className="hidden lg:block p-4 md:p-6 space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-bold text-slate-900 tracking-tight">Склад</h1>
@@ -208,7 +226,7 @@ export default function OwnerWarehousePage() {
 
       {tab === 'inventory' && (
         <div className="animate-fade-in space-y-4">
-          <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] lg:grid-cols-[1fr_170px_auto_auto]">
+          <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
             <label className="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
               <Search size={17} className="text-slate-400" />
               <input
@@ -218,11 +236,6 @@ export default function OwnerWarehousePage() {
                 className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
               />
             </label>
-            <select className="input py-2" value={inventoryStatus} onChange={(e) => setInventoryStatus(e.target.value)}>
-              {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-            <Button icon={<FilterX size={15} />} onClick={clearInventoryFilters}>Сбросить</Button>
-            <Button variant="primary" icon={<Download size={15} />} onClick={() => setReceiveProduct(null)}>Новая приёмка</Button>
           </div>
           <InventoryTable
             rows={inventoryRows}
@@ -240,23 +253,13 @@ export default function OwnerWarehousePage() {
             <Button variant="primary" icon={<PackagePlus size={15} />} onClick={() => setReceiveProduct(null)}>Новая приёмка</Button>
             <Button variant="danger" icon={<Trash2 size={15} />} onClick={() => setWriteoffProduct(null)}>Новое списание</Button>
           </div>
-          <section className="grid gap-3 md:grid-cols-2">
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <p className="text-sm font-bold text-emerald-900">Приёмка</p>
-              <p className="mt-1 text-xs text-emerald-800">Создаёт FIFO-партию с фиксированной закупочной ценой.</p>
-            </div>
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
-              <p className="text-sm font-bold text-rose-900">Списания</p>
-              <p className="mt-1 text-xs text-rose-800">Уменьшают доступный остаток и расходуют старые партии.</p>
-            </div>
-          </section>
           <MovementList rows={receivingRows} data={data} emptyTitle="Операций пока нет" showEntryActions onlyLatestEntryEditable />
         </div>
       )}
 
       {tab === 'movements' && (
         <div className="animate-fade-in space-y-4">
-          <section className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] xl:grid-cols-[1fr_160px_210px_auto]">
+          <section className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] lg:grid-cols-[minmax(0,1fr)_160px_210px_auto]">
             <label className="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
               <Search size={17} className="text-slate-400" />
               <input
@@ -278,12 +281,13 @@ export default function OwnerWarehousePage() {
           <MovementList rows={movementRows} data={data} />
         </div>
       )}
+    </div>
 
       <ProductModal open={showProduct} onClose={() => setShowProduct(false)} suppliers={data.suppliers} />
       <ProductModal open={Boolean(editingProduct)} onClose={() => setEditingProduct(null)} product={editingProduct} suppliers={data.suppliers} />
       <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={data.products} inventory={data.inventory} />
       <WriteoffModal open={writeoffProduct !== null} onClose={() => setWriteoffProduct(null)} products={writeoffProduct ? [writeoffProduct] : data.products} inventory={data.inventory} />
-    </div>
+    </>
   )
 }
 

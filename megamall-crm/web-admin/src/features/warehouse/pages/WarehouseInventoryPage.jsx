@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Clock, Download, FilterX, Package, PackagePlus, Pencil, Search, Trash2 } from 'lucide-react'
+import { Clock, Download, Package, PackagePlus, Pencil, Search, Trash2 } from 'lucide-react'
 import PageHeader from '../../../shared/components/PageHeader'
 import Button from '../../../shared/components/Button'
 import Badge from '../../../shared/components/Badge'
@@ -31,16 +31,8 @@ import {
   isProductActive,
 } from '../utils/warehouseHelpers'
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'Все статусы' },
-  { value: 'in_stock', label: 'В наличии' },
-  { value: 'low_stock', label: 'Мало' },
-  { value: 'out_of_stock', label: 'Нет в наличии' },
-]
-
 export default function WarehouseInventoryPage() {
-  const [params, setParams] = useSearchParams()
-  const [statusFilter, setStatusFilter] = useState(params.get('status') ?? '')
+  const [params] = useSearchParams()
   const [search, setSearch] = useState(params.get('q') ?? '')
   const [drawerProduct, setDrawerProduct] = useState(null)
   const [modalProduct, setModalProduct] = useState(null)
@@ -56,8 +48,6 @@ export default function WarehouseInventoryPage() {
       const inv = inventoryByProduct.get(getId(product)) ?? null
       return { product, inv }
     }).filter(({ product, inv }) => {
-      const status = getStockStatus(inv)
-      if (statusFilter && status !== statusFilter) return false
       if (!q) return true
       return (
         getProductName(product).toLowerCase().includes(q) ||
@@ -65,13 +55,7 @@ export default function WarehouseInventoryPage() {
         getProductBarcode(product).toLowerCase().includes(q)
       )
     })
-  }, [data.inventory, data.products, search, statusFilter])
-
-  function clearFilters() {
-    setSearch('')
-    setStatusFilter('')
-    setParams({}, { replace: true })
-  }
+  }, [data.inventory, data.products, search])
 
   return (
     <div className="animate-fade-in p-6 pb-20 lg:pb-6">
@@ -81,7 +65,6 @@ export default function WarehouseInventoryPage() {
         icon={<Package size={20} />}
         action={
           <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="primary" icon={<Download size={15} />} onClick={() => setReceiveProduct(null)}>Новая приёмка</Button>
             <Button icon={<PackagePlus size={15} />} onClick={() => setShowCreateProduct(true)}>Добавить товар</Button>
           </div>
         }
@@ -94,7 +77,7 @@ export default function WarehouseInventoryPage() {
       )}
 
       <section className="mb-4 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
-        <div className="grid gap-2 lg:grid-cols-[1fr_170px_auto]">
+        <div className="grid gap-2">
           <label className="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
             <Search size={17} className="text-slate-400" />
             <input
@@ -104,10 +87,6 @@ export default function WarehouseInventoryPage() {
               className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
             />
           </label>
-          <select className="input py-2" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <Button icon={<FilterX size={15} />} onClick={clearFilters}>Сбросить</Button>
         </div>
       </section>
 

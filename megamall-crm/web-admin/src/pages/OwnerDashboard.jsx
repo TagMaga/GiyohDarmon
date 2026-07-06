@@ -347,7 +347,7 @@ function SellerLeaderboard({ sellers = [], loading, onNav }) {
   return (
     <Card
       title="Топ продавцов"
-      action={<LinkBtn onClick={() => onNav('/owner/employees')}>Все</LinkBtn>}
+      action={<LinkBtn onClick={() => onNav('/owner/team-directory')}>Все</LinkBtn>}
       className="min-h-[205px]"
     >
       <div className="px-5 pb-5 pt-3">

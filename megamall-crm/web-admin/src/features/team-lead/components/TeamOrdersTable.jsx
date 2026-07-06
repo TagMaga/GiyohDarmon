@@ -42,8 +42,8 @@ function DesktopRow({ order, userMap, onView }) {
       <td className="px-4 py-3 text-xs text-slate-800 max-w-[120px] truncate">{name}</td>
       <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{phone ?? '—'}</td>
       <td className="px-4 py-3 text-xs text-slate-700 max-w-[120px] truncate">{resolveProduct(order)}</td>
-      <td className="px-4 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap text-right">{fmtAmount(amount)} сомони</td>
-      <td className="px-4 py-3 text-xs font-semibold text-emerald-700 whitespace-nowrap text-right">{fmtAmount(net)} сомони</td>
+      <td className="px-4 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap text-right">{fmtAmount(amount)} смн</td>
+      <td className="px-4 py-3 text-xs font-semibold text-emerald-700 whitespace-nowrap text-right">{fmtAmount(net)} смн</td>
       <td className="px-4 py-3"><Badge variant={STATUS_BADGE[status] ?? 'slate'} size="sm">{STATUS_LABELS[status] ?? status}</Badge></td>
       <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{seller}</td>
       <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">{fmtDate(order.created_at ?? order.CreatedAt)}</td>
@@ -73,7 +73,7 @@ function MobileCard({ order, userMap, onView }) {
       </div>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-slate-500">{fmtDate(order.created_at ?? order.CreatedAt)}</span>
-        <span className="text-sm font-bold text-slate-800">{fmtAmount(amount)} сомони</span>
+        <span className="text-sm font-bold text-slate-800">{fmtAmount(amount)} смн</span>
       </div>
       <button onClick={() => onView(order)}
         className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold transition-colors min-h-[40px]">
