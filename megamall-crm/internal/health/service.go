@@ -113,11 +113,10 @@ func (s *Service) Ready(ctx context.Context) ReadinessStatus {
 	}
 	checks["commission_configs"] = commOK
 
-	// 5. Active delivery tariff exists.
-	tariffOK := s.countCheck(ctx, "delivery_tariffs",
-		"is_active = true AND effective_to IS NULL", 1)
-	checks["delivery_tariff"] = tariffOK
-	if !tariffOK {
+	// 5. Delivery settings singleton row exists.
+	deliverySettingsOK := s.countCheck(ctx, "delivery_settings", "id = 1", 1)
+	checks["delivery_settings"] = deliverySettingsOK
+	if !deliverySettingsOK {
 		allOK = false
 	}
 

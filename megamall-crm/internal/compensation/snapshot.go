@@ -3,7 +3,6 @@ package compensation
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -57,35 +56,27 @@ type SnapshotInput struct {
 	TeamLeadID     *uuid.UUID
 	TeamLeadTeamID *uuid.UUID // team lead's team (for team-level rate lookup)
 
-	// OrderTotal is the gross order amount — used only for legacy delivery tariff
-	// audit lookups (tiered ranges). It does NOT drive the stored fee anymore.
-	OrderTotal float64
-
 	// DeliveryFee is the authoritative client delivery fee resolved from
-	// delivery_settings by the order-creation flow. When DeliveryFeeSet is true,
-	// this value is frozen into the snapshot and the legacy delivery_tariffs table
-	// is never required (order creation must not fail on a missing tariff row).
-	DeliveryFee    float64
-	DeliveryFeeSet bool
+	// delivery_settings (or a per-product override) by the caller, frozen
+	// into the snapshot as-is.
+	DeliveryFee float64
 
 	// ResolvedAt is the timestamp at which rates are frozen (= order.created_at).
 	// Pass time.Now() when calling from Phase 4 order creation.
 	ResolvedAt time.Time
 }
 
-// SnapshotBuilder resolves all 5 commission rates and the delivery tariff,
-// then builds (and optionally persists) an OrderFinancialSnapshot.
+// SnapshotBuilder resolves all 5 commission rates, then builds (and optionally
+// persists) an OrderFinancialSnapshot.
 type SnapshotBuilder struct {
 	resolver *RateResolver
-	tariff   *TariffCalculator
 	repo     *Repository
 }
 
 // NewSnapshotBuilder creates a SnapshotBuilder wired to the given sub-components.
-func NewSnapshotBuilder(resolver *RateResolver, tariff *TariffCalculator, repo *Repository) *SnapshotBuilder {
+func NewSnapshotBuilder(resolver *RateResolver, repo *Repository) *SnapshotBuilder {
 	return &SnapshotBuilder{
 		resolver: resolver,
-		tariff:   tariff,
 		repo:     repo,
 	}
 }
@@ -94,7 +85,7 @@ func NewSnapshotBuilder(resolver *RateResolver, tariff *TariffCalculator, repo *
 // inside the provided transaction tx.
 //
 // Designed to be called by Phase 4 (orders module) inside the order creation
-// transaction. If any rate or tariff resolution fails, the error propagates and
+// transaction. If any rate resolution fails, the error propagates and
 // the outer transaction is rolled back — no order is created without a snapshot.
 //
 // Phase 4 usage pattern:
@@ -102,7 +93,7 @@ func NewSnapshotBuilder(resolver *RateResolver, tariff *TariffCalculator, repo *
 //	db.Transaction(func(tx *gorm.DB) error {
 //	    // 1. Insert order row
 //	    // 2. Call SnapshotBuilder.BuildAndSave(ctx, tx, input)
-//	    // 3. Set order.SnapshotID = snapshot.ID, order.DeliveryFee = snapshot.TariffFee
+//	    // 3. Set order.SnapshotID = snapshot.ID, order.DeliveryFee = snapshot.DeliveryFee
 //	    // 4. Update order row
 //	    return nil
 //	})
@@ -127,8 +118,8 @@ func (sb *SnapshotBuilder) Build(ctx context.Context, input SnapshotInput) (*Ord
 	return sb.resolve(ctx, input)
 }
 
-// resolve is the shared implementation: resolves all 5 rates + delivery tariff,
-// builds and returns the snapshot struct (not yet persisted).
+// resolve is the shared implementation: resolves all 5 rates, builds and
+// returns the snapshot struct (not yet persisted).
 func (sb *SnapshotBuilder) resolve(ctx context.Context, input SnapshotInput) (*OrderFinancialSnapshot, error) {
 	at := input.ResolvedAt
 	if at.IsZero() {
@@ -167,30 +158,6 @@ func (sb *SnapshotBuilder) resolve(ctx context.Context, input SnapshotInput) (*O
 		return nil, fmt.Errorf("snapshot: %w", err)
 	}
 
-	// ── Resolve delivery fee ──────────────────────────────────────────────────
-	//
-	// Source of truth is delivery_settings (passed in as DeliveryFee by the order
-	// flow). The legacy delivery_tariffs table is consulted only for backward-
-	// compatible audit metadata and NEVER blocks snapshot creation: a missing or
-	// out-of-range tariff is tolerated.
-	var tariffID *uuid.UUID
-	tariffType := TariffTypeFixed
-	deliveryFee := input.DeliveryFee
-
-	if resolvedTariff, terr := sb.tariff.Resolve(ctx, input.OrderTotal, at); terr == nil {
-		id := resolvedTariff.TariffID
-		tariffID = &id
-		tariffType = resolvedTariff.TariffType
-		if !input.DeliveryFeeSet {
-			// Preview path with no explicit fee: fall back to the tariff fee.
-			deliveryFee = resolvedTariff.Fee
-		}
-	} else if !input.DeliveryFeeSet && !errors.Is(terr, ErrNoActiveTariff) {
-		// Only the preview path (no authoritative fee) surfaces unexpected errors;
-		// ErrNoActiveTariff is tolerated everywhere.
-		return nil, fmt.Errorf("snapshot: %w", terr)
-	}
-
 	// ── Build snapshot_json (human-readable backup) ───────────────────────────
 
 	snapshotData := map[string]interface{}{
@@ -220,11 +187,7 @@ func (sb *SnapshotBuilder) resolve(ctx context.Context, input SnapshotInput) (*O
 			"source":    companyR.Source,
 			"config_id": companyR.ConfigID,
 		},
-		"tariff": map[string]interface{}{
-			"id":   tariffID,
-			"type": tariffType,
-			"fee":  deliveryFee,
-		},
+		"delivery_fee": input.DeliveryFee,
 	}
 
 	jsonBytes, err := json.Marshal(snapshotData)
@@ -244,9 +207,7 @@ func (sb *SnapshotBuilder) resolve(ctx context.Context, input SnapshotInput) (*O
 		TeamLeadPoolRate:    tlPoolR.Rate,
 		CompanyRate:         companyR.Rate,
 
-		TariffID:   tariffID,
-		TariffType: tariffType,
-		TariffFee:  deliveryFee,
+		DeliveryFee: input.DeliveryFee,
 
 		SellerRateSource:          sellerR.Source,
 		ManagerTeamRateSource:     mgrTeamR.Source,

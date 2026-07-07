@@ -136,10 +136,6 @@ func Run(ctx context.Context, db *gorm.DB, cfg *Config) (*Result, error) {
 	ownerPtr := &ownerID
 	seedCommissionConfigs(ctx, db, res, ownerPtr)
 
-	// ── Delivery tariff ───────────────────────────────────────────────────────
-	log.Println("--- Delivery Tariff ---")
-	seedDeliveryTariff(ctx, db, res, ownerPtr)
-
 	log.Printf("=== seed complete: %d created, %d skipped, %d errors ===",
 		res.Created, res.Skipped, len(res.Errors))
 
@@ -485,39 +481,6 @@ func seedCommissionConfigs(ctx context.Context, db *gorm.DB, res *Result, create
 		}
 		res.created(fmt.Sprintf("commission_config %s (%.5f)", dr.commType, dr.rate))
 	}
-}
-
-// ─── Delivery tariff ──────────────────────────────────────────────────────────
-
-func seedDeliveryTariff(ctx context.Context, db *gorm.DB, res *Result, createdBy *uuid.UUID) {
-	var count int64
-	db.WithContext(ctx).Model(&compensation.DeliveryTariff{}).
-		Where("is_active = true AND effective_to IS NULL").
-		Count(&count)
-
-	if count > 0 {
-		res.skipped("delivery_tariff (active tariff already exists)")
-		return
-	}
-
-	fee := DefaultTariffFee
-	now := time.Now().UTC()
-
-	t := compensation.DeliveryTariff{
-		ID:            uuid.New(),
-		Name:          DefaultTariffName,
-		Type:          compensation.TariffTypeFixed,
-		FixedFee:      &fee,
-		IsActive:      true,
-		EffectiveFrom: now,
-		Notes:         "default seed tariff — fixed 10.00 delivery fee",
-		CreatedBy:     createdBy,
-	}
-	if err := db.WithContext(ctx).Create(&t).Error; err != nil {
-		res.fail("delivery_tariff", err)
-		return
-	}
-	res.created(fmt.Sprintf("delivery_tariff %s (fixed fee=%.2f)", DefaultTariffName, fee))
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

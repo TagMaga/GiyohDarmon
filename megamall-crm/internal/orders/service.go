@@ -279,8 +279,6 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		}
 
 		// ── Financial snapshot ────────────────────────────────────────────────
-		// DeliveryFee is authoritative; the legacy delivery_tariffs table is not
-		// required, so creation never fails on a missing active tariff row.
 		snap, err := s.compSvc.BuildSnapshot(ctx, tx, compensation.SnapshotInput{
 			SellerID:       &effectiveSellerID,
 			SellerTeamID:   nil,
@@ -288,9 +286,7 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 			ManagerTeamID:  hier.managerTeamID,
 			TeamLeadID:     hier.teamLeadID,
 			TeamLeadTeamID: hier.teamLeadTeamID,
-			OrderTotal:     totalAmount,
 			DeliveryFee:    deliveryFee,
-			DeliveryFeeSet: true,
 			ResolvedAt:     time.Now().UTC(),
 		})
 		if err != nil {
@@ -1118,7 +1114,7 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 					ManagerTeamID:  hier.managerTeamID,
 					TeamLeadID:     hier.teamLeadID,
 					TeamLeadTeamID: hier.teamLeadTeamID,
-					OrderTotal:     o.TotalAmount,
+					DeliveryFee:    o.DeliveryFee,
 					ResolvedAt:     time.Now().UTC(),
 				})
 				if err != nil {

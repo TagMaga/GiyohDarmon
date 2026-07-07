@@ -126,111 +126,6 @@ type GlobalRatesResponse struct {
 	CompanyRate         GlobalRateEntry `json:"company_rate"`
 }
 
-// ─── Delivery tariff request DTOs ─────────────────────────────────────────────
-
-// TariffRangeInput is one tier range inside CreateTariffRequest.
-type TariffRangeInput struct {
-	// MinAmount is the lower bound (inclusive, >= 0).
-	MinAmount float64 `json:"min_amount" validate:"gte=0"`
-
-	// MaxAmount is the upper bound (exclusive). Null = no upper bound (unlimited).
-	MaxAmount *float64 `json:"max_amount"`
-
-	// Fee applied when the order total falls in this range.
-	Fee float64 `json:"fee" validate:"gt=0"`
-}
-
-// CreateTariffRequest is the body for POST /hr/tariffs.
-type CreateTariffRequest struct {
-	Name string     `json:"name" validate:"required,min=1"`
-	Type TariffType `json:"type" validate:"required,oneof=fixed tiered"`
-
-	// FixedFee is required when type = "fixed". Must be > 0.
-	FixedFee *float64 `json:"fixed_fee"`
-
-	// Ranges are required when type = "tiered". Must not overlap.
-	Ranges []TariffRangeInput `json:"ranges"`
-
-	// EffectiveFrom is when this tariff takes effect.
-	EffectiveFrom time.Time `json:"effective_from" validate:"required"`
-
-	// Notes is the mandatory reason for creating this tariff.
-	Notes string `json:"notes" validate:"required,min=1"`
-}
-
-// DeactivateTariffRequest is the body for POST /hr/tariffs/:id/deactivate.
-type DeactivateTariffRequest struct {
-	// EffectiveTo is the timestamp at which this tariff becomes inactive.
-	EffectiveTo time.Time `json:"effective_to" validate:"required"`
-
-	// Notes is the mandatory reason for deactivation.
-	Notes string `json:"notes" validate:"required,min=1"`
-}
-
-// ─── Delivery tariff response DTOs ────────────────────────────────────────────
-
-// TariffRangeResponse is the API representation of a DeliveryTariffRange.
-type TariffRangeResponse struct {
-	ID        uuid.UUID `json:"id"`
-	MinAmount float64   `json:"min_amount"`
-	MaxAmount *float64  `json:"max_amount,omitempty"`
-	Fee       float64   `json:"fee"`
-	SortOrder int       `json:"sort_order"`
-}
-
-// DeliveryTariffResponse is the API representation of a DeliveryTariff.
-type DeliveryTariffResponse struct {
-	ID            uuid.UUID             `json:"id"`
-	Name          string                `json:"name"`
-	Type          TariffType            `json:"type"`
-	FixedFee      *float64              `json:"fixed_fee,omitempty"`
-	IsActive      bool                  `json:"is_active"`
-	EffectiveFrom time.Time             `json:"effective_from"`
-	EffectiveTo   *time.Time            `json:"effective_to,omitempty"`
-	Notes         string                `json:"notes"`
-	CreatedBy     *uuid.UUID            `json:"created_by,omitempty"`
-	CreatedAt     time.Time             `json:"created_at"`
-	Ranges        []TariffRangeResponse `json:"ranges,omitempty"`
-}
-
-// ToTariffResponse converts a domain model to its response DTO.
-func ToTariffResponse(t *DeliveryTariff) DeliveryTariffResponse {
-	resp := DeliveryTariffResponse{
-		ID:            t.ID,
-		Name:          t.Name,
-		Type:          t.Type,
-		FixedFee:      t.FixedFee,
-		IsActive:      t.IsActive && t.EffectiveTo == nil,
-		EffectiveFrom: t.EffectiveFrom,
-		EffectiveTo:   t.EffectiveTo,
-		Notes:         t.Notes,
-		CreatedBy:     t.CreatedBy,
-		CreatedAt:     t.CreatedAt,
-	}
-	if len(t.Ranges) > 0 {
-		resp.Ranges = make([]TariffRangeResponse, len(t.Ranges))
-		for i, r := range t.Ranges {
-			resp.Ranges[i] = TariffRangeResponse{
-				ID:        r.ID,
-				MinAmount: r.MinAmount,
-				MaxAmount: r.MaxAmount,
-				Fee:       r.Fee,
-				SortOrder: r.SortOrder,
-			}
-		}
-	}
-	return resp
-}
-
-// ToTariffResponseList converts a slice of tariff domain models.
-func ToTariffResponseList(tariffs []DeliveryTariff) []DeliveryTariffResponse {
-	out := make([]DeliveryTariffResponse, len(tariffs))
-	for i := range tariffs {
-		out[i] = ToTariffResponse(&tariffs[i])
-	}
-	return out
-}
-
 // ─── Preview DTOs ─────────────────────────────────────────────────────────────
 
 // PreviewQueryParams is bound from GET /hr/compensation/preview query string.
@@ -249,21 +144,13 @@ type RateInfo struct {
 	EffectiveFrom time.Time  `json:"effective_from"`
 }
 
-// TariffInfo holds the resolved delivery tariff details.
-type TariffInfo struct {
-	TariffID   uuid.UUID  `json:"tariff_id"`
-	TariffType TariffType `json:"tariff_type"`
-	Fee        float64    `json:"fee"`
-}
-
-// ResolvedRatesInfo groups all five resolved rates and the delivery tariff.
+// ResolvedRatesInfo groups all five resolved rates.
 type ResolvedRatesInfo struct {
-	SellerRate          RateInfo   `json:"seller_rate"`
-	ManagerTeamRate     RateInfo   `json:"manager_team_rate"`
-	ManagerPersonalRate RateInfo   `json:"manager_personal_rate"`
-	TeamLeadPoolRate    RateInfo   `json:"team_lead_pool_rate"`
-	CompanyRate         RateInfo   `json:"company_rate"`
-	DeliveryTariff      TariffInfo `json:"delivery_tariff"`
+	SellerRate          RateInfo `json:"seller_rate"`
+	ManagerTeamRate     RateInfo `json:"manager_team_rate"`
+	ManagerPersonalRate RateInfo `json:"manager_personal_rate"`
+	TeamLeadPoolRate    RateInfo `json:"team_lead_pool_rate"`
+	CompanyRate         RateInfo `json:"company_rate"`
 }
 
 // CommissionBreakdown shows the calculated amounts per participant.

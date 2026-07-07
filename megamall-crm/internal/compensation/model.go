@@ -51,17 +51,6 @@ const (
 	RateSourceGlobal   RateSource = "global"
 )
 
-// ─── Tariff type ──────────────────────────────────────────────────────────────
-
-// TariffType describes the pricing model of a delivery tariff.
-// Maps to the tariff_type PostgreSQL ENUM.
-type TariffType string
-
-const (
-	TariffTypeFixed  TariffType = "fixed"
-	TariffTypeTiered TariffType = "tiered"
-)
-
 // ─── Order type ───────────────────────────────────────────────────────────────
 
 // OrderType mirrors the orders.order_type ENUM (Phase 4).
@@ -182,42 +171,11 @@ func (c *CommissionConfig) Scope() string {
 	return "global"
 }
 
-// DeliveryTariff is an immutable tariff header.
-// Changes create a new record (same immutability principle as CommissionConfig).
-type DeliveryTariff struct {
-	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	Name          string     `gorm:"not null"`
-	Type          TariffType `gorm:"type:tariff_type;not null"`
-	FixedFee      *float64   `gorm:"type:numeric(12,2)"` // set when Type == fixed
-	IsActive      bool       `gorm:"default:true;not null"`
-	EffectiveFrom time.Time  `gorm:"not null"`
-	EffectiveTo   *time.Time // NULL = currently open
-	Notes         string     `gorm:"not null"`
-	CreatedBy     *uuid.UUID `gorm:"type:uuid"`
-	CreatedAt     time.Time  `gorm:"autoCreateTime"`
-
-	Ranges []DeliveryTariffRange `gorm:"foreignKey:TariffID"`
-}
-
-func (DeliveryTariff) TableName() string { return "delivery_tariffs" }
-
-// DeliveryTariffRange is one tier in a tiered delivery tariff.
-type DeliveryTariffRange struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TariffID  uuid.UUID `gorm:"type:uuid;not null"`
-	MinAmount float64   `gorm:"type:numeric(12,2);not null"`
-	MaxAmount *float64  `gorm:"type:numeric(12,2)"` // NULL = no upper bound
-	Fee       float64   `gorm:"type:numeric(12,2);not null"`
-	SortOrder int       `gorm:"default:0;not null"`
-}
-
-func (DeliveryTariffRange) TableName() string { return "delivery_tariff_ranges" }
-
 // OrderFinancialSnapshot is the immutable rate snapshot frozen at order creation.
 //
 // Created once per order inside the order creation transaction (Phase 4).
 // The Financial Engine reads ONLY from this table — never from commission_configs
-// or delivery_tariffs during commission calculations.
+// during commission calculations.
 //
 // Phase 4 adds the FK: ALTER TABLE order_financial_snapshots
 //
@@ -233,10 +191,9 @@ type OrderFinancialSnapshot struct {
 	TeamLeadPoolRate    float64 `gorm:"type:numeric(6,5);not null"`
 	CompanyRate         float64 `gorm:"type:numeric(6,5);not null"`
 
-	// Frozen delivery tariff
-	TariffID   *uuid.UUID `gorm:"type:uuid"`
-	TariffType TariffType `gorm:"type:tariff_type;not null"`
-	TariffFee  float64    `gorm:"type:numeric(12,2);not null"`
+	// Frozen delivery fee (resolved from delivery_settings / product overrides
+	// at order creation time — see internal/orders/service.go resolveDeliveryFeeForItems).
+	DeliveryFee float64 `gorm:"type:numeric(12,2);not null"`
 
 	// Rate source tracing (for audit/reporting)
 	SellerRateSource          RateSource `gorm:"type:rate_source;not null"`

@@ -48,8 +48,6 @@ const (
 	DefaultProductSKU           = "TEST-001"
 	DefaultProductName          = "Test Product"
 	DefaultTeamName             = "Default Team"
-	DefaultTariffName           = "Standard Delivery"
-	DefaultTariffFee            = 10.0
 	DefaultProductSalePrice     = 100.0
 	DefaultProductPurchasePrice = 40.0
 	DefaultInventoryQty         = 100
