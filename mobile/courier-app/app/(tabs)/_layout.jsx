@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router'
 import { useEffect, useRef } from 'react'
 import { Animated, StyleSheet } from 'react-native'
 import { BlurView } from 'expo-blur'
-import { Home, Package, MapPin, Wallet } from 'lucide-react-native'
+import { Home, Package, MapPin, Wallet, User } from 'lucide-react-native'
 import { useGlass } from '../../src/components/glass'
 
 const BLUE = '#0a84ff'
@@ -111,7 +111,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="deliveries" options={{ title: 'Доставки',  tabBarIcon: ({ focused }) => <TabIcon Icon={Package} focused={focused} inactiveColor={inactive} /> }} />
       <Tabs.Screen name="claimable"  options={{ title: 'Доступные', tabBarIcon: ({ focused }) => <TabIcon Icon={MapPin}  focused={focused} inactiveColor={inactive} /> }} />
       <Tabs.Screen name="cash"       options={{ title: 'Касса',     tabBarIcon: ({ focused }) => <TabIcon Icon={Wallet}  focused={focused} inactiveColor={inactive} /> }} />
-      <Tabs.Screen name="profile"    options={{ href: null }} />
+      <Tabs.Screen name="profile"    options={{ title: 'Профиль',   tabBarIcon: ({ focused }) => <TabIcon Icon={User}    focused={focused} inactiveColor={inactive} /> }} />
     </Tabs>
   )
 }

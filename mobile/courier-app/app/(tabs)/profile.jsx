@@ -1,11 +1,9 @@
-import { useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import * as ImagePicker from 'expo-image-picker'
 import useAuthStore from '../../src/store/authStore'
-import { logout as apiLogout, getMe, uploadAvatar } from '../../src/api/auth'
+import { logout as apiLogout } from '../../src/api/auth'
 import { API_URL } from '../../src/api/client'
 import { GlassBackdrop, useGlass } from '../../src/components/glass'
 
@@ -18,27 +16,8 @@ const C = {
 }
 
 export default function ProfileScreen() {
-  const { user, refreshToken, logout, setUser } = useAuthStore()
-  const [uploading, setUploading] = useState(false)
+  const { user, refreshToken, logout } = useAuthStore()
   const { T, dark } = useGlass()
-
-  const handlePickAvatar = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') { Alert.alert('Нет доступа', 'Разрешите доступ к галерее в настройках'); return }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8, allowsEditing: true, aspect: [1, 1] })
-    if (result.canceled || !result.assets?.length) return
-
-    setUploading(true)
-    try {
-      await uploadAvatar(result.assets[0])
-      const { data } = await getMe()
-      setUser(data.data)
-    } catch (e) {
-      Alert.alert('Ошибка', e?.response?.data?.error?.message || 'Не удалось загрузить фото')
-    } finally {
-      setUploading(false)
-    }
-  }
 
   const handleLogout = async () => {
     Alert.alert('Выйти из аккаунта?', 'Вам нужно будет войти снова', [
@@ -66,7 +45,7 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={s.content}>
         {/* Avatar block */}
         <View style={s.avatarBlock}>
-          <TouchableOpacity style={[s.avatarRing, { borderColor: T.blue, shadowColor: T.blue }]} onPress={handlePickAvatar} disabled={uploading} activeOpacity={0.85}>
+          <View style={[s.avatarRing, { borderColor: T.blue, shadowColor: T.blue }]}>
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={s.avatarImage} />
             ) : (
@@ -74,10 +53,7 @@ export default function ProfileScreen() {
                 <Text style={s.avatarText}>{initials}</Text>
               </View>
             )}
-            <View style={[s.avatarEditBadge, { backgroundColor: T.blue, borderColor: T.base }]}>
-              {uploading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.avatarEditIcon}>📷</Text>}
-            </View>
-          </TouchableOpacity>
+          </View>
           <Text style={[s.name, { color: T.ink }]}>{user?.full_name || '—'}</Text>
           <View style={[s.roleBadge, { backgroundColor: T.chip }]}>
             <Text style={[s.roleText, { color: T.blue }]}>🛵  КУРЬЕР</Text>
@@ -91,8 +67,7 @@ export default function ProfileScreen() {
         {/* Info card */}
         <View style={[s.card, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
           <Text style={[s.cardTitle, { color: T.muted }]}>ИНФОРМАЦИЯ</Text>
-          <InfoRow label="Телефон" value={user?.phone} />
-          <InfoRow label="Email" value={user?.email} last />
+          <InfoRow label="Телефон" value={user?.phone} last />
         </View>
 
         {/* Tariff card */}
@@ -176,12 +151,6 @@ const s = StyleSheet.create({
   avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: C.accent, justifyContent: 'center', alignItems: 'center' },
   avatarImage: { width: 76, height: 76, borderRadius: 38 },
   avatarText: { fontSize: 28, fontWeight: '600', color: '#fff' },
-  avatarEditBadge: {
-    position: 'absolute', bottom: -2, right: -2, width: 26, height: 26, borderRadius: 13,
-    backgroundColor: C.accent, borderWidth: 2, borderColor: C.bg,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  avatarEditIcon: { fontSize: 12 },
   name: { fontSize: 20, fontWeight: '700', color: C.text },
   roleBadge: { backgroundColor: C.accentDim, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 },
   roleText: { fontSize: 11, fontWeight: '700', color: C.accent, letterSpacing: 0.6 },

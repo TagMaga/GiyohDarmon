@@ -3,11 +3,9 @@ import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, A
 import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { getMyOrders, getCashSummary, getClaimableOrders, updateOrderStatus } from '../../src/api/orders'
-import { logout as apiLogout } from '../../src/api/auth'
 import useAuthStore from '../../src/store/authStore'
 import { OrderDetailSheet, C } from '../../src/components/OrderDetailSheet'
 import { OrderCard } from '../../src/components/OrderCard'
-import { AccountMenu } from '../../src/components/AccountMenu'
 import Avatar from '../../src/components/Avatar'
 import { FadeSlideIn, PressScale, CountUp, PulseDot, Skeleton, OrderCardSkeleton, animateLayout } from '../../src/components/motion'
 import { GlassBackdrop, Sheen, useGlass } from '../../src/components/glass'
@@ -16,7 +14,7 @@ import 'dayjs/locale/ru'
 dayjs.locale('ru')
 
 export default function DashboardScreen() {
-  const { user, refreshToken, logout } = useAuthStore()
+  const { user } = useAuthStore()
   const [orders, setOrders]           = useState([])
   const [summary, setSummary]         = useState(null)
   const [availCount, setAvailCount]   = useState(0)
@@ -25,11 +23,9 @@ export default function DashboardScreen() {
   const [detailOrder, setDetailOrder] = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [isOnline, setIsOnline]       = useState(true)
-  const [menuOpen, setMenuOpen]       = useState(false)
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [error, setError]             = useState(null)
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
-  const { dark, T, setDark }          = useGlass()
+  const { T }                         = useGlass()
 
   const fetchAll = async () => {
     try {
@@ -64,18 +60,6 @@ export default function DashboardScreen() {
     } finally { setActionLoading(false) }
   }
 
-  const handleLogout = () => {
-    Alert.alert('Выйти из аккаунта?', 'Вам нужно будет войти снова', [
-      { text: 'Отмена', style: 'cancel' },
-      { text: 'Выйти', style: 'destructive', onPress: async () => {
-        try { await apiLogout(refreshToken) } catch {}
-        await logout()
-        setMenuOpen(false)
-        router.replace('/(auth)/login')
-      }},
-    ])
-  }
-
   const getStatus = (o) => String(o?.status ?? o?.Status ?? '').toLowerCase()
   const getPayout = (o) => Number(o?.courier_payout ?? o?.CourierPayout ?? o?.delivery_fee ?? o?.DeliveryFee ?? 0)
   const deliveredOrders = orders.filter(o => getStatus(o) === 'delivered')
@@ -98,7 +82,7 @@ export default function DashboardScreen() {
       >
         {/* Top bar */}
         <View style={s.top}>
-          <TouchableOpacity style={s.profile} activeOpacity={0.82} onPress={() => setMenuOpen(true)}>
+          <TouchableOpacity style={s.profile} activeOpacity={0.82} onPress={() => router.push('/(tabs)/profile')}>
             <Avatar uri={user?.avatar_url} name={user?.full_name} fallback={initial} size={52} radius={19} color="#101827" />
             <View style={{ minWidth: 0 }}>
               <Text style={[s.name, { color: T.ink }]}>{firstName}</Text>
@@ -226,20 +210,6 @@ export default function DashboardScreen() {
         onDelivered={handleDelivered}
         actionLoading={actionLoading}
         onRefresh={fetchAll}
-      />
-
-      <AccountMenu
-        visible={menuOpen}
-        user={user}
-        isOnline={isOnline}
-        notificationsEnabled={notificationsEnabled}
-        darkTheme={dark}
-        onClose={() => setMenuOpen(false)}
-        onRefresh={fetchAll}
-        onToggleOnline={() => setIsOnline(v => !v)}
-        onToggleNotifications={() => setNotificationsEnabled(v => !v)}
-        onToggleDarkTheme={() => setDark(!dark)}
-        onLogout={handleLogout}
       />
     </SafeAreaView>
   )
