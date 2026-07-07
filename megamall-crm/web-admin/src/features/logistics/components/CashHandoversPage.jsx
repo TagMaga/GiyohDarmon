@@ -441,6 +441,14 @@ export default function CashHandoversPage({ courierId } = {}) {
     updateHandover({ id: row.id, status: 'rejected', admin_note: reason })
   }
 
+  function handleQuickConfirm(row) {
+    const input = prompt('Сумма, которую передал курьер:', String(row.total_to_return))
+    if (input == null) return
+    const amt = parseFloat(input)
+    if (isNaN(amt)) return
+    updateHandover({ id: row.id, status: 'confirmed', actual_returned: amt })
+  }
+
   function handleDeleteConfirm() {
     if (!deleteTarget) return
     deleteHandover(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) })
@@ -542,7 +550,7 @@ export default function CashHandoversPage({ courierId } = {}) {
                             <div className="flex items-center gap-1">
                               <button
                                 title="Подтвердить"
-                                onClick={() => setVerifyRow(row)}
+                                onClick={() => handleQuickConfirm(row)}
                                 className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-600 hover:bg-emerald-50 transition-colors"
                               >
                                 <CheckCircle2 size={15} />
@@ -554,15 +562,6 @@ export default function CashHandoversPage({ courierId } = {}) {
                               >
                                 <XCircle size={15} />
                               </button>
-                              {row.status === 'pending' && (
-                                <button
-                                  title="Удалить"
-                                  onClick={() => setDeleteTarget(row)}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              )}
                             </div>
                           )}
                         </td>
@@ -604,7 +603,7 @@ export default function CashHandoversPage({ courierId } = {}) {
                       )}
                       {isPending && (
                         <div className="flex gap-2 ml-auto">
-                          <button onClick={e => { e.stopPropagation(); setVerifyRow(row) }}
+                          <button onClick={e => { e.stopPropagation(); handleQuickConfirm(row) }}
                             className="btn btn-sm bg-emerald-50 text-emerald-700">
                             <CheckCircle2 size={13} /> Принять
                           </button>
