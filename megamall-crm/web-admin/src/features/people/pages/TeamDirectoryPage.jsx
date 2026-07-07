@@ -43,6 +43,8 @@ import Alert               from '../../../shared/components/Alert'
 import Badge               from '../../../shared/components/Badge'
 import { useToast }        from '../../../shared/components/ToastProvider'
 import AssignTeamModal     from '../components/AssignTeamModal'
+import CreateEmployeeModal from '../components/CreateEmployeeModal'
+import CreateTeamModal     from '../components/CreateTeamModal'
 
 // ── Status config ─────────────────────────────────────────────────────────────
 
@@ -1974,6 +1976,8 @@ export default function TeamDirectoryPage() {
   const [q, setQ]                     = useState('')
   const [roleFilter, setRoleFilter]   = useState('all')
   const [teamFilter, setTeamFilter]   = useState('all')
+  const [showCreateEmployee, setShowCreateEmployee] = useState(false)
+  const [showCreateTeam, setShowCreateTeam]         = useState(false)
   const { data: auditHistory = [] } = useQuery({
     queryKey: ['users-history'],
     queryFn: fetchAllUserHistory,
@@ -2085,9 +2089,21 @@ export default function TeamDirectoryPage() {
                 : 'Все сотрудники компании'}
           </p>
         </div>
-        <span className="text-[13px] font-semibold text-slate-800 bg-white border border-slate-200 rounded-full px-4 py-1.5 shadow-sm">
-          {loading ? '…' : tab === 'groups' ? `${teams.length} групп` : tab === 'audit' ? `${auditHistory.length} событий` : `${filtered.length} чел.`}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-[13px] font-semibold text-slate-800 bg-white border border-slate-200 rounded-full px-4 py-1.5 shadow-sm">
+            {loading ? '…' : tab === 'groups' ? `${teams.length} групп` : tab === 'audit' ? `${auditHistory.length} событий` : `${filtered.length} чел.`}
+          </span>
+          {tab === 'employees' && (
+            <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setShowCreateEmployee(true)}>
+              Добавить сотрудника
+            </Button>
+          )}
+          {tab === 'groups' && (
+            <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setShowCreateTeam(true)}>
+              Создать команду
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="mb-7 flex gap-7 border-b border-slate-200">
@@ -2200,6 +2216,17 @@ export default function TeamDirectoryPage() {
       {tab === 'audit' && (
         <AuditJournal history={auditHistory} userMap={userMap} />
       )}
+
+      <CreateEmployeeModal
+        open={showCreateEmployee}
+        onClose={() => setShowCreateEmployee(false)}
+      />
+      <CreateTeamModal
+        open={showCreateTeam}
+        onClose={() => setShowCreateTeam(false)}
+        users={employees}
+        showLeadManager={false}
+      />
     </div>
   )
 }

@@ -11,11 +11,14 @@ import { createTeam } from '../api'
  * CreateTeamModal — POST /teams
  *
  * Props:
- *   open    {bool}
- *   onClose {function}
- *   users   {Array}   all employees (to pick lead / manager from)
+ *   open             {bool}
+ *   onClose          {function}
+ *   users            {Array}   all employees (to pick lead / manager from)
+ *   showLeadManager  {bool}    show lead/manager selects (default true) — set
+ *                              false for a name-only create form; lead/manager
+ *                              can always be assigned later via team edit.
  */
-export default function CreateTeamModal({ open, onClose, users = [] }) {
+export default function CreateTeamModal({ open, onClose, users = [], showLeadManager = true }) {
   const qc    = useQueryClient()
   const toast = useToast()
 
@@ -39,6 +42,7 @@ export default function CreateTeamModal({ open, onClose, users = [] }) {
       // Invalidate both the teams list and the KPI counts
       qc.invalidateQueries({ queryKey: ['people', 'teams'] })
       qc.invalidateQueries({ queryKey: ['people'] })
+      qc.invalidateQueries({ queryKey: ['teams'] }) // TeamDirectoryPage's own cache key
       toast.success('Команда создана')
       reset()
       setName(''); setTeamLeadId(''); setManagerId('')
@@ -87,43 +91,47 @@ export default function CreateTeamModal({ open, onClose, users = [] }) {
           />
         </div>
 
-        <div>
-          <label className="input-label">Руководитель группы</label>
-          <select
-            value={teamLeadId}
-            onChange={e => setTeamLeadId(e.target.value)}
-            className="input mt-1"
-          >
-            <option value="">Без руководителя</option>
-            {leads.map(u => (
-              <option key={u.id} value={u.id}>{u.full_name ?? u.FullName}</option>
-            ))}
-          </select>
-          {leads.length === 0 && (
-            <p className="text-xs text-slate-400 mt-1">
-              Нет пользователей с ролью «Руководитель группы»
-            </p>
-          )}
-        </div>
+        {showLeadManager && (
+          <>
+            <div>
+              <label className="input-label">Руководитель группы</label>
+              <select
+                value={teamLeadId}
+                onChange={e => setTeamLeadId(e.target.value)}
+                className="input mt-1"
+              >
+                <option value="">Без руководителя</option>
+                {leads.map(u => (
+                  <option key={u.id} value={u.id}>{u.full_name ?? u.FullName}</option>
+                ))}
+              </select>
+              {leads.length === 0 && (
+                <p className="text-xs text-slate-400 mt-1">
+                  Нет пользователей с ролью «Руководитель группы»
+                </p>
+              )}
+            </div>
 
-        <div>
-          <label className="input-label">Менеджер</label>
-          <select
-            value={managerId}
-            onChange={e => setManagerId(e.target.value)}
-            className="input mt-1"
-          >
-            <option value="">Без менеджера</option>
-            {managers.map(u => (
-              <option key={u.id} value={u.id}>{u.full_name ?? u.FullName}</option>
-            ))}
-          </select>
-          {managers.length === 0 && (
-            <p className="text-xs text-slate-400 mt-1">
-              Нет пользователей с ролью «Менеджер»
-            </p>
-          )}
-        </div>
+            <div>
+              <label className="input-label">Менеджер</label>
+              <select
+                value={managerId}
+                onChange={e => setManagerId(e.target.value)}
+                className="input mt-1"
+              >
+                <option value="">Без менеджера</option>
+                {managers.map(u => (
+                  <option key={u.id} value={u.id}>{u.full_name ?? u.FullName}</option>
+                ))}
+              </select>
+              {managers.length === 0 && (
+                <p className="text-xs text-slate-400 mt-1">
+                  Нет пользователей с ролью «Менеджер»
+                </p>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </Modal>
   )
