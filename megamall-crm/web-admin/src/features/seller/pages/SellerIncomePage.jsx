@@ -92,6 +92,19 @@ function periodOrderTotals(orders = [], from, to) {
   }, { revenue: 0, deliveryFee: 0 })
 }
 
+/** Per-row "(revenue − delivery) × rate% = amount" breakdown, using the order's
+ *  actual snapshot rate (amount / net_revenue) rather than the seller's current
+ *  flat rate, since CommissionConfig can change between orders. */
+function orderBreakdown(ev, fallbackPct) {
+  if (ev.total_amount == null) return null
+  const total = Number(ev.total_amount)
+  const delivery = Number(ev.delivery_fee ?? 0)
+  const net = ev.net_revenue != null ? Number(ev.net_revenue) : total - delivery
+  const rate = net > 0 ? Math.round((Number(ev.amount) / net) * 1000) / 10 : fallbackPct
+  if (rate == null) return null
+  return `(${fmtAmount(total)} − ${fmtAmount(delivery)}) × ${rate}% = ${fmtAmount(ev.amount)}`
+}
+
 function eventOrderTotals(events = []) {
   const seen = new Set()
   return events.reduce((acc, ev) => {
@@ -250,27 +263,35 @@ export default function SellerIncomePage() {
                 </Card>
               ) : (
                 <Card style={{ borderRadius: 18, overflow: 'hidden' }}>
-                  {events.map((ev, i) => (
-                    <div
-                      key={ev.id ?? i}
-                      className="flex items-center gap-[14px]"
-                      style={{ padding: '16px 22px', borderBottom: i < events.length - 1 ? `1px solid ${M.bg}` : 'none' }}
-                    >
-                      <div className="flex items-center justify-center flex-shrink-0" style={{ width: 42, height: 42, borderRadius: 12, background: '#EEEDFB', color: M.indigoDeep }}>
-                        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="3" width="16" height="18" rx="2.5" /><path d="M9 8h6M9 12h6" /></svg>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate" style={{ fontSize: 14.5, fontWeight: 700, color: M.ink }}>
-                          {ev.order_number ? `Заказ ${ev.order_number}` : (EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type)}
+                  {events.map((ev, i) => {
+                    const breakdown = orderBreakdown(ev, commissionPct)
+                    return (
+                      <div
+                        key={ev.id ?? i}
+                        className="flex items-center gap-[14px]"
+                        style={{ padding: '16px 22px', borderBottom: i < events.length - 1 ? `1px solid ${M.bg}` : 'none' }}
+                      >
+                        <div className="flex items-center justify-center flex-shrink-0" style={{ width: 42, height: 42, borderRadius: 12, background: '#EEEDFB', color: M.indigoDeep }}>
+                          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="3" width="16" height="18" rx="2.5" /><path d="M9 8h6M9 12h6" /></svg>
                         </div>
-                        <div style={{ fontSize: 12.5, color: M.muted, marginTop: 1 }}>
-                          {fmtDate(ev.created_at)}
-                          {commissionPct !== null ? ` · комиссия ${commissionPct}%` : ''}
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate" style={{ fontSize: 14.5, fontWeight: 700, color: M.ink }}>
+                            {ev.order_number ? `Заказ ${ev.order_number}` : (EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type)}
+                          </div>
+                          <div style={{ fontSize: 12.5, color: M.muted, marginTop: 1 }}>
+                            {fmtDate(ev.created_at)}
+                            {breakdown == null && commissionPct !== null ? ` · комиссия ${commissionPct}%` : ''}
+                          </div>
+                          {breakdown && (
+                            <div style={{ fontSize: 11.5, color: M.faint, marginTop: 1, fontVariantNumeric: 'tabular-nums' }}>
+                              {breakdown}
+                            </div>
+                          )}
                         </div>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: M.green, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>+{fmtAmount(ev.amount)} с</span>
                       </div>
-                      <span style={{ fontSize: 15, fontWeight: 800, color: M.green, fontVariantNumeric: 'tabular-nums' }}>+{fmtAmount(ev.amount)} с</span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </Card>
               )}
             </div>
@@ -480,29 +501,35 @@ export default function SellerIncomePage() {
                 </Card>
               ) : (
                 <Card className="overflow-hidden">
-                  {events.map((ev, i) => (
-                    <div
-                      key={ev.id ?? i}
-                      className="flex items-center gap-3"
-                      style={{ padding: '14px 15px', borderBottom: i < events.length - 1 ? `1px solid ${M.bg}` : 'none' }}
-                    >
-                      <div className="flex items-center justify-center flex-shrink-0" style={{ width: 38, height: 38, borderRadius: 11, background: '#EEEDFB', color: M.indigoDeep }}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="3" width="16" height="18" rx="2.5" /><path d="M9 8h6M9 12h6" /></svg>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate" style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>
-                          {ev.order_number ? `Заказ ${ev.order_number}` : (EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type)}
+                  {events.map((ev, i) => {
+                    const breakdown = orderBreakdown(ev, commissionPct)
+                    return (
+                      <div
+                        key={ev.id ?? i}
+                        className="flex items-center gap-3"
+                        style={{ padding: '14px 15px', borderBottom: i < events.length - 1 ? `1px solid ${M.bg}` : 'none' }}
+                      >
+                        <div className="flex items-center justify-center flex-shrink-0" style={{ width: 38, height: 38, borderRadius: 11, background: '#EEEDFB', color: M.indigoDeep }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="3" width="16" height="18" rx="2.5" /><path d="M9 8h6M9 12h6" /></svg>
                         </div>
-                        <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>
-                          {fmtDate(ev.created_at)}
-                          {commissionPct !== null ? ` · комиссия ${commissionPct}%` : ''}
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate" style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>
+                            {ev.order_number ? `Заказ ${ev.order_number}` : (EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type)}
+                          </div>
+                          <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>
+                            {fmtDate(ev.created_at)}
+                            {breakdown == null && commissionPct !== null ? ` · комиссия ${commissionPct}%` : ''}
+                          </div>
+                          {breakdown && (
+                            <div style={{ fontSize: 10.5, color: M.faint, marginTop: 1 }}>{breakdown}</div>
+                          )}
                         </div>
+                        <span style={{ fontSize: 14, fontWeight: 800, color: M.green, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                          +{fmtAmount(ev.amount)} с
+                        </span>
                       </div>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: M.green, fontVariantNumeric: 'tabular-nums' }}>
-                        +{fmtAmount(ev.amount)} с
-                      </span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </Card>
               )}
             </div>
