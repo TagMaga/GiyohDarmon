@@ -98,6 +98,24 @@ func (s *Service) resolveHierarchy(ctx context.Context, sellerID uuid.UUID) (*or
 		return h, nil
 	}
 
+	// A team with no manager/team-lead assigned at all (both nil) is a valid,
+	// pre-existing state — e.g. a newly created team awaiting staffing — and
+	// must keep working exactly as before (zero rates for the unassigned role).
+	// A team whose manager/team-lead ID IS set must resolve to a real, active,
+	// non-deleted user — never a deleted/inactive/dangling reference. Once a
+	// team lead or manager is deleted or deactivated, this fails loudly instead
+	// of silently freezing commission events onto their user_id.
+	if team.ManagerID != nil {
+		if err := s.validateActiveAssignee(ctx, *team.ManagerID, "manager"); err != nil {
+			return nil, err
+		}
+	}
+	if team.TeamLeadID != nil {
+		if err := s.validateActiveAssignee(ctx, *team.TeamLeadID, "team lead"); err != nil {
+			return nil, err
+		}
+	}
+
 	h.managerID = team.ManagerID
 	h.teamLeadID = team.TeamLeadID
 
@@ -124,6 +142,41 @@ func (s *Service) resolveHierarchy(ctx context.Context, sellerID uuid.UUID) (*or
 	}
 
 	return h, nil
+}
+
+// validateActiveAssignee ensures a team's manager or team-lead reference
+// (roleLabel identifies which, for the error message) resolves to a real,
+// active, non-deleted user. Returns a clear business error otherwise —
+// resolveHierarchy must never silently attribute a new order's commission to
+// a deleted, deactivated, or dangling user reference (High-severity fix: a
+// soft-deleted or deactivated team lead/manager used to stay frozen into
+// every subsequent order's manager_id/team_lead_id and financial_events).
+func (s *Service) validateActiveAssignee(ctx context.Context, userID uuid.UUID, roleLabel string) error {
+	type row struct {
+		IsActive  bool
+		DeletedAt *time.Time
+	}
+	var rows []row
+	if err := s.db.WithContext(ctx).
+		Table("users").
+		Select("is_active, deleted_at").
+		Where("id = ?", userID).
+		Find(&rows).Error; err != nil {
+		return apperrors.Internal(fmt.Errorf("validate %s account: %w", roleLabel, err))
+	}
+	if len(rows) == 0 {
+		return apperrors.Unprocessable(fmt.Sprintf(
+			"team's %s account could not be found — reassign the team before creating new orders", roleLabel))
+	}
+	if rows[0].DeletedAt != nil {
+		return apperrors.Unprocessable(fmt.Sprintf(
+			"team's %s account has been deleted — reassign the team before creating new orders", roleLabel))
+	}
+	if !rows[0].IsActive {
+		return apperrors.Unprocessable(fmt.Sprintf(
+			"team's %s account is inactive — reassign the team before creating new orders", roleLabel))
+	}
+	return nil
 }
 
 // ─── Order creation ───────────────────────────────────────────────────────────
