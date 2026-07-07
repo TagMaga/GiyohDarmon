@@ -6,6 +6,7 @@ const OWNER_MORE_LINKS = [
   { label: 'Бюджет',    icon: Wallet, path: '/owner/budget'    },
   { label: 'Логистика', icon: Truck,  path: '/owner/logistics' },
   { label: 'HR',        icon: User,   path: '/owner/team-directory' },
+  { label: 'Профиль',   icon: User,   path: '/owner/profile'   },
 ]
 
 export default function OwnerMoreSheet({ open, onClose }) {

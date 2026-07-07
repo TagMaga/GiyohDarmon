@@ -25,6 +25,7 @@ const NAV = {
     { label: 'Бюджет компании', icon: Wallet,     path: '/owner/budget' },
     { label: 'Склад',      icon: Building2,     path: '/owner/warehouse' },
     { label: 'Команда',    icon: BookUser,      path: '/owner/team-directory' },
+    { label: 'Профиль',    icon: User,          path: '/owner/profile' },
   ],
   manager: [
     { label: 'Главная',        icon: Home,          path: '/manager' },

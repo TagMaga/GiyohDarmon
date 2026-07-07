@@ -113,6 +113,12 @@ export async function uploadMyAvatar(file) {
   return unwrap(res)
 }
 
+/** PATCH /users/:id/password — self-service password change */
+export async function changePassword(userId, payload) {
+  const res = await client.patch(`/users/${userId}/password`, payload)
+  return unwrap(res)
+}
+
 /** GET /hr/compensation/me */
 export async function fetchMyCompensation() {
   const res = await client.get('/hr/compensation/me')

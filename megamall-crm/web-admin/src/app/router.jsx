@@ -24,6 +24,8 @@ const CourierProfilePage      = lazy(() => import('../features/logistics/pages/C
 const OwnerWarehousePage      = lazy(() => import('../features/owner/pages/OwnerWarehousePage'))
 const OwnerSettingsPage       = lazy(() => import('../features/owner/pages/OwnerSettingsPage'))
 const OwnerReportsPage        = lazy(() => import('../features/owner/pages/OwnerReportsPage'))
+const OwnerProfilePage        = lazy(() => import('../features/owner/pages/OwnerProfilePage'))
+const OwnerProfileInfoPage    = lazy(() => import('../features/owner/pages/OwnerProfileInfoPage'))
 
 // People / HR (owner sub-pages)
 const TeamsHub              = lazy(() => import('../features/people/pages/TeamsHub'))
@@ -134,6 +136,15 @@ const router = createBrowserRouter([
 
         // Settings hub
         { path: 'settings', element: <Lazy><OwnerSettingsPage /></Lazy> },
+
+        {
+          path: 'profile',
+          element: <Lazy><OwnerProfilePage /></Lazy>,
+          children: [
+            { index: true,  element: <Navigate to="info" replace /> },
+            { path: 'info', element: <Lazy><OwnerProfileInfoPage /></Lazy> },
+          ],
+        },
 
         { path: '*', element: <ComingSoon /> },
       ],
