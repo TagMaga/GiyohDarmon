@@ -1,12 +1,11 @@
 import { Link } from 'react-router-dom'
-import { Wallet, Truck, User, Settings } from 'lucide-react'
+import { Wallet, Truck, User } from 'lucide-react'
 import Modal from '../../../shared/components/Modal'
 
 const OWNER_MORE_LINKS = [
-  { label: 'Бюджет',    icon: Wallet,   path: '/owner/budget'    },
-  { label: 'Логистика', icon: Truck,    path: '/owner/logistics' },
-  { label: 'HR',        icon: User,     path: '/owner/team-directory' },
-  { label: 'Настройки', icon: Settings, path: '/owner/settings'  },
+  { label: 'Бюджет',    icon: Wallet, path: '/owner/budget'    },
+  { label: 'Логистика', icon: Truck,  path: '/owner/logistics' },
+  { label: 'HR',        icon: User,   path: '/owner/team-directory' },
 ]
 
 export default function OwnerMoreSheet({ open, onClose }) {
