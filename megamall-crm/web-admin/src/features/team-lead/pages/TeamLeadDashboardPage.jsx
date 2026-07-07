@@ -13,7 +13,7 @@ import { useState, useMemo }   from 'react'
 import { useNavigate }         from 'react-router-dom'
 import {
   ShoppingCart, Package, PackageCheck, TrendingUp, Users,
-  BarChart2, ChevronRight, RefreshCw, Users2, Medal, AlertTriangle,
+  BarChart2, ChevronRight, RefreshCw, Users2, Medal,
 } from 'lucide-react'
 import Badge                   from '../../../shared/components/Badge'
 import EmptyState              from '../../../shared/components/EmptyState'
@@ -102,60 +102,6 @@ function SectionCard({ title, action, children, loading, emptyTitle, emptyDesc, 
           ? <EmptyState icon={<ShoppingCart size={18}/>} title={emptyTitle ?? 'Нет данных'} description={emptyDesc} />
           : children
       }
-    </div>
-  )
-}
-
-function AttentionNeeded({ orders, userMap, onOpenOrders }) {
-  const rows = useMemo(() => {
-    const flaggedStatuses = new Set(['cancelled', 'returned', 'issue', 'prepayment_pending'])
-    return orders.filter(o => flaggedStatuses.has(o.status ?? o.Status)).slice(0, 5)
-  }, [orders])
-
-  return (
-    <div className="rounded-2xl border border-slate-900 bg-slate-950 text-white p-5 shadow-[0_24px_55px_rgba(15,23,42,0.18)]">
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center">
-            <AlertTriangle size={16} />
-          </span>
-          <div>
-            <p className="text-sm font-bold">Attention needed</p>
-            <p className="text-[11px] text-slate-400">Risk orders from your team only</p>
-          </div>
-        </div>
-        <button onClick={onOpenOrders} className="text-xs font-semibold text-white/80 hover:text-white min-h-[32px]">
-          Review
-        </button>
-      </div>
-
-      {rows.length === 0 ? (
-        <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
-          <p className="text-sm font-semibold text-white">No urgent risks</p>
-          <p className="text-xs text-slate-400 mt-1">Cancelled, returned, issue and prepayment-pending orders will appear here.</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {rows.map((order, i) => {
-            const status = order.status ?? order.Status ?? ''
-            const sellerId = order.seller_id ?? order.SellerID
-            const seller = sellerId ? (userMap[sellerId]?.full_name ?? userMap[sellerId]?.FullName ?? '—') : '—'
-            return (
-              <button
-                key={getOrderId(order) ?? i}
-                onClick={onOpenOrders}
-                className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-left hover:bg-white/[0.07] transition-colors"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-mono font-bold text-white">{formatOrderLabel(order)}</span>
-                  <span className="text-[11px] font-semibold text-amber-200">{STATUS_LABELS[status] ?? status}</span>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-1 truncate">{resolveCustomer(order)} · {seller}</p>
-              </button>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }
@@ -577,12 +523,6 @@ export default function TeamLeadDashboardPage() {
           <span className="hidden sm:inline">Обновить</span>
         </button>
       </div>
-
-      <AttentionNeeded
-        orders={myPeriodOrders}
-        userMap={userMap}
-        onOpenOrders={() => navigate('/team-lead/orders')}
-      />
 
       {/* ── KPI row ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
