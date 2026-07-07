@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
 
 function toYMD(date) {
@@ -112,7 +112,9 @@ export default function DesktopDateRangePicker({
   const [draftFrom, setDraftFrom] = useState(from ?? '')
   const [draftTo, setDraftTo] = useState(to ?? '')
   const [baseMonth, setBaseMonth] = useState(() => startOfMonth(fromYMD(from) ?? new Date()))
+  const [panelOffset, setPanelOffset] = useState(0)
   const popoverRef = useRef(null)
+  const panelRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
@@ -122,6 +124,31 @@ export default function DesktopDateRangePicker({
     document.addEventListener('mousedown', handlePointer)
     return () => document.removeEventListener('mousedown', handlePointer)
   }, [open])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const margin = 16
+
+    function reposition() {
+      const wrapper = popoverRef.current
+      const panel = panelRef.current
+      if (!wrapper || !panel) return
+      const wrapperRect = wrapper.getBoundingClientRect()
+      const panelWidth = panel.getBoundingClientRect().width
+      const viewportWidth = window.innerWidth
+
+      let desiredLeft = align === 'right' ? wrapperRect.width - panelWidth : 0
+      let viewportLeft = wrapperRect.left + desiredLeft
+      if (viewportLeft < margin) viewportLeft = margin
+      if (viewportLeft + panelWidth > viewportWidth - margin) viewportLeft = viewportWidth - margin - panelWidth
+
+      setPanelOffset(viewportLeft - wrapperRect.left)
+    }
+
+    reposition()
+    window.addEventListener('resize', reposition)
+    return () => window.removeEventListener('resize', reposition)
+  }, [open, align])
 
   useEffect(() => {
     if (!open) {
@@ -191,10 +218,9 @@ export default function DesktopDateRangePicker({
 
       {open && (
         <div
-          className={[
-            'absolute top-[calc(100%+8px)] z-50 w-[min(760px,calc(100vw-32px))] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-2xl',
-            align === 'right' ? 'right-0' : 'left-0',
-          ].join(' ')}
+          ref={panelRef}
+          style={{ left: `${panelOffset}px` }}
+          className="absolute top-[calc(100%+8px)] left-0 z-50 w-[min(760px,calc(100vw-32px))] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-2xl"
         >
           <div className="grid grid-cols-[220px_minmax(0,1fr)]">
             <div className="border-r border-slate-200 bg-slate-50/70 p-3">

@@ -13,6 +13,7 @@ import { useState }              from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, PlusCircle, TrendingUp, X } from 'lucide-react'
 import Alert                     from '../../../shared/components/Alert'
+import DesktopDateRangePicker    from '../../../shared/components/DesktopDateRangePicker'
 import { postFinanceExpense }    from '../api'
 import FinanceSummaryKpis        from '../components/FinanceSummaryKpis'
 import RevenueBreakdownCard      from '../components/RevenueBreakdownCard'
@@ -167,7 +168,7 @@ function AddExpenseModal({ open, onClose, onSubmit, loading, error }) {
 
 export default function OwnerFinancePage() {
   const queryClient = useQueryClient()
-  const [{ from, to }] = useState(() => last30DaysDefault())
+  const [{ from, to }, setRange] = useState(() => last30DaysDefault())
   const [expenseOpen, setExpenseOpen] = useState(false)
 
   const summaryParams = { from, to }
@@ -202,6 +203,11 @@ export default function OwnerFinancePage() {
           </div>
         </div>
 
+        <DesktopDateRangePicker
+          from={from}
+          to={to}
+          onChange={({ from: nextFrom, to: nextTo }) => setRange({ from: nextFrom, to: nextTo })}
+        />
       </div>
 
       {/* ── Error alert ─────────────────────────────────────────────────────── */}
