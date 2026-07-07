@@ -917,8 +917,6 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
   const cardColor = order.status === 'new' ? 'var(--text3)' : order.status === 'confirmed' ? 'var(--blue)' : order.status === 'issue' ? 'var(--red)' : order.status === 'delivered' ? 'var(--green)' : 'var(--amber)'
   const isCash = order.payment_method === 'cash' || order.payment_method === 'наличные'
   const hasPrepay = order.prepayment_status || Number(order.prepayment_amount ?? 0) > 0
-  // V3: relative time alongside absolute age
-  const relative = relTime(order.created_at)
 
   return (
     <div
@@ -941,11 +939,6 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
           {isCash && <span className="dv2-badge cash">cash</span>}
           {!isCash && order.payment_method && <span className="dv2-badge card">card</span>}
           {hasPrepay && <span className="dv2-badge claimable">prepay</span>}
-          {(mins >= 30 || isOverdue(order)) && (
-            <span className="dv2-badge urgent">
-              {orderAge(order)}{relative ? ` · ${relative}` : ''}
-            </span>
-          )}
           {order.status === 'issue' && <span className="dv2-badge issue">issue</span>}
           {isToday(order.scheduled_at || order.delivery_date) && <span className="dv2-badge today">today</span>}
           {isTomorrow(order.scheduled_at || order.delivery_date) && <span className="dv2-badge tomorrow">tomorrow</span>}
