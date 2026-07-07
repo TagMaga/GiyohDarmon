@@ -72,8 +72,8 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
     mutationFn: async () => {
       const payload = {
         name: form.name.trim(),
-        sku: form.sku.trim(),
       }
+      if (isEdit) payload.sku = form.sku.trim()
       if (form.purchase_price !== '') payload.purchase_price = Number(form.purchase_price)
       if (form.sale_price !== '')     payload.sale_price     = Number(form.sale_price)
 
@@ -103,7 +103,7 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
   }
 
   const errMsg = mutation.error?.response?.data?.error?.message ?? mutation.error?.message
-  const canSubmit = form.name.trim() && form.sku.trim()
+  const canSubmit = form.name.trim() && (!isEdit || form.sku.trim())
 
   return (
     <Modal
@@ -125,7 +125,9 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Название *" value={form.name} onChange={v => setField('name', v)} placeholder="Например, Пахлавон" />
-        <Field label="SKU *" value={form.sku} onChange={v => setField('sku', v)} placeholder="P-001" />
+        {isEdit && (
+          <Field label="SKU *" value={form.sku} onChange={v => setField('sku', v)} placeholder="P-001" />
+        )}
         <Field label="Закупочная цена" type="number" min="0" value={form.purchase_price} onChange={v => setField('purchase_price', v)} placeholder="0" />
         <Field label="Цена продажи" type="number" min="0" value={form.sale_price} onChange={v => setField('sale_price', v)} placeholder="0" />
       </div>

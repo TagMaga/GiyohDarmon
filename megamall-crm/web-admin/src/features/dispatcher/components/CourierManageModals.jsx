@@ -1,14 +1,15 @@
 /**
  * CourierManageModals — three dispatcher-only courier management modals:
- *   1. EditCourierModal  — edit name, surname, phone, password, telegram_chat_id
- *   2. TariffsModal      — per-courier range-based tariff rules (normal / fast)
- *   3. ToggleActiveModal — enable / disable courier with confirmation
+ *   1. EditCourierModal        — edit name, surname, phone, password, telegram_chat_id
+ *   2. TariffsModal            — per-courier range-based tariff rules (normal / fast)
+ *   3. ToggleOrderIntakeModal  — enable / disable a courier's ability to take new orders
  */
 import { useEffect, useRef, useState } from 'react'
 import { Pencil, Trash2, Plus, X, MapPin } from 'lucide-react'
 import {
   updateCourier,
-  toggleCourierActive,
+  updateCourierOrderIntake,
+  setCourierAccountActive,
   fetchCourierTariffs,
   createCourierTariff,
   deleteCourierTariff,
@@ -556,9 +557,19 @@ export function TariffsModal({ courier, onClose }) {
   )
 }
 
-// ── 3. TOGGLE ACTIVE MODAL ───────────────────────────────────────────────────
-export function ToggleActiveModal({ courier, onClose, onSuccess }) {
-  const isActive = courier.is_active
+// ── 3. TOGGLE ORDER INTAKE MODAL ─────────────────────────────────────────────
+// Disabling only ever touches order-intake (courier keeps login access and
+// stays a valid employee). But if the account itself was fully deactivated
+// (is_active=false — e.g. from the People page, or a stuck state from before
+// this button was split from account-active), a plain intake toggle can't
+// recover it, since the courier stays locked out regardless. In that case the
+// "enable" action also reactivates the account, so this button can always
+// bring a courier back to working order in one click.
+export function ToggleOrderIntakeModal({ courier, onClose, onSuccess }) {
+  const accountActive = courier.is_active !== false
+  const intakeEnabled = courier.order_intake_enabled !== false
+  const operational = accountActive && intakeEnabled
+  const [reason,  setReason]  = useState('')
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
 
@@ -566,7 +577,12 @@ export function ToggleActiveModal({ courier, onClose, onSuccess }) {
     setError('')
     setLoading(true)
     try {
-      await toggleCourierActive(courier.courier_id, !isActive)
+      if (operational) {
+        await updateCourierOrderIntake(courier.courier_id, { enabled: false, reason })
+      } else {
+        if (!accountActive) await setCourierAccountActive(courier.courier_id, true)
+        if (!intakeEnabled) await updateCourierOrderIntake(courier.courier_id, { enabled: true })
+      }
       onSuccess?.()
       onClose()
     } catch (e) {
@@ -574,19 +590,27 @@ export function ToggleActiveModal({ courier, onClose, onSuccess }) {
     } finally { setLoading(false) }
   }
 
+  const title = operational
+    ? 'Отключить приём заказов?'
+    : !accountActive
+      ? 'Активировать курьера?'
+      : 'Включить приём заказов?'
+
   return (
-    <ModalShell
-      title={isActive ? 'Выключить курьера?' : 'Включить курьера?'}
-      onClose={onClose}
-      width={420}
-    >
+    <ModalShell title={title} onClose={onClose} width={420}>
       <div style={{ padding: '20px 24px 24px' }}>
         <div style={{ color: T.text2, fontSize: 14, lineHeight: 1.6, marginBottom: 20 }}>
-          {isActive ? (
+          {operational ? (
             <>
               Курьер <strong style={{ color: T.text1 }}>{courier.full_name}</strong> больше не
-              сможет брать новые заказы.<br />
+              сможет брать новые заказы и не будет виден в списке доступных курьеров.<br />
               <span style={{ color: T.amber }}>Уже назначенные активные заказы останутся у него.</span>
+            </>
+          ) : !accountActive ? (
+            <>
+              Курьер <strong style={{ color: T.text1 }}>{courier.full_name}</strong> полностью
+              деактивирован — нет доступа в приложение и заказы недоступны.<br />
+              Активация восстановит доступ и включит приём заказов.
             </>
           ) : (
             <>
@@ -596,6 +620,18 @@ export function ToggleActiveModal({ courier, onClose, onSuccess }) {
           )}
         </div>
 
+        {operational && (
+          <FieldGroup>
+            <Label>Причина (необязательно)</Label>
+            <input
+              style={field.base}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Например: закончил смену"
+            />
+          </FieldGroup>
+        )}
+
         <ErrorMsg msg={error} />
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
@@ -603,9 +639,9 @@ export function ToggleActiveModal({ courier, onClose, onSuccess }) {
           <PrimaryBtn
             onClick={handleConfirm}
             loading={loading}
-            color={isActive ? T.red : T.green}
+            color={operational ? T.red : T.green}
           >
-            {isActive ? 'Выключить' : 'Включить'}
+            {operational ? 'Отключить' : !accountActive ? 'Активировать' : 'Включить'}
           </PrimaryBtn>
         </div>
       </div>

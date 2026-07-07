@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ShoppingCart, Search, X, Package, AlertCircle } from 'lucide-react'
 import { useToast } from '../../../shared/components/ToastProvider'
@@ -61,12 +61,12 @@ function ProductSearch({ products, loading, onAdd }) {
   const [q, setQ] = useState('')
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase()
-    if (!query) return products.slice(0, 12)
+    if (!query) return products.slice(0, 16)
     return products.filter((p) =>
       p.name?.toLowerCase().includes(query) ||
       p.sku?.toLowerCase().includes(query) ||
       p.article?.toLowerCase().includes(query)
-    ).slice(0, 12)
+    ).slice(0, 16)
   }, [q, products])
 
   return (
@@ -83,9 +83,9 @@ function ProductSearch({ products, loading, onAdd }) {
         )}
       </div>
       {loading && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-[72px] rounded-xl bg-slate-100 animate-pulse" />
+        <div className="grid grid-cols-4 gap-1.5">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-[76px] rounded-lg bg-slate-100 animate-pulse" />
           ))}
         </div>
       )}
@@ -93,23 +93,23 @@ function ProductSearch({ products, loading, onAdd }) {
         <p className="text-xs text-slate-400 text-center py-3">Товары не найдены</p>
       )}
       {!loading && filtered.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto scrollbar-none">
+        <div className="grid grid-cols-4 gap-1.5 max-h-96 overflow-y-auto scrollbar-none">
           {filtered.map((p) => (
             <button key={p.id} type="button" onClick={() => { onAdd(p); setQ('') }}
-              className="text-left rounded-xl border border-slate-200 hover:border-indigo-300
+              className="min-w-0 text-left rounded-lg border border-slate-200 hover:border-indigo-300
                          hover:bg-indigo-50 active:scale-[0.97] transition-all group overflow-hidden">
               {getProductImageUrl(p) ? (
                 <img src={getProductImageUrl(p)} alt={p.name}
                   className="w-full aspect-square object-cover" />
               ) : (
                 <div className="w-full aspect-square bg-slate-100 group-hover:bg-indigo-50 flex items-center justify-center transition-colors">
-                  <Package size={22} className="text-slate-300 group-hover:text-indigo-400" />
+                  <Package size={18} className="text-slate-300 group-hover:text-indigo-400" />
                 </div>
               )}
-              <div className="p-2">
-                <p className="text-[11px] font-semibold text-slate-800 leading-tight line-clamp-2">{p.name}</p>
+              <div className="min-w-0 p-1.5">
+                <p className="truncate text-[10px] font-semibold text-slate-800 leading-tight">{p.name}</p>
                 {(p.sale_price ?? p.base_price) != null && (
-                  <p className="text-[11px] font-bold text-indigo-600 mt-0.5">
+                  <p className="truncate text-[10px] font-bold text-indigo-600 mt-0.5">
                     {fmtAmount(p.sale_price ?? p.base_price)} с
                   </p>
                 )}
@@ -167,6 +167,7 @@ export default function CreateOrder() {
   const toast = useToast()
   const qc = useQueryClient()
   const navigate = useNavigate()
+  const location = useLocation()
   const { role } = useProfile()
   const orderType = ORDER_TYPE_BY_ROLE[role] ?? 'seller_order'
 
@@ -379,6 +380,18 @@ export default function CreateOrder() {
     uploadedProofUrl.current = null
     clearDraft()
   }
+
+  // Tapping the "+" tab while already on this route (e.g. from the success
+  // screen) pushes a new history entry but doesn't remount the page, so
+  // `success` would otherwise stick around forever. Reset on every fresh
+  // navigation to this route.
+  const locationKeyRef = useRef(location.key)
+  useEffect(() => {
+    if (location.key === locationKeyRef.current) return
+    locationKeyRef.current = location.key
+    if (success) handleCreateAnother()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key])
 
   const handleClear = () => {
     setForm(EMPTY_FORM)

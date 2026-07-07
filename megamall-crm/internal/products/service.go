@@ -178,13 +178,22 @@ func (s *Service) GetProductByID(ctx context.Context, id uuid.UUID) (*Product, e
 }
 
 func (s *Service) CreateProduct(ctx context.Context, actorID uuid.UUID, req CreateProductRequest) (*Product, error) {
-	// SKU uniqueness check.
-	existing, err := s.repo.GetProductBySKU(ctx, req.SKU)
-	if err != nil {
-		return nil, err
-	}
-	if existing != nil {
-		return nil, apperrors.Conflict(fmt.Sprintf("product with SKU '%s' already exists", req.SKU))
+	sku := strings.TrimSpace(req.SKU)
+	if sku == "" {
+		generated, err := s.generateSKU(ctx)
+		if err != nil {
+			return nil, err
+		}
+		sku = generated
+	} else {
+		// SKU uniqueness check for explicitly provided SKUs.
+		existing, err := s.repo.GetProductBySKU(ctx, sku)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return nil, apperrors.Conflict(fmt.Sprintf("product with SKU '%s' already exists", sku))
+		}
 	}
 
 	// Barcode uniqueness check.
@@ -200,7 +209,7 @@ func (s *Service) CreateProduct(ctx context.Context, actorID uuid.UUID, req Crea
 
 	p := &Product{
 		ID:                 uuid.New(),
-		SKU:                req.SKU,
+		SKU:                sku,
 		ArticleNumber:      req.ArticleNumber,
 		Barcode:            req.Barcode,
 		Name:               req.Name,
@@ -224,6 +233,26 @@ func (s *Service) CreateProduct(ctx context.Context, actorID uuid.UUID, req Crea
 		AfterState: p,
 	})
 	return p, nil
+}
+
+// generateSKU produces a "P-000001"-style SKU seeded from the total number of
+// products ever created, then bumps past any collision (e.g. a manually
+// created SKU that already used that number).
+func (s *Service) generateSKU(ctx context.Context) (string, error) {
+	total, err := s.repo.CountAllProducts(ctx)
+	if err != nil {
+		return "", err
+	}
+	for n := total + 1; ; n++ {
+		candidate := fmt.Sprintf("P-%06d", n)
+		existing, err := s.repo.GetProductBySKU(ctx, candidate)
+		if err != nil {
+			return "", err
+		}
+		if existing == nil {
+			return candidate, nil
+		}
+	}
 }
 
 func (s *Service) UpdateProduct(ctx context.Context, actorID, id uuid.UUID, req UpdateProductRequest) (*Product, error) {

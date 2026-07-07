@@ -13,10 +13,11 @@
  *   to       {string}  YYYY-MM-DD
  *   action   {ReactNode} optional header action
  */
-import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, FileText, RotateCcw, Pencil, Undo2 } from 'lucide-react'
-import EditFinanceExpenseModal from './EditFinanceExpenseModal'
-import VoidPayoutModal from './VoidPayoutModal'
+import { useMemo, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, FileText, RotateCcw, Pencil, Undo2, X } from 'lucide-react'
+import EditFinanceExpenseModal   from './EditFinanceExpenseModal'
+import VoidPayoutModal           from './VoidPayoutModal'
+import DesktopDateRangePicker    from '../../../shared/components/DesktopDateRangePicker'
 import Alert              from '../../../shared/components/Alert'
 import Badge              from '../../../shared/components/Badge'
 import EmptyState         from '../../../shared/components/EmptyState'
@@ -56,6 +57,32 @@ const EVENT_TYPE_OPTIONS = [
   { value: 'manager_payout',                      label: 'Выплата · Менеджер → Продавец' },
   { value: 'owner_payout',                        label: 'Выплата · Владелец' },
 ]
+
+// Direction grouping for the Пополнение/Списание quick-filter: every accrual
+// (*_earned/*_confirmed — money being credited to someone) counts as income;
+// payouts, cancellations, and manual expenses are the money leaving that
+// balance again.
+const INCOME_EVENT_TYPES = new Set([
+  'company_revenue_earned', 'company_revenue_confirmed',
+  'seller_commission_earned', 'seller_commission_confirmed',
+  'manager_personal_commission_earned', 'manager_personal_commission_confirmed',
+  'manager_team_commission_earned', 'manager_team_commission_confirmed',
+  'team_lead_pool_earned', 'team_lead_pool_confirmed',
+  'courier_fee_earned', 'courier_fee_confirmed',
+  'cash_collected',
+])
+const EXPENSE_EVENT_TYPES = new Set([
+  'seller_commission_cancelled',
+  'business_expense',
+  'team_lead_payout', 'manager_payout', 'owner_payout',
+  'cash_handed_over',
+])
+
+// Base display order of the reorderable filter chips (Date is pinned before
+// all of these and never reorders). Whichever chip gets a value first moves
+// to the front, right after Date — matching the "active filters bubble left"
+// behavior this was modeled on.
+const FILTER_ORDER_KEYS = ['direction', 'type', 'amount', 'user', 'order']
 
 // Payout rows are auto-reconciled from the payouts ledger (never hand-typed),
 // business_expense is the only manually-entered row — the tag makes that
@@ -101,6 +128,31 @@ function EditedMarker({ event }) {
   )
 }
 
+function DirectionFilter({ value, onChange }) {
+  const chip = (key, label) => {
+    const active = value === key
+    return (
+      <button
+        type="button"
+        onClick={() => onChange(active ? '' : key)}
+        className={[
+          'inline-flex h-9 flex-shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold transition-colors',
+          active ? 'bg-slate-900 text-white hover:bg-slate-800' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+        ].join(' ')}
+      >
+        {active && <X size={12} />}
+        {label}
+      </button>
+    )
+  }
+  return (
+    <div className="flex flex-shrink-0 items-center gap-1.5">
+      {chip('income', 'Пополнение')}
+      {chip('expense', 'Списание')}
+    </div>
+  )
+}
+
 function AmountRangeFilter({ minAmount, maxAmount, onMinChange, onMaxChange }) {
   return (
     <div className="flex h-9 w-[210px] flex-shrink-0 items-center rounded-full border border-slate-200 bg-white px-3 text-xs text-slate-500">
@@ -130,9 +182,10 @@ function AmountRangeFilter({ minAmount, maxAmount, onMinChange, onMaxChange }) {
   )
 }
 
-export default function FinanceEventsTable({ from, to, action = null, onExpenseEdited }) {
+export default function FinanceEventsTable({ from, to, onDateChange, action = null, onExpenseEdited }) {
   const [editExpense, setEditExpense] = useState(null)
   const [voidTarget, setVoidTarget] = useState(null)
+  const [direction, setDirection] = useState('') // '' | 'income' | 'expense'
   const [eventType, setEventType] = useState('')
   const [orderSearch, setOrderSearch] = useState('')
   const [userSearch,  setUserSearch]  = useState('')
@@ -154,7 +207,18 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
     }
   }
 
+  function updateDirection(next) {
+    setDirection(next)
+    setEventType((current) => {
+      if (!current) return current
+      const groupSet = next === 'income' ? INCOME_EVENT_TYPES : next === 'expense' ? EXPENSE_EVENT_TYPES : null
+      return groupSet && !groupSet.has(current) ? '' : current
+    })
+    setPage(1)
+  }
+
   function resetFilters() {
+    setDirection('')
     setEventType('')
     setOrderSearch('')
     setUserSearch('')
@@ -162,6 +226,43 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
     setMaxAmount('')
     setPage(1)
   }
+
+  const scopedEventTypeOptions = useMemo(() => {
+    if (direction === 'income') return EVENT_TYPE_OPTIONS.filter((o) => o.value === '' || INCOME_EVENT_TYPES.has(o.value))
+    if (direction === 'expense') return EVENT_TYPE_OPTIONS.filter((o) => o.value === '' || EXPENSE_EVENT_TYPES.has(o.value))
+    return EVENT_TYPE_OPTIONS
+  }, [direction])
+
+  // Active filters bubble to the front of the chip row, in the order they
+  // were set, right after the (always-pinned) Date filter — mirrors the
+  // reference UX where applying a filter promotes its chip to the left.
+  const activationOrderRef = useRef({})
+  const activationCounterRef = useRef(0)
+  const isFilterActive = {
+    direction: Boolean(direction),
+    type: Boolean(eventType),
+    amount: Boolean(minAmount || maxAmount),
+    user: Boolean(userSearch),
+    order: Boolean(orderSearch),
+  }
+  FILTER_ORDER_KEYS.forEach((key) => {
+    if (isFilterActive[key]) {
+      if (!activationOrderRef.current[key]) activationOrderRef.current[key] = ++activationCounterRef.current
+    } else {
+      delete activationOrderRef.current[key]
+    }
+  })
+  const orderedFilterKeys = useMemo(() => (
+    [...FILTER_ORDER_KEYS].sort((a, b) => {
+      const orderA = activationOrderRef.current[a]
+      const orderB = activationOrderRef.current[b]
+      if (orderA && orderB) return orderA - orderB
+      if (orderA) return -1
+      if (orderB) return 1
+      return FILTER_ORDER_KEYS.indexOf(a) - FILTER_ORDER_KEYS.indexOf(b)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [isFilterActive.direction, isFilterActive.type, isFilterActive.amount, isFilterActive.user, isFilterActive.order])
 
   const { data: employees = [] } = useEmployees()
   const { items: orders = [] } = useOwnerOrders({ from, to, page: 1, limit: 500 })
@@ -192,7 +293,7 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
   })).filter((user) => user.id), [employees])
   const selectedOrder = orderOptions.find((order) => order.label === orderSearch || order.id === orderSearch.trim())
   const selectedUser = userOptions.find((user) => user.label === userSearch || user.id === userSearch.trim())
-  const hasFilters = Boolean(eventType || orderSearch || userSearch || minAmount || maxAmount)
+  const hasFilters = Boolean(direction || eventType || orderSearch || userSearch || minAmount || maxAmount)
 
   const params = {
     from,
@@ -234,7 +335,11 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
       resolveUserName(ev.user_id),
     ].filter(Boolean).join(' ').toLowerCase()
 
-    return (!normalizedOrderSearch || orderText.includes(normalizedOrderSearch)) &&
+    const directionGroup = direction === 'income' ? INCOME_EVENT_TYPES : direction === 'expense' ? EXPENSE_EVENT_TYPES : null
+    const matchesDirection = !directionGroup || directionGroup.has(ev.event_type)
+
+    return matchesDirection &&
+      (!normalizedOrderSearch || orderText.includes(normalizedOrderSearch)) &&
       (!normalizedUserSearch || userText.includes(normalizedUserSearch))
   })
 
@@ -252,35 +357,66 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
         </div>
         <div className="flex flex-nowrap items-center gap-2 overflow-x-auto py-1">
           {action}
-          <select
-            value={eventType}
-            onChange={updateFilter(setEventType)}
-            className="input h-9 w-auto min-w-[180px] py-0 pr-8 text-xs"
-          >
-            {EVENT_TYPE_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-          <input
-            type="search"
-            value={orderSearch}
-            onChange={updateFilter(setOrderSearch)}
-            placeholder="Поиск заказа"
-            className="input h-9 w-[170px] py-0 text-xs"
-          />
-          <input
-            type="search"
-            value={userSearch}
-            onChange={updateFilter(setUserSearch)}
-            placeholder="Поиск пользователя"
-            className="input h-9 w-[180px] py-0 text-xs"
-          />
-          <AmountRangeFilter
-            minAmount={minAmount}
-            maxAmount={maxAmount}
-            onMinChange={updateAmountFilter(setMinAmount)}
-            onMaxChange={updateAmountFilter(setMaxAmount)}
-          />
+          {onDateChange && (
+            <DesktopDateRangePicker
+              variant="chip"
+              from={from}
+              to={to}
+              onChange={({ from: nextFrom, to: nextTo }) => { onDateChange({ from: nextFrom, to: nextTo }); setPage(1) }}
+            />
+          )}
+          {orderedFilterKeys.map((key) => {
+            if (key === 'direction') {
+              return <DirectionFilter key={key} value={direction} onChange={updateDirection} />
+            }
+            if (key === 'type') {
+              return (
+                <select
+                  key={key}
+                  value={eventType}
+                  onChange={updateFilter(setEventType)}
+                  className="input h-9 w-auto min-w-[180px] py-0 pr-8 text-base"
+                >
+                  {scopedEventTypeOptions.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              )
+            }
+            if (key === 'amount') {
+              return (
+                <AmountRangeFilter
+                  key={key}
+                  minAmount={minAmount}
+                  maxAmount={maxAmount}
+                  onMinChange={updateAmountFilter(setMinAmount)}
+                  onMaxChange={updateAmountFilter(setMaxAmount)}
+                />
+              )
+            }
+            if (key === 'user') {
+              return (
+                <input
+                  key={key}
+                  type="search"
+                  value={userSearch}
+                  onChange={updateFilter(setUserSearch)}
+                  placeholder="Поиск пользователя"
+                  className="input h-9 w-[180px] py-0 text-base"
+                />
+              )
+            }
+            return (
+              <input
+                key={key}
+                type="search"
+                value={orderSearch}
+                onChange={updateFilter(setOrderSearch)}
+                placeholder="Поиск заказа"
+                className="input h-9 w-[170px] py-0 text-base"
+              />
+            )
+          })}
           {hasFilters && (
             <button
               type="button"

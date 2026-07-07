@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { STATUS_LABELS, STATUS_BADGE } from '../../../shared/orderStatusConfig'
 
 /**
@@ -70,12 +71,18 @@ export function DarkCard({ glow = 'rgba(99,102,241,.16)', children, style }) {
 }
 
 /** Small stat tile: big value + caption */
-export function StatTile({ value, label, valueColor = M.ink, center = false }) {
-  return (
+export function StatTile({ value, label, valueColor = M.ink, center = false, to, state }) {
+  const tile = (
     <Card style={{ borderRadius: 15, padding: '13px 12px', textAlign: center ? 'center' : 'left' }}>
       <div style={{ fontSize: 21, fontWeight: 800, color: valueColor, letterSpacing: '-.01em' }}>{value}</div>
       <div style={{ fontSize: 11.5, color: M.sub, fontWeight: 600, marginTop: 2 }}>{label}</div>
     </Card>
+  )
+  if (!to) return tile
+  return (
+    <Link to={to} state={state} className="active:scale-95 transition-transform" style={{ display: 'block' }}>
+      {tile}
+    </Link>
   )
 }
 

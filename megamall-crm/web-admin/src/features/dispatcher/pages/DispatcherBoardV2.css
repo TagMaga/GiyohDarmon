@@ -647,7 +647,7 @@
   border: 1px solid var(--border2);
   border-radius: var(--radius-sm);
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: 16px;
 }
 .dv2-cash-select { min-width: 190px; }
 .dv2-history-controls { flex-wrap: wrap; justify-content: flex-end; }
@@ -728,7 +728,7 @@
   min-width: 0;
   min-height: 42px;
 }
-.dv2-history-search input { min-height: 40px; font-size: 13px; }
+.dv2-history-search input { min-height: 40px; font-size: 16px; }
 /* Row 2 — Date · Status · Courier · Seller · Product */
 .dv2-history-filters {
   display: flex;

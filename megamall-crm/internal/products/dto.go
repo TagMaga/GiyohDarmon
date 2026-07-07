@@ -54,7 +54,7 @@ func ToSupplierResponse(s *Supplier) SupplierResponse {
 // ─── Product ──────────────────────────────────────────────────────────────────
 
 type CreateProductRequest struct {
-	SKU           string     `json:"sku"                  validate:"required,max=100"`
+	SKU           string     `json:"sku"                  validate:"omitempty,max=100"`
 	ArticleNumber *string    `json:"article_number"`
 	Barcode       *string    `json:"barcode"`
 	Name          string     `json:"name"                 validate:"required,max=500"`

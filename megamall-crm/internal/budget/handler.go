@@ -91,7 +91,7 @@ func (h *Handler) ListTransactions(c *gin.Context) {
 }
 
 type incomeRequest struct {
-	Amount float64 `json:"amount" binding:"required,gt=0"`
+	Amount float64 `json:"amount" binding:"gte=0"`
 	Note   string  `json:"note"`
 }
 
@@ -116,7 +116,7 @@ func (h *Handler) AddIncome(c *gin.Context) {
 }
 
 type withdrawalRequest struct {
-	Amount float64 `json:"amount" binding:"required,gt=0"`
+	Amount float64 `json:"amount" binding:"gte=0"`
 	Note   string  `json:"note"`
 }
 
@@ -145,7 +145,7 @@ func (h *Handler) AddWithdrawal(c *gin.Context) {
 }
 
 type transactionUpdateRequest struct {
-	Amount float64 `json:"amount" binding:"required,gt=0"`
+	Amount float64 `json:"amount" binding:"gte=0"`
 	Note   string  `json:"note"`
 }
 

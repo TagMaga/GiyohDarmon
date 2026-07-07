@@ -53,6 +53,8 @@ type CourierListRow struct {
 	FullName           string               `json:"full_name"`
 	Phone              string               `json:"phone"`
 	IsActive           bool                 `json:"is_active"`
+	OrderIntakeEnabled bool                 `json:"order_intake_enabled"`
+	OrderIntakeReason  *string              `json:"order_intake_reason,omitempty"`
 	Status             CourierDisplayStatus `json:"status"`
 	ActiveOrders       int                  `json:"active_orders"`
 	OrdersToday        int                  `json:"orders_today"`

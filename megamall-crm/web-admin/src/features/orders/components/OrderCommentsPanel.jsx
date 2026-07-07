@@ -64,7 +64,7 @@ export default function OrderCommentsPanel({ orderId, compact = false }) {
 
       <div className={`${compact ? 'pt-3' : 'px-5 py-3'} flex items-center gap-2 flex-shrink-0 border-t border-slate-100`}>
         <input
-          className="input flex-1 text-sm py-2.5"
+          className="input flex-1 text-base py-2.5"
           placeholder="Написать комментарий…"
           value={text}
           onChange={e => setText(e.target.value)}

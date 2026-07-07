@@ -260,7 +260,7 @@ function OverviewTab() {
                 ) : (
                   <>
                     <input
-                      className="w-full text-right border-2 rounded-xl px-2.5 py-2 text-sm font-black"
+                      className="w-full text-right border-2 rounded-xl px-2.5 py-2 text-base font-black"
                       style={isChecked && isAmountInvalid(m)
                         ? { borderColor: '#FCA5A5', background: '#FEF2F2', color: '#DC2626' }
                         : { borderColor: '#E2E8F0', background: '#F8FAFF', color: M.indigoDeep }}

@@ -6,7 +6,7 @@ import {
   ClipboardList, Wallet, Check, AlertTriangle, CalendarDays, ChevronDown, WifiOff, Search, Image as ImageIcon, X,
   Pencil, DollarSign, Power, Plus,
 } from 'lucide-react'
-import { EditCourierModal, TariffsModal, ToggleActiveModal } from '../components/CourierManageModals'
+import { EditCourierModal, TariffsModal, ToggleOrderIntakeModal } from '../components/CourierManageModals'
 import useAuthStore   from '../../../shared/store/authStore'
 import { useToast }   from '../../../shared/components/ToastProvider'
 import { KEYS }       from '../../../shared/queryKeys'
@@ -987,7 +987,7 @@ function CashView({ rows, couriers, range, courierId, loading, error, onRange, o
           </thead>
           <tbody>
             {visibleRows.map((row) => {
-              const courier = courierMap[row.courier_id] ?? { courier_id: row.courier_id, full_name: row.courier_name, is_active: true }
+              const courier = courierMap[row.courier_id] ?? { courier_id: row.courier_id, full_name: row.courier_name, is_active: true, order_intake_enabled: true }
               return (
               <tr key={row.courier_id}>
                 <td><CourierCell row={row} /></td>
@@ -1011,9 +1011,9 @@ function CashView({ rows, couriers, range, courierId, loading, error, onRange, o
                       style={{ background: 'rgba(16,185,129,0.12)', border: 'none', borderRadius: 7, color: '#10b981', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
                     ><DollarSign size={14} /></button>
                     <button
-                      title={courier.is_active ? 'Выключить' : 'Включить'}
+                      title={courier.is_active !== false && courier.order_intake_enabled !== false ? 'Отключить приём заказов' : courier.is_active === false ? 'Активировать курьера' : 'Включить приём заказов'}
                       onClick={() => setToggleTarget(courier)}
-                      style={{ background: courier.is_active ? 'rgba(239,68,68,0.10)' : 'rgba(16,185,129,0.10)', border: 'none', borderRadius: 7, color: courier.is_active ? '#ef4444' : '#10b981', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
+                      style={{ background: courier.is_active !== false && courier.order_intake_enabled !== false ? 'rgba(239,68,68,0.10)' : 'rgba(16,185,129,0.10)', border: 'none', borderRadius: 7, color: courier.is_active !== false && courier.order_intake_enabled !== false ? '#ef4444' : '#10b981', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}
                     ><Power size={14} /></button>
                   </div>
                 </td>
@@ -1044,7 +1044,7 @@ function CashView({ rows, couriers, range, courierId, loading, error, onRange, o
       />
     )}
     {toggleTarget && (
-      <ToggleActiveModal
+      <ToggleOrderIntakeModal
         courier={toggleTarget}
         onClose={() => setToggleTarget(null)}
         onSuccess={() => { setToggleTarget(null); onCourierUpdated?.() }}

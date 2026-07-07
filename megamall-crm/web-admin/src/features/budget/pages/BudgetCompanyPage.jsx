@@ -85,7 +85,7 @@ function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, l
 
   function handleSubmit() {
     const amt = parseFloat(amount)
-    if (!amt || amt <= 0) { setErr('Введите сумму больше нуля'); return }
+    if (isNaN(amt) || amt < 0) { setErr('Введите корректную сумму'); return }
     if (isWithdrawal && amt > balance) { setErr('Недостаточно средств на балансе'); return }
     setErr('')
     onSubmit({ amount: amt, note: note.trim() })
@@ -119,7 +119,7 @@ function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, l
         <label className="block text-[11.5px] font-semibold text-slate-500 mb-1.5">Сумма (смн)</label>
         <input
           type="number"
-          min="1"
+          min="0"
           value={amount}
           onChange={(e) => { setAmount(e.target.value); setErr('') }}
           placeholder="50 000"

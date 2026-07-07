@@ -98,7 +98,7 @@ export default function EditFinanceExpenseModal({ expense, onClose, onSuccess })
 
   function handleSubmit() {
     const parsed = parseFloat(amount)
-    if (!parsed || parsed <= 0) { setLocalErr('Введите сумму больше нуля'); return }
+    if (isNaN(parsed) || parsed < 0) { setLocalErr('Введите корректную сумму'); return }
     setLocalErr('')
     mut.mutate({ id: expense.id, amount: parsed, note: note.trim() })
   }
@@ -145,7 +145,7 @@ export default function EditFinanceExpenseModal({ expense, onClose, onSuccess })
             <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Сумма (смн)</label>
             <input
               type="number"
-              min="0.01"
+              min="0"
               step="0.01"
               value={amount}
               onChange={(e) => { setAmount(e.target.value); setLocalErr('') }}

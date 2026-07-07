@@ -185,7 +185,7 @@ type expensesSummaryRow struct {
 
 // ExpenseRequest is the request body for POST/PATCH /finance/expenses.
 type ExpenseRequest struct {
-	Amount   float64 `json:"amount" binding:"required,gt=0"`
+	Amount   float64 `json:"amount" binding:"gte=0"`
 	Note     string  `json:"note"`
 	Category string  `json:"category"` // required on create, ignored on update (not editable)
 }

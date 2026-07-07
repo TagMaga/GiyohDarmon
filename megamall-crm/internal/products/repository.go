@@ -112,6 +112,16 @@ func (r *Repository) GetProductByID(ctx context.Context, id uuid.UUID) (*Product
 	return &p, nil
 }
 
+// CountAllProducts returns the total number of products ever created,
+// including soft-deleted ones, so generated SKU numbers never get reused.
+func (r *Repository) CountAllProducts(ctx context.Context) (int64, error) {
+	var total int64
+	if err := r.db.WithContext(ctx).Model(&Product{}).Count(&total).Error; err != nil {
+		return 0, fmt.Errorf("count all products: %w", err)
+	}
+	return total, nil
+}
+
 func (r *Repository) GetProductBySKU(ctx context.Context, sku string) (*Product, error) {
 	var p Product
 	err := r.db.WithContext(ctx).

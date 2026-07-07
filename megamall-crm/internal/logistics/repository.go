@@ -373,6 +373,8 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 		FullName           string     `gorm:"column:full_name"`
 		Phone              string     `gorm:"column:phone"`
 		IsActive           bool       `gorm:"column:is_active"`
+		OrderIntakeEnabled bool       `gorm:"column:order_intake_enabled"`
+		OrderIntakeReason  *string    `gorm:"column:order_intake_reason"`
 		ActiveOrders       int        `gorm:"column:active_orders"`
 		OrdersToday        int        `gorm:"column:orders_today"`
 		DeliveredToday     int        `gorm:"column:delivered_today"`
@@ -462,6 +464,8 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 			u.full_name,
 			u.phone,
 			u.is_active,
+			u.courier_order_intake_enabled AS order_intake_enabled,
+			u.courier_order_intake_reason  AS order_intake_reason,
 			COALESCE(a.cnt, 0)          AS active_orders,
 			COALESCE(t.orders_today, 0) AS orders_today,
 			COALESCE(t.delivered_today, 0) AS delivered_today,
@@ -504,6 +508,8 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 			FullName:           row.FullName,
 			Phone:              row.Phone,
 			IsActive:           row.IsActive,
+			OrderIntakeEnabled: row.OrderIntakeEnabled,
+			OrderIntakeReason:  row.OrderIntakeReason,
 			Status:             status,
 			ActiveOrders:       row.ActiveOrders,
 			OrdersToday:        row.OrdersToday,

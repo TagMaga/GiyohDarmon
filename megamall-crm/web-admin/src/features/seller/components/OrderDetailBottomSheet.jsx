@@ -339,7 +339,7 @@ export default function OrderDetailBottomSheet({ order, onClose, citiesById = {}
             style={{ borderTop: '1px solid rgba(226,232,240,0.7)' }}
           >
             <input
-              className="input flex-1 text-sm py-2.5"
+              className="input flex-1 text-base py-2.5"
               placeholder="Написать комментарий…"
               value={comment}
               onChange={e => setComment(e.target.value)}

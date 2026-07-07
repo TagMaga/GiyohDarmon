@@ -14,6 +14,7 @@ import { Search, X, ClipboardList, SlidersHorizontal } from 'lucide-react'
 import Badge                           from '../../../shared/components/Badge'
 import EmptyState                      from '../../../shared/components/EmptyState'
 import DesktopDateRangePicker          from '../../../shared/components/DesktopDateRangePicker'
+import MobileDateRangeCalendar         from '../../../shared/components/MobileDateRangeCalendar'
 import SellerOrderDetailPanel          from '../../seller/components/SellerOrderDetailPanel'
 import OrderDetailBottomSheet          from '../../seller/components/OrderDetailBottomSheet'
 import { KEYS }                        from '../../../shared/queryKeys'
@@ -158,10 +159,12 @@ export default function TeamLeadOrdersPage() {
         to={dateTo}
         onChange={(range) => { setDateFrom(range.from); setDateTo(range.to) }}
       />
-      <div className="grid w-full grid-cols-2 gap-2 md:hidden">
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="input min-w-0" />
-        <input type="date" value={dateTo}   onChange={e => setDateTo(e.target.value)}   className="input min-w-0" />
-      </div>
+      <MobileDateRangeCalendar
+        className="w-full md:hidden"
+        from={dateFrom}
+        to={dateTo}
+        onChange={(range) => { setDateFrom(range.from); setDateTo(range.to) }}
+      />
       {sellers.length > 0 && (
         <select value={sellerId} onChange={e => setSellerId(e.target.value)} className="input flex-1 min-w-[140px]">
           <option value="">Все продавцы</option>

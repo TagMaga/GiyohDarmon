@@ -5,11 +5,6 @@ import { useToast } from '../../../shared/components/ToastProvider'
 import { Check } from 'lucide-react'
 import { M, Card } from '../components/mobileUi'
 
-function toDateInput(value) {
-  if (!value) return ''
-  return String(value).slice(0, 10)
-}
-
 function initials(name = '') {
   return name.trim().split(/\s+/).map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase() || 'SE'
 }
@@ -19,11 +14,9 @@ export default function SellerProfileInfoPage() {
   const patch = usePatchMe()
   const toast = useToast()
   const [fullName, setFullName] = useState('')
-  const [dateOfBirth, setDateOfBirth] = useState('')
 
   useEffect(() => {
     if (me?.full_name != null) setFullName(me.full_name)
-    if (me?.date_of_birth != null) setDateOfBirth(toDateInput(me.date_of_birth))
   }, [me])
 
   if (isLoading) {
@@ -37,10 +30,7 @@ export default function SellerProfileInfoPage() {
   const errMsg = patch.error?.response?.data?.error?.message ?? patch.error?.message
 
   function handlePersonalSave() {
-    const payload = {
-      full_name: fullName.trim(),
-      ...(dateOfBirth ? { date_of_birth: `${dateOfBirth}T00:00:00Z` } : {}),
-    }
+    const payload = { full_name: fullName.trim() }
     patch.mutate(payload, { onSuccess: () => toast.success('Изменения сохранены') })
   }
 
@@ -67,7 +57,6 @@ export default function SellerProfileInfoPage() {
           >
             {avatarUrl ? <img src={avatarUrl} alt={fullName || 'Профиль'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials(fullName)}
           </div>
-          <span style={{ fontSize: 13.5, fontWeight: 700, color: M.indigo, marginTop: 12 }}>Изменить фото</span>
         </Card>
 
         <div>
@@ -76,10 +65,6 @@ export default function SellerProfileInfoPage() {
             <div style={{ padding: '13px 0', borderBottom: `1px solid ${M.bg}` }}>
               <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Имя и фамилия</div>
               <input value={fullName} onChange={e => setFullName(e.target.value)} style={desktopInputStyle} placeholder="Имя и фамилия" />
-            </div>
-            <div style={{ padding: '13px 0', borderBottom: `1px solid ${M.bg}` }}>
-              <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Дата рождения</div>
-              <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} style={desktopInputStyle} />
             </div>
             <div style={{ padding: '13px 0' }}>
               <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Номер телефона</div>
@@ -158,7 +143,6 @@ export default function SellerProfileInfoPage() {
               {avatarUrl ? <img src={avatarUrl} alt={fullName || 'Профиль'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials(fullName)}
             </div>
           </div>
-          <span style={{ fontSize: 14, fontWeight: 700, color: M.indigo, marginTop: 14, cursor: 'pointer' }}>Изменить фото</span>
         </Card>
 
         {/* form column */}
@@ -166,13 +150,9 @@ export default function SellerProfileInfoPage() {
           <div>
             <SectionTitle>Основное</SectionTitle>
             <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 16, padding: '6px 22px' }} className="grid grid-cols-2">
-              <div style={{ padding: '14px 14px 14px 0', borderBottom: `1px solid ${M.bg}` }}>
+              <div style={{ gridColumn: '1 / -1', padding: '14px 0', borderBottom: `1px solid ${M.bg}` }}>
                 <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Имя и фамилия</div>
                 <input value={fullName} onChange={e => setFullName(e.target.value)} style={desktopInputStyle} placeholder="Имя и фамилия" />
-              </div>
-              <div style={{ padding: '14px 0 14px 14px', borderBottom: `1px solid ${M.bg}` }}>
-                <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Дата рождения</div>
-                <input type="date" value={dateOfBirth} onChange={e => setDateOfBirth(e.target.value)} style={desktopInputStyle} />
               </div>
               <div style={{ gridColumn: '1 / -1', padding: '14px 0' }}>
                 <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Номер телефона</div>

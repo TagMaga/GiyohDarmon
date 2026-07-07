@@ -61,8 +61,8 @@ function AddExpenseModal({ open, onClose, onSubmit, loading, error }) {
 
   function handleSubmit() {
     const parsedAmount = Number(amount)
-    if (!parsedAmount || parsedAmount <= 0) {
-      setLocalError('Введите сумму больше нуля')
+    if (amount === '' || isNaN(parsedAmount) || parsedAmount < 0) {
+      setLocalError('Введите корректную сумму')
       return
     }
     setLocalError('')
@@ -114,7 +114,7 @@ function AddExpenseModal({ open, onClose, onSubmit, loading, error }) {
             <label className="mb-1.5 block text-[11.5px] font-semibold text-slate-500">Сумма (смн)</label>
             <input
               type="number"
-              min="1"
+              min="0"
               step="0.01"
               value={amount}
               onChange={(event) => { setAmount(event.target.value); setLocalError('') }}
@@ -203,11 +203,22 @@ export default function OwnerFinancePage() {
           </div>
         </div>
 
-        <DesktopDateRangePicker
-          from={from}
-          to={to}
-          onChange={({ from: nextFrom, to: nextTo }) => setRange({ from: nextFrom, to: nextTo })}
-        />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setExpenseOpen(true)}
+            className="inline-flex h-9 flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-orange-200 bg-orange-50 px-3.5 text-[12px] font-semibold text-orange-700 transition-colors hover:border-orange-300 hover:bg-orange-100"
+          >
+            <PlusCircle size={14} />
+            Добавить расход
+          </button>
+
+          <DesktopDateRangePicker
+            from={from}
+            to={to}
+            onChange={({ from: nextFrom, to: nextTo }) => setRange({ from: nextFrom, to: nextTo })}
+          />
+        </div>
       </div>
 
       {/* ── Error alert ─────────────────────────────────────────────────────── */}
@@ -242,16 +253,7 @@ export default function OwnerFinancePage() {
         <FinanceEventsTable
           from={from}
           to={to}
-          action={
-            <button
-              type="button"
-              onClick={() => setExpenseOpen(true)}
-              className="inline-flex h-9 flex-shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-orange-200 bg-orange-50 px-3.5 text-[12px] font-semibold text-orange-700 transition-colors hover:border-orange-300 hover:bg-orange-100"
-            >
-              <PlusCircle size={14} />
-              Добавить расход
-            </button>
-          }
+          onDateChange={({ from: nextFrom, to: nextTo }) => setRange({ from: nextFrom, to: nextTo })}
         />
       </div>
 

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Plus, Search, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import SellerOrderMobileCard from '../components/SellerOrderMobileCard'
@@ -14,9 +14,10 @@ import useSellerOrders from '../hooks/useSellerOrders'
 import { ClipboardList } from 'lucide-react'
 
 export default function SellerOrders() {
+  const location = useLocation()
   const { orders = [], isLoading } = useSellerOrders()
   const { data: cities = [] } = useQuery({ queryKey: KEYS.seller.cities, queryFn: fetchCities, staleTime: 10 * 60 * 1000 })
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState(location.state?.statusFilter ?? 'all')
   const [search, setSearch] = useState('')
   const [detailOrder, setDetailOrder] = useState(null)
 

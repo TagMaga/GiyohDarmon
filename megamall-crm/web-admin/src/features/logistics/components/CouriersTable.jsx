@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Search, Clock, Pencil, DollarSign, Power } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
 import { KEYS } from '../../../shared/queryKeys'
-import { EditCourierModal, TariffsModal, ToggleActiveModal } from '../../dispatcher/components/CourierManageModals'
+import { EditCourierModal, TariffsModal, ToggleOrderIntakeModal } from '../../dispatcher/components/CourierManageModals'
 
 const fmtMoney = (n) =>
   n == null ? '—' : Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 0 })
@@ -75,7 +75,7 @@ export default function CouriersTable({ couriers = [], loading }) {
   }
 
   const ActionButtons = ({ courier }) => {
-    const active = courier.is_active !== false
+    const operational = courier.is_active !== false && courier.order_intake_enabled !== false
     return (
       <div className="flex items-center gap-1.5">
         <button
@@ -96,11 +96,11 @@ export default function CouriersTable({ couriers = [], loading }) {
         </button>
         <button
           type="button"
-          title={active ? 'Выключить' : 'Включить'}
-          onClick={() => setToggleTarget({ ...courier, is_active: active })}
+          title={operational ? 'Отключить приём заказов' : courier.is_active === false ? 'Активировать курьера' : 'Включить приём заказов'}
+          onClick={() => setToggleTarget(courier)}
           className={[
             'inline-flex items-center justify-center rounded-[7px] transition-colors px-2 py-1.5',
-            active
+            operational
               ? 'bg-rose-500/10 text-rose-600 hover:bg-rose-500/20'
               : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20',
           ].join(' ')}
@@ -136,7 +136,7 @@ export default function CouriersTable({ couriers = [], loading }) {
         <div className="relative flex-1 max-w-xs">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            className="input pl-9 py-2 text-xs"
+            className="input pl-9 py-2 text-base"
             placeholder="Поиск по имени или телефону…"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -283,7 +283,7 @@ export default function CouriersTable({ couriers = [], loading }) {
       <TariffsModal courier={tariffsTarget} onClose={() => setTariffsTarget(null)} />
     )}
     {toggleTarget && (
-      <ToggleActiveModal
+      <ToggleOrderIntakeModal
         courier={toggleTarget}
         onClose={() => setToggleTarget(null)}
         onSuccess={() => {

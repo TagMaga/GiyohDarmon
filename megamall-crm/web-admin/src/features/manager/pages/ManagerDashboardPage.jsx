@@ -9,7 +9,7 @@ import { useMemo }         from 'react'
 import { useNavigate }     from 'react-router-dom'
 import {
   ShoppingCart, UserCheck, ClipboardList, TrendingUp,
-  ChevronRight, Package, PackageCheck, PlusCircle,
+  ChevronRight, Package, PackageCheck,
 } from 'lucide-react'
 import Badge               from '../../../shared/components/Badge'
 import Alert               from '../../../shared/components/Alert'
@@ -166,18 +166,9 @@ export default function ManagerDashboardPage() {
   return (
     <div className="p-4 md:p-6 space-y-5 pb-28 lg:pb-6" style={{ background: M.bg, fontFamily: M.font, minHeight: '100vh' }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Панель менеджера</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Текущий месяц · только ваша команда</p>
-        </div>
-        <button
-          onClick={() => navigate('/manager/my-orders/create')}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors flex-shrink-0"
-        >
-          <PlusCircle size={16} />
-          <span className="hidden sm:inline">Новый заказ</span>
-        </button>
+      <div>
+        <h1 className="text-xl font-bold text-slate-900">Панель менеджера</h1>
+        <p className="text-xs text-slate-400 mt-0.5">Текущий месяц · только ваша команда</p>
       </div>
 
       {/* KPI grid */}

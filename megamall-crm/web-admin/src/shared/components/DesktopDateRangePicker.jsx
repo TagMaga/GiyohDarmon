@@ -40,6 +40,14 @@ function formatShort(value) {
   return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function formatDMY(value) {
+  const date = fromYMD(value)
+  if (!date) return ''
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${day}.${month}.${date.getFullYear()}`
+}
+
 function formatMonth(date) {
   return date.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
 }
@@ -103,6 +111,8 @@ export default function DesktopDateRangePicker({
   from,
   to,
   onChange,
+  onClear,
+  variant = 'button', // 'button' (default light trigger) | 'chip' (dark pill with clear ✕, always visible)
   className = '',
   buttonClassName = '',
   align = 'left',
@@ -200,21 +210,63 @@ export default function DesktopDateRangePicker({
     setOpen(false)
   }
 
+  function clear() {
+    if (onClear) onClear()
+    else onChange({ from: '', to: '' })
+  }
+
+  const chipLabel = useMemo(() => {
+    if (from && to) return `${formatDMY(from)} — ${formatDMY(to)}`
+    if (from) return formatDMY(from)
+    return 'Выберите период'
+  }, [from, to])
+
   return (
-    <div ref={popoverRef} className={`relative hidden md:inline-flex ${className}`}>
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className={[
-          'inline-flex min-h-[38px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50',
-          buttonClassName,
-        ].join(' ')}
-        aria-expanded={open}
-      >
-        <CalendarDays size={15} />
-        <span className="max-w-[210px] truncate">{label}</span>
-        <ChevronDown size={14} />
-      </button>
+    <div
+      ref={popoverRef}
+      className={[
+        'relative inline-flex',
+        variant === 'button' ? 'hidden md:inline-flex' : '',
+        className,
+      ].filter(Boolean).join(' ')}
+    >
+      {variant === 'chip' ? (
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className={[
+            'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-900 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800',
+            buttonClassName,
+          ].join(' ')}
+          aria-expanded={open}
+        >
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); clear() }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); clear() } }}
+            className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full hover:bg-white/20"
+            aria-label="Сбросить период"
+          >
+            <X size={11} />
+          </span>
+          {chipLabel}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className={[
+            'inline-flex min-h-[38px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50',
+            buttonClassName,
+          ].join(' ')}
+          aria-expanded={open}
+        >
+          <CalendarDays size={15} />
+          <span className="max-w-[210px] truncate">{label}</span>
+          <ChevronDown size={14} />
+        </button>
+      )}
 
       {open && (
         <div
@@ -252,7 +304,9 @@ export default function DesktopDateRangePicker({
                     <X size={13} /> Отмена
                   </button>
                   <button type="button" onClick={apply} className="inline-flex h-9 items-center rounded-lg bg-indigo-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-indigo-700">
-                    Обновить
+                    {variant === 'chip' && draftFrom && draftTo
+                      ? `Показать результаты — ${formatDMY(draftFrom)} - ${formatDMY(draftTo)}`
+                      : 'Обновить'}
                   </button>
                 </div>
               </div>

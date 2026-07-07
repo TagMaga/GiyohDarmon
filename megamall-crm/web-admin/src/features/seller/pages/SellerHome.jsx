@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Phone, Search } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import useSellerOrders from '../hooks/useSellerOrders'
 import { useSellerCompensation, useSellerTeamRank, useSellerMe } from '../hooks/useSellerMe'
@@ -82,14 +82,18 @@ export default function SellerHome() {
             </div>
           </DarkCard>
           <div className="grid grid-cols-3 gap-3">
-            <Card style={{ borderRadius: 16, padding: '18px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{isLoading ? '—' : stats.activeCount}</div>
-              <div style={{ fontSize: 12, color: M.sub, fontWeight: 600, marginTop: 3 }}>В работе</div>
-            </Card>
-            <Card style={{ borderRadius: 16, padding: '18px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{isLoading ? '—' : stats.deliveredCount}</div>
-              <div style={{ fontSize: 12, color: M.sub, fontWeight: 600, marginTop: 3 }}>Доставлено</div>
-            </Card>
+            <Link to="/seller/orders" state={{ statusFilter: 'confirmed' }} style={{ display: 'block' }}>
+              <Card style={{ borderRadius: 16, padding: '18px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ fontSize: 26, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{isLoading ? '—' : stats.activeCount}</div>
+                <div style={{ fontSize: 12, color: M.sub, fontWeight: 600, marginTop: 3 }}>В работе</div>
+              </Card>
+            </Link>
+            <Link to="/seller/orders" state={{ statusFilter: 'delivered' }} style={{ display: 'block' }}>
+              <Card style={{ borderRadius: 16, padding: '18px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ fontSize: 26, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{isLoading ? '—' : stats.deliveredCount}</div>
+                <div style={{ fontSize: 12, color: M.sub, fontWeight: 600, marginTop: 3 }}>Доставлено</div>
+              </Card>
+            </Link>
             <Card style={{ borderRadius: 16, padding: '18px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div style={{ fontSize: 26, fontWeight: 800, color: commissionPct !== null ? M.green : M.ink, letterSpacing: '-.01em' }}>
                 {commissionPct !== null ? `${commissionPct}%` : (rank !== null ? `#${rank}` : '—')}
@@ -187,103 +191,18 @@ export default function SellerHome() {
 
           {/* Stat tiles */}
           <div className="grid grid-cols-3 gap-[9px] mt-[14px]">
-            <StatTile value={isLoading ? '—' : String(stats.activeCount)} label="В работе" />
-            <StatTile value={isLoading ? '—' : String(stats.deliveredCount)} label="Доставлено" />
+            <StatTile value={isLoading ? '—' : String(stats.activeCount)} label="В работе" to="/seller/orders" state={{ statusFilter: 'confirmed' }} />
+            <StatTile value={isLoading ? '—' : String(stats.deliveredCount)} label="Доставлено" to="/seller/orders" state={{ statusFilter: 'delivered' }} />
             {commissionPct !== null
               ? <StatTile value={`${commissionPct}%`} label="Мой процент" valueColor={M.green} />
               : <StatTile value={rank !== null ? `#${rank}` : '—'} label="В команде" />}
           </div>
 
-          {/* Recent orders */}
-          <div className="flex items-center justify-between" style={{ margin: '22px 4px 12px' }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>Последние заказы</span>
-            <Link to="/seller/orders" style={{ fontSize: 13, fontWeight: 600, color: M.indigo }}>
-              Все →
-            </Link>
-          </div>
-
-          {isLoading ? (
-            <div className="space-y-[10px]">
-              {[1, 2, 3].map(i => <Card key={i} className="h-[104px] animate-pulse" />)}
-            </div>
-          ) : recent.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p style={{ fontSize: 13, color: M.muted, marginBottom: 14 }}>Заказов нет. Создайте первый!</p>
-              <Link to="/seller/orders/create" className="inline-block">
-                <PrimaryButton as="span" style={{ pointerEvents: 'none' }}>Создать заказ</PrimaryButton>
-              </Link>
-            </Card>
-          ) : (
-            <div className="space-y-[10px]">
-              {recent.map(order => (
-                <RecentCard
-                  key={order.id}
-                  order={order}
-                  cityName={citiesById[order.city_id]}
-                  onDetail={() => setDetailOrder(order)}
-                />
-              ))}
-            </div>
-          )}
         </div>
       </MobileShell>
 
       {/* Bottom sheet — works on both mobile and desktop dashboard */}
       <OrderDetailBottomSheet order={detailOrder} onClose={() => setDetailOrder(null)} citiesById={citiesById} />
     </>
-  )
-}
-
-/* ─── Sub-components ──────────────────────────────────────────────────────── */
-
-function RecentCard({ order, cityName, onDetail }) {
-  return (
-    <Card className="p-[15px] active:scale-[0.99] transition-transform" onClick={onDetail}>
-      <div className="flex items-start justify-between gap-[10px]">
-        <div className="min-w-0">
-          <p style={{ fontSize: 11, fontWeight: 700, color: M.faint, letterSpacing: '.03em', fontVariantNumeric: 'tabular-nums' }}>
-            {order.order_number ?? order.id?.slice(0, 8)}
-          </p>
-          <p className="truncate" style={{ fontSize: 15, fontWeight: 700, color: M.ink, marginTop: 3 }}>
-            {order.customer?.full_name ?? '—'}
-          </p>
-          <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 6 }}>
-            {cityName && (
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: '#76766E', background: '#F0EFEA', padding: '2px 8px', borderRadius: 7 }}>
-                {cityName}
-              </span>
-            )}
-            <span style={{ fontSize: 11.5, color: M.muted, fontWeight: 500 }}>{fmtDate(order.created_at)}</span>
-          </div>
-        </div>
-        <div className="text-right flex-shrink-0">
-          <StatusPill status={order.status} />
-          <div style={{ fontSize: 16, fontWeight: 800, color: M.ink, marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>
-            {fmtAmount(order.total_order_amount ?? order.total_amount)} с
-          </div>
-        </div>
-      </div>
-
-      <div className="flex gap-2" style={{ marginTop: 13 }}>
-        {order.customer?.phone && (
-          <a
-            href={`tel:${order.customer.phone}`}
-            onClick={e => e.stopPropagation()}
-            className="flex-1 flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
-            style={{ background: '#EAF6EF', color: M.green, fontSize: 13, fontWeight: 700, padding: 10, borderRadius: 11, minHeight: 40 }}
-          >
-            <Phone size={14} />
-            Позвонить
-          </a>
-        )}
-        <button
-          onClick={e => { e.stopPropagation(); onDetail() }}
-          className="flex-1 flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
-          style={{ background: '#EEEDFB', color: M.indigoDeep, border: 'none', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, padding: 10, borderRadius: 11, minHeight: 40, cursor: 'pointer' }}
-        >
-          Детали →
-        </button>
-      </div>
-    </Card>
   )
 }

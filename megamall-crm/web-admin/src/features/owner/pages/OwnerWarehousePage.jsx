@@ -63,7 +63,7 @@ export default function OwnerWarehousePage() {
   const [showProduct, setShowProduct] = useState(false)
   const [editingProduct, setEditingProduct] = useState(null)
   const [receiveProduct, setReceiveProduct] = useState(undefined)
-  const [writeoffProduct, setWriteoffProduct] = useState(null)
+  const [writeoffProduct, setWriteoffProduct] = useState(undefined)
   const data = useWarehouseData()
 
   const inventoryByProduct = useMemo(
@@ -286,7 +286,7 @@ export default function OwnerWarehousePage() {
       <ProductModal open={showProduct} onClose={() => setShowProduct(false)} suppliers={data.suppliers} />
       <ProductModal open={Boolean(editingProduct)} onClose={() => setEditingProduct(null)} product={editingProduct} suppliers={data.suppliers} />
       <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={data.products} inventory={data.inventory} />
-      <WriteoffModal open={writeoffProduct !== null} onClose={() => setWriteoffProduct(null)} products={writeoffProduct ? [writeoffProduct] : data.products} inventory={data.inventory} />
+      <WriteoffModal open={writeoffProduct !== undefined} onClose={() => setWriteoffProduct(undefined)} products={writeoffProduct ? [writeoffProduct] : data.products} inventory={data.inventory} />
     </>
   )
 }

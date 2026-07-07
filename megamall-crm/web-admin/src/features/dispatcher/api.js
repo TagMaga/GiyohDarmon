@@ -63,8 +63,10 @@ export async function updateCourier(id, payload) {
   return unwrap(res)
 }
 
-/** PATCH /dispatch/couriers/:id/active — toggle courier active */
-export async function toggleCourierActive(id, active) {
+/** PATCH /dispatch/couriers/:id/active — reactivate a fully deactivated courier account
+ *  (used only to recover from is_active=false; normal disable/enable goes through
+ *  order-intake instead, see updateCourierOrderIntake). */
+export async function setCourierAccountActive(id, active) {
   const res = await client.patch(`/dispatch/couriers/${id}/active`, { active })
   return unwrap(res)
 }
