@@ -99,8 +99,8 @@ export default function ReceivingModal({ open, onClose, products, inventory = []
           </div>
           {batchValue !== null && !Number.isNaN(batchValue) && (
             <p className="mt-3 text-center text-xs text-emerald-700">
-              Стоимость партии: <b>{batchValue.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} сом</b>
-              {unitCost !== '' && cost > 0 && ` · ${cost.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} сом/ед.`}
+              Стоимость партии: <b>{batchValue.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} смн</b>
+              {unitCost !== '' && cost > 0 && ` · ${cost.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} смн/ед.`}
             </p>
           )}
           {selectedInventory && (

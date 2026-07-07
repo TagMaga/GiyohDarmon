@@ -32,10 +32,14 @@ func ToResponse(r *CourierTariffRule) TariffRuleResponse {
 }
 
 // CreateTariffRuleRequest is the payload to create a new tariff rule.
+// TariffValue's upper bound depends on TariffType (percent must be <= 100,
+// fixed has no such cap) so that conditional check lives in Service.Create —
+// the max=1000000 tag here is just a defense-in-depth ceiling against absurd
+// input (e.g. 1e18) regardless of type.
 type CreateTariffRuleRequest struct {
 	DeliveryType DeliveryType `json:"delivery_type" validate:"required,oneof=normal fast"`
-	AmountFrom   float64      `json:"amount_from"   validate:"min=0"`
-	AmountTo     *float64     `json:"amount_to"`
+	AmountFrom   float64      `json:"amount_from"   validate:"min=0,max=1000000"`
+	AmountTo     *float64     `json:"amount_to"     validate:"omitempty,max=1000000"`
 	TariffType   TariffType   `json:"tariff_type"   validate:"required,oneof=fixed percent"`
-	TariffValue  float64      `json:"tariff_value"  validate:"gt=0"`
+	TariffValue  float64      `json:"tariff_value"  validate:"gt=0,max=1000000"`
 }

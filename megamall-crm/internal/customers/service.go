@@ -19,12 +19,17 @@ func NewService(repo *Repository, logger *activity.Logger) *Service {
 	return &Service{repo: repo, logger: logger}
 }
 
-func (s *Service) List(ctx context.Context, f ListCustomersFilter, p pagination.Params) ([]Customer, int, error) {
-	return s.repo.List(ctx, f, p)
+// List returns customers matching filter, restricted to actorRole/actorID's
+// scope — see repository.applyCustomerScope for the exact rule per role.
+func (s *Service) List(ctx context.Context, actorID uuid.UUID, actorRole string, f ListCustomersFilter, p pagination.Params) ([]Customer, int, error) {
+	return s.repo.List(ctx, f, actorID, actorRole, p)
 }
 
-func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*Customer, error) {
-	c, err := s.repo.GetByID(ctx, id)
+// GetByID returns a customer by ID, restricted to actorRole/actorID's scope.
+// Cross-scope access reports NotFound rather than Forbidden, so a caller
+// can't distinguish "doesn't exist" from "not yours".
+func (s *Service) GetByID(ctx context.Context, actorID uuid.UUID, actorRole string, id uuid.UUID) (*Customer, error) {
+	c, err := s.repo.GetByID(ctx, id, actorID, actorRole)
 	if err != nil {
 		return nil, err
 	}
@@ -64,8 +69,8 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, req CreateCusto
 	return c, nil
 }
 
-func (s *Service) Update(ctx context.Context, actorID, id uuid.UUID, req UpdateCustomerRequest) (*Customer, error) {
-	c, err := s.repo.GetByID(ctx, id)
+func (s *Service) Update(ctx context.Context, actorID uuid.UUID, actorRole string, id uuid.UUID, req UpdateCustomerRequest) (*Customer, error) {
+	c, err := s.repo.GetByID(ctx, id, actorID, actorRole)
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +121,8 @@ func (s *Service) Update(ctx context.Context, actorID, id uuid.UUID, req UpdateC
 	return c, nil
 }
 
-func (s *Service) Delete(ctx context.Context, actorID, id uuid.UUID) error {
-	c, err := s.repo.GetByID(ctx, id)
+func (s *Service) Delete(ctx context.Context, actorID uuid.UUID, actorRole string, id uuid.UUID) error {
+	c, err := s.repo.GetByID(ctx, id, actorID, actorRole)
 	if err != nil {
 		return err
 	}
@@ -137,8 +142,8 @@ func (s *Service) Delete(ctx context.Context, actorID, id uuid.UUID) error {
 	return nil
 }
 
-func (s *Service) GetHistory(ctx context.Context, id uuid.UUID) (*CustomerHistory, error) {
-	c, err := s.repo.GetByID(ctx, id)
+func (s *Service) GetHistory(ctx context.Context, actorID uuid.UUID, actorRole string, id uuid.UUID) (*CustomerHistory, error) {
+	c, err := s.repo.GetByID(ctx, id, actorID, actorRole)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +151,7 @@ func (s *Service) GetHistory(ctx context.Context, id uuid.UUID) (*CustomerHistor
 		return nil, apperrors.NotFound("customer")
 	}
 
-	h, err := s.repo.GetHistory(ctx, id)
+	h, err := s.repo.GetHistory(ctx, id, actorID, actorRole)
 	if err != nil {
 		return nil, err
 	}

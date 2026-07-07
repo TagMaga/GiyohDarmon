@@ -20,6 +20,7 @@ import useMyPayouts     from '../../../shared/hooks/useMyPayouts'
 import usePayables       from '../hooks/usePayables'
 import useCreatePayouts  from '../hooks/useCreatePayouts'
 import { M, Card, InitialsAvatar, Chip } from '../../seller/components/mobileUi'
+import Alert from '../../../shared/components/Alert'
 
 // Local Y/M/D, not toISOString() — that converts to UTC first and can shift
 // the calendar date by a day depending on timezone/time-of-day.
@@ -71,7 +72,7 @@ function OverviewTab() {
   const from = toYMD(new Date(now.getFullYear(), now.getMonth(), 1))
   const to   = toYMD(now)
 
-  const { data: payables, isLoading } = usePayables(userId, { from, to })
+  const { data: payables, isLoading, isError, error, refetch } = usePayables(userId, { from, to })
   const { data: payoutHistory = [], isLoading: historyLoading } = useMyPayouts()
   const members = payables?.members ?? []
 
@@ -143,15 +144,29 @@ function OverviewTab() {
 
   return (
     <div className="space-y-4 pb-24">
+      {isError && (
+        <div className="flex items-center justify-between gap-2">
+          <Alert variant="error" title="Не удалось загрузить доходы команды">
+            {error?.response?.data?.error?.message ?? error?.message ?? 'Проверьте соединение и попробуйте снова.'}
+          </Alert>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="min-h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-700 text-[13px] font-bold flex-shrink-0"
+          >
+            Повторить
+          </button>
+        </div>
+      )}
       {isLoading ? (
         <CardSkeleton />
-      ) : (
+      ) : isError ? null : (
         <Card style={{ borderRadius: 20, padding: 18 }}>
           <div style={{ fontSize: 10.5, fontWeight: 700, color: M.muted, letterSpacing: '.05em', textTransform: 'uppercase' }}>
             Ваш личный доход за период
           </div>
           <div style={{ fontSize: 33, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', lineHeight: 1, margin: '10px 0' }}>
-            {fmtRu(payables?.personal_net)} <span style={{ fontSize: 17, fontWeight: 700, color: M.faint }}>с</span>
+            {fmtRu(payables?.personal_net)} <span style={{ fontSize: 17, fontWeight: 700, color: M.faint }}>смн</span>
           </div>
           <p style={{ fontSize: 11.5, color: M.sub, fontWeight: 500 }}>
             Ваша доля пула команды (40%) — уже за вычетом продавцов и менеджеров
@@ -187,7 +202,7 @@ function OverviewTab() {
         >
           <div className="flex-1">
             <p style={{ fontSize: 10, fontWeight: 700, color: M.muted, textTransform: 'uppercase' }}>Выбрано: {selected.size}</p>
-            <p style={{ fontSize: 16, fontWeight: 800, color: M.ink }}>Итого: {fmtRu(total)} с</p>
+            <p style={{ fontSize: 16, fontWeight: 800, color: M.ink }}>Итого: {fmtRu(total)} смн</p>
           </div>
           <button
             className="rounded-xl px-5 py-3 text-white font-black text-sm disabled:opacity-40"
@@ -233,12 +248,12 @@ function OverviewTab() {
                   </span>
                 </div>
                 <p style={{ fontSize: 11, color: M.muted, marginBottom: 8 }}>
-                  {m.orders_count} {m.orders_count === 1 ? 'заказ' : 'заказов'} · сумма {fmtAmount(m.gross_amount)} с
+                  {m.orders_count} {m.orders_count === 1 ? 'заказ' : 'заказов'} · сумма {fmtAmount(m.gross_amount)} смн
                 </p>
                 <div className="flex gap-3.5 flex-wrap" style={{ fontSize: 11, marginBottom: 8 }}>
-                  <div style={{ color: M.muted, fontWeight: 700 }}>Заработано<b style={{ display: 'block', color: M.ink, fontSize: 12, marginTop: 2 }}>{fmtAmount(m.earned)} с</b></div>
-                  <div style={{ color: M.muted, fontWeight: 700 }}>Выплачено<b style={{ display: 'block', color: M.ink, fontSize: 12, marginTop: 2 }}>{fmtAmount(m.already_paid)} с</b></div>
-                  <div style={{ color: M.muted, fontWeight: 700 }}>Осталось<b style={{ display: 'block', fontSize: 12, marginTop: 2, color: isFullyPaid ? M.green : M.indigoDeep }}>{fmtAmount(m.remaining)} с</b></div>
+                  <div style={{ color: M.muted, fontWeight: 700 }}>Заработано<b style={{ display: 'block', color: M.ink, fontSize: 12, marginTop: 2 }}>{fmtAmount(m.earned)} смн</b></div>
+                  <div style={{ color: M.muted, fontWeight: 700 }}>Выплачено<b style={{ display: 'block', color: M.ink, fontSize: 12, marginTop: 2 }}>{fmtAmount(m.already_paid)} смн</b></div>
+                  <div style={{ color: M.muted, fontWeight: 700 }}>Осталось<b style={{ display: 'block', fontSize: 12, marginTop: 2, color: isFullyPaid ? M.green : M.indigoDeep }}>{fmtAmount(m.remaining)} смн</b></div>
                 </div>
                 {isFullyPaid ? (
                   <span style={{ fontSize: 10.5, fontWeight: 700, color: M.green, background: M.greenBg, padding: '4px 8px', borderRadius: 7 }}>Выплачено полностью</span>
@@ -275,7 +290,7 @@ function OverviewTab() {
         >
           <div className="flex-1">
             <p style={{ fontSize: 10, fontWeight: 700, color: M.muted, textTransform: 'uppercase' }}>Выбрано: {selected.size}</p>
-            <p style={{ fontSize: 16, fontWeight: 800, color: M.ink }}>Итого: {fmtRu(total)} с</p>
+            <p style={{ fontSize: 16, fontWeight: 800, color: M.ink }}>Итого: {fmtRu(total)} смн</p>
           </div>
           <button
             className="rounded-xl px-5 py-3 text-white font-black text-sm disabled:opacity-40"
@@ -310,7 +325,7 @@ function OverviewTab() {
                   <p style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>{p.method ?? 'выплата'} · {p.status ?? 'оплачено'}</p>
                   <p style={{ fontSize: 11, color: M.muted }} className="truncate">{p.period_start} → {p.period_end}</p>
                 </div>
-                <span style={{ fontSize: 13.5, fontWeight: 800, color: M.ink }} className="whitespace-nowrap">{fmtAmount(p.amount)} с</span>
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: M.ink }} className="whitespace-nowrap">{fmtAmount(p.amount)} смн</span>
               </div>
             ))}
           </div>
@@ -436,7 +451,7 @@ function BySellerTab() {
                   <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>{m.orders_count} заказ{m.orders_count === 1 ? '' : 'ов'}</div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <div style={{ fontSize: 15.5, fontWeight: 800, color: M.ink }}>{fmtRu(m.gross_amount)} с</div>
+                  <div style={{ fontSize: 15.5, fontWeight: 800, color: M.ink }}>{fmtRu(m.gross_amount)} смн</div>
                   <div style={{ fontSize: 11, color: M.muted, fontWeight: 600, marginTop: 2 }}>комиссия {commissionPct.toFixed(1).replace('.', ',')}%</div>
                 </div>
               </div>

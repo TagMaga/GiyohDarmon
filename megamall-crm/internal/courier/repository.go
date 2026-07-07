@@ -790,6 +790,23 @@ func (r *Repository) CreateStatusLog(ctx context.Context, s *CourierStatusLog) e
 //	courier_collected = total_amount + delivery_fee - prepayment_amount
 //	delivery_fee      = courier_payout kept as courier salary
 //	courier_returns   = courier_collected - courier_payout
+// LockCourierForHandover serializes concurrent handover submissions for the
+// same courier. A plain row lock on `orders` doesn't work here because the
+// orders rows themselves are never written to by a handover — only new rows
+// are inserted into cash_handover_orders/cash_handovers — so Postgres has
+// nothing to re-check via EvalPlanQual after unblocking, and a second
+// transaction's eligibility query still runs against its original
+// (pre-commit) snapshot, seeing the same "eligible" orders as the first and
+// creating a duplicate handover that double-claims the same cash.
+// A session-scoped advisory lock has no row of its own to snapshot: the
+// second transaction blocks on this call until the first COMMITS, and only
+// then issues its eligibility query as a new statement, which under READ
+// COMMITTED takes a fresh snapshot that correctly sees the first transaction's
+// now-committed handover-order links.
+func (r *Repository) LockCourierForHandover(tx *gorm.DB, ctx context.Context, courierID uuid.UUID) error {
+	return tx.WithContext(ctx).Exec("SELECT pg_advisory_xact_lock(hashtext(?))", courierID.String()).Error
+}
+
 func (r *Repository) FindEligibleHandoverOrders(tx *gorm.DB, ctx context.Context, courierID uuid.UUID) ([]orders.Order, error) {
 	var rows []orders.Order
 	err := tx.WithContext(ctx).

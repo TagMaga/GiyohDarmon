@@ -5,12 +5,46 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"net/url"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/megamall/crm/internal/activity"
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/pagination"
 )
+
+// allowedImageURLSchemes is a strict allowlist for product image_url values.
+// "" means a scheme-less relative path (e.g. "/uploads/xyz.jpg" — what
+// POST /uploads returns). Anything not in this set is rejected, which is what
+// keeps out data:, javascript:, vbscript:, file:, blob:, and any other scheme
+// without having to enumerate each dangerous one individually.
+var allowedImageURLSchemes = map[string]bool{"": true, "http": true, "https": true}
+
+// validateImageURL enforces the allowlist above. Case-insensitive on the
+// scheme and tolerant of leading/trailing whitespace, since both are trivial
+// ways to smuggle a "data:" / "javascript:" payload past a naive prefix check.
+func validateImageURL(raw string) error {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return apperrors.BadRequest("image_url is required")
+	}
+	u, err := url.Parse(trimmed)
+	if err != nil {
+		return apperrors.BadRequest("image_url is not a valid URL")
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if !allowedImageURLSchemes[scheme] {
+		return apperrors.BadRequest("image_url must be a relative path, or an http(s) URL — scheme not allowed")
+	}
+	// Reject protocol-relative URLs ("//evil.com/x") — these parse with an
+	// empty scheme but a real host, and browsers resolve them against
+	// whatever scheme the current page is using.
+	if scheme == "" && u.Host != "" {
+		return apperrors.BadRequest("image_url must be a relative path, not a protocol-relative URL")
+	}
+	return nil
+}
 
 // Service encapsulates product catalog business logic.
 type Service struct {
@@ -293,6 +327,10 @@ func (s *Service) DeleteProduct(ctx context.Context, actorID, id uuid.UUID) erro
 // ─── Product Images ───────────────────────────────────────────────────────────
 
 func (s *Service) AddProductImage(ctx context.Context, actorID, productID uuid.UUID, req AddProductImageRequest) (*ProductImage, error) {
+	if err := validateImageURL(req.ImageURL); err != nil {
+		return nil, err
+	}
+
 	p, err := s.repo.GetProductByID(ctx, productID)
 	if err != nil {
 		return nil, err

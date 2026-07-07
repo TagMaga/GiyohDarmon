@@ -43,8 +43,22 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*Team, error) {
 	return &t, nil
 }
 
-func (r *Repository) List(ctx context.Context, filter ListTeamsFilter, p pagination.Params) ([]Team, int, error) {
+// List returns teams matching filter, restricted to those visible to
+// actorRole/actorID: owner sees all, manager only teams they manage,
+// sales_team_lead only the team they lead. Any other role sees none.
+func (r *Repository) List(ctx context.Context, filter ListTeamsFilter, actorID uuid.UUID, actorRole string, p pagination.Params) ([]Team, int, error) {
 	query := r.db.WithContext(ctx).Model(&Team{}).Where("deleted_at IS NULL")
+
+	switch actorRole {
+	case "owner":
+		// no restriction
+	case "manager":
+		query = query.Where("manager_id = ?", actorID)
+	case "sales_team_lead":
+		query = query.Where("team_lead_id = ?", actorID)
+	default:
+		query = query.Where("1 = 0")
+	}
 
 	if filter.IsActive != nil {
 		query = query.Where("is_active = ?", *filter.IsActive)

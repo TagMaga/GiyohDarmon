@@ -68,7 +68,8 @@ func (h *Handler) GetUserChain(c *gin.Context) {
 		return
 	}
 
-	chain, err := h.svc.GetUserChain(c.Request.Context(), userID)
+	claims := middleware.ClaimsFromContext(c)
+	chain, err := h.svc.GetUserChain(c.Request.Context(), claims.UserID, claims.Role, userID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -83,7 +84,8 @@ func (h *Handler) GetTeamMembers(c *gin.Context) {
 		return
 	}
 
-	members, err := h.svc.GetTeamMembers(c.Request.Context(), teamID)
+	claims := middleware.ClaimsFromContext(c)
+	members, err := h.svc.GetTeamMembers(c.Request.Context(), claims.UserID, claims.Role, teamID)
 	if err != nil {
 		response.HandleError(c, err)
 		return

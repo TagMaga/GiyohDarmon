@@ -17,13 +17,26 @@ const documentStatusUploaded = "uploaded"
 const documentStatusVerified = "verified"
 const documentStatusRejected = "rejected"
 
+// SessionRevokerFn revokes all active sessions (refresh tokens) for a user.
+// Injected after construction (avoids a circular import on internal/auth) and
+// called whenever a user is deactivated or deleted, so their existing tokens
+// stop working immediately instead of remaining valid until they expire.
+type SessionRevokerFn func(ctx context.Context, userID uuid.UUID) error
+
 // Service encapsulates all user business logic.
 type Service struct {
-	repo *Repository
+	repo           *Repository
+	sessionRevoker SessionRevokerFn
 }
 
 func NewService(repo *Repository) *Service {
 	return &Service{repo: repo}
+}
+
+// SetSessionRevoker injects the session-revocation hook. Called from main.go
+// after all services are constructed.
+func (s *Service) SetSessionRevoker(fn SessionRevokerFn) {
+	s.sessionRevoker = fn
 }
 
 func (s *Service) Create(ctx context.Context, req CreateUserRequest) (*User, error) {
@@ -168,6 +181,21 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateUserReques
 
 	if err := s.recordProfileHistory(ctx, &before, u, req, actorIDs...); err != nil {
 		return nil, err
+	}
+
+	// Deactivation must revoke existing sessions immediately — otherwise a
+	// deactivated user's already-issued tokens keep working. It must also
+	// clear this user as anyone else's hierarchy parent, so they stop
+	// appearing as a manager in someone's upward chain while deactivated.
+	if before.IsActive && !u.IsActive {
+		if s.sessionRevoker != nil {
+			if err := s.sessionRevoker(ctx, u.ID); err != nil {
+				return nil, apperrors.Internal(fmt.Errorf("revoke sessions: %w", err))
+			}
+		}
+		if err := s.repo.ClearAsHierarchyParent(ctx, u.ID); err != nil {
+			return nil, apperrors.Internal(err)
+		}
 	}
 
 	return u, nil
@@ -323,6 +351,14 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
 		if err.Error() == "user not found" {
 			return apperrors.NotFound("user")
 		}
+		return apperrors.Internal(err)
+	}
+	if s.sessionRevoker != nil {
+		if err := s.sessionRevoker(ctx, id); err != nil {
+			return apperrors.Internal(fmt.Errorf("revoke sessions: %w", err))
+		}
+	}
+	if err := s.repo.ClearAsHierarchyParent(ctx, id); err != nil {
 		return apperrors.Internal(err)
 	}
 	return nil

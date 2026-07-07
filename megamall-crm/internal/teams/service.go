@@ -46,23 +46,44 @@ func (s *Service) Create(ctx context.Context, req CreateTeamRequest) (*Team, err
 	return t, nil
 }
 
-func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*Team, error) {
+// GetByID returns a team by ID, scoped to what actorRole may see: owner sees
+// any team; manager only a team they manage; sales_team_lead only the team
+// they lead. Cross-scope access reports NotFound rather than Forbidden, so a
+// caller can't distinguish "doesn't exist" from "not yours".
+func (s *Service) GetByID(ctx context.Context, actorID uuid.UUID, actorRole string, id uuid.UUID) (*Team, error) {
 	t, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, apperrors.Internal(err)
 	}
-	if t == nil {
+	if t == nil || !canAccessTeam(t, actorID, actorRole) {
 		return nil, apperrors.NotFound("team")
 	}
 	return t, nil
 }
 
-func (s *Service) List(ctx context.Context, filter ListTeamsFilter, p pagination.Params) ([]Team, int, error) {
-	list, total, err := s.repo.List(ctx, filter, p)
+// List returns teams matching filter, scoped to what actorRole may see (see
+// GetByID for the scoping rules). The scoping is applied in the repository
+// query itself so pagination totals reflect only visible rows.
+func (s *Service) List(ctx context.Context, actorID uuid.UUID, actorRole string, filter ListTeamsFilter, p pagination.Params) ([]Team, int, error) {
+	list, total, err := s.repo.List(ctx, filter, actorID, actorRole, p)
 	if err != nil {
 		return nil, 0, apperrors.Internal(err)
 	}
 	return list, total, nil
+}
+
+// canAccessTeam reports whether actorRole/actorID may view team t.
+func canAccessTeam(t *Team, actorID uuid.UUID, actorRole string) bool {
+	switch actorRole {
+	case "owner":
+		return true
+	case "manager":
+		return t.ManagerID != nil && *t.ManagerID == actorID
+	case "sales_team_lead":
+		return t.TeamLeadID != nil && *t.TeamLeadID == actorID
+	default:
+		return false
+	}
 }
 
 func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateTeamRequest) (*Team, error) {

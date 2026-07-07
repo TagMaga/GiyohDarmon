@@ -9,6 +9,7 @@ import (
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/pagination"
 	"github.com/megamall/crm/pkg/response"
+	"github.com/megamall/crm/pkg/validator"
 )
 
 type Handler struct {
@@ -152,6 +153,10 @@ func (h *Handler) createHandover(c *gin.Context) {
 		response.HandleError(c, apperrors.BadRequest("invalid request body"))
 		return
 	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.HandleError(c, appErr)
+		return
+	}
 	row, err := h.repo.CreateHandover(c.Request.Context(), req)
 	if err != nil {
 		response.HandleError(c, err)
@@ -169,6 +174,10 @@ func (h *Handler) updateHandover(c *gin.Context) {
 	var req UpdateHandoverReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.HandleError(c, apperrors.BadRequest("invalid request body"))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.HandleError(c, appErr)
 		return
 	}
 	row, err := h.repo.UpdateHandover(c.Request.Context(), id, req)

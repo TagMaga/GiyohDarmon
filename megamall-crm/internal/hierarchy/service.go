@@ -89,8 +89,22 @@ func (s *Service) Assign(ctx context.Context, req AssignRequest) (*UserHierarchy
 	return h, nil
 }
 
-// GetUserChain returns the upward chain for a user.
-func (s *Service) GetUserChain(ctx context.Context, userID uuid.UUID) ([]HierarchyResponse, error) {
+// GetUserChain returns the upward chain for a user, scoped to what
+// actorRole/actorID may see: owner sees anyone; a caller can always see their
+// own chain; otherwise manager/sales_team_lead may only see users within a
+// team they manage/lead. Cross-scope access reports NotFound rather than
+// Forbidden, so a caller can't distinguish "doesn't exist" from "not yours".
+func (s *Service) GetUserChain(ctx context.Context, actorID uuid.UUID, actorRole string, userID uuid.UUID) ([]HierarchyResponse, error) {
+	if actorRole != "owner" && actorID != userID {
+		allowed, err := s.canAccessUser(ctx, actorID, actorRole, userID)
+		if err != nil {
+			return nil, apperrors.Internal(err)
+		}
+		if !allowed {
+			return nil, apperrors.NotFound("user")
+		}
+	}
+
 	chain, err := s.repo.GetChainUpward(ctx, userID)
 	if err != nil {
 		return nil, apperrors.Internal(err)
@@ -173,8 +187,21 @@ func (s *Service) GetMyTeam(ctx context.Context, teamID uuid.UUID) (*MyTeamRespo
 	return resp, nil
 }
 
-// GetTeamMembers returns all hierarchy entries for a team.
-func (s *Service) GetTeamMembers(ctx context.Context, teamID uuid.UUID) ([]HierarchyResponse, error) {
+// GetTeamMembers returns all hierarchy entries for a team, scoped to what
+// actorRole/actorID may see (see GetUserChain for the scoping rules).
+// Existence is checked for every role, including owner — teamBrief already
+// excludes soft-deleted teams (teams.Repository.GetByID filters deleted_at),
+// so a deleted team's roster is never reachable through this endpoint even
+// if stale user_hierarchy rows still reference its id.
+func (s *Service) GetTeamMembers(ctx context.Context, actorID uuid.UUID, actorRole string, teamID uuid.UUID) ([]HierarchyResponse, error) {
+	team, err := s.teamBrief(ctx, teamID)
+	if err != nil {
+		return nil, apperrors.Internal(fmt.Errorf("resolve team: %w", err))
+	}
+	if team == nil || !canAccessTeamBrief(team, actorID, actorRole) {
+		return nil, apperrors.NotFound("team")
+	}
+
 	entries, err := s.repo.GetByTeamID(ctx, teamID)
 	if err != nil {
 		return nil, apperrors.Internal(err)
@@ -185,4 +212,42 @@ func (s *Service) GetTeamMembers(ctx context.Context, teamID uuid.UUID) ([]Hiera
 		out[i] = toResponse(&h)
 	}
 	return out, nil
+}
+
+// canAccessTeamBrief reports whether actorRole/actorID may view team's
+// roster: owner always; manager only for a team they manage; sales_team_lead
+// only for the team they lead. Any other role is denied.
+func canAccessTeamBrief(team *TeamBrief, actorID uuid.UUID, actorRole string) bool {
+	switch actorRole {
+	case "owner":
+		return true
+	case "manager":
+		return team.ManagerID != nil && *team.ManagerID == actorID
+	case "sales_team_lead":
+		return team.TeamLeadID != nil && *team.TeamLeadID == actorID
+	default:
+		return false
+	}
+}
+
+// canAccessUser reports whether actorRole/actorID may view userID's
+// hierarchy chain: allowed when userID belongs to a team actorID may access
+// (see canAccessTeamBrief). A user with no assigned team is only visible to
+// owner (handled by the caller, which skips this check entirely for owner).
+func (s *Service) canAccessUser(ctx context.Context, actorID uuid.UUID, actorRole string, userID uuid.UUID) (bool, error) {
+	h, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return false, fmt.Errorf("resolve target hierarchy: %w", err)
+	}
+	if h == nil || h.TeamID == nil {
+		return false, nil
+	}
+	team, err := s.teamBrief(ctx, *h.TeamID)
+	if err != nil {
+		return false, fmt.Errorf("resolve team: %w", err)
+	}
+	if team == nil {
+		return false, nil
+	}
+	return canAccessTeamBrief(team, actorID, actorRole), nil
 }

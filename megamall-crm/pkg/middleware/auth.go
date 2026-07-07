@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -20,7 +21,7 @@ type ContextClaims struct {
 
 // TokenValidator is the function signature for JWT validation.
 // Injected at startup to avoid circular imports.
-type TokenValidator func(token string) (*ContextClaims, error)
+type TokenValidator func(ctx context.Context, token string) (*ContextClaims, error)
 
 var globalValidator TokenValidator
 
@@ -51,7 +52,7 @@ func authenticateOnly(c *gin.Context) (*ContextClaims, bool) {
 		return nil, false
 	}
 
-	claims, valErr := globalValidator(token)
+	claims, valErr := globalValidator(c.Request.Context(), token)
 	if valErr != nil {
 		response.HandleError(c, valErr)
 		c.Abort()

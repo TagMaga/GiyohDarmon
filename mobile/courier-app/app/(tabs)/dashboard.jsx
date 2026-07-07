@@ -27,14 +27,18 @@ export default function DashboardScreen() {
   const [isOnline, setIsOnline]       = useState(true)
   const [menuOpen, setMenuOpen]       = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
+  const [error, setError]             = useState(null)
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const { dark, T, setDark }          = useGlass()
 
   const fetchAll = async () => {
     try {
       const [o, s, a] = await Promise.allSettled([getMyOrders(), getCashSummary(), getClaimableOrders()])
-      if (o.status === 'fulfilled') setOrders(o.value.data.data || [])
+      const failed = [o, s, a].find(r => r.status === 'rejected')
+      if (o.status === 'fulfilled') { setOrders(o.value.data.data || []); setHasLoadedOnce(true) }
       if (s.status === 'fulfilled') setSummary(s.value.data.data)
       if (a.status === 'fulfilled') setAvailCount((a.value.data.data || []).length)
+      setError(failed ? (failed.reason?.response?.data?.error?.message || 'Не удалось загрузить данные') : null)
     } finally { setLoading(false); setRefreshing(false) }
   }
 
@@ -109,6 +113,26 @@ export default function DashboardScreen() {
             <Text style={[s.onlineText, !isOnline && { color: T.muted }]}>{isOnline ? 'На линии' : 'Не на линии'}</Text>
           </TouchableOpacity>
         </View>
+
+        {(!loading && error && !hasLoadedOnce) ? (
+          <View style={[s.card, s.errorCard, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
+            <Text style={{ fontSize: 32 }}>📡</Text>
+            <Text style={[s.errorTitle, { color: T.ink }]}>Не удалось загрузить данные</Text>
+            <Text style={[s.errorSub, { color: T.muted }]}>{error}</Text>
+            <TouchableOpacity style={s.retryBtn} onPress={() => { setLoading(true); fetchAll() }}>
+              <Text style={s.retryText}>Повторить</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+        <>
+        {hasLoadedOnce && error && (
+          <View style={[s.inlineError, { backgroundColor: T.chip, borderColor: T.chipEdge }]}>
+            <Text style={[s.inlineErrorText, { color: T.muted }]} numberOfLines={1}>⚠️ {error}</Text>
+            <TouchableOpacity onPress={() => fetchAll()}>
+              <Text style={s.inlineErrorRetry}>Повторить</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Hero */}
         <FadeSlideIn delay={0}>
@@ -190,6 +214,8 @@ export default function DashboardScreen() {
             </>
           )
         }
+        </>
+        )}
       </ScrollView>
 
       {/* Modern light bottom sheet — same component as Deliveries screen */}
@@ -247,4 +273,12 @@ const s = StyleSheet.create({
   iconBox:     { width: 60, height: 60, borderRadius: 22, backgroundColor: 'rgba(10,132,255,0.12)', justifyContent: 'center', alignItems: 'center' },
   statusTitle: { fontSize: 19, fontWeight: '700', color: C.ink, marginBottom: 6 },
   statusSub:   { fontSize: 14, color: C.muted, fontWeight: '600' },
+  errorCard:   { alignItems: 'center', padding: 28, gap: 8 },
+  errorTitle:  { fontSize: 17, fontWeight: '700', color: C.ink, marginTop: 6, textAlign: 'center' },
+  errorSub:    { fontSize: 14, color: C.muted, fontWeight: '600', textAlign: 'center', marginBottom: 8 },
+  retryBtn:    { backgroundColor: C.blue, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 24, minHeight: 44, justifyContent: 'center' },
+  retryText:   { color: '#fff', fontSize: 15, fontWeight: '700' },
+  inlineError: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 16, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 14, marginBottom: 14, gap: 10 },
+  inlineErrorText:   { fontSize: 13, fontWeight: '600', flex: 1 },
+  inlineErrorRetry:  { fontSize: 13, fontWeight: '700', color: C.blue },
 })

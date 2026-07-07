@@ -60,6 +60,17 @@ export async function addProductImage(productId, payload) {
   return unwrap(res)
 }
 
+// Uploads a file to the shared /uploads endpoint and returns its served URL
+// (e.g. "/uploads/<uuid>.jpg"), instead of embedding the image as base64.
+export async function uploadImageFile(file) {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await client.post('/uploads', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return unwrap(res) // { url: "/uploads/<filename>" }
+}
+
 export async function importProducts(file, dryRun = false) {
   const form = new FormData()
   form.append('file', file)

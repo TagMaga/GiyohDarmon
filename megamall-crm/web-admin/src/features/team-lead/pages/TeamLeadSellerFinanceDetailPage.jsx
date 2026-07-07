@@ -115,10 +115,10 @@ export default function TeamLeadSellerFinanceDetailPage() {
     <Card style={{ borderRadius: 20, padding: 18 }}>
       <div style={{ fontSize: 10.5, fontWeight: 700, color: M.muted, letterSpacing: '.05em', textTransform: 'uppercase' }}>Выручка за месяц</div>
       <div style={{ fontSize: 33, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', lineHeight: 1, marginTop: 10 }}>
-        {fmtRu(member.gross_amount)} <span style={{ fontSize: 17, fontWeight: 700, color: M.faint }}>с</span>
+        {fmtRu(member.gross_amount)} <span style={{ fontSize: 17, fontWeight: 700, color: M.faint }}>смн</span>
       </div>
       <div style={{ fontSize: 11.5, color: M.sub, fontWeight: 500, marginTop: 8 }}>
-        {member.orders_count} заказ{member.orders_count === 1 ? '' : member.orders_count < 5 ? 'а' : 'ов'} · средний чек {fmtRu(Math.round(avgCheck))} с
+        {member.orders_count} заказ{member.orders_count === 1 ? '' : member.orders_count < 5 ? 'а' : 'ов'} · средний чек {fmtRu(Math.round(avgCheck))} смн
       </div>
       <div className="flex items-center justify-center gap-2" style={{ background: '#F5F4FE', borderRadius: 12, padding: '11px 12px', marginTop: 12 }}>
         <span style={{ fontSize: 16, fontWeight: 800, color: M.ink }}>{fmtRu(member.gross_amount)}</span>
@@ -139,7 +139,7 @@ export default function TeamLeadSellerFinanceDetailPage() {
         </div>
       </div>
       <span style={{ fontSize: 20, fontWeight: 800, color: member.remaining > 0 ? M.indigoDeep : M.green, fontVariantNumeric: 'tabular-nums' }}>
-        {fmtRu(member.remaining)} с
+        {fmtRu(member.remaining)} смн
       </span>
     </Card>
   )
@@ -165,7 +165,7 @@ export default function TeamLeadSellerFinanceDetailPage() {
               <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>{p.period_start} → {p.period_end}</div>
             </div>
             <span style={{ fontSize: 13.5, fontWeight: 800, color: M.ink, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-              {fmtAmount(p.amount)} с
+              {fmtAmount(p.amount)} смн
             </span>
           </div>
         ))
@@ -180,7 +180,7 @@ export default function TeamLeadSellerFinanceDetailPage() {
     >
       <div>
         <div style={{ fontSize: 10.5, color: M.muted, fontWeight: 700, letterSpacing: '.03em', textTransform: 'uppercase' }}>К выплате</div>
-        <div style={{ fontSize: 16.5, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', marginTop: 2 }}>{fmtRu(member.remaining)} с</div>
+        <div style={{ fontSize: 16.5, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', marginTop: 2 }}>{fmtRu(member.remaining)} смн</div>
       </div>
       <button
         type="button"
@@ -251,7 +251,7 @@ export default function TeamLeadSellerFinanceDetailPage() {
               className="active:scale-95 transition-transform"
               style={{ background: M.dark, color: '#fff', border: 'none', fontFamily: 'inherit', fontSize: 14, fontWeight: 700, padding: '13px 26px', borderRadius: 13, cursor: 'pointer' }}
             >
-              Выплатить {fmtRu(member.remaining)} с
+              Выплатить {fmtRu(member.remaining)} смн
             </button>
           </div>
         )}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import Alert from '../../../shared/components/Alert'
 import { useSellerMe, usePatchMe } from '../hooks/useSellerMe'
 import { useToast } from '../../../shared/components/ToastProvider'
-import { Check, MessageCircle } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { M, Card } from '../components/mobileUi'
 
 function toDateInput(value) {
@@ -20,12 +20,10 @@ export default function SellerProfileInfoPage() {
   const toast = useToast()
   const [fullName, setFullName] = useState('')
   const [dateOfBirth, setDateOfBirth] = useState('')
-  const [telegramChatId, setTelegramChatId] = useState('')
 
   useEffect(() => {
     if (me?.full_name != null) setFullName(me.full_name)
     if (me?.date_of_birth != null) setDateOfBirth(toDateInput(me.date_of_birth))
-    if (me?.telegram_chat_id != null) setTelegramChatId(me.telegram_chat_id)
   }, [me])
 
   if (isLoading) {
@@ -37,13 +35,6 @@ export default function SellerProfileInfoPage() {
   }
 
   const errMsg = patch.error?.response?.data?.error?.message ?? patch.error?.message
-
-  function handleTelegramSave() {
-    patch.mutate(
-      { telegram_chat_id: telegramChatId.trim() || null },
-      { onSuccess: () => toast.success('Сохранено') }
-    )
-  }
 
   function handlePersonalSave() {
     const payload = {
@@ -59,7 +50,6 @@ export default function SellerProfileInfoPage() {
 
   function handleSaveAll() {
     handlePersonalSave()
-    if (telegramChatId.trim() !== (me?.telegram_chat_id ?? '')) handleTelegramSave()
   }
 
   return (
@@ -115,24 +105,6 @@ export default function SellerProfileInfoPage() {
               <span style={{ fontSize: 14, fontWeight: 600, color: M.ink }}>Роль</span>
               <span style={{ fontSize: 11.5, fontWeight: 700, color: '#76766E', background: '#F0EFEA', padding: '4px 11px', borderRadius: 7 }}>{roleLabel}</span>
             </div>
-          </Card>
-        </div>
-
-        <div>
-          <SectionTitle>Telegram</SectionTitle>
-          <Card style={{ borderRadius: 16, padding: '16px' }} className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg,#2481CC,#1A6CB0)' }}>
-                <MessageCircle size={15} color="white" />
-              </div>
-              <p style={{ fontSize: 12, color: M.sub }}>Для уведомлений о заказах</p>
-            </div>
-            <input
-              className="input"
-              placeholder="Chat ID, например -100123456789"
-              value={telegramChatId}
-              onChange={e => setTelegramChatId(e.target.value)}
-            />
           </Card>
         </div>
 
@@ -226,24 +198,6 @@ export default function SellerProfileInfoPage() {
                 <span style={{ fontSize: 14.5, fontWeight: 600, color: M.ink }}>Роль</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: '#76766E', background: '#F0EFEA', padding: '5px 12px', borderRadius: 7 }}>{roleLabel}</span>
               </div>
-            </Card>
-          </div>
-
-          <div>
-            <SectionTitle>Telegram</SectionTitle>
-            <Card style={{ borderRadius: 16, padding: '18px 22px' }} className="space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#2481CC,#1A6CB0)' }}>
-                  <MessageCircle size={15} color="white" />
-                </div>
-                <p style={{ fontSize: 12.5, color: M.sub }}>Для уведомлений о заказах</p>
-              </div>
-              <input
-                className="input"
-                placeholder="Chat ID, например -100123456789"
-                value={telegramChatId}
-                onChange={e => setTelegramChatId(e.target.value)}
-              />
             </Card>
           </div>
         </div>

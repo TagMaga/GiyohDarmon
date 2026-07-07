@@ -10,8 +10,10 @@ package dispatch
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/megamall/crm/internal/activity"
 	courier_tariffs "github.com/megamall/crm/internal/courier_tariffs"
 	apperrors "github.com/megamall/crm/pkg/errors"
+	"github.com/megamall/crm/pkg/middleware"
 	"github.com/megamall/crm/pkg/response"
 	"github.com/megamall/crm/pkg/validator"
 )
@@ -104,6 +106,16 @@ func (h *Handler) createCourierTariff(c *gin.Context) {
 		response.HandleError(c, svcErr)
 		return
 	}
+
+	actorID := middleware.ClaimsFromContext(c).UserID
+	h.svc.logger.LogAsync(activity.Entry{
+		ActorID:    &actorID,
+		Action:     "create",
+		EntityType: "courier_tariff_rule",
+		EntityID:   &rule.ID,
+		AfterState: rule,
+	})
+
 	response.Created(c, rule)
 }
 
@@ -122,10 +134,26 @@ func (h *Handler) deleteCourierTariff(c *gin.Context) {
 	db := h.svc.db
 	repo := courier_tariffs.NewRepository(db)
 	svc := courier_tariffs.NewService(repo)
+
+	existing, svcErr := svc.GetByID(c.Request.Context(), ruleID)
+	if svcErr != nil {
+		response.HandleError(c, svcErr)
+		return
+	}
+
 	if svcErr := svc.Delete(c.Request.Context(), ruleID, courierID); svcErr != nil {
 		response.HandleError(c, svcErr)
 		return
 	}
+
+	actorID := middleware.ClaimsFromContext(c).UserID
+	h.svc.logger.LogAsync(activity.Entry{
+		ActorID:     &actorID,
+		Action:      "delete",
+		EntityType:  "courier_tariff_rule",
+		EntityID:    &ruleID,
+		BeforeState: existing,
+	})
+
 	response.NoContent(c)
 }
-

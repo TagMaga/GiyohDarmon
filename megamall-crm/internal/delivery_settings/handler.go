@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/megamall/crm/internal/activity"
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/middleware"
 	"github.com/megamall/crm/pkg/response"
@@ -11,11 +12,12 @@ import (
 )
 
 type Handler struct {
-	db *gorm.DB
+	db     *gorm.DB
+	logger *activity.Logger
 }
 
-func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{db: db}
+func NewHandler(db *gorm.DB, logger *activity.Logger) *Handler {
+	return &Handler{db: db, logger: logger}
 }
 
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
@@ -50,6 +52,12 @@ func (h *Handler) update(c *gin.Context) {
 		return
 	}
 
+	before, err := h.fetch(c)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
 	updates := map[string]interface{}{
 		"normal_fee": req.NormalFee,
 		"fast_fee":   req.FastFee,
@@ -65,6 +73,16 @@ func (h *Handler) update(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
+
+	// delivery_settings is a singleton row (id=1, not a uuid) — no EntityID to attach.
+	h.logger.LogAsync(activity.Entry{
+		ActorID:     &actorID,
+		Action:      "update",
+		EntityType:  "delivery_settings",
+		BeforeState: Response{NormalFee: before.NormalFee, FastFee: before.FastFee},
+		AfterState:  Response{NormalFee: s.NormalFee, FastFee: s.FastFee},
+	})
+
 	response.OK(c, Response{NormalFee: s.NormalFee, FastFee: s.FastFee})
 }
 

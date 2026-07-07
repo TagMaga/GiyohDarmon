@@ -7,6 +7,7 @@ package testutil
 
 import (
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,6 +19,10 @@ import (
 	"gorm.io/gorm"
 )
 
+// phoneCounter guarantees unique test phone numbers within the process,
+// even when CreateUser is called multiple times in the same nanosecond.
+var phoneCounter atomic.Uint64
+
 // CreateUser inserts a test user with the given role and returns it.
 // Uses a random UUID and a deterministic phone derived from a counter.
 func CreateUser(t *testing.T, db *gorm.DB, role users.Role) *users.User {
@@ -26,9 +31,12 @@ func CreateUser(t *testing.T, db *gorm.DB, role users.Role) *users.User {
 	if err != nil {
 		t.Fatalf("testutil: hash password: %v", err)
 	}
+	// phone column is VARCHAR(20) — a raw UnixNano would overflow it, so
+	// truncate to a 9-digit counter tail, which is unique within a test run.
+	seq := phoneCounter.Add(1)
 	u := &users.User{
 		ID:           uuid.New(),
-		Phone:        fmt.Sprintf("+0%d", time.Now().UnixNano()),
+		Phone:        fmt.Sprintf("+1%09d", seq%1_000_000_000),
 		PasswordHash: string(hash),
 		FullName:     "Test " + string(role),
 		Role:         role,

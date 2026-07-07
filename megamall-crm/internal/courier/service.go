@@ -260,6 +260,13 @@ func (s *Service) SubmitHandover(ctx context.Context, courierID uuid.UUID, req S
 	var created *CashHandover
 
 	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// Must run before the eligibility check, as its own statement — see
+		// LockCourierForHandover's doc comment for why a plain row lock on
+		// orders can't prevent a duplicate handover here.
+		if err := s.repo.LockCourierForHandover(tx, ctx, courierID); err != nil {
+			return err
+		}
+
 		eligible, err := s.repo.FindEligibleHandoverOrders(tx, ctx, courierID)
 		if err != nil {
 			return err

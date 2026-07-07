@@ -34,13 +34,19 @@ type TeamForUserFn func(ctx context.Context, userID uuid.UUID) (*uuid.UUID, erro
 // RoleResolverFn resolves the role for a user ID — used during token refresh.
 type RoleResolverFn func(ctx context.Context, userID uuid.UUID) (users.Role, error)
 
+// IsActiveFn reports whether a user account is currently active. Used on every
+// access-token validation and on refresh, so a deactivated account loses access
+// immediately instead of waiting out the token's natural expiry.
+type IsActiveFn func(ctx context.Context, userID uuid.UUID) (bool, error)
+
 // Service handles authentication: login, token issuance, refresh, logout.
 type Service struct {
-	repo         *Repository
-	cfg          config.JWTConfig
-	userByPhone  UserByPhoneFn
-	teamForUser  TeamForUserFn
-	roleResolver RoleResolverFn // injected after construction to avoid circular dep
+	repo          *Repository
+	cfg           config.JWTConfig
+	userByPhone   UserByPhoneFn
+	teamForUser   TeamForUserFn
+	roleResolver  RoleResolverFn // injected after construction to avoid circular dep
+	activeChecker IsActiveFn     // injected after construction to avoid circular dep
 }
 
 func NewService(
@@ -61,6 +67,12 @@ func NewService(
 // Called from main.go after all services are constructed.
 func (s *Service) SetRoleResolver(fn RoleResolverFn) {
 	s.roleResolver = fn
+}
+
+// SetActiveChecker injects the is_active lookup used on every access-token
+// validation and on refresh. Called from main.go after all services are constructed.
+func (s *Service) SetActiveChecker(fn IsActiveFn) {
+	s.activeChecker = fn
 }
 
 // Login validates credentials and issues a token pair.
@@ -134,6 +146,23 @@ func (s *Service) Refresh(ctx context.Context, rawToken, ip, userAgent string) (
 		return nil, apperrors.Internal(err)
 	}
 
+	// Reject if the account has been deactivated since this token was issued —
+	// otherwise a deactivated user could keep refreshing indefinitely.
+	if s.activeChecker != nil {
+		active, err := s.activeChecker(ctx, existing.UserID)
+		if err != nil {
+			return nil, apperrors.Internal(fmt.Errorf("check active status: %w", err))
+		}
+		if !active {
+			_ = s.repo.RevokeFamily(ctx, existing.FamilyID)
+			return nil, &apperrors.AppError{
+				Code:       apperrors.CodeUserInactive,
+				StatusCode: 401,
+				Message:    "account is inactive",
+			}
+		}
+	}
+
 	// Resolve current role and team (may have changed since last login).
 	if s.roleResolver == nil {
 		return nil, apperrors.Internal(fmt.Errorf("role resolver not configured"))
@@ -160,8 +189,10 @@ func (s *Service) Logout(ctx context.Context, userID uuid.UUID) error {
 	return nil
 }
 
-// ValidateAccessToken parses and validates a signed JWT access token.
-func (s *Service) ValidateAccessToken(tokenStr string) (*Claims, error) {
+// ValidateAccessToken parses and validates a signed JWT access token, then
+// confirms the account is still active — a deactivated user's token is
+// rejected immediately rather than remaining valid until it naturally expires.
+func (s *Service) ValidateAccessToken(ctx context.Context, tokenStr string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
@@ -191,6 +222,21 @@ func (s *Service) ValidateAccessToken(tokenStr string) (*Claims, error) {
 			Message:    "malformed token claims",
 		}
 	}
+
+	if s.activeChecker != nil {
+		active, err := s.activeChecker(ctx, claims.UserID)
+		if err != nil {
+			return nil, apperrors.Internal(fmt.Errorf("check active status: %w", err))
+		}
+		if !active {
+			return nil, &apperrors.AppError{
+				Code:       apperrors.CodeUserInactive,
+				StatusCode: 401,
+				Message:    "account is inactive",
+			}
+		}
+	}
+
 	return claims, nil
 }
 

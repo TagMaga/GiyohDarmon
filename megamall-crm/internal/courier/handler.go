@@ -1,6 +1,8 @@
 package courier
 
 import (
+	"io"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	apperrors "github.com/megamall/crm/pkg/errors"
@@ -275,7 +277,15 @@ func (h *Handler) cashSummary(c *gin.Context) {
 
 func (h *Handler) submitHandover(c *gin.Context) {
 	var req SubmitHandoverRequest
-	_ = c.ShouldBindJSON(&req) // proof_url is optional
+	if err := c.ShouldBindJSON(&req); err != nil && err != io.EOF {
+		// io.EOF: an empty body is fine — every field is optional.
+		response.HandleError(c, apperrors.BadRequest("invalid request body"))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.HandleError(c, appErr)
+		return
+	}
 	claims := middleware.ClaimsFromContext(c)
 	handover, err := h.svc.SubmitHandover(c.Request.Context(), claims.UserID, req)
 	if err != nil {

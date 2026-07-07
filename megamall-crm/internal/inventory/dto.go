@@ -36,10 +36,11 @@ func ToInventoryResponse(inv *Inventory) InventoryResponse {
 
 type CreateReceivingRequest struct {
 	ProductID uuid.UUID `json:"product_id"   validate:"required"`
-	Quantity  int       `json:"quantity"      validate:"required,min=1"`
-	UnitCost  float64   `json:"unit_cost"     validate:"min=0"`
-	InvoiceNo *string   `json:"invoice_no"`
-	Notes     *string   `json:"notes"`
+	// max=1000000 is a fat-finger/overflow guard, not a real stock limit.
+	Quantity  int     `json:"quantity"      validate:"required,min=1,max=1000000"`
+	UnitCost  float64 `json:"unit_cost"     validate:"min=0,max=10000000"`
+	InvoiceNo *string `json:"invoice_no"`
+	Notes     *string `json:"notes"`
 }
 
 type ReceivingResponse struct {
@@ -49,8 +50,8 @@ type ReceivingResponse struct {
 
 type UpdateReceivingRequest struct {
 	ProductID uuid.UUID `json:"product_id" validate:"required"`
-	Quantity  int       `json:"quantity" validate:"required,min=1"`
-	UnitCost  float64   `json:"unit_cost" validate:"min=0"`
+	Quantity  int       `json:"quantity" validate:"required,min=1,max=1000000"`
+	UnitCost  float64   `json:"unit_cost" validate:"min=0,max=10000000"`
 	Notes     *string   `json:"notes"`
 }
 
@@ -134,11 +135,11 @@ type InventoryIntegrityDiscrepancy struct {
 
 type CreateAdjustmentRequest struct {
 	ProductID   uuid.UUID `json:"product_id"   validate:"required"`
-	NewQuantity int       `json:"new_quantity"  validate:"min=0"`
+	NewQuantity int       `json:"new_quantity"  validate:"min=0,max=1000000"`
 	Reason      string    `json:"reason"        validate:"required,max=500"`
 	// UnitCost is used when the adjustment increases stock (creates a batch).
 	// Defaults to 0 when omitted.
-	UnitCost *float64 `json:"unit_cost"`
+	UnitCost *float64 `json:"unit_cost" validate:"omitempty,min=0,max=10000000"`
 }
 
 type AdjustmentResponse struct {
@@ -167,7 +168,7 @@ func ToAdjustmentResponse(a *Adjustment) AdjustmentResponse {
 
 type CreateWriteoffRequest struct {
 	ProductID  uuid.UUID  `json:"product_id"   validate:"required"`
-	Quantity   int        `json:"quantity"      validate:"required,min=1"`
+	Quantity   int        `json:"quantity"      validate:"required,min=1,max=1000000"`
 	Reason     string     `json:"reason"        validate:"required,max=500"`
 	ApprovedBy *uuid.UUID `json:"approved_by"`
 }

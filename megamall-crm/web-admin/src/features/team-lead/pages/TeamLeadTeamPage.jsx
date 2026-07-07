@@ -66,7 +66,7 @@ function MobileMemberRow({ member, rank, onClick }) {
         </div>
       </div>
       <div className="text-right flex-shrink-0">
-        <span style={{ fontSize: 12.5, fontWeight: 700, color: M.ink }}>{fmtAmount(member.earned)} с</span>
+        <span style={{ fontSize: 12.5, fontWeight: 700, color: M.ink }}>{fmtAmount(member.earned)} смн</span>
       </div>
       <ChevronRight size={16} style={{ color: '#C7C5BC' }} className="flex-shrink-0" />
     </button>

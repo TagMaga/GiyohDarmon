@@ -8,6 +8,7 @@ package orders
 // Run with: go test ./internal/orders/ -v -run TestRBAC
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -40,7 +41,7 @@ func ordersForbiddenRoles() []string {
 // The route handler just returns 200 so tests can distinguish auth-pass from auth-fail.
 func buildTestRouter() *gin.Engine {
 	// Inject a fake validator that trusts the role passed as the Bearer token value.
-	middleware.SetTokenValidator(func(token string) (*middleware.ContextClaims, error) {
+	middleware.SetTokenValidator(func(_ context.Context, token string) (*middleware.ContextClaims, error) {
 		if token == "" {
 			return nil, apperrors.Unauthorized("no token")
 		}
@@ -163,7 +164,7 @@ func TestOrderRoleScope(t *testing.T) {
 
 	cases := []scopeCase{
 		{"seller", "self"},
-		{"manager", "self"},       // sees managed + own
+		{"manager", "self"},         // sees managed + own
 		{"sales_team_lead", "self"}, // sees team + own
 		{"dispatcher", "all"},
 		{"owner", "all"},

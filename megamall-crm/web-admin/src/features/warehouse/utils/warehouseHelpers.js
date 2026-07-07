@@ -157,7 +157,7 @@ export function getMovementType(m) {
 const currFmt = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 export function fmtMoney(n) {
   const num = Number(n)
-  return Number.isNaN(num) ? '—' : `${currFmt.format(num)} сом`
+  return Number.isNaN(num) ? '—' : `${currFmt.format(num)} смн`
 }
 
 const dateFmt = new Intl.DateTimeFormat('ru-RU', {

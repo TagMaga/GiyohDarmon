@@ -6,7 +6,7 @@ import Button from '../../../shared/components/Button'
 import Alert from '../../../shared/components/Alert'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
-import { addProductImage, createProduct, updateProduct } from '../api'
+import { addProductImage, createProduct, updateProduct, uploadImageFile } from '../api'
 import {
   getId,
   getProductImage,
@@ -83,10 +83,10 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
 
       const productId = getId(saved) ?? getId(product)
 
-      // Upload new image file as base64 data URL
+      // Upload new image file to /uploads and store the returned URL (not base64)
       if (productId && imageFile) {
-        const dataUrl = await fileToDataURL(imageFile)
-        await addProductImage(productId, { image_url: dataUrl, is_primary: true, sort_order: 0 })
+        const { url } = await uploadImageFile(imageFile)
+        await addProductImage(productId, { image_url: url, is_primary: true, sort_order: 0 })
       }
 
       return saved
@@ -166,15 +166,6 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
       </div>
     </Modal>
   )
-}
-
-function fileToDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = e => resolve(e.target.result)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
 }
 
 function Field({ label, value, onChange, type = 'text', placeholder, min }) {

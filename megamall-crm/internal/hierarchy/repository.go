@@ -48,11 +48,13 @@ func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) (*UserHi
 	return &h, nil
 }
 
-// GetByTeamID returns all hierarchy entries for a given team.
+// GetByTeamID returns all hierarchy entries for a given team, excluding
+// entries for users who are deactivated or soft-deleted — a deactivated
+// member/manager/team-lead must not remain visible in a team roster.
 func (r *Repository) GetByTeamID(ctx context.Context, teamID uuid.UUID) ([]UserHierarchy, error) {
 	var list []UserHierarchy
 	if err := r.db.WithContext(ctx).
-		Where("team_id = ?", teamID).
+		Where("team_id = ? AND EXISTS (SELECT 1 FROM users u WHERE u.id = user_hierarchy.user_id AND u.deleted_at IS NULL AND u.is_active = true)", teamID).
 		Find(&list).Error; err != nil {
 		return nil, fmt.Errorf("get hierarchy by team: %w", err)
 	}

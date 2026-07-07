@@ -30,9 +30,9 @@ type UpdateCourierRequest struct {
 	FullName       string      `json:"full_name"        validate:"required,min=1"`
 	Surname        *string     `json:"surname"`
 	Phone          string      `json:"phone"            validate:"required"`
-	Password       *string     `json:"password"`         // empty = keep existing
+	Password       *string     `json:"password"` // empty = keep existing
 	TelegramChatID *string     `json:"telegram_chat_id" validate:"required"`
-	CityIDs        []uuid.UUID `json:"city_ids"`         // nil = unchanged; empty slice = remove all
+	CityIDs        []uuid.UUID `json:"city_ids"` // nil = unchanged; empty slice = remove all
 }
 
 // ToggleCourierActiveRequest toggles the courier's is_active flag.
@@ -64,17 +64,17 @@ type CourierProfileResponse struct {
 //	                 delivered/returned. Used for the N/6 capacity gauge so a
 //	                 courier with held orders never shows as free.
 type CourierOverview struct {
-	CourierID            uuid.UUID  `json:"courier_id"`
-	FullName             string     `json:"full_name"`
-	Surname              *string    `json:"surname,omitempty"`
-	TelegramChatID       *string    `json:"telegram_chat_id,omitempty"`
-	Phone                string     `json:"phone"`
-	IsActive             bool       `json:"is_active"`
-	ActiveOrders         int        `json:"active_orders"`   // assigned + in_delivery + issue
-	AssignedOrders       int        `json:"assigned_orders"` // status = assigned
-	InDelivery           int        `json:"in_delivery"`     // status = in_delivery
-	IssueOrders          int        `json:"issue_orders"`    // status = issue
-	CashOwed             float64    `json:"cash_owed"`       // sum of (total_amount - prepayment) for delivered, not-yet-handovered
+	CourierID            uuid.UUID   `json:"courier_id"`
+	FullName             string      `json:"full_name"`
+	Surname              *string     `json:"surname,omitempty"`
+	TelegramChatID       *string     `json:"telegram_chat_id,omitempty"`
+	Phone                string      `json:"phone"`
+	IsActive             bool        `json:"is_active"`
+	ActiveOrders         int         `json:"active_orders"`   // assigned + in_delivery + issue
+	AssignedOrders       int         `json:"assigned_orders"` // status = assigned
+	InDelivery           int         `json:"in_delivery"`     // status = in_delivery
+	IssueOrders          int         `json:"issue_orders"`    // status = issue
+	CashOwed             float64     `json:"cash_owed"`       // sum of (total_amount - prepayment) for delivered, not-yet-handovered
 	OrderIntakeEnabled   bool        `json:"order_intake_enabled"`
 	OrderIntakeReason    *string     `json:"order_intake_reason,omitempty"`
 	OrderIntakeUpdatedAt *time.Time  `json:"order_intake_updated_at,omitempty"`
@@ -194,7 +194,9 @@ type StatusChangeRequest struct {
 }
 
 type ConfirmHandoverRequest struct {
-	ActualReturned float64 `json:"actual_returned" validate:"min=0"`
+	// max=1000000 is a fat-finger/overflow guard on cash-in-hand, not a real
+	// business ceiling.
+	ActualReturned float64 `json:"actual_returned" validate:"min=0,max=1000000"`
 	Comment        *string `json:"comment"`
 }
 

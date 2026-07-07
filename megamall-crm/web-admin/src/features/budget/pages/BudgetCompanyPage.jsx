@@ -9,6 +9,7 @@ import useBudgetTransactions from '../hooks/useBudgetTransactions'
 import { postBudgetIncome, postBudgetWithdrawal } from '../api'
 import EditBudgetTransactionModal from '../components/EditBudgetTransactionModal'
 import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
+import Alert from '../../../shared/components/Alert'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 const fmt = (v) => Number(v || 0).toLocaleString('ru-RU', { maximumFractionDigits: 0 })
@@ -115,7 +116,7 @@ function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, l
         <h2 className="text-[15px] font-bold text-slate-900 mb-1">{title}</h2>
         <p className="text-[11.5px] text-slate-400 mb-5">{sub}</p>
 
-        <label className="block text-[11.5px] font-semibold text-slate-500 mb-1.5">Сумма (TJS)</label>
+        <label className="block text-[11.5px] font-semibold text-slate-500 mb-1.5">Сумма (смн)</label>
         <input
           type="number"
           min="1"
@@ -137,7 +138,7 @@ function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, l
         {err && <p className="text-red-500 text-[11px] mt-1 mb-1">{err}</p>}
 
         <p className="text-[11px] text-slate-400 mb-5 mt-2">
-          Текущий баланс: <span className="font-bold text-slate-700">{fmt(balance)}</span> TJS
+          Текущий баланс: <span className="font-bold text-slate-700">{fmt(balance)}</span> смн
         </p>
 
         <div className="flex gap-2">
@@ -212,14 +213,14 @@ function MobileTxRow({ tx, onClick }) {
         </div>
       </div>
       <span className={`whitespace-nowrap text-[14.5px] font-extrabold tabular-nums ${cfg.amtClass}`}>
-        {cfg.sign}{fmt(tx.amount)} с
+        {cfg.sign}{fmt(tx.amount)} смн
       </span>
     </button>
   )
 }
 
 function MobileBudgetView({
-  balance, sumLoading, allTimeProfit, allTimeSumLoading, summary,
+  balance, sumLoading, sumError, onRetrySummary, allTimeProfit, allTimeSumLoading, summary,
   incomeCount, withdrawalCount, items, txLoading,
   typeFilter, onTypeFilter, onIncome, onWithdrawal, onEditTx,
 }) {
@@ -234,6 +235,13 @@ function MobileBudgetView({
         <h1 className="text-[22px] font-extrabold tracking-tight text-slate-950">Бюджет</h1>
       </div>
 
+      {sumError && (
+        <div className="flex items-center justify-between gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+          <span className="text-[12.5px] font-semibold text-red-700">Не удалось загрузить баланс</span>
+          <button onClick={onRetrySummary} className="text-[12.5px] font-bold text-red-700 underline flex-shrink-0">Повторить</button>
+        </div>
+      )}
+
       {/* Hero balance card */}
       <div
         className="rounded-[24px] px-5 pt-[22px] pb-[18px]"
@@ -241,10 +249,10 @@ function MobileBudgetView({
       >
         <div className="text-[11px] font-bold uppercase tracking-[.08em] text-indigo-100/85">Баланс сейчас</div>
         <div className="mt-2 text-[40px] font-extrabold leading-none tracking-tight text-white tabular-nums">
-          {sumLoading ? '—' : fmt(balance)} <span className="text-[22px] font-bold text-indigo-100/80">с</span>
+          {sumLoading || sumError ? '—' : fmt(balance)} <span className="text-[22px] font-bold text-indigo-100/80">смн</span>
         </div>
         <div className="mt-2 text-[12px] font-semibold text-emerald-300">
-          {allTimeSumLoading ? '—' : `↗ ${fmt(allTimeProfit)} с из чистой прибыли за всё время`}
+          {sumLoading || sumError || allTimeSumLoading ? '—' : `↗ ${fmt(allTimeProfit)} смн из чистой прибыли за всё время`}
         </div>
         <div className="mt-[18px] flex gap-2.5">
           <button
@@ -266,17 +274,17 @@ function MobileBudgetView({
       <div className="grid grid-cols-3 gap-2.5">
         <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
           <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Пополнения</div>
-          <div className="mt-1.5 text-[16px] font-extrabold tabular-nums text-emerald-600">{sumLoading ? '—' : `+${fmt(summary?.manual_top_ups)}`}</div>
+          <div className="mt-1.5 text-[16px] font-extrabold tabular-nums text-emerald-600">{sumLoading || sumError ? '—' : `+${fmt(summary?.manual_top_ups)}`}</div>
           <div className="mt-0.5 text-[10.5px] font-semibold text-slate-400">{incomeCount} {incomeCount === 1 ? 'операция' : 'операции'}</div>
         </div>
         <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
           <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Списания</div>
-          <div className="mt-1.5 text-[16px] font-extrabold tabular-nums text-rose-600">{sumLoading ? '—' : `-${fmt(summary?.owner_withdrawals)}`}</div>
+          <div className="mt-1.5 text-[16px] font-extrabold tabular-nums text-rose-600">{sumLoading || sumError ? '—' : `-${fmt(summary?.owner_withdrawals)}`}</div>
           <div className="mt-0.5 text-[10.5px] font-semibold text-slate-400">{withdrawalCount} {withdrawalCount === 1 ? 'операция' : 'операции'}</div>
         </div>
         <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
           <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Прибыль</div>
-          <div className="mt-1.5 text-[16px] font-extrabold tabular-nums text-slate-950">{sumLoading ? '—' : fmt(summary?.profit_from_finance)}</div>
+          <div className="mt-1.5 text-[16px] font-extrabold tabular-nums text-slate-950">{sumLoading || sumError ? '—' : fmt(summary?.profit_from_finance)}</div>
           <div className="mt-0.5 text-[10.5px] font-semibold text-slate-400">из финансов</div>
         </div>
       </div>
@@ -351,7 +359,7 @@ export default function BudgetCompanyPage() {
   const incomeCountParams = { ...sharedParams, type: 'manual_income', page: 1, limit: 1 }
   const withdrawalCountParams = { ...sharedParams, type: 'owner_withdrawal', page: 1, limit: 1 }
 
-  const { data: summary, isLoading: sumLoading } = useBudgetSummary(sharedParams)
+  const { data: summary, isLoading: sumLoading, isError: sumError, error: sumErrorObj, refetch: refetchSummary } = useBudgetSummary(sharedParams)
   const { data: allTimeSummary, isLoading: allTimeSumLoading } = useBudgetSummary()
   const { data: txData,  isLoading: txLoading  } = useBudgetTransactions(txParams)
   const { data: incomeTxData } = useBudgetTransactions(incomeCountParams)
@@ -378,6 +386,8 @@ export default function BudgetCompanyPage() {
         <MobileBudgetView
           balance={balance}
           sumLoading={sumLoading}
+          sumError={sumError}
+          onRetrySummary={refetchSummary}
           allTimeProfit={allTimeProfit}
           allTimeSumLoading={allTimeSumLoading}
           summary={summary}
@@ -423,31 +433,45 @@ export default function BudgetCompanyPage() {
         </div>
       </div>
 
+      {sumError && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Alert variant="error" title="Не удалось загрузить баланс">
+            {sumErrorObj?.response?.data?.error?.message ?? sumErrorObj?.message ?? 'Проверьте соединение и попробуйте снова.'}
+          </Alert>
+          <button
+            onClick={() => refetchSummary()}
+            className="min-h-10 px-4 rounded-[10px] border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-[13.5px] font-bold transition-all shadow-sm flex-shrink-0"
+          >
+            Повторить
+          </button>
+        </div>
+      )}
+
       {/* KPI grid — balance is all-time, other cards are scoped to the selected date range */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.4fr_1fr_1fr_1fr] gap-3">
         <KpiCard
           label="Баланс сейчас"
-          value={sumLoading ? '—' : `${fmt(balance)} с`}
-          sub={sumLoading || allTimeSumLoading ? '—' : `${fmt(allTimeProfit)} с из чистой прибыли за всё время`}
+          value={sumLoading || sumError ? '—' : `${fmt(balance)} смн`}
+          sub={sumLoading || sumError || allTimeSumLoading ? '—' : `${fmt(allTimeProfit)} смн из чистой прибыли за всё время`}
           subColor="text-emerald-500"
           valueClass="text-indigo-950"
           featured
         />
         <KpiCard
           label="Пополнения"
-          value={sumLoading ? '—' : `+${fmt(summary?.manual_top_ups)} с`}
+          value={sumLoading || sumError ? '—' : `+${fmt(summary?.manual_top_ups)} смн`}
           sub={`${incomeCount} ${incomeCount === 1 ? 'операция' : 'операции'}`}
           valueClass="text-emerald-600"
         />
         <KpiCard
           label="Списания"
-          value={sumLoading ? '—' : `-${fmt(summary?.owner_withdrawals)} с`}
+          value={sumLoading || sumError ? '—' : `-${fmt(summary?.owner_withdrawals)} смн`}
           sub={`${withdrawalCount} ${withdrawalCount === 1 ? 'операция' : 'операции'}`}
           valueClass="text-rose-600"
         />
         <KpiCard
           label="Прибыль за период"
-          value={sumLoading ? '—' : `${fmt(summary?.profit_from_finance)} с`}
+          value={sumLoading || sumError ? '—' : `${fmt(summary?.profit_from_finance)} смн`}
           sub="из финансов"
           valueClass="text-slate-950"
         />
@@ -530,7 +554,7 @@ export default function BudgetCompanyPage() {
                         </span>
                       </td>
                       <td className={`px-5 sm:px-6 py-4 text-[15px] font-extrabold whitespace-nowrap tabular-nums text-right ${cfg.amtClass}`}>
-                        {cfg.sign}{fmt(t.amount)} с
+                        {cfg.sign}{fmt(t.amount)} смн
                       </td>
                       <td className="px-5 sm:px-6 py-4 text-right">
                         <button

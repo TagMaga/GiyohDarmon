@@ -2,6 +2,7 @@ package courier_tariffs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -38,6 +39,19 @@ func (r *Repository) ListByType(ctx context.Context, courierID uuid.UUID, dt Del
 		return nil, fmt.Errorf("list courier tariff rules by type: %w", err)
 	}
 	return rules, nil
+}
+
+// GetByID returns a tariff rule by id, or nil if not found.
+func (r *Repository) GetByID(ctx context.Context, ruleID uuid.UUID) (*CourierTariffRule, error) {
+	var rule CourierTariffRule
+	err := r.db.WithContext(ctx).Where("id = ?", ruleID).First(&rule).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get courier tariff rule: %w", err)
+	}
+	return &rule, nil
 }
 
 // Create inserts a new tariff rule.

@@ -134,7 +134,7 @@ function CreateTariffModal({ open, onClose }) {
           </select>
         </div>
         {type === 'fixed' && (
-          <div><label className="input-label">Стоимость доставки (сом) *</label>
+          <div><label className="input-label">Стоимость доставки (смн) *</label>
             <input type="number" min="0.01" step="0.01" value={fixedFee} onChange={e => setFixedFee(e.target.value)} className="input mt-1" placeholder="15.00" />
           </div>
         )}

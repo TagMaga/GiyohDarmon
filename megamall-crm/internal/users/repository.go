@@ -103,8 +103,14 @@ func (r *Repository) List(ctx context.Context, filter ListUsersFilter, p paginat
 }
 
 func (r *Repository) Update(ctx context.Context, u *User) error {
+	// Select("*") is required: GORM's struct-based Updates silently skips
+	// zero-value fields (false, "", nil, ...), which meant setting
+	// is_active=false (a zero value) was never actually persisted — a
+	// deactivated user's row stayed is_active=true in the DB regardless of
+	// what the API reported back.
 	result := r.db.WithContext(ctx).
 		Model(u).
+		Select("*").
 		Where("deleted_at IS NULL").
 		Updates(u)
 	if result.Error != nil {
@@ -159,14 +165,18 @@ func (r *Repository) ExistsByID(ctx context.Context, id uuid.UUID) (bool, error)
 	return count > 0, nil
 }
 
-// GetByIDs returns all active users whose IDs are in the given set.
+// GetByIDs returns all active, non-deleted users whose IDs are in the given
+// set. Used to resolve user cards (name/avatar/etc.) for display — deactivated
+// or deleted users are excluded so they never appear as a visible team lead,
+// manager, or member in a roster (see hierarchy.Service.GetMyTeam, the only
+// current caller via userBriefsFn).
 func (r *Repository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]User, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
 	var list []User
 	err := r.db.WithContext(ctx).
-		Where("id IN ? AND deleted_at IS NULL", ids).
+		Where("id IN ? AND deleted_at IS NULL AND is_active = true", ids).
 		Find(&list).Error
 	if err != nil {
 		return nil, fmt.Errorf("get users by ids: %w", err)
@@ -208,6 +218,25 @@ func (r *Repository) ShareTeam(ctx context.Context, a uuid.UUID, b uuid.UUID) (b
 		return false, fmt.Errorf("share team check: %w", err)
 	}
 	return count > 0, nil
+}
+
+// ClearAsHierarchyParent nulls out parent_id for every hierarchy entry that
+// points at userID as its parent. Called when a user is deactivated or
+// soft-deleted, so they stop appearing as someone else's manager in the
+// upward hierarchy chain (internal/hierarchy.GetChainUpward). Does not touch
+// the user's own hierarchy row (team_id/parent_id) — that's left intact so
+// reactivation restores their original placement without needing
+// re-assignment; GetByIDs/GetByTeamID already exclude inactive/deleted users
+// from team rosters, which is what actually keeps them from appearing as a
+// visible team lead/manager/member in the UI/API.
+func (r *Repository) ClearAsHierarchyParent(ctx context.Context, userID uuid.UUID) error {
+	if err := r.db.WithContext(ctx).
+		Table("user_hierarchy").
+		Where("parent_id = ?", userID).
+		Update("parent_id", nil).Error; err != nil {
+		return fmt.Errorf("clear hierarchy parent references: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) CreateDocument(ctx context.Context, doc *UserDocument) error {

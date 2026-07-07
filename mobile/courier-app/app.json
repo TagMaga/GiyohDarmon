@@ -15,7 +15,6 @@
       "supportsTablet": false,
       "bundleIdentifier": "tj.megamall.courier",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Для отслеживания доставки",
         "NSCameraUsageDescription": "Для фото подтверждения оплаты",
         "NSPhotoLibraryUsageDescription": "Для загрузки фото квитанций"
       }
@@ -27,8 +26,6 @@
       },
       "package": "tj.megamall.courier",
       "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
@@ -37,12 +34,6 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "Разрешите доступ к геопозиции для отслеживания доставки"
-        }
-      ],
       "expo-asset"
     ],
     "scheme": "megamall-courier",

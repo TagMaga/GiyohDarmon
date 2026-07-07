@@ -43,6 +43,9 @@ func (s *Service) Create(ctx context.Context, courierID uuid.UUID, req CreateTar
 	if req.AmountTo != nil && *req.AmountTo <= req.AmountFrom {
 		return TariffRuleResponse{}, apperrors.BadRequest("amount_to must be greater than amount_from")
 	}
+	if req.TariffType == TariffPercent && req.TariffValue > 100 {
+		return TariffRuleResponse{}, apperrors.BadRequest("tariff_value must be <= 100 for a percent tariff")
+	}
 
 	// Overlap check: load existing rules for this courier+delivery_type.
 	existing, err := s.repo.ListByType(ctx, courierID, req.DeliveryType)
@@ -68,6 +71,17 @@ func (s *Service) Create(ctx context.Context, courierID uuid.UUID, req CreateTar
 		return TariffRuleResponse{}, apperrors.Internal(err)
 	}
 	return ToResponse(rule), nil
+}
+
+// GetByID returns a tariff rule by id, or nil if not found. Exposed so
+// callers (e.g. the audit log on delete) can capture the rule's state before
+// it's removed.
+func (s *Service) GetByID(ctx context.Context, ruleID uuid.UUID) (*CourierTariffRule, error) {
+	rule, err := s.repo.GetByID(ctx, ruleID)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+	return rule, nil
 }
 
 func (s *Service) Delete(ctx context.Context, ruleID, courierID uuid.UUID) error {

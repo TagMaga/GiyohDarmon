@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, FileText, RotateCcw, Pencil, Undo2 } from 'lucide-react'
 import EditFinanceExpenseModal from './EditFinanceExpenseModal'
 import VoidPayoutModal from './VoidPayoutModal'
+import Alert              from '../../../shared/components/Alert'
 import Badge              from '../../../shared/components/Badge'
 import EmptyState         from '../../../shared/components/EmptyState'
 import { CardSkeleton }   from '../../../shared/components/Skeleton'
@@ -204,7 +205,7 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
     page,
     limit: PAGE_LIMIT,
   }
-  const { data, isLoading, isFetching } = useFinanceEvents(params)
+  const { data, isLoading, isFetching, isError, error, refetch } = useFinanceEvents(params)
 
   const items     = data?.items  ?? []
   const meta      = data?.meta   ?? null
@@ -298,6 +299,19 @@ export default function FinanceEventsTable({ from, to, action = null, onExpenseE
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} />)}
+        </div>
+      ) : isError ? (
+        <div className="space-y-2">
+          <Alert variant="error" title="Не удалось загрузить события">
+            {error?.response?.data?.error?.message ?? error?.message ?? 'Проверьте соединение и попробуйте снова.'}
+          </Alert>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="inline-flex h-9 items-center rounded-lg bg-slate-100 px-3 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-200"
+          >
+            Повторить
+          </button>
         </div>
       ) : visibleItems.length === 0 ? (
         <EmptyState

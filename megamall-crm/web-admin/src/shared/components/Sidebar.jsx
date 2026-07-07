@@ -5,7 +5,7 @@ import {
   LayoutDashboard, PlusCircle, LogOut, ShoppingBag,
   Truck,
   Package, PackagePlus,
-  Building2, User, BookUser,
+  Building2, User, BookUser, Settings,
   PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import useAuthStore from '../store/authStore'
@@ -25,6 +25,7 @@ const NAV = {
     { label: 'Бюджет компании', icon: Wallet,     path: '/owner/budget' },
     { label: 'Склад',      icon: Building2,     path: '/owner/warehouse' },
     { label: 'Команда',    icon: BookUser,      path: '/owner/team-directory' },
+    { label: 'Настройки',  icon: Settings,      path: '/owner/settings' },
   ],
   manager: [
     { label: 'Главная',        icon: Home,          path: '/manager' },

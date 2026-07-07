@@ -1,5 +1,5 @@
 import {
-  Download, Package, PackagePlus, RefreshCw, Search, Trash2,
+  Download, FilterX, Package, PackagePlus, RefreshCw, Search, Trash2,
 } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
 import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'

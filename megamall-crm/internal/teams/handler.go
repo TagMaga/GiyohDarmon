@@ -54,7 +54,8 @@ func (h *Handler) List(c *gin.Context) {
 	}
 
 	p := pagination.ParseFromQuery(c)
-	teams, total, err := h.svc.List(c.Request.Context(), filter, p)
+	claims := middleware.ClaimsFromContext(c)
+	teams, total, err := h.svc.List(c.Request.Context(), claims.UserID, claims.Role, filter, p)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -70,7 +71,8 @@ func (h *Handler) GetByID(c *gin.Context) {
 		return
 	}
 
-	t, err := h.svc.GetByID(c.Request.Context(), id)
+	claims := middleware.ClaimsFromContext(c)
+	t, err := h.svc.GetByID(c.Request.Context(), claims.UserID, claims.Role, id)
 	if err != nil {
 		response.HandleError(c, err)
 		return

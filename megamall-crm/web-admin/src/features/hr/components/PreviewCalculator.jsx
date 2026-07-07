@@ -47,7 +47,7 @@ export default function PreviewCalculator() {
 
         <div className="space-y-4">
           <div>
-            <label className="input-label">Сумма заказа (сом) *</label>
+            <label className="input-label">Сумма заказа (смн) *</label>
             <input
               type="number" min="0.01" step="0.01"
               value={orderTotal}

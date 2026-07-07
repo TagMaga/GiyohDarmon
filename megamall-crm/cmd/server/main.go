@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/gin-gonic/gin"
@@ -32,6 +33,7 @@ import (
 	"github.com/megamall/crm/internal/payouts"
 	"github.com/megamall/crm/internal/products"
 	"github.com/megamall/crm/internal/teams"
+	"github.com/megamall/crm/internal/uploads"
 	"github.com/megamall/crm/internal/users"
 	"github.com/megamall/crm/pkg/database"
 	"github.com/megamall/crm/pkg/middleware"
@@ -148,9 +150,26 @@ func main() {
 		return u.Role, nil
 	})
 
+	// Wire is_active lookup so deactivated users lose access before their
+	// access token naturally expires (checked on every request + on refresh).
+	authSvc.SetActiveChecker(func(ctx context.Context, userID uuid.UUID) (bool, error) {
+		u, err := userRepo.GetByID(ctx, userID)
+		if err != nil {
+			return false, err
+		}
+		if u == nil {
+			return false, nil
+		}
+		return u.IsActive, nil
+	})
+
+	// Wire session revocation so deactivating/deleting a user immediately
+	// invalidates their existing refresh tokens.
+	userSvc.SetSessionRevoker(authSvc.Logout)
+
 	// ── Inject JWT validator into middleware package ───────────────────────────
-	middleware.SetTokenValidator(func(token string) (*middleware.ContextClaims, error) {
-		claims, err := authSvc.ValidateAccessToken(token)
+	middleware.SetTokenValidator(func(ctx context.Context, token string) (*middleware.ContextClaims, error) {
+		claims, err := authSvc.ValidateAccessToken(ctx, token)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +283,7 @@ func main() {
 		healthHandler.RegisterRoutes(v1)
 
 		// Delivery settings (GET: all authenticated roles; PUT: owner only)
-		deliverySettingsHandler := delivery_settings.NewHandler(db)
+		deliverySettingsHandler := delivery_settings.NewHandler(db, activityLogger)
 		deliverySettingsHandler.RegisterRoutes(v1.Group("/settings/delivery", middleware.RequireAuth()))
 
 		// Phase 15: Owner Finance Dashboard
@@ -277,7 +296,7 @@ func main() {
 		logisticsHandler.RegisterRoutes(v1.Group("/owner/logistics"))
 
 		// Phase 2 (delivery rework): cities + per-courier payout tariffs.
-		logisticsSettingsHandler := logistics_settings.NewHandler(db)
+		logisticsSettingsHandler := logistics_settings.NewHandler(db, activityLogger)
 		logisticsSettingsHandler.RegisterRoutes(v1)
 
 		// Payouts: generalized ledger (Team Lead → Manager/Seller, Owner → anyone).
@@ -286,9 +305,14 @@ func main() {
 		payoutsHandler := payouts.NewHandler(payoutsSvc)
 		payoutsHandler.RegisterRoutes(v1.Group("/payouts"))
 
-		// File uploads — saves to ./uploads/ and returns a URL
+		// File uploads — saves to ./uploads/ and returns a URL.
+		// The allowed type/size is enforced by internal/uploads.Validate via
+		// magic-byte sniffing — the client-supplied filename/extension is
+		// never trusted for either the check or the persisted extension.
 		uploadAuth := middleware.RequireAuth()
 		v1.POST("/uploads", uploadAuth, func(c *gin.Context) {
+			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, uploads.MaxFileSize+64<<10)
+
 			file, header, err := c.Request.FormFile("file")
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "BAD_REQUEST", "message": "file is required"}})
@@ -296,9 +320,10 @@ func main() {
 			}
 			defer file.Close()
 
-			ext := filepath.Ext(header.Filename)
-			if ext == "" {
-				ext = ".jpg"
+			ext, _, err := uploads.Validate(file, header.Size)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": gin.H{"code": "BAD_REQUEST", "message": err.Error()}})
+				return
 			}
 			filename := uuid.New().String() + ext
 
@@ -323,8 +348,47 @@ func main() {
 		})
 	}
 
-	// Serve uploaded files
-	router.Static("/uploads", "./uploads")
+	// Serve uploaded files. Never trusts the on-disk file's extension for the
+	// Content-Type — re-sniffs the actual bytes on every request via
+	// uploads.SniffAllowed, so a file that predates this validation (or
+	// somehow bypassed it) still can't be served as anything other than an
+	// allowed type. Non-image types are forced to download rather than
+	// render inline.
+	router.GET("/uploads/:filename", func(c *gin.Context) {
+		// :filename is a single gin path segment (no "/"), but reject any
+		// ".." defensively before it ever reaches the filesystem.
+		name := c.Param("filename")
+		if name == "" || strings.Contains(name, "..") || strings.Contains(name, "/") {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		f, err := os.Open(filepath.Join("./uploads", name))
+		if err != nil {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		defer f.Close()
+
+		info, err := f.Stat()
+		if err != nil || info.IsDir() {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		contentType, ok := uploads.SniffAllowed(f)
+		if !ok {
+			c.Status(http.StatusNotFound)
+			return
+		}
+
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("Content-Type", contentType)
+		if !uploads.IsImage(contentType) {
+			c.Header("Content-Disposition", `attachment; filename="`+name+`"`)
+		}
+		http.ServeContent(c.Writer, c.Request, name, info.ModTime(), f)
+	})
 
 	// ── HTTP Server ────────────────────────────────────────────────────────────
 	srv := &http.Server{

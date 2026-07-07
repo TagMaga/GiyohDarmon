@@ -43,14 +43,16 @@ type RegisterPushTokenRequest struct {
 }
 
 type SubmitHandoverRequest struct {
-	ProofURL        *string  `json:"proof_url"`
-	AttachmentsJSON *string  `json:"attachments_json"`
-	Notes           *string  `json:"notes"`
-	ActualAmount    *float64 `json:"actual_amount"`
+	ProofURL        *string `json:"proof_url"`
+	AttachmentsJSON *string `json:"attachments_json"`
+	Notes           *string `json:"notes"`
+	// max=1000000 is a fat-finger/overflow guard on cash-in-hand, not a real
+	// business ceiling.
+	ActualAmount *float64 `json:"actual_amount" validate:"omitempty,min=0,max=1000000"`
 }
 
 type ConfirmHandoverRequest struct {
-	ActualReturned float64 `json:"actual_returned" validate:"min=0"`
+	ActualReturned float64 `json:"actual_returned" validate:"min=0,max=1000000"`
 	Comment        *string `json:"comment"`
 }
 

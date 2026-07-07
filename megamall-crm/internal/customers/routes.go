@@ -8,11 +8,14 @@ import (
 // RegisterRoutes mounts customer routes.
 //
 // RBAC:
-//   All authenticated roles can read customers.
-//   Create/Update/Delete: owner, sales_team_lead, manager, seller, dispatcher.
-//   Courier has no access.
+//
+//	Read/Create/Update: owner, sales_team_lead, manager, seller, dispatcher —
+//	each scoped server-side to the orders they're entitled to see (see
+//	Repository.applyCustomerScope). warehouse_manager and courier have no
+//	access — neither needs customer PII for their job (inventory vs.
+//	delivery execution), so it's withheld entirely rather than scoped.
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
-	readRoles := middleware.RequireRoles("owner", "sales_team_lead", "manager", "seller", "dispatcher", "warehouse_manager")
+	readRoles := middleware.RequireRoles("owner", "sales_team_lead", "manager", "seller", "dispatcher")
 	writeRoles := middleware.RequireRoles("owner", "sales_team_lead", "manager", "seller", "dispatcher")
 
 	rg.GET("", readRoles, h.List)

@@ -9,6 +9,7 @@ import (
 // Expected to be called with v1.Group("/dispatch").
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	dispatcherRoles := middleware.RequireRoles("dispatcher", "owner")
+	ownerOnly := middleware.RequireRoles("owner")
 	auth := middleware.RequireAuth()
 
 	// Board
@@ -19,8 +20,10 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.PATCH("/couriers/:id/active", auth, dispatcherRoles, h.toggleCourierActive)
 	rg.PATCH("/couriers/:id/order-intake", auth, dispatcherRoles, h.updateCourierOrderIntake)
 	rg.GET("/couriers/:id/tariffs", auth, dispatcherRoles, h.listCourierTariffs)
-	rg.POST("/couriers/:id/tariffs", auth, dispatcherRoles, h.createCourierTariff)
-	rg.DELETE("/couriers/:id/tariffs/:rule_id", auth, dispatcherRoles, h.deleteCourierTariff)
+	// Tariffs set payout economics — owner-only to write, even though dispatcher
+	// can read them (needed to explain payouts to couriers).
+	rg.POST("/couriers/:id/tariffs", auth, ownerOnly, h.createCourierTariff)
+	rg.DELETE("/couriers/:id/tariffs/:rule_id", auth, ownerOnly, h.deleteCourierTariff)
 	rg.GET("/cash/settlement", auth, dispatcherRoles, h.getCashSettlement)
 	rg.GET("/cash/transactions", auth, dispatcherRoles, h.listCashTransactions)
 	rg.GET("/history/orders", auth, dispatcherRoles, h.listOrderHistory)

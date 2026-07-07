@@ -132,17 +132,21 @@ type HandoverListRow struct {
 	CreatedAt         time.Time  `json:"created_at"`
 }
 
+// Amount bounds (max=1000000) are a fat-finger/overflow guard on
+// cash-in-hand, not a real business ceiling — mirrors the same bound used
+// for courier/dispatch handover amounts (internal/courier/dto.go,
+// internal/dispatch/dto.go).
 type CreateHandoverReq struct {
-	CourierID         uuid.UUID `json:"courier_id"          binding:"required"`
-	TotalCollected    float64   `json:"total_collected"`
-	TotalDeliveryFees float64   `json:"total_delivery_fees"`
-	TotalToReturn     float64   `json:"total_to_return"`
+	CourierID         uuid.UUID `json:"courier_id"          validate:"required"`
+	TotalCollected    float64   `json:"total_collected"     validate:"min=0,max=1000000"`
+	TotalDeliveryFees float64   `json:"total_delivery_fees" validate:"min=0,max=1000000"`
+	TotalToReturn     float64   `json:"total_to_return"     validate:"min=0,max=1000000"`
 	Comment           *string   `json:"comment"`
 }
 
 type UpdateHandoverReq struct {
-	Status         *string  `json:"status"`
-	ActualReturned *float64 `json:"actual_returned"`
+	Status         *string  `json:"status" validate:"omitempty,oneof=pending confirmed rejected disputed"`
+	ActualReturned *float64 `json:"actual_returned" validate:"omitempty,min=0,max=1000000"`
 	Comment        *string  `json:"comment"`
 	AdminNote      *string  `json:"admin_note"`
 }

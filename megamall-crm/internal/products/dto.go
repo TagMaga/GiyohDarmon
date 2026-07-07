@@ -54,17 +54,19 @@ func ToSupplierResponse(s *Supplier) SupplierResponse {
 // ─── Product ──────────────────────────────────────────────────────────────────
 
 type CreateProductRequest struct {
-	SKU                string     `json:"sku"                  validate:"required,max=100"`
-	ArticleNumber      *string    `json:"article_number"`
-	Barcode            *string    `json:"barcode"`
-	Name               string     `json:"name"                 validate:"required,max=500"`
-	Description        *string    `json:"description"`
-	SupplierID         *uuid.UUID `json:"supplier_id"`
-	PurchasePrice      *float64   `json:"purchase_price"       validate:"omitempty,min=0"`
-	SalePrice          *float64   `json:"sale_price"           validate:"omitempty,min=0"`
-	Weight             *float64   `json:"weight"               validate:"omitempty,min=0"`
-	NormalDeliveryFee  *float64   `json:"normal_delivery_fee"  validate:"omitempty,min=0"`
-	ExpressDeliveryFee *float64   `json:"express_delivery_fee" validate:"omitempty,min=0"`
+	SKU           string     `json:"sku"                  validate:"required,max=100"`
+	ArticleNumber *string    `json:"article_number"`
+	Barcode       *string    `json:"barcode"`
+	Name          string     `json:"name"                 validate:"required,max=500"`
+	Description   *string    `json:"description"`
+	SupplierID    *uuid.UUID `json:"supplier_id"`
+	// The 10,000,000 ceiling is a fat-finger/overflow guard, not a real
+	// business limit.
+	PurchasePrice      *float64 `json:"purchase_price"       validate:"omitempty,min=0,max=10000000"`
+	SalePrice          *float64 `json:"sale_price"           validate:"omitempty,min=0,max=10000000"`
+	Weight             *float64 `json:"weight"               validate:"omitempty,min=0,max=1000000"`
+	NormalDeliveryFee  *float64 `json:"normal_delivery_fee"  validate:"omitempty,min=0,max=10000000"`
+	ExpressDeliveryFee *float64 `json:"express_delivery_fee" validate:"omitempty,min=0,max=10000000"`
 }
 
 type UpdateProductRequest struct {
@@ -74,11 +76,11 @@ type UpdateProductRequest struct {
 	Name               *string    `json:"name"                 validate:"omitempty,max=500"`
 	Description        *string    `json:"description"`
 	SupplierID         *uuid.UUID `json:"supplier_id"`
-	PurchasePrice      *float64   `json:"purchase_price"       validate:"omitempty,min=0"`
-	SalePrice          *float64   `json:"sale_price"           validate:"omitempty,min=0"`
-	Weight             *float64   `json:"weight"               validate:"omitempty,min=0"`
-	NormalDeliveryFee  *float64   `json:"normal_delivery_fee"  validate:"omitempty,min=0"`
-	ExpressDeliveryFee *float64   `json:"express_delivery_fee" validate:"omitempty,min=0"`
+	PurchasePrice      *float64   `json:"purchase_price"       validate:"omitempty,min=0,max=10000000"`
+	SalePrice          *float64   `json:"sale_price"           validate:"omitempty,min=0,max=10000000"`
+	Weight             *float64   `json:"weight"               validate:"omitempty,min=0,max=1000000"`
+	NormalDeliveryFee  *float64   `json:"normal_delivery_fee"  validate:"omitempty,min=0,max=10000000"`
+	ExpressDeliveryFee *float64   `json:"express_delivery_fee" validate:"omitempty,min=0,max=10000000"`
 	IsActive           *bool      `json:"is_active"`
 }
 

@@ -7,7 +7,7 @@ import * as ImagePicker from 'expo-image-picker'
 import useAuthStore from '../../src/store/authStore'
 import { logout as apiLogout, getMe, uploadAvatar } from '../../src/api/auth'
 import { API_URL } from '../../src/api/client'
-import { GlassBackdrop } from '../../src/components/glass'
+import { GlassBackdrop, useGlass } from '../../src/components/glass'
 
 const C = {
   bg: '#0b101e', surface: 'rgba(30,36,58,0.55)', surface2: 'rgba(255,255,255,0.06)',
@@ -20,6 +20,7 @@ const C = {
 export default function ProfileScreen() {
   const { user, refreshToken, logout, setUser } = useAuthStore()
   const [uploading, setUploading] = useState(false)
+  const { T, dark } = useGlass()
 
   const handlePickAvatar = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -59,50 +60,50 @@ export default function ProfileScreen() {
     : null
 
   return (
-    <SafeAreaView style={s.safe}>
-      <GlassBackdrop dark />
-      <StatusBar style="light" />
+    <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
+      <GlassBackdrop />
+      <StatusBar style={dark ? 'light' : 'dark'} />
       <ScrollView contentContainerStyle={s.content}>
         {/* Avatar block */}
         <View style={s.avatarBlock}>
-          <TouchableOpacity style={s.avatarRing} onPress={handlePickAvatar} disabled={uploading} activeOpacity={0.85}>
+          <TouchableOpacity style={[s.avatarRing, { borderColor: T.blue, shadowColor: T.blue }]} onPress={handlePickAvatar} disabled={uploading} activeOpacity={0.85}>
             {avatarUrl ? (
               <Image source={{ uri: avatarUrl }} style={s.avatarImage} />
             ) : (
-              <View style={s.avatar}>
+              <View style={[s.avatar, { backgroundColor: T.blue }]}>
                 <Text style={s.avatarText}>{initials}</Text>
               </View>
             )}
-            <View style={s.avatarEditBadge}>
+            <View style={[s.avatarEditBadge, { backgroundColor: T.blue, borderColor: T.base }]}>
               {uploading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.avatarEditIcon}>📷</Text>}
             </View>
           </TouchableOpacity>
-          <Text style={s.name}>{user?.full_name || '—'}</Text>
-          <View style={s.roleBadge}>
-            <Text style={s.roleText}>🛵  КУРЬЕР</Text>
+          <Text style={[s.name, { color: T.ink }]}>{user?.full_name || '—'}</Text>
+          <View style={[s.roleBadge, { backgroundColor: T.chip }]}>
+            <Text style={[s.roleText, { color: T.blue }]}>🛵  КУРЬЕР</Text>
           </View>
           <View style={s.statusPill}>
-            <View style={s.statusDot} />
-            <Text style={s.statusText}>Онлайн</Text>
+            <View style={[s.statusDot, { backgroundColor: T.green }]} />
+            <Text style={[s.statusText, { color: T.green }]}>Онлайн</Text>
           </View>
         </View>
 
         {/* Info card */}
-        <View style={s.card}>
-          <Text style={s.cardTitle}>ИНФОРМАЦИЯ</Text>
+        <View style={[s.card, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
+          <Text style={[s.cardTitle, { color: T.muted }]}>ИНФОРМАЦИЯ</Text>
           <InfoRow label="Телефон" value={user?.phone} />
           <InfoRow label="Email" value={user?.email} last />
         </View>
 
         {/* Tariff card */}
-        <View style={s.card}>
-          <Text style={s.cardTitle}>ТАРИФ</Text>
+        <View style={[s.card, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
+          <Text style={[s.cardTitle, { color: T.muted }]}>ТАРИФ</Text>
           <TariffRules rules={user?.tariff_rules} />
         </View>
 
         {/* Logout */}
-        <TouchableOpacity style={s.logoutBtn} onPress={handleLogout}>
-          <Text style={s.logoutText}>Выйти из аккаунта</Text>
+        <TouchableOpacity style={[s.logoutBtn, { borderColor: T.red }]} onPress={handleLogout}>
+          <Text style={[s.logoutText, { color: T.red }]}>Выйти из аккаунта</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -110,10 +111,11 @@ export default function ProfileScreen() {
 }
 
 function InfoRow({ label, value, last }) {
+  const { T } = useGlass()
   return (
-    <View style={[s.infoRow, !last && s.infoRowBorder]}>
-      <Text style={s.infoLabel}>{label}</Text>
-      <Text style={s.infoValue}>{value || '—'}</Text>
+    <View style={[s.infoRow, !last && [s.infoRowBorder, { borderBottomColor: T.hairline }]]}>
+      <Text style={[s.infoLabel, { color: T.muted }]}>{label}</Text>
+      <Text style={[s.infoValue, { color: T.ink }]}>{value || '—'}</Text>
     </View>
   )
 }
@@ -121,10 +123,12 @@ function InfoRow({ label, value, last }) {
 const DELIVERY_TYPE_LABEL = { normal: 'Обычная', fast: 'Срочная' }
 
 function TariffRules({ rules }) {
+  const { T } = useGlass()
+
   if (!rules?.length) {
     return (
       <View style={s.tariffEmpty}>
-        <Text style={s.tariffEmptyText}>Тариф не настроен</Text>
+        <Text style={[s.tariffEmptyText, { color: T.muted }]}>Тариф не настроен</Text>
       </View>
     )
   }
@@ -139,15 +143,15 @@ function TariffRules({ rules }) {
       {Object.entries(groups).map(([deliveryType, groupRules]) => (
         <View key={deliveryType}>
           <View style={s.tariffGroupHeader}>
-            <Text style={s.tariffGroupLabel}>{DELIVERY_TYPE_LABEL[deliveryType] ?? deliveryType}</Text>
+            <Text style={[s.tariffGroupLabel, { color: T.muted }]}>{DELIVERY_TYPE_LABEL[deliveryType] ?? deliveryType}</Text>
           </View>
           {groupRules.map((r, i) => (
-            <View key={r.id} style={[s.tariffRow, i < groupRules.length - 1 && s.infoRowBorder]}>
-              <Text style={s.tariffRange}>
+            <View key={r.id} style={[s.tariffRow, i < groupRules.length - 1 && [s.infoRowBorder, { borderBottomColor: T.hairline }]]}>
+              <Text style={[s.tariffRange, { color: T.muted }]}>
                 {r.amount_from} – {r.amount_to != null ? r.amount_to : '∞'} сом
               </Text>
-              <View style={[s.tariffBadge, { backgroundColor: C.accentDim }]}>
-                <Text style={{ color: C.accent, fontSize: 13, fontWeight: '600' }}>
+              <View style={[s.tariffBadge, { backgroundColor: T.chip }]}>
+                <Text style={{ color: T.blue, fontSize: 13, fontWeight: '600' }}>
                   {r.tariff_type === 'percent' ? `${r.tariff_value}%` : `${r.tariff_value} TJS`}
                 </Text>
               </View>

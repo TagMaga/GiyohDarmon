@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/megamall/crm/internal/activity"
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/middleware"
 	"github.com/megamall/crm/pkg/response"
@@ -13,11 +14,12 @@ import (
 )
 
 type Handler struct {
-	db *gorm.DB
+	db     *gorm.DB
+	logger *activity.Logger
 }
 
-func NewHandler(db *gorm.DB) *Handler {
-	return &Handler{db: db}
+func NewHandler(db *gorm.DB, logger *activity.Logger) *Handler {
+	return &Handler{db: db, logger: logger}
 }
 
 // ─── Cities ─────────────────────────────────────────────────────────────────
@@ -60,6 +62,16 @@ func (h *Handler) createCity(c *gin.Context) {
 		response.HandleError(c, apperrors.Conflict("city already exists"))
 		return
 	}
+
+	actorID := middleware.ClaimsFromContext(c).UserID
+	h.logger.LogAsync(activity.Entry{
+		ActorID:    &actorID,
+		Action:     "create",
+		EntityType: "city",
+		EntityID:   &city.ID,
+		AfterState: CityResponse{ID: city.ID, Name: city.Name, IsActive: city.IsActive},
+	})
+
 	response.Created(c, CityResponse{ID: city.ID, Name: city.Name, IsActive: city.IsActive})
 }
 
@@ -77,6 +89,13 @@ func (h *Handler) toggleCity(c *gin.Context) {
 		response.HandleError(c, apperrors.BadRequest(err.Error()))
 		return
 	}
+
+	var before City
+	if err := h.db.WithContext(c).First(&before, "id = ?", id).Error; err != nil {
+		response.HandleError(c, apperrors.NotFound("city"))
+		return
+	}
+
 	res := h.db.WithContext(c).Model(&City{}).Where("id = ?", id).
 		Update("is_active", req.IsActive)
 	if res.Error != nil {
@@ -87,6 +106,17 @@ func (h *Handler) toggleCity(c *gin.Context) {
 		response.HandleError(c, apperrors.NotFound("city"))
 		return
 	}
+
+	actorID := middleware.ClaimsFromContext(c).UserID
+	h.logger.LogAsync(activity.Entry{
+		ActorID:     &actorID,
+		Action:      "update",
+		EntityType:  "city",
+		EntityID:    &id,
+		BeforeState: CityResponse{ID: before.ID, Name: before.Name, IsActive: before.IsActive},
+		AfterState:  CityResponse{ID: before.ID, Name: before.Name, IsActive: req.IsActive},
+	})
+
 	response.OK(c, gin.H{"id": id, "is_active": req.IsActive})
 }
 
@@ -159,6 +189,16 @@ func (h *Handler) updateCourierPayout(c *gin.Context) {
 		return
 	}
 
+	// Capture prior state for the audit log — zero-value if no profile
+	// existed yet (matches getCourierPayout's auto-create-a-default behavior).
+	var beforeProfile CourierProfile
+	_ = h.db.WithContext(c).First(&beforeProfile, "user_id = ?", id).Error
+	beforeCityIDs, err := h.courierCityIDs(c, id)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
 	err = h.db.WithContext(c).Transaction(func(tx *gorm.DB) error {
 		// Upsert the profile.
 		p := CourierProfile{
@@ -190,6 +230,28 @@ func (h *Handler) updateCourierPayout(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
+
+	actorID := middleware.ClaimsFromContext(c).UserID
+	h.logger.LogAsync(activity.Entry{
+		ActorID:    &actorID,
+		Action:     "update",
+		EntityType: "courier_payout_profile",
+		EntityID:   &id,
+		BeforeState: CourierPayoutResponse{
+			UserID:       id,
+			PayoutNormal: beforeProfile.PayoutNormal,
+			PayoutFast:   beforeProfile.PayoutFast,
+			IsActive:     beforeProfile.IsActive,
+			CityIDs:      beforeCityIDs,
+		},
+		AfterState: CourierPayoutResponse{
+			UserID:       id,
+			PayoutNormal: req.PayoutNormal,
+			PayoutFast:   req.PayoutFast,
+			IsActive:     req.IsActive,
+			CityIDs:      req.CityIDs,
+		},
+	})
 
 	response.OK(c, CourierPayoutResponse{
 		UserID:       id,

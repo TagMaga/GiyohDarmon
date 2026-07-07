@@ -26,7 +26,8 @@ func (h *Handler) List(c *gin.Context) {
 		return
 	}
 	p := pagination.ParseFromQuery(c)
-	customers, total, err := h.svc.List(c.Request.Context(), f, p)
+	claims := middleware.ClaimsFromContext(c)
+	customers, total, err := h.svc.List(c.Request.Context(), claims.UserID, claims.Role, f, p)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -62,7 +63,8 @@ func (h *Handler) GetByID(c *gin.Context) {
 	if !ok {
 		return
 	}
-	cust, err := h.svc.GetByID(c.Request.Context(), id)
+	claims := middleware.ClaimsFromContext(c)
+	cust, err := h.svc.GetByID(c.Request.Context(), claims.UserID, claims.Role, id)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -85,7 +87,7 @@ func (h *Handler) Update(c *gin.Context) {
 		return
 	}
 	claims := middleware.ClaimsFromContext(c)
-	cust, err := h.svc.Update(c.Request.Context(), claims.UserID, id, req)
+	cust, err := h.svc.Update(c.Request.Context(), claims.UserID, claims.Role, id, req)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -99,7 +101,7 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 	claims := middleware.ClaimsFromContext(c)
-	if err := h.svc.Delete(c.Request.Context(), claims.UserID, id); err != nil {
+	if err := h.svc.Delete(c.Request.Context(), claims.UserID, claims.Role, id); err != nil {
 		response.HandleError(c, err)
 		return
 	}
@@ -111,7 +113,8 @@ func (h *Handler) GetHistory(c *gin.Context) {
 	if !ok {
 		return
 	}
-	hist, err := h.svc.GetHistory(c.Request.Context(), id)
+	claims := middleware.ClaimsFromContext(c)
+	hist, err := h.svc.GetHistory(c.Request.Context(), claims.UserID, claims.Role, id)
 	if err != nil {
 		response.HandleError(c, err)
 		return
