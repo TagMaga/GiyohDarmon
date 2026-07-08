@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import FilterChip from './FilterChip'
 
 function toYMD(date) {
   return [
@@ -231,27 +232,15 @@ export default function DesktopDateRangePicker({
       ].filter(Boolean).join(' ')}
     >
       {variant === 'chip' ? (
-        <button
-          type="button"
+        <FilterChip
+          label={chipLabel}
+          active={Boolean(from || to)}
           onClick={() => setOpen((value) => !value)}
-          className={[
-            'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-900 px-3.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800',
-            buttonClassName,
-          ].join(' ')}
-          aria-expanded={open}
-        >
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => { e.stopPropagation(); clear() }}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); clear() } }}
-            className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full hover:bg-white/20"
-            aria-label="Сбросить период"
-          >
-            <X size={11} />
-          </span>
-          {chipLabel}
-        </button>
+          onClear={clear}
+          ariaExpanded={open}
+          className={buttonClassName}
+          maxWidthClass=""
+        />
       ) : (
         <button
           type="button"

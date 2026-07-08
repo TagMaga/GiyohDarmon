@@ -1607,6 +1607,115 @@ function PayPanel({ person, teamId, teamName, teamColor, teams, employees, empCo
 }
 
 // ── Edit modal ────────────────────────────────────────────────────────────────
+// Dark panel chrome matches the dispatcher's courier edit modal
+// (features/dispatcher/components/CourierManageModals.jsx) for UI consistency
+// between the two "edit a person" flows.
+const PT = {
+  panel:  '#0d1525',
+  card:   '#111d30',
+  border: 'rgba(255,255,255,0.07)',
+  text1:  '#f0f4ff',
+  text2:  '#8fa3c8',
+  text3:  '#4a6080',
+  violet: '#8b5cf6',
+  red:    '#ef4444',
+}
+
+const ptField = {
+  width: '100%', background: PT.card, border: `1px solid ${PT.border}`,
+  borderRadius: 10, color: PT.text1, fontSize: 14, padding: '9px 12px',
+  outline: 'none', boxSizing: 'border-box',
+}
+
+function PTModalShell({ title, subtitle, onClose, children, width = 560 }) {
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(0,0,0,0.72)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', padding: 20,
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div style={{
+        width: '100%', maxWidth: width, maxHeight: '90vh',
+        background: PT.panel, borderRadius: 18,
+        border: `1px solid ${PT.border}`,
+        boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+          padding: '20px 24px 16px', borderBottom: `1px solid ${PT.border}`, flexShrink: 0,
+        }}>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: PT.text1 }}>{title}</div>
+            {subtitle && <div style={{ fontSize: 13, color: PT.text2, marginTop: 4 }}>{subtitle}</div>}
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8,
+              color: PT.text2, cursor: 'pointer', padding: '6px 10px', fontSize: 16,
+              marginLeft: 12, flexShrink: 0,
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function PTLabel({ children, required }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 700, color: PT.text2, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+      {children}{required && <span style={{ color: PT.red, marginLeft: 3 }}>*</span>}
+    </div>
+  )
+}
+
+function PTPrimaryBtn({ onClick, disabled, loading, children }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || loading}
+      style={{
+        background: disabled || loading ? 'rgba(139,92,246,0.4)' : PT.violet,
+        color: '#fff', border: 'none', borderRadius: 10,
+        padding: '11px 20px', fontWeight: 700, fontSize: 14,
+        cursor: disabled || loading ? 'not-allowed' : 'pointer',
+        opacity: disabled || loading ? 0.7 : 1, minWidth: 100,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+      }}
+    >
+      {loading ? '...' : children}
+    </button>
+  )
+}
+
+function PTGhostBtn({ onClick, children }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: 'transparent', color: PT.text2,
+        border: `1px solid ${PT.border}`, borderRadius: 10,
+        padding: '11px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
 
 function EditPersonModal({ open, onClose, person, onSaved }) {
   const qc    = useQueryClient()
@@ -1661,54 +1770,33 @@ function EditPersonModal({ open, onClose, person, onSaved }) {
     },
   })
 
-  if (!person) return null
+  if (!open || !person) return null
+
+  const close = () => { reset(); onClose() }
 
   return (
-    <Modal
-      open={open}
-      onClose={() => { reset(); onClose() }}
-      title="Редактировать сотрудника"
-      size="lg"
-      footer={
-        <>
-          <Button variant="secondary" onClick={() => { reset(); onClose() }} disabled={isPending}>Отмена</Button>
-          <Button variant="primary" onClick={() => mutate()} loading={isPending}>Сохранить</Button>
-        </>
-      }
+    <PTModalShell
+      title="✏️ Редактировать сотрудника"
+      subtitle={`ID: ${person.id?.slice(0, 8)}…`}
+      onClose={close}
     >
-      {error && (
-        <Alert variant="error" className="mb-4">
-          {error.response?.data?.error?.message ?? error.message}
-        </Alert>
-      )}
-
-      <div className="space-y-5">
+      <div style={{ padding: '20px 24px 24px' }}>
         {/* Row 1 — name + phone */}
-        <div className="grid grid-cols-2 gap-4">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
           <div>
-            <label className="input-label">Полное имя *</label>
-            <input
-              value={fullName}
-              onChange={e => setFullName(e.target.value)}
-              className="input mt-1"
-              placeholder="Имя Фамилия"
-            />
+            <PTLabel required>Полное имя</PTLabel>
+            <input style={ptField} value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Имя Фамилия" />
           </div>
           <div>
-            <label className="input-label">Телефон</label>
-            <input
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
-              className="input mt-1"
-              placeholder="+992 93 000 00 00"
-            />
+            <PTLabel>Телефон</PTLabel>
+            <input style={ptField} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+992 93 000 00 00" />
           </div>
         </div>
 
         {/* Row 2 — role */}
-        <div>
-          <label className="input-label">Должность *</label>
-          <select value={role} onChange={e => setRole(e.target.value)} className="input mt-1">
+        <div style={{ marginBottom: 16 }}>
+          <PTLabel required>Должность</PTLabel>
+          <select style={ptField} value={role} onChange={e => setRole(e.target.value)}>
             {ALL_ROLES.filter(r => r !== 'owner').map(r => (
               <option key={r} value={r}>{ROLE_LABEL[r]}</option>
             ))}
@@ -1716,62 +1804,56 @@ function EditPersonModal({ open, onClose, person, onSaved }) {
         </div>
 
         {/* Row 3 — hire date + dob */}
-        <div className="grid grid-cols-2 gap-4">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
           <div>
-            <label className="input-label">Дата найма</label>
-            <input
-              type="date"
-              value={hireDate}
-              onChange={e => setHireDate(e.target.value)}
-              className="input mt-1"
-            />
+            <PTLabel>Дата найма</PTLabel>
+            <input style={ptField} type="date" value={hireDate} onChange={e => setHireDate(e.target.value)} />
           </div>
           <div>
-            <label className="input-label">Дата рождения</label>
-            <input
-              type="date"
-              value={dob}
-              onChange={e => setDob(e.target.value)}
-              className="input mt-1"
-            />
+            <PTLabel>Дата рождения</PTLabel>
+            <input style={ptField} type="date" value={dob} onChange={e => setDob(e.target.value)} />
           </div>
         </div>
 
         {/* Row 4 — status + is_active */}
-        <div className="grid grid-cols-2 gap-4">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16, alignItems: 'end' }}>
           <div>
-            <label className="input-label">Статус</label>
-            <select value={status} onChange={e => setStatus(e.target.value)} className="input mt-1">
+            <PTLabel>Статус</PTLabel>
+            <select style={ptField} value={status} onChange={e => setStatus(e.target.value)}>
               {STATUS_OPTIONS.map(o => (
                 <option key={o.key} value={o.key}>{o.label}</option>
               ))}
             </select>
           </div>
-          <div className="flex items-end pb-[2px]">
-            <label className="flex items-center gap-2.5 cursor-pointer min-h-[44px]">
-              <input
-                type="checkbox"
-                checked={isActive}
-                onChange={e => setIsActive(e.target.checked)}
-                className="w-4 h-4 rounded accent-indigo-600"
-              />
-              <span className="text-[13.5px] text-slate-700 font-medium">Активный сотрудник</span>
-            </label>
-          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', minHeight: 44 }}>
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={e => setIsActive(e.target.checked)}
+              style={{ width: 16, height: 16, borderRadius: 4, accentColor: PT.violet }}
+            />
+            <span style={{ fontSize: 13.5, color: PT.text2, fontWeight: 600 }}>Активный сотрудник</span>
+          </label>
         </div>
 
         {/* Row 5 — address */}
-        <div>
-          <label className="input-label">Адрес</label>
-          <input
-            value={address}
-            onChange={e => setAddress(e.target.value)}
-            className="input mt-1"
-            placeholder="г. Душанбе, ул. ..."
-          />
+        <div style={{ marginBottom: 4 }}>
+          <PTLabel>Адрес</PTLabel>
+          <input style={ptField} value={address} onChange={e => setAddress(e.target.value)} placeholder="г. Душанбе, ул. ..." />
+        </div>
+
+        {error && (
+          <div style={{ marginTop: 12, fontSize: 13, color: PT.red }}>
+            {error.response?.data?.error?.message ?? error.message}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+          <PTGhostBtn onClick={close}>Отмена</PTGhostBtn>
+          <PTPrimaryBtn onClick={() => mutate()} loading={isPending}>Сохранить</PTPrimaryBtn>
         </div>
       </div>
-    </Modal>
+    </PTModalShell>
   )
 }
 

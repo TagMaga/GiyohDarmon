@@ -30,10 +30,9 @@ function toYMD(date) {
   return `${year}-${month}-${day}`
 }
 
-function last30DaysDefault() {
-  const now   = new Date()
-  const start = new Date(now)
-  start.setDate(start.getDate() - 29)
+function thisMonthDefault() {
+  const now = new Date()
+  const start = new Date(now.getFullYear(), now.getMonth(), 1)
   return { from: toYMD(start), to: toYMD(now) }
 }
 
@@ -168,7 +167,7 @@ function AddExpenseModal({ open, onClose, onSubmit, loading, error }) {
 
 export default function OwnerFinancePage() {
   const queryClient = useQueryClient()
-  const [{ from, to }, setRange] = useState(() => last30DaysDefault())
+  const [{ from, to }, setRange] = useState(() => thisMonthDefault())
   const [expenseOpen, setExpenseOpen] = useState(false)
 
   const summaryParams = { from, to }

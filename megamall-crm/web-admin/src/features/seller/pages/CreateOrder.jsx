@@ -11,7 +11,7 @@ import useCustomers from '../hooks/useCustomers'
 import useProducts from '../hooks/useProducts'
 import useDeliverySettings from '../hooks/useDeliverySettings'
 import useCities from '../hooks/useCities'
-import PhoneSearchField from '../components/PhoneSearchField'
+import PhoneSearchField, { isValidPhone } from '../components/PhoneSearchField'
 import CartItemRow from '../components/CartItemRow'
 import CartTotalsBreakdown from '../components/CartTotalsBreakdown'
 import DeliveryModeSelector from '../components/DeliveryModeSelector'
@@ -405,6 +405,9 @@ export default function CreateOrder() {
   // ── Validation ───────────────────────────────────────────────────────────────
   const canSubmit = (() => {
     if (!form.phone.trim()) return false
+    // Existing customers may have legacy phone formats — only enforce strict
+    // country/digit validation when entering a brand-new number.
+    if (!form.customerId && !isValidPhone(form.phone)) return false
     if (!form.cityId) return false
     if (cartItems.length === 0) return false
     if (cartItems.some((i) => calcPayloadUnitPrice(i) <= 0)) return false

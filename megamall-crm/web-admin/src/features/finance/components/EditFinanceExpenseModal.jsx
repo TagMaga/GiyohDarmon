@@ -11,14 +11,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Check, Clock, Pencil } from 'lucide-react'
 import { patchFinanceExpense, fetchFinanceExpenseHistory } from '../api'
-
-const CATEGORY_LABEL = {
-  salary:    'Зарплата',
-  rent:      'Аренда',
-  marketing: 'Маркетинг',
-  taxes:     'Налоги',
-  other:     'Другое',
-}
+import { EXPENSE_CATEGORY_LABEL } from '../../hr/utils/hrHelpers'
 
 const fmt = (v) => Number(v || 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 })
 
@@ -136,7 +129,7 @@ export default function EditFinanceExpenseModal({ expense, onClose, onSuccess })
           <div>
             <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Категория</label>
             <div className="h-10 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 flex items-center text-sm font-semibold text-slate-500">
-              {CATEGORY_LABEL[expense.expense_category] ?? expense.expense_category ?? '—'}
+              {EXPENSE_CATEGORY_LABEL[expense.expense_category] ?? expense.expense_category ?? '—'}
             </div>
           </div>
 

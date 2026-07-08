@@ -4,20 +4,23 @@
  * Uses GET /finance/events (all event types including company_revenue_earned).
  *
  * Features:
- *   - event_type, order_id, user_id, amount range filters
+ *   - event_type, order_id, user_id, amount range, and date filters (via
+ *     FinanceFilterBar's chip-row + bottom-sheet pattern)
+ *   - Расходы/Доходы summary stat cards with a donut indicator (mobile)
  *   - pagination (prev/next + page indicator)
- *   - desktop table + mobile card stack
+ *   - desktop table + mobile card stack, grouped by day on mobile
  *
  * Props:
- *   from     {string}  YYYY-MM-DD
- *   to       {string}  YYYY-MM-DD
- *   action   {ReactNode} optional header action
+ *   from          {string}    YYYY-MM-DD
+ *   to            {string}    YYYY-MM-DD
+ *   onDateChange  {(next:{from,to}) => void}  drives the Период chip
+ *   action        {ReactNode} optional header action
  */
-import { useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, FileText, RotateCcw, Pencil, Undo2, X } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, FileText, Pencil, Undo2 } from 'lucide-react'
 import EditFinanceExpenseModal   from './EditFinanceExpenseModal'
 import VoidPayoutModal           from './VoidPayoutModal'
-import DesktopDateRangePicker    from '../../../shared/components/DesktopDateRangePicker'
+import FinanceFilterBar          from './FinanceFilterBar'
 import Alert              from '../../../shared/components/Alert'
 import Badge              from '../../../shared/components/Badge'
 import EmptyState         from '../../../shared/components/EmptyState'
@@ -27,62 +30,15 @@ import { buildUserMap, userName } from '../../people/utils/peopleHelpers'
 import useOwnerOrders     from '../../orders/hooks/useOwnerOrders'
 import { formatOrderLabel, getOrderId } from '../../dispatcher/utils/orderHelpers'
 import useFinanceEvents   from '../hooks/useFinanceEvents'
+import useFinanceEventTotals from '../hooks/useFinanceEventTotals'
 import {
   fmtMoney,
   fmtDateTime,
   EVENT_TYPE_LABEL,
   EVENT_TYPE_BADGE,
+  INCOME_EVENT_TYPES,
+  EXPENSE_EVENT_TYPES,
 } from '../../hr/utils/hrHelpers'
-
-// Finance-specific event type options for the filter dropdown
-const EVENT_TYPE_OPTIONS = [
-  { value: '',                                    label: 'Все типы' },
-  { value: 'company_revenue_earned',              label: 'Доход компании' },
-  { value: 'company_revenue_confirmed',           label: 'Доход компании подтвержден' },
-  { value: 'seller_commission_earned',            label: 'Комиссия продавца' },
-  { value: 'seller_commission_confirmed',         label: 'Комиссия продавца подтверждена' },
-  { value: 'seller_commission_cancelled',         label: 'Комиссия продавца отменена' },
-  { value: 'manager_personal_commission_earned',  label: 'Комиссия менеджера (личная)' },
-  { value: 'manager_personal_commission_confirmed', label: 'Комиссия менеджера (личная) подтверждена' },
-  { value: 'manager_team_commission_earned',      label: 'Комиссия менеджера (команда)' },
-  { value: 'manager_team_commission_confirmed',   label: 'Комиссия менеджера (команда) подтверждена' },
-  { value: 'team_lead_pool_earned',               label: 'Пул руководителя' },
-  { value: 'team_lead_pool_confirmed',            label: 'Пул руководителя подтвержден' },
-  { value: 'courier_fee_earned',                  label: 'Доставка курьеру' },
-  { value: 'courier_fee_confirmed',               label: 'Доставка курьеру подтверждена' },
-  { value: 'cash_collected',                      label: 'Наличные собраны' },
-  { value: 'cash_handed_over',                    label: 'Наличные сданы' },
-  { value: 'business_expense',                    label: 'Расход' },
-  { value: 'team_lead_payout',                    label: 'Выплата · Тимлид → Менеджер' },
-  { value: 'manager_payout',                      label: 'Выплата · Менеджер → Продавец' },
-  { value: 'owner_payout',                        label: 'Выплата · Владелец' },
-]
-
-// Direction grouping for the Пополнение/Списание quick-filter: every accrual
-// (*_earned/*_confirmed — money being credited to someone) counts as income;
-// payouts, cancellations, and manual expenses are the money leaving that
-// balance again.
-const INCOME_EVENT_TYPES = new Set([
-  'company_revenue_earned', 'company_revenue_confirmed',
-  'seller_commission_earned', 'seller_commission_confirmed',
-  'manager_personal_commission_earned', 'manager_personal_commission_confirmed',
-  'manager_team_commission_earned', 'manager_team_commission_confirmed',
-  'team_lead_pool_earned', 'team_lead_pool_confirmed',
-  'courier_fee_earned', 'courier_fee_confirmed',
-  'cash_collected',
-])
-const EXPENSE_EVENT_TYPES = new Set([
-  'seller_commission_cancelled',
-  'business_expense',
-  'team_lead_payout', 'manager_payout', 'owner_payout',
-  'cash_handed_over',
-])
-
-// Base display order of the reorderable filter chips (Date is pinned before
-// all of these and never reorders). Whichever chip gets a value first moves
-// to the front, right after Date — matching the "active filters bubble left"
-// behavior this was modeled on.
-const FILTER_ORDER_KEYS = ['direction', 'type', 'amount', 'user', 'order']
 
 // Payout rows are auto-reconciled from the payouts ledger (never hand-typed),
 // business_expense is the only manually-entered row — the tag makes that
@@ -128,58 +84,75 @@ function EditedMarker({ event }) {
   )
 }
 
-function DirectionFilter({ value, onChange }) {
-  const chip = (key, label) => {
-    const active = value === key
+function RowActions({ ev, onEdit, onVoid }) {
+  if (ev.event_type === 'business_expense') {
     return (
       <button
         type="button"
-        onClick={() => onChange(active ? '' : key)}
-        className={[
-          'inline-flex h-9 flex-shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold transition-colors',
-          active ? 'bg-slate-900 text-white hover:bg-slate-800' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
-        ].join(' ')}
+        onClick={() => onEdit(ev)}
+        className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-colors hover:bg-indigo-100 hover:text-indigo-600"
+        title="Редактировать"
       >
-        {active && <X size={12} />}
-        {label}
+        <Pencil size={11} />
       </button>
     )
   }
+  if (PAYOUT_EVENT_TYPES.has(ev.event_type)) {
+    return (
+      <button
+        type="button"
+        onClick={() => onVoid(ev)}
+        className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-colors hover:bg-rose-100 hover:text-rose-600"
+        title="Отменить выплату"
+      >
+        <Undo2 size={11} />
+      </button>
+    )
+  }
+  return null
+}
+
+function DonutRing({ pct, color }) {
   return (
-    <div className="flex flex-shrink-0 items-center gap-1.5">
-      {chip('income', 'Пополнение')}
-      {chip('expense', 'Списание')}
+    <div
+      className="relative h-11 w-11 flex-shrink-0 rounded-full"
+      style={{ background: `conic-gradient(${color} 0% ${pct}%, #e2e8f0 ${pct}% 100%)` }}
+    >
+      <div className="absolute inset-[4px] rounded-full bg-white" />
     </div>
   )
 }
 
-function AmountRangeFilter({ minAmount, maxAmount, onMinChange, onMaxChange }) {
+function StatCard({ label, value, pct, color }) {
   return (
-    <div className="flex h-9 w-[210px] flex-shrink-0 items-center rounded-full border border-slate-200 bg-white px-3 text-xs text-slate-500">
-      <span className="mr-2 font-semibold text-slate-500">Сумма</span>
-      <input
-        type="number"
-        min="0"
-        step="0.01"
-        value={minAmount}
-        onChange={(e) => onMinChange(e.target.value)}
-        placeholder="от"
-        className="h-7 w-[54px] bg-transparent text-center font-semibold text-slate-800 outline-none placeholder:text-slate-400"
-        aria-label="Сумма от"
-      />
-      <span className="mx-1 h-4 w-px bg-slate-200" />
-      <input
-        type="number"
-        min="0"
-        step="0.01"
-        value={maxAmount}
-        onChange={(e) => onMaxChange(e.target.value)}
-        placeholder="до"
-        className="h-7 w-[54px] bg-transparent text-center font-semibold text-slate-800 outline-none placeholder:text-slate-400"
-        aria-label="Сумма до"
-      />
+    <div className="flex items-center justify-between gap-2.5 rounded-[18px] border border-slate-100 bg-white p-3.5 shadow-sm">
+      <div className="min-w-0">
+        <p className="text-[12.5px] text-slate-500">{label}</p>
+        <p className="mt-0.5 truncate text-[17px] font-extrabold text-slate-900">{value}</p>
+      </div>
+      <DonutRing pct={pct} color={color} />
     </div>
   )
+}
+
+function dayKey(iso) {
+  return iso ? iso.slice(0, 10) : 'unknown'
+}
+
+function dayLabel(iso) {
+  if (!iso) return 'Без даты'
+  const date = new Date(iso)
+  const today = new Date()
+  const yesterday = new Date()
+  yesterday.setDate(today.getDate() - 1)
+  const sameDay = (a, b) => a.toDateString() === b.toDateString()
+  if (sameDay(date, today)) return 'Сегодня'
+  if (sameDay(date, yesterday)) return 'Вчера'
+  return date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+  })
 }
 
 export default function FinanceEventsTable({ from, to, onDateChange, action = null, onExpenseEdited }) {
@@ -187,82 +160,24 @@ export default function FinanceEventsTable({ from, to, onDateChange, action = nu
   const [voidTarget, setVoidTarget] = useState(null)
   const [direction, setDirection] = useState('') // '' | 'income' | 'expense'
   const [eventType, setEventType] = useState('')
+  const [expenseCategory, setExpenseCategory] = useState('') // only meaningful when eventType === 'business_expense'
   const [orderSearch, setOrderSearch] = useState('')
   const [userSearch,  setUserSearch]  = useState('')
   const [minAmount, setMinAmount] = useState('')
   const [maxAmount, setMaxAmount] = useState('')
   const [page,      setPage]      = useState(1)
 
-  function updateFilter(setter) {
-    return (e) => {
-      setter(e.target.value)
-      setPage(1)
-    }
-  }
-
-  function updateAmountFilter(setter) {
-    return (value) => {
-      setter(value)
-      setPage(1)
-    }
-  }
-
   function updateDirection(next) {
     setDirection(next)
     setEventType((current) => {
       if (!current) return current
       const groupSet = next === 'income' ? INCOME_EVENT_TYPES : next === 'expense' ? EXPENSE_EVENT_TYPES : null
-      return groupSet && !groupSet.has(current) ? '' : current
+      const cleared = groupSet && !groupSet.has(current)
+      if (cleared) setExpenseCategory('')
+      return cleared ? '' : current
     })
     setPage(1)
   }
-
-  function resetFilters() {
-    setDirection('')
-    setEventType('')
-    setOrderSearch('')
-    setUserSearch('')
-    setMinAmount('')
-    setMaxAmount('')
-    setPage(1)
-  }
-
-  const scopedEventTypeOptions = useMemo(() => {
-    if (direction === 'income') return EVENT_TYPE_OPTIONS.filter((o) => o.value === '' || INCOME_EVENT_TYPES.has(o.value))
-    if (direction === 'expense') return EVENT_TYPE_OPTIONS.filter((o) => o.value === '' || EXPENSE_EVENT_TYPES.has(o.value))
-    return EVENT_TYPE_OPTIONS
-  }, [direction])
-
-  // Active filters bubble to the front of the chip row, in the order they
-  // were set, right after the (always-pinned) Date filter — mirrors the
-  // reference UX where applying a filter promotes its chip to the left.
-  const activationOrderRef = useRef({})
-  const activationCounterRef = useRef(0)
-  const isFilterActive = {
-    direction: Boolean(direction),
-    type: Boolean(eventType),
-    amount: Boolean(minAmount || maxAmount),
-    user: Boolean(userSearch),
-    order: Boolean(orderSearch),
-  }
-  FILTER_ORDER_KEYS.forEach((key) => {
-    if (isFilterActive[key]) {
-      if (!activationOrderRef.current[key]) activationOrderRef.current[key] = ++activationCounterRef.current
-    } else {
-      delete activationOrderRef.current[key]
-    }
-  })
-  const orderedFilterKeys = useMemo(() => (
-    [...FILTER_ORDER_KEYS].sort((a, b) => {
-      const orderA = activationOrderRef.current[a]
-      const orderB = activationOrderRef.current[b]
-      if (orderA && orderB) return orderA - orderB
-      if (orderA) return -1
-      if (orderB) return 1
-      return FILTER_ORDER_KEYS.indexOf(a) - FILTER_ORDER_KEYS.indexOf(b)
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [isFilterActive.direction, isFilterActive.type, isFilterActive.amount, isFilterActive.user, isFilterActive.order])
 
   const { data: employees = [] } = useEmployees()
   const { items: orders = [] } = useOwnerOrders({ from, to, page: 1, limit: 500 })
@@ -293,7 +208,6 @@ export default function FinanceEventsTable({ from, to, onDateChange, action = nu
   })).filter((user) => user.id), [employees])
   const selectedOrder = orderOptions.find((order) => order.label === orderSearch || order.id === orderSearch.trim())
   const selectedUser = userOptions.find((user) => user.label === userSearch || user.id === userSearch.trim())
-  const hasFilters = Boolean(direction || eventType || orderSearch || userSearch || minAmount || maxAmount)
 
   const params = {
     from,
@@ -307,6 +221,21 @@ export default function FinanceEventsTable({ from, to, onDateChange, action = nu
     limit: PAGE_LIMIT,
   }
   const { data, isLoading, isFetching, isError, error, refetch } = useFinanceEvents(params)
+
+  // Independent fetch just for the Расходы/Доходы stat cards — pages through
+  // the full (filtered) result set (the backend caps any single page at 100
+  // rows) rather than relying on the current page of `items` above. Mirrors
+  // every active filter so the cards match what the table shows.
+  const { data: totalsAgg, isLoading: totalsLoading } = useFinanceEventTotals({
+    ...params,
+    direction: direction || undefined,
+    expenseCategory: expenseCategory || undefined,
+  })
+  const incomeTotal = totalsAgg?.income ?? 0
+  const expenseTotal = totalsAgg?.expense ?? 0
+  const totalsSum = incomeTotal + expenseTotal
+  const incomePct = totalsSum ? Math.round((incomeTotal / totalsSum) * 100) : 0
+  const expensePct = totalsSum ? Math.round((expenseTotal / totalsSum) * 100) : 0
 
   const items     = data?.items  ?? []
   const meta      = data?.meta   ?? null
@@ -337,11 +266,29 @@ export default function FinanceEventsTable({ from, to, onDateChange, action = nu
 
     const directionGroup = direction === 'income' ? INCOME_EVENT_TYPES : direction === 'expense' ? EXPENSE_EVENT_TYPES : null
     const matchesDirection = !directionGroup || directionGroup.has(ev.event_type)
+    const matchesCategory = !expenseCategory || ev.expense_category === expenseCategory
 
-    return matchesDirection &&
+    return matchesDirection && matchesCategory &&
       (!normalizedOrderSearch || orderText.includes(normalizedOrderSearch)) &&
       (!normalizedUserSearch || userText.includes(normalizedUserSearch))
   })
+
+  const groupedItems = useMemo(() => {
+    const groups = []
+    const indexByKey = new Map()
+    visibleItems.forEach((ev) => {
+      const key = dayKey(ev.created_at)
+      if (!indexByKey.has(key)) {
+        indexByKey.set(key, groups.length)
+        groups.push({ key, title: dayLabel(ev.created_at), items: [] })
+      }
+      groups[indexByKey.get(key)].items.push(ev)
+    })
+    return groups
+  }, [visibleItems])
+
+  const openEdit = (ev) => setEditExpense({ id: ev.id, amount: ev.amount, note: ev.note ?? '', expense_category: ev.expense_category ?? 'other' })
+  const openVoid = (ev) => setVoidTarget({ id: ev.id, amount: ev.amount, created_at: ev.created_at })
 
   return (
     <div className="space-y-4">
@@ -355,80 +302,40 @@ export default function FinanceEventsTable({ from, to, onDateChange, action = nu
             )}
           </h3>
         </div>
-        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto py-1">
-          {action}
-          {onDateChange && (
-            <DesktopDateRangePicker
-              variant="chip"
-              from={from}
-              to={to}
-              onChange={({ from: nextFrom, to: nextTo }) => { onDateChange({ from: nextFrom, to: nextTo }); setPage(1) }}
-            />
-          )}
-          {orderedFilterKeys.map((key) => {
-            if (key === 'direction') {
-              return <DirectionFilter key={key} value={direction} onChange={updateDirection} />
-            }
-            if (key === 'type') {
-              return (
-                <select
-                  key={key}
-                  value={eventType}
-                  onChange={updateFilter(setEventType)}
-                  className="input h-9 w-auto min-w-[180px] py-0 pr-8 text-base"
-                >
-                  {scopedEventTypeOptions.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              )
-            }
-            if (key === 'amount') {
-              return (
-                <AmountRangeFilter
-                  key={key}
-                  minAmount={minAmount}
-                  maxAmount={maxAmount}
-                  onMinChange={updateAmountFilter(setMinAmount)}
-                  onMaxChange={updateAmountFilter(setMaxAmount)}
-                />
-              )
-            }
-            if (key === 'user') {
-              return (
-                <input
-                  key={key}
-                  type="search"
-                  value={userSearch}
-                  onChange={updateFilter(setUserSearch)}
-                  placeholder="Поиск пользователя"
-                  className="input h-9 w-[180px] py-0 text-base"
-                />
-              )
-            }
-            return (
-              <input
-                key={key}
-                type="search"
-                value={orderSearch}
-                onChange={updateFilter(setOrderSearch)}
-                placeholder="Поиск заказа"
-                className="input h-9 w-[170px] py-0 text-base"
-              />
-            )
-          })}
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200"
-              title="Сбросить фильтры"
-              aria-label="Сбросить фильтры"
-            >
-              <RotateCcw size={14} />
-            </button>
-          )}
-        </div>
+
+        <FinanceFilterBar
+          action={action}
+          from={from}
+          to={to}
+          onDateChange={({ from: nextFrom, to: nextTo }) => { onDateChange?.({ from: nextFrom, to: nextTo }); setPage(1) }}
+          direction={direction}
+          onDirectionChange={updateDirection}
+          eventType={eventType}
+          onEventTypeChange={(value) => { setEventType(value); setPage(1) }}
+          expenseCategory={expenseCategory}
+          onExpenseCategoryChange={(value) => { setExpenseCategory(value); setPage(1) }}
+          minAmount={minAmount}
+          maxAmount={maxAmount}
+          onAmountChange={(min, max) => { setMinAmount(min); setMaxAmount(max); setPage(1) }}
+          userSearch={userSearch}
+          onUserChange={(value) => { setUserSearch(value); setPage(1) }}
+          userOptions={userOptions}
+          orderSearch={orderSearch}
+          onOrderChange={(value) => { setOrderSearch(value); setPage(1) }}
+          orderOptions={orderOptions}
+        />
+
+        {/* Расходы / Доходы summary (mobile only) */}
+        {totalsLoading ? (
+          <div className="grid grid-cols-2 gap-2.5 sm:hidden">
+            {[0, 1].map((i) => <div key={i} className="skeleton h-[72px] rounded-[18px]" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2.5 sm:hidden">
+            <StatCard label="Расходы" value={fmtMoney(expenseTotal)} pct={expensePct} color="#e11d48" />
+            <StatCard label="Доходы" value={fmtMoney(incomeTotal)} pct={incomePct} color="#10b981" />
+          </div>
+        )}
       </div>
 
       {/* Loading state */}
@@ -466,7 +373,6 @@ export default function FinanceEventsTable({ from, to, onDateChange, action = nu
                   <th className="py-2.5 pr-3 text-left font-semibold">Заказ / пользователь</th>
                   <th className="py-2.5 pr-3 text-right font-semibold">Сумма</th>
                   <th className="py-2.5 text-right font-semibold">Дата</th>
-                  <th className="py-2.5 pl-2 text-right font-semibold">Действие</th>
                 </tr>
               </thead>
               <tbody>
@@ -481,6 +387,7 @@ export default function FinanceEventsTable({ from, to, onDateChange, action = nu
                           {EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type}
                         </Badge>
                         <ReconciliationTag eventType={ev.event_type} />
+                        <RowActions ev={ev} onEdit={openEdit} onVoid={openVoid} />
                       </div>
                     </td>
                     <td className="py-2.5 pr-3">
@@ -516,91 +423,59 @@ export default function FinanceEventsTable({ from, to, onDateChange, action = nu
                     <td className="py-2.5 text-right text-xs text-slate-400 whitespace-nowrap">
                       {fmtDateTime(ev.created_at)}
                     </td>
-                    <td className="py-2.5 pl-2 text-right">
-                      {ev.event_type === 'business_expense' && (
-                        <button
-                          onClick={() => setEditExpense({ id: ev.id, amount: ev.amount, note: ev.note ?? '', expense_category: ev.expense_category ?? 'other' })}
-                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-indigo-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"
-                          title="Редактировать"
-                        >
-                          <Pencil size={12} />
-                        </button>
-                      )}
-                      {PAYOUT_EVENT_TYPES.has(ev.event_type) && (
-                        <button
-                          onClick={() => setVoidTarget({ id: ev.id, amount: ev.amount, created_at: ev.created_at })}
-                          className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-rose-100 flex items-center justify-center text-slate-400 hover:text-rose-600 transition-colors"
-                          title="Отменить выплату"
-                        >
-                          <Undo2 size={12} />
-                        </button>
-                      )}
-                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          {/* Mobile cards */}
-          <div className="sm:hidden space-y-2">
-            {visibleItems.map((ev, i) => (
-              <div key={ev.id ?? i} className="card p-4 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <Badge variant={EVENT_TYPE_BADGE[ev.event_type] ?? 'slate'} size="sm">
-                      {EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type}
-                    </Badge>
-                    <ReconciliationTag eventType={ev.event_type} />
-                  </div>
-                  <span className="font-bold text-slate-900 tabular-nums flex-shrink-0">
-                    {fmtMoney(ev.amount)}
-                  </span>
+          {/* Mobile cards, grouped by day */}
+          <div className="sm:hidden space-y-4">
+            {groupedItems.map((group) => (
+              <div key={group.key}>
+                <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">{group.title}</p>
+                <div className="space-y-2">
+                  {group.items.map((ev, i) => (
+                    <div key={ev.id ?? i} className="card p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Badge variant={EVENT_TYPE_BADGE[ev.event_type] ?? 'slate'} size="sm">
+                            {EVENT_TYPE_LABEL[ev.event_type] ?? ev.event_type}
+                          </Badge>
+                          <ReconciliationTag eventType={ev.event_type} />
+                          <RowActions ev={ev} onEdit={openEdit} onVoid={openVoid} />
+                        </div>
+                        <span className="font-bold text-slate-900 tabular-nums flex-shrink-0">
+                          {fmtMoney(ev.amount)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 text-xs text-slate-400">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          {ev.order_id ? (
+                            <span>
+                              Заказ: <span className="font-medium text-slate-500">{resolveOrderLabel(ev.order_id)}</span>
+                            </span>
+                          ) : (
+                            <span className="min-w-0 truncate font-medium text-slate-500">{ev.note || '—'}</span>
+                          )}
+                          <EditedMarker event={ev} />
+                        </div>
+                        <span>{fmtDateTime(ev.created_at)}</span>
+                      </div>
+                      {ev.user_id && (
+                        <p className="text-[11px] text-slate-400">
+                          Пользователь: <span className="font-medium text-slate-500">{resolveUserName(ev.user_id)}</span>
+                        </p>
+                      )}
+                      {ev.payer_id && (
+                        <p className="text-[11px] text-slate-400">
+                          от <span className="font-medium text-slate-500">{resolveUserName(ev.payer_id)}</span>
+                          {ev.payer_role && ` (${PAYER_ROLE_LABEL[ev.payer_role] ?? ev.payer_role})`}
+                        </p>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center justify-between gap-3 text-xs text-slate-400">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    {ev.order_id ? (
-                      <span>
-                        Заказ: <span className="font-medium text-slate-500">{resolveOrderLabel(ev.order_id)}</span>
-                      </span>
-                    ) : (
-                      <span className="min-w-0 truncate font-medium text-slate-500">{ev.note || '—'}</span>
-                    )}
-                    <EditedMarker event={ev} />
-                  </div>
-                  <span>{fmtDateTime(ev.created_at)}</span>
-                </div>
-                {ev.user_id && (
-                  <p className="text-[11px] text-slate-400">
-                    Пользователь: <span className="font-medium text-slate-500">{resolveUserName(ev.user_id)}</span>
-                  </p>
-                )}
-                {ev.payer_id && (
-                  <p className="text-[11px] text-slate-400">
-                    от <span className="font-medium text-slate-500">{resolveUserName(ev.payer_id)}</span>
-                    {ev.payer_role && ` (${PAYER_ROLE_LABEL[ev.payer_role] ?? ev.payer_role})`}
-                  </p>
-                )}
-                {ev.event_type === 'business_expense' && (
-                  <div className="pt-1">
-                    <button
-                      onClick={() => setEditExpense({ id: ev.id, amount: ev.amount, note: ev.note ?? '', expense_category: ev.expense_category ?? 'other' })}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800"
-                    >
-                      <Pencil size={11} /> Редактировать
-                    </button>
-                  </div>
-                )}
-                {PAYOUT_EVENT_TYPES.has(ev.event_type) && (
-                  <div className="pt-1">
-                    <button
-                      onClick={() => setVoidTarget({ id: ev.id, amount: ev.amount, created_at: ev.created_at })}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-800"
-                    >
-                      <Undo2 size={11} /> Отменить выплату
-                    </button>
-                  </div>
-                )}
               </div>
             ))}
           </div>

@@ -99,9 +99,10 @@ export const KEYS = {
   },
   // ── Phase 15: Owner Finance Dashboard ─────────────────────────────────────
   finance: {
-    summary: (params) => ['finance', 'summary', params ?? {}],
-    events:  (params) => ['finance', 'events',  params ?? {}],
-    cash:    (params) => ['finance', 'cash',     params ?? {}],
+    summary:     (params) => ['finance', 'summary', params ?? {}],
+    events:      (params) => ['finance', 'events',  params ?? {}],
+    eventTotals: (params) => ['finance', 'events', 'totals', params ?? {}],
+    cash:        (params) => ['finance', 'cash',     params ?? {}],
   },
   // ── Phase 16: Owner Orders Center ─────────────────────────────────────────
   orders: {

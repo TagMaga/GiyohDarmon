@@ -81,24 +81,24 @@ export default function SellerHome() {
               {isLoading ? 'Загрузка…' : `${stats.todayCount} заказов сегодня · ${stats.deliveredCount} доставлено`}
             </div>
           </DarkCard>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="flex flex-col" style={{ justifyContent: 'space-between' }}>
             <Link to="/seller/orders" state={{ statusFilter: 'confirmed' }} style={{ display: 'block' }}>
-              <Card style={{ borderRadius: 16, padding: '18px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <div style={{ fontSize: 26, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{isLoading ? '—' : stats.activeCount}</div>
-                <div style={{ fontSize: 12, color: M.sub, fontWeight: 600, marginTop: 3 }}>В работе</div>
+              <Card style={{ borderRadius: 16, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 13, color: M.sub, fontWeight: 600 }}>В работе</span>
+                <span style={{ fontSize: 22, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{isLoading ? '—' : stats.activeCount}</span>
               </Card>
             </Link>
             <Link to="/seller/orders" state={{ statusFilter: 'delivered' }} style={{ display: 'block' }}>
-              <Card style={{ borderRadius: 16, padding: '18px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                <div style={{ fontSize: 26, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{isLoading ? '—' : stats.deliveredCount}</div>
-                <div style={{ fontSize: 12, color: M.sub, fontWeight: 600, marginTop: 3 }}>Доставлено</div>
+              <Card style={{ borderRadius: 16, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 13, color: M.sub, fontWeight: 600 }}>Доставлено</span>
+                <span style={{ fontSize: 22, fontWeight: 800, color: M.ink, letterSpacing: '-.01em' }}>{isLoading ? '—' : stats.deliveredCount}</span>
               </Card>
             </Link>
-            <Card style={{ borderRadius: 16, padding: '18px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: commissionPct !== null ? M.green : M.ink, letterSpacing: '-.01em' }}>
+            <Card style={{ borderRadius: 16, padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, color: M.sub, fontWeight: 600 }}>{commissionPct !== null ? 'Мой процент' : 'В команде'}</span>
+              <span style={{ fontSize: 22, fontWeight: 800, color: commissionPct !== null ? M.green : M.ink, letterSpacing: '-.01em' }}>
                 {commissionPct !== null ? `${commissionPct}%` : (rank !== null ? `#${rank}` : '—')}
-              </div>
-              <div style={{ fontSize: 12, color: M.sub, fontWeight: 600, marginTop: 3 }}>{commissionPct !== null ? 'Мой процент' : 'В команде'}</div>
+              </span>
             </Card>
           </div>
         </div>

@@ -1,5 +1,23 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Phone, UserCheck, UserPlus } from 'lucide-react'
+
+const COUNTRIES = [
+  { code: 'TJ', dial: '+992', digits: 9, flag: '🇹🇯', placeholder: '90 000 0000' },
+  { code: 'RU', dial: '+7', digits: 10, flag: '🇷🇺', placeholder: '912 345 67 89' },
+]
+
+// Detects country + national number from a phone string regardless of spacing/plus sign.
+function detectCountry(phone) {
+  const digits = (phone ?? '').replace(/\D/g, '')
+  if (digits.startsWith('992')) return { country: COUNTRIES[0], national: digits.slice(3) }
+  if (digits.startsWith('7')) return { country: COUNTRIES[1], national: digits.slice(1) }
+  return null
+}
+
+export function isValidPhone(phone) {
+  const detected = detectCountry(phone)
+  return !!detected && detected.national.length === detected.country.digits
+}
 
 /**
  * PhoneSearchField — phone input that searches existing customers.
@@ -20,6 +38,24 @@ export default function PhoneSearchField({
   onSelect,
   onClearSelection,
 }) {
+  const [touched, setTouched] = useState(false)
+  const detected = detectCountry(phone)
+  const country = detected?.country ?? COUNTRIES[0]
+  const nationalDigits = detected?.national ?? ''
+  const showError = touched && phone.trim().length > 0 && !isValidPhone(phone)
+
+  const handleCountryChange = (e) => {
+    const next = COUNTRIES.find((c) => c.code === e.target.value) ?? COUNTRIES[0]
+    onChange(next.dial)
+    if (selectedId) onClearSelection()
+  }
+
+  const handleDigitsChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, country.digits)
+    onChange(country.dial + digits)
+    if (selectedId) onClearSelection()
+  }
+
   // Filter customers by phone substring (show results when phone >= 4 chars)
   const matches = useMemo(() => {
     const q = phone.trim().replace(/\s+/g, '')
@@ -41,25 +77,45 @@ export default function PhoneSearchField({
         </span>
       </label>
 
-      <div className="relative">
-        <input
-          type="tel"
-          value={phone}
-          onChange={(e) => {
-            onChange(e.target.value)
-            // Clear selection if phone changes after a customer was selected
-            if (selectedId) onClearSelection()
-          }}
-          placeholder="+992 90 000 0000"
-          className={`input pr-10 ${selected ? 'border-emerald-400 ring-2 ring-emerald-500/20' : ''}`}
-          autoComplete="tel"
-        />
-        {selected && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <UserCheck size={16} className="text-emerald-500" />
-          </div>
-        )}
+      <div className="flex gap-2">
+        <select
+          value={country.code}
+          onChange={handleCountryChange}
+          className="input w-[92px] px-2 text-sm flex-shrink-0"
+        >
+          {COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>{c.flag} {c.dial}</option>
+          ))}
+        </select>
+
+        <div className="relative flex-1">
+          <input
+            type="tel"
+            inputMode="numeric"
+            value={nationalDigits}
+            onChange={handleDigitsChange}
+            onBlur={() => setTouched(true)}
+            placeholder={country.placeholder}
+            className={`input pr-10 ${
+              selected ? 'border-emerald-400 ring-2 ring-emerald-500/20'
+              : showError ? 'border-red-400 focus:ring-red-500/25 focus:border-red-400'
+              : ''
+            }`}
+            autoComplete="tel"
+          />
+          {selected && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <UserCheck size={16} className="text-emerald-500" />
+            </div>
+          )}
+        </div>
       </div>
+
+      {showError && (
+        <p className="text-xs text-red-500">
+          Введите корректный номер — {country.digits} цифр после {country.dial}
+        </p>
+      )}
 
       {/* Selected customer badge */}
       {selected && (

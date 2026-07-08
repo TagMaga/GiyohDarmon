@@ -81,6 +81,35 @@ export const EVENT_TYPE_BADGE = {
   owner_payout:                           'slate',
 }
 
+// Direction grouping used by the Finance ledger's Пополнение/Списание split:
+// every accrual (*_earned/*_confirmed — money being credited to someone)
+// counts as income; payouts, cancellations, and manual expenses are the
+// money leaving that balance again.
+export const INCOME_EVENT_TYPES = new Set([
+  'company_revenue_earned', 'company_revenue_confirmed',
+  'seller_commission_earned', 'seller_commission_confirmed',
+  'manager_personal_commission_earned', 'manager_personal_commission_confirmed',
+  'manager_team_commission_earned', 'manager_team_commission_confirmed',
+  'team_lead_pool_earned', 'team_lead_pool_confirmed',
+  'courier_fee_earned', 'courier_fee_confirmed',
+  'cash_collected',
+])
+export const EXPENSE_EVENT_TYPES = new Set([
+  'seller_commission_cancelled',
+  'business_expense',
+  'team_lead_payout', 'manager_payout', 'owner_payout',
+  'cash_handed_over',
+])
+
+// business_expense sub-categories (finance_expense_category enum on the backend).
+export const EXPENSE_CATEGORY_LABEL = {
+  salary:    'Зарплата',
+  rent:      'Аренда',
+  marketing: 'Маркетинг',
+  taxes:     'Налоги',
+  other:     'Другое',
+}
+
 // ── Rate source labels ────────────────────────────────────────────────────────
 export const RATE_SOURCE_LABEL = { global: 'Глобальный', team: 'Команда', employee: 'Сотрудник' }
 export const RATE_SOURCE_BADGE = { global: 'slate', team: 'indigo', employee: 'violet' }
