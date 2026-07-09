@@ -7,10 +7,12 @@
     },
     "preview": {
       "distribution": "internal",
-      "android": { "buildType": "apk" }
+      "android": { "buildType": "apk" },
+      "env": { "EXPO_PUBLIC_API_URL": "http://134.122.81.40" }
     },
     "production": {
-      "android": { "buildType": "aab" }
+      "android": { "buildType": "app-bundle" },
+      "env": { "EXPO_PUBLIC_API_URL": "http://134.122.81.40" }
     }
   },
   "submit": {

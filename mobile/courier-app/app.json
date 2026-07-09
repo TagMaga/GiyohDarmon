@@ -29,7 +29,8 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
-      ]
+      ],
+      "usesCleartextTraffic": true
     },
     "plugins": [
       "expo-router",
@@ -41,9 +42,11 @@
       "typedRoutes": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "5f020a78-04d3-47c7-9991-3047d864855c"
       }
-    }
+    },
+    "owner": "mahmadnazaralif"
   }
 }
