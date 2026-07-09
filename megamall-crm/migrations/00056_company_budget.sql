@@ -3,6 +3,9 @@
 -- Balance = SUM(amount) WHERE type IN ('manual_income','finance_profit')
 --         - SUM(amount) WHERE type = 'manual_expense'
 
+-- +goose Up
+-- +goose StatementBegin
+
 CREATE TYPE budget_transaction_type AS ENUM (
     'manual_income',
     'manual_expense',
@@ -34,3 +37,14 @@ CREATE UNIQUE INDEX uq_budget_order_profit
 
 CREATE INDEX idx_budget_created_at ON company_budget_transactions (created_at DESC);
 CREATE INDEX idx_budget_type       ON company_budget_transactions (transaction_type);
+
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+
+DROP TABLE IF EXISTS company_budget_transactions;
+DROP TYPE IF EXISTS budget_expense_category;
+DROP TYPE IF EXISTS budget_transaction_type;
+
+-- +goose StatementEnd
