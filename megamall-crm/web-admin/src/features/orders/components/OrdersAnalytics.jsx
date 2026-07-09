@@ -178,8 +178,8 @@ function RevenueTrend({ orders }) {
         <span className="text-[10px] text-slate-400">{dailyData[dailyData.length - 1]?.[0]}</span>
       </div>
       <div className="mt-2 flex justify-between text-xs text-slate-500">
-        <span>Мин: <strong className="text-slate-700">{fmtAmount(minV)} смн</strong></span>
-        <span>Макс: <strong className="text-slate-700">{fmtAmount(maxV)} смн</strong></span>
+        <span>Мин: <strong className="text-slate-700">{fmtAmount(minV)} с</strong></span>
+        <span>Макс: <strong className="text-slate-700">{fmtAmount(maxV)} с</strong></span>
       </div>
     </div>
   )

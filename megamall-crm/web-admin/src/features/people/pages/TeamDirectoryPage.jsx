@@ -112,11 +112,11 @@ function compensationLabel(comp, configs = [], globalByType = {}) {
   if (!comp && configs.length === 0 && Object.keys(globalByType).length === 0) return null
   if (comp) {
     const kind = comp.compensation_type
-    if (kind === 'fixed')   return comp.fixed_salary != null ? `${Number(comp.fixed_salary).toLocaleString('ru-RU')} TJS / мес.` : null
+    if (kind === 'fixed')   return comp.fixed_salary != null ? `${Number(comp.fixed_salary).toLocaleString('ru-RU')} с / мес.` : null
     if (kind === 'percent') return comp.commission_rate != null ? `${(comp.commission_rate * 100).toFixed(1)}%` : null
     if (kind === 'mixed') {
       const parts = []
-      if (comp.fixed_salary != null)    parts.push(`${Number(comp.fixed_salary).toLocaleString('ru-RU')} TJS`)
+      if (comp.fixed_salary != null)    parts.push(`${Number(comp.fixed_salary).toLocaleString('ru-RU')} с`)
       if (comp.commission_rate != null) parts.push(`${(comp.commission_rate * 100).toFixed(1)}%`)
       return parts.join(' + ')
     }
@@ -466,7 +466,7 @@ function GroupCard({ team, index, members, orders, leaderName, onClick }) {
 
       <div className="mt-3 grid grid-cols-[minmax(0,.9fr)_minmax(126px,1fr)] items-end gap-2 sm:mt-5 sm:block">
         <div className="min-w-0">
-          <p className="text-[11px] font-bold text-slate-500">Выручка (TJS)</p>
+          <p className="text-[11px] font-bold text-slate-500">Выручка (с)</p>
           <div className="mt-1 flex items-end gap-2">
             <p className="text-[25px] font-black leading-none tracking-tight text-slate-950 sm:text-[24px]">{revenue.toLocaleString('ru-RU')}</p>
             <p className={`text-[12px] font-black ${growth >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
@@ -504,7 +504,7 @@ function GroupCard({ team, index, members, orders, leaderName, onClick }) {
                     {chartDateLabel(days[pointIndex])}
                   </text>
                   <text className="chart-point-ui" x={tooltipX + tooltipWidth / 2} y={tooltipY + 24} textAnchor="middle" fontSize="9" fontWeight="900" fill="#0F172A">
-                    {trend[pointIndex].toLocaleString('ru-RU')} TJS
+                    {trend[pointIndex].toLocaleString('ru-RU')} с
                   </text>
                 </g>
               )
@@ -1163,7 +1163,7 @@ function SetSalaryModal({ open, onClose, personId, current }) {
         </div>
         {(kind === 'fixed' || kind === 'mixed') && (
           <div>
-            <label className="input-label">Оклад (TJS/мес) *</label>
+            <label className="input-label">Оклад (с/мес) *</label>
             <input type="number" min="0" step="0.01" value={salary}
               onChange={e => setSalary(e.target.value)} className="input mt-1" placeholder="3000" />
           </div>

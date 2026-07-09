@@ -1,5 +1,5 @@
 import { useLocation, Outlet, Link, NavLink } from 'react-router-dom'
-import { Info, Users, ChevronRight, LogOut, Percent } from 'lucide-react'
+import { Info, Users, UserCheck, ChevronRight, LogOut, Percent } from 'lucide-react'
 import { useSellerMe, useSellerCompensation } from '../../seller/hooks/useSellerMe'
 import useManagerPersonalOrders from '../hooks/useManagerPersonalOrders'
 import useMyManagerTeam from '../hooks/useMyManagerTeam'
@@ -110,9 +110,19 @@ export default function ManagerProfilePage() {
             <div>
               <SectionLabel style={{ margin: '0 0 10px' }}>Команда</SectionLabel>
               <Card style={{ borderRadius: 16, overflow: 'hidden' }}>
-                <NavLink to="/manager/sellers" className="flex items-center gap-[14px]" style={{ padding: '16px 20px' }}>
+                <NavLink to="/manager/profile/team" className="flex items-center gap-[14px]" style={{ padding: '16px 20px' }}>
                   <div className="flex items-center justify-center flex-shrink-0" style={{ width: 42, height: 42, borderRadius: 12, background: M.amberBg, color: M.amber }}>
                     <Users size={19} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>Моя команда</div>
+                    <div className="truncate" style={{ fontSize: 12.5, color: M.muted, marginTop: 1 }}>{teamDesc}</div>
+                  </div>
+                  <ChevronRight size={18} style={{ color: '#C7C5BC' }} className="flex-shrink-0" />
+                </NavLink>
+                <NavLink to="/manager/sellers" className="flex items-center gap-[14px]" style={{ padding: '16px 20px', borderTop: '1px solid #F4F3EF' }}>
+                  <div className="flex items-center justify-center flex-shrink-0" style={{ width: 42, height: 42, borderRadius: 12, background: M.indigoBg, color: M.indigoDeep }}>
+                    <UserCheck size={19} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>Мои продавцы</div>
@@ -200,9 +210,19 @@ export default function ManagerProfilePage() {
               {/* Team section */}
               <SectionLabel style={{ margin: '22px 4px 10px' }}>Команда</SectionLabel>
               <Card className="overflow-hidden">
-                <Link to="/manager/sellers" className="flex items-center gap-3" style={{ padding: '14px 15px' }}>
+                <Link to="/manager/profile/team" className="flex items-center gap-3" style={{ padding: '14px 15px' }}>
                   <div className="flex items-center justify-center flex-shrink-0" style={{ width: 36, height: 36, borderRadius: 11, background: M.amberBg, color: M.amber }}>
                     <Users size={17} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div style={{ fontSize: 14, fontWeight: 700, color: M.ink }}>Моя команда</div>
+                    <div className="truncate" style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>{teamDesc}</div>
+                  </div>
+                  <ChevronRight size={17} style={{ color: '#C7C5BC' }} className="flex-shrink-0" />
+                </Link>
+                <Link to="/manager/sellers" className="flex items-center gap-3" style={{ padding: '14px 15px', borderTop: '1px solid #F4F3EF' }}>
+                  <div className="flex items-center justify-center flex-shrink-0" style={{ width: 36, height: 36, borderRadius: 11, background: M.indigoBg, color: M.indigoDeep }}>
+                    <UserCheck size={17} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div style={{ fontSize: 14, fontWeight: 700, color: M.ink }}>Мои продавцы</div>

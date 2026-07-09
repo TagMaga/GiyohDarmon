@@ -51,6 +51,7 @@ const ManagerOrdersPage    = lazy(() => import('../features/manager/pages/Manage
 const ManagerSellersPage   = lazy(() => import('../features/manager/pages/ManagerSellersPage'))
 const ManagerMyOrdersPage  = lazy(() => import('../features/manager/pages/ManagerMyOrdersPage'))
 const ManagerProfilePage   = lazy(() => import('../features/manager/pages/ManagerProfilePage'))
+const ManagerProfileTeamPage = lazy(() => import('../features/manager/pages/ManagerProfileTeamPage'))
 
 // Seller
 const SellerDashboard        = lazy(() => import('../pages/SellerDashboard'))
@@ -201,6 +202,7 @@ const router = createBrowserRouter([
           children: [
             { index: true,  element: <Navigate to="info" replace /> },
             { path: 'info', element: <Lazy><SellerProfileInfoPage /></Lazy> },
+            { path: 'team', element: <Lazy><ManagerProfileTeamPage /></Lazy> },
           ],
         },
         { path: '*',                     element: <ComingSoon /> },

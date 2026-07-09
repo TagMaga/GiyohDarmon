@@ -126,7 +126,7 @@ export default function TeamLeadManagerPage() {
                 <StatCard icon={<Package size={16}/>}      label="Заказов команды"     value={managerStats.teamOrders}                    accent="indigo"  />
                 <StatCard icon={<PackageCheck size={16}/>} label="Доставлено"          value={managerStats.delivered}                     accent="emerald" />
                 <StatCard icon={<BarChart2 size={16}/>}    label="Личные заказы"       value={managerStats.personalOrders}                accent="amber"   />
-                <StatCard icon={<TrendingUp size={16}/>}   label="Выручка команды"     value={`${fmtAmount(managerStats.revenue)} смн`}     accent="violet"  />
+                <StatCard icon={<TrendingUp size={16}/>}   label="Выручка команды"     value={`${fmtAmount(managerStats.revenue)} с`}     accent="violet"  />
               </div>
             </div>
           )}

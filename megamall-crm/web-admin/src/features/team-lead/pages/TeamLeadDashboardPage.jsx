@@ -134,7 +134,7 @@ function RecentOrderRow({ order, userMap }) {
       </div>
       {/* Amount */}
       <span className="text-xs font-bold text-slate-800 flex-shrink-0 whitespace-nowrap">
-        {fmtAmount(amount)} смн
+        {fmtAmount(amount)} с
       </span>
     </div>
   )
@@ -204,7 +204,7 @@ function PerformanceRanking({ orders, userMap }) {
                 />
               </div>
               <p className="text-[10px] text-slate-400 mt-0.5">
-                {s.delivered} сдано · {conv}% конв. · {fmtAmount(s.revenue)} смн
+                {s.delivered} сдано · {conv}% конв. · {fmtAmount(s.revenue)} с
               </p>
             </div>
           </div>
@@ -441,7 +441,7 @@ export default function TeamLeadDashboardPage() {
             <span style={{ fontSize: 12.5, color: M.darkSub, fontWeight: 600, letterSpacing: '.02em' }}>Продажи команды сегодня</span>
           </div>
           <div style={{ fontSize: 42, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', lineHeight: 1, marginTop: 12 }}>
-            {todayLoading ? '…' : fmtAmount(todaySalesSum)} <span style={{ fontSize: 24, fontWeight: 600, color: M.darkMuted }}>смн</span>
+            {todayLoading ? '…' : fmtAmount(todaySalesSum)} <span style={{ fontSize: 24, fontWeight: 600, color: M.darkMuted }}>с</span>
           </div>
           <div style={{ fontSize: 12.5, color: M.darkMuted, marginTop: 9, fontWeight: 500 }}>
             {myTodayOrders.length} заказ{myTodayOrders.length === 1 ? '' : 'ов'} · {activeSellersToday} продавц{activeSellersToday === 1 ? 'ец' : 'ов'} активно
@@ -487,7 +487,7 @@ export default function TeamLeadDashboardPage() {
                   <div style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }} className="truncate">{s.name}</div>
                   <div style={{ fontSize: 11.5, color: M.faint, marginTop: 1 }}>{s.orders} заказ{s.orders === 1 ? '' : 'ов'}</div>
                 </div>
-                <span style={{ fontSize: 13.5, fontWeight: 800, color: M.ink, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmtAmount(s.revenue)} смн</span>
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: M.ink, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>{fmtAmount(s.revenue)} с</span>
               </div>
             ))}
           </Card>

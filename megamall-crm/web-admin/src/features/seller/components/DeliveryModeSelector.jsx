@@ -15,7 +15,7 @@ export const DELIVERY_MODES = [
  *   fastFee    {number}  — client fee from owner settings
  */
 export default function DeliveryModeSelector({ mode, onChange, normalFee = 0, fastFee = 0 }) {
-  const fmtFee = (f) => (f <= 0 ? 'Бесплатно' : `${f.toLocaleString('ru-RU')} смн`)
+  const fmtFee = (f) => (f <= 0 ? 'Бесплатно' : `${f.toLocaleString('ru-RU')} с`)
 
   const options = [
     { key: 'normal', label: 'Обычная', sub: `1–2 дня · ${fmtFee(normalFee)}` },

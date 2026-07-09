@@ -10,9 +10,10 @@
  */
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery }                    from '@tanstack/react-query'
-import { Search, X, ClipboardList, SlidersHorizontal } from 'lucide-react'
+import { Search, X, ClipboardList, ChevronDown } from 'lucide-react'
 import Badge                           from '../../../shared/components/Badge'
 import EmptyState                      from '../../../shared/components/EmptyState'
+import BottomSheet                     from '../../../shared/components/BottomSheet'
 import DesktopDateRangePicker          from '../../../shared/components/DesktopDateRangePicker'
 import MobileDateRangeCalendar         from '../../../shared/components/MobileDateRangeCalendar'
 import SellerOrderDetailPanel          from '../../seller/components/SellerOrderDetailPanel'
@@ -36,10 +37,143 @@ function useDebounce(value, delay) {
   return dv
 }
 
-function toYMD(d) { return d.toISOString().slice(0, 10) }
+function toYMD(date) {
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
+}
+function fromYMD(value) {
+  if (!value) return null
+  const [y, m, d] = value.split('-').map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d)
+}
+function addDays(date, days) { const n = new Date(date); n.setDate(n.getDate() + days); return n }
+function startOfMonth(date) { return new Date(date.getFullYear(), date.getMonth(), 1) }
+function endOfMonth(date) { return new Date(date.getFullYear(), date.getMonth() + 1, 0) }
+function addMonths(date, months) { return new Date(date.getFullYear(), date.getMonth() + months, 1) }
+function formatDMY(value) {
+  const d = fromYMD(value)
+  if (!d) return ''
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`
+}
+function formatHuman(value) {
+  const d = fromYMD(value)
+  if (!d) return ''
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+}
+function formatMonthLabel(date) { return date.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) }
+function parseDMY(text) {
+  const m = text.trim().match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/)
+  if (!m) return null
+  const day = Number(m[1]), month = Number(m[2]), year = Number(m[3])
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
 function currentMonthDefault() {
   const now = new Date()
-  return { from: toYMD(new Date(now.getFullYear(), now.getMonth(), 1)), to: toYMD(now) }
+  return { from: toYMD(startOfMonth(now)), to: toYMD(now) }
+}
+
+function periodChipLabel(from, to) {
+  if (!from || !to) return 'Период'
+  const start = fromYMD(from)
+  const end = fromYMD(to)
+  if (!start || !end) return 'Период'
+  const sameMonth = start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()
+  const isMonthToDate = from === toYMD(startOfMonth(start)) && to === toYMD(new Date())
+  if (sameMonth && isMonthToDate) {
+    return start.toLocaleDateString('ru-RU', { month: 'long' }).replace(/^./, ch => ch.toUpperCase())
+  }
+  const fmt = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' })
+  return sameMonth ? `${fmt.format(start)}-${fmt.format(end)}` : `${fmt.format(start)} | ${fmt.format(end)}`
+}
+
+const DATE_PRESETS = [
+  { label: 'Сегодня', get: () => { const t = toYMD(new Date()); return { from: t, to: t } } },
+  { label: 'Вчера', get: () => { const y = toYMD(addDays(new Date(), -1)); return { from: y, to: y } } },
+  { label: '7 дней', get: () => ({ from: toYMD(addDays(new Date(), -6)), to: toYMD(new Date()) }) },
+  { label: '30 дней', get: () => ({ from: toYMD(addDays(new Date(), -29)), to: toYMD(new Date()) }) },
+  { label: 'Этот месяц', get: () => ({ from: toYMD(startOfMonth(new Date())), to: toYMD(new Date()) }) },
+]
+const WEEKDAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС']
+
+const CHIP_BASE = 'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold transition duration-150 font-sans active:scale-[0.94]'
+const CHIP_OFF = `${CHIP_BASE} bg-slate-100 text-slate-600 hover:bg-slate-200`
+const CHIP_ON = `${CHIP_BASE} bg-indigo-600 text-white hover:bg-indigo-700`
+
+function FilterChip({ flipKey, active, onClick, onClear, children }) {
+  return (
+    <button type="button" data-flip-key={flipKey} onClick={onClick} className={active ? CHIP_ON : CHIP_OFF}>
+      {active && (
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label="Сбросить"
+          onClick={(e) => { e.stopPropagation(); onClear() }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onClear() } }}
+          className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full hover:bg-white/20"
+        >
+          <X size={11} />
+        </span>
+      )}
+      {children}
+      {!active && <ChevronDown size={13} className="opacity-50 transition-transform duration-200" />}
+    </button>
+  )
+}
+
+function PresetPill({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'h-8 rounded-full px-3 text-xs font-semibold transition-colors',
+        active ? 'border border-indigo-600 bg-indigo-50 text-indigo-700' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  )
+}
+
+function MonthGrid({ month, from, to, onPick }) {
+  const days = useMemo(() => {
+    const first = startOfMonth(month)
+    const offset = (first.getDay() + 6) % 7
+    const cells = []
+    for (let i = 0; i < offset; i += 1) cells.push(null)
+    const total = endOfMonth(month).getDate()
+    for (let d = 1; d <= total; d += 1) cells.push(new Date(month.getFullYear(), month.getMonth(), d))
+    return cells
+  }, [month])
+
+  return (
+    <div className="pb-1 pt-3">
+      <p className="mb-2 text-[15px] font-bold capitalize text-slate-900">{formatMonthLabel(month)}</p>
+      <div className="grid grid-cols-7 gap-1">
+        {days.map((day, i) => {
+          if (!day) return <div key={`e-${i}`} className="h-[42px]" />
+          const value = toYMD(day)
+          const edge = value === from || value === to
+          const inRange = Boolean(from && to && value > from && value < to)
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onPick(day)}
+              className={[
+                'h-[42px] select-none rounded-full text-[13.5px] font-semibold transition-colors',
+                edge ? 'bg-indigo-600 text-white' : inRange ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-100',
+              ].join(' ')}
+            >
+              {day.getDate()}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export default function ManagerOrdersPage() {
@@ -51,9 +185,13 @@ export default function ManagerOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [sellerId,     setSellerId]     = useState('')
   const [rawSearch,    setRawSearch]    = useState('')
+  const [minAmount,    setMinAmount]    = useState('')
+  const [maxAmount,    setMaxAmount]    = useState('')
   const [page,         setPage]         = useState(1)
   const [detailOrder,  setDetailOrder]  = useState(null)
-  const [filtersOpen,  setFiltersOpen]  = useState(false)
+  const [sheet,        setSheet]        = useState(null) // null | 'period' | 'user' | 'amount'
+  const [draft,        setDraft]        = useState({})
+  const [monthCount,   setMonthCount]   = useState(2)
 
   const search = useDebounce(rawSearch, 400)
 
@@ -66,6 +204,82 @@ export default function ManagerOrdersPage() {
   const sellers = useMemo(() =>
     members.map(m => userMap[m.user_id]).filter(u => u && (u.role ?? u.Role) === 'seller'),
     [members, userMap]
+  )
+  const selectedSeller = useMemo(() => sellers.find(u => u.id === sellerId) ?? null, [sellers, sellerId])
+
+  // Mobile chip row: Период / Пользователь / Сумма, each opening a bottom sheet.
+  function openSheet(kind) {
+    if (kind === 'period') {
+      setDraft({ from: dateFrom, to: dateTo, fromTxt: formatDMY(dateFrom), toTxt: formatDMY(dateTo) })
+      setMonthCount(2)
+    } else if (kind === 'user') setDraft({ sel: sellerId })
+    else if (kind === 'amount') setDraft({ min: minAmount, max: maxAmount })
+    setSheet(kind)
+  }
+  function closeSheet() { setSheet(null); setDraft({}) }
+  function patchDraft(patch) { setDraft(d => ({ ...d, ...patch })) }
+  function applySheet() {
+    if (sheet === 'period') {
+      if (draft.from) { setDateFrom(draft.from); setDateTo(draft.to || draft.from) }
+    } else if (sheet === 'user') {
+      setSellerId(draft.sel || '')
+    } else if (sheet === 'amount') {
+      setMinAmount(draft.min || ''); setMaxAmount(draft.max || '')
+    }
+    closeSheet()
+  }
+
+  function pickDay(day) {
+    const value = toYMD(day)
+    let nextFrom = draft.from, nextTo = draft.to
+    if (!nextFrom || (nextFrom && nextTo)) { nextFrom = value; nextTo = '' }
+    else if (value < nextFrom) { nextTo = nextFrom; nextFrom = value }
+    else { nextTo = value }
+    patchDraft({ from: nextFrom, to: nextTo, fromTxt: formatDMY(nextFrom), toTxt: formatDMY(nextTo) })
+  }
+  function onTypeDateFrom(e) {
+    const text = e.target.value
+    const value = parseDMY(text)
+    patchDraft(value ? { fromTxt: text, from: value } : { fromTxt: text })
+  }
+  function onTypeDateTo(e) {
+    const text = e.target.value
+    const value = parseDMY(text)
+    patchDraft(value ? { toTxt: text, to: value } : { toTxt: text })
+  }
+
+  const periodActive = dateFrom !== def.from || dateTo !== def.to
+  const periodLabel = periodChipLabel(dateFrom, dateTo)
+  const amountOn = Boolean(minAmount || maxAmount)
+  const amountLabel = amountOn
+    ? (minAmount && maxAmount ? `${minAmount}–${maxAmount}` : minAmount ? `от ${minAmount}` : `до ${maxAmount}`)
+    : 'Сумма'
+
+  const periodBaseMonth = useMemo(() => startOfMonth(fromYMD(dateFrom) ?? fromYMD(dateTo) ?? addMonths(new Date(), -1)), [dateFrom, dateTo])
+  const periodMonths = useMemo(() => Array.from({ length: monthCount }, (_, i) => addMonths(periodBaseMonth, i)), [periodBaseMonth, monthCount])
+  const periodCtaLabel = (() => {
+    if (!draft.from) return 'Выберите даты'
+    const toTxt = draft.to && draft.to !== draft.from ? ` – ${formatHuman(draft.to)}` : ''
+    return `Показать результаты — ${formatHuman(draft.from)}${toTxt}`
+  })()
+  const periodCTA = (
+    <button
+      type="button"
+      onClick={applySheet}
+      className="flex h-[50px] w-full items-center justify-center rounded-full bg-indigo-600 text-[15px] font-bold text-white shadow-[0_4px_12px_rgba(79,70,229,.28)] transition-colors hover:bg-indigo-700"
+    >
+      {periodCtaLabel}
+    </button>
+  )
+
+  const sheetCTA = (
+    <button
+      type="button"
+      onClick={applySheet}
+      className="flex h-[50px] w-full items-center justify-center rounded-full bg-indigo-600 text-[15px] font-bold text-white shadow-[0_4px_12px_rgba(79,70,229,.28)] transition-colors hover:bg-indigo-700"
+    >
+      Применить
+    </button>
   )
 
   // Cities
@@ -84,6 +298,17 @@ export default function ManagerOrdersPage() {
   }), [dateFrom, dateTo, page, statusFilter, sellerId, search])
 
   const { items, meta, isLoading, isError, error } = useManagerOrders(hookParams, memberIds)
+
+  // Сумма has no backend param — filter the current page client-side (mobile chip only).
+  const visibleItems = useMemo(() => {
+    if (!amountOn) return items
+    const min = minAmount ? Number(minAmount) : -Infinity
+    const max = maxAmount ? Number(maxAmount) : Infinity
+    return items.filter(o => {
+      const amt = o.total_order_amount ?? o.total_amount ?? 0
+      return amt >= min && amt <= max
+    })
+  }, [items, amountOn, minAmount, maxAmount])
 
   // Reset page when filters change (not page itself)
   const prevFilters = useRef({ dateFrom, dateTo, statusFilter, sellerId, search })
@@ -151,6 +376,7 @@ export default function ManagerOrdersPage() {
   const advancedFilters = (
     <div className="flex gap-2 flex-wrap">
       <DesktopDateRangePicker
+        variant="trigger"
         from={dateFrom}
         to={dateTo}
         onChange={(range) => { setDateFrom(range.from); setDateTo(range.to) }}
@@ -277,6 +503,7 @@ export default function ManagerOrdersPage() {
   }
 
   const totalCount = meta?.total ?? items.length
+  const mobileCount = amountOn ? visibleItems.length : totalCount
   const totalPages = meta?.total_pages ?? 1
 
   return (
@@ -287,56 +514,114 @@ export default function ManagerOrdersPage() {
       <div className="lg:hidden" style={{ background: M.bg, fontFamily: M.font, minHeight: '100vh', padding: '8px 20px 7.5rem' }}>
         <div className="flex items-baseline gap-[9px]">
           <h1 style={{ fontSize: 24, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0 }}>Заказы команды</h1>
-          <span style={{ fontSize: 14, color: M.muted, fontWeight: 600 }}>{totalCount}</span>
+          <span style={{ fontSize: 14, color: M.muted, fontWeight: 600 }}>{mobileCount}</span>
         </div>
 
         <div style={{ marginTop: 14 }} className="space-y-3">
           {quickFilters}
-          <button
-            type="button"
-            onClick={() => setFiltersOpen(true)}
-            className="w-full min-h-[40px] flex items-center justify-between active:scale-[0.99] transition-transform"
-            style={{ background: '#fff', border: `1px solid ${M.borderAlt}`, borderRadius: 12, padding: '9px 14px', fontSize: 13, fontWeight: 700, color: M.ink }}
-          >
-            <span>Период и продавец</span>
-            <SlidersHorizontal size={15} style={{ color: M.muted }} />
-          </button>
+          <div className="scrollbar-none -mx-5 flex flex-nowrap items-center gap-2 overflow-x-auto px-5 py-[5px]">
+            <FilterChip flipKey="period" active={periodActive} onClick={() => openSheet('period')} onClear={() => { setDateFrom(def.from); setDateTo(def.to) }}>
+              {periodLabel}
+            </FilterChip>
+            <FilterChip flipKey="user" active={Boolean(sellerId)} onClick={() => openSheet('user')} onClear={() => setSellerId('')}>
+              {selectedSeller?.full_name ?? 'Пользователь'}
+            </FilterChip>
+            <FilterChip flipKey="amount" active={amountOn} onClick={() => openSheet('amount')} onClear={() => { setMinAmount(''); setMaxAmount('') }}>
+              {amountLabel}
+            </FilterChip>
+          </div>
         </div>
 
-        {filtersOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden">
-            <button
-              type="button"
-              aria-label="Close filters"
-              onClick={() => setFiltersOpen(false)}
-              className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
+        <BottomSheet open={sheet === 'period'} onClose={closeSheet} title="Выбор периода" footer={periodCTA}>
+          <div className="mb-1 mt-1.5 flex items-center gap-2.5">
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="дд.мм.гггг"
+              value={draft.fromTxt ?? ''}
+              onChange={onTypeDateFrom}
+              aria-label="Дата от"
+              className="h-[42px] min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-sm font-semibold text-slate-900 outline-none focus:border-indigo-300 focus:bg-white"
             />
-            <div className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-white p-4 pb-[calc(env(safe-area-inset-bottom,0px)+18px)] shadow-[0_-24px_60px_rgba(15,23,42,0.18)]">
-              <div className="mx-auto mb-4 h-1 w-11 rounded-full bg-slate-200" />
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-base font-black text-slate-950">Период и продавец</p>
-                  <p className="text-xs text-slate-400">Диапазон дат и конкретный продавец</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFiltersOpen(false)}
-                  className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              {advancedFilters}
-              <button
-                type="button"
-                onClick={() => setFiltersOpen(false)}
-                className="mt-4 w-full min-h-[46px] rounded-2xl bg-slate-950 text-white text-sm font-black"
-              >
-                Применить
-              </button>
-            </div>
+            <span className="flex-shrink-0 font-semibold text-slate-400">—</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="дд.мм.гггг"
+              value={draft.toTxt ?? ''}
+              onChange={onTypeDateTo}
+              aria-label="Дата до"
+              className="h-[42px] min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 text-center text-sm font-semibold text-slate-900 outline-none focus:border-indigo-300 focus:bg-white"
+            />
           </div>
-        )}
+
+          <div className="mb-1 mt-3 flex flex-wrap gap-2">
+            {DATE_PRESETS.map((preset) => {
+              const range = preset.get()
+              const active = draft.from === range.from && draft.to === range.to
+              return (
+                <PresetPill key={preset.label} active={active} onClick={() => patchDraft({ ...range, fromTxt: formatDMY(range.from), toTxt: formatDMY(range.to) })}>
+                  {preset.label}
+                </PresetPill>
+              )
+            })}
+          </div>
+
+          <div className="mt-3 grid grid-cols-7 gap-1 text-center">
+            {WEEKDAYS.map((d) => <span key={d} className="text-[11px] font-bold text-slate-400">{d}</span>)}
+          </div>
+          {periodMonths.map((month, i) => (
+            <MonthGrid key={i} month={month} from={draft.from} to={draft.to} onPick={pickDay} />
+          ))}
+          <button
+            type="button"
+            onClick={() => setMonthCount((c) => c + 1)}
+            className="mt-1 w-full rounded-lg py-2 text-center text-[12px] font-bold text-indigo-600 hover:bg-indigo-50"
+          >
+            Показать следующий месяц
+          </button>
+        </BottomSheet>
+
+        <BottomSheet open={sheet === 'user'} onClose={closeSheet} title="Пользователь" footer={sheetCTA}>
+          <button
+            type="button"
+            onClick={() => setDraft({ sel: '' })}
+            className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold transition-colors ${!draft.sel ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+          >
+            Все продавцы
+          </button>
+          {sellers.map(u => (
+            <button
+              key={u.id}
+              type="button"
+              onClick={() => setDraft({ sel: u.id })}
+              className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold transition-colors ${draft.sel === u.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+            >
+              {u.full_name ?? u.id}
+            </button>
+          ))}
+        </BottomSheet>
+
+        <BottomSheet open={sheet === 'amount'} onClose={closeSheet} title="Сумма" footer={sheetCTA}>
+          <div className="grid grid-cols-2 gap-6 py-3.5">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-slate-400">От</span>
+              <input
+                type="number" min="0" step="0.01" placeholder="0"
+                value={draft.min ?? ''} onChange={(e) => setDraft(d => ({ ...d, min: e.target.value }))}
+                className="w-full border-0 border-b-2 border-slate-200 bg-transparent py-1 text-[22px] font-bold text-slate-900 outline-none focus:border-indigo-400"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-slate-400">До</span>
+              <input
+                type="number" min="0" step="0.01" placeholder="∞"
+                value={draft.max ?? ''} onChange={(e) => setDraft(d => ({ ...d, max: e.target.value }))}
+                className="w-full border-0 border-b-2 border-slate-200 bg-transparent py-1 text-[22px] font-bold text-slate-900 outline-none focus:border-indigo-400"
+              />
+            </label>
+          </div>
+        </BottomSheet>
 
         <div style={{ marginTop: 14 }} className="space-y-2.5">
           {isLoading && (
@@ -346,10 +631,10 @@ export default function ManagerOrdersPage() {
             ))}
             </div>
           )}
-          {!isLoading && items.length === 0 && (
+          {!isLoading && visibleItems.length === 0 && (
             <div className="card"><EmptyState icon={<ClipboardList size={24} />} title="Нет заказов" description="Заказы вашей команды появятся здесь." /></div>
           )}
-          {!isLoading && items.map(o => <MobileCard key={o.id} order={o} />)}
+          {!isLoading && visibleItems.map(o => <MobileCard key={o.id} order={o} />)}
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-3 mt-4">

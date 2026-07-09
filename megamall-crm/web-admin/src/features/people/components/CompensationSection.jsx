@@ -229,11 +229,11 @@ function SetSalaryModal({ open, onClose, scopeId, current }) {
 
         {(kind === 'fixed' || kind === 'mixed') && (
           <div>
-            <label className="input-label">Фиксированная зарплата (смн/мес) *</label>
+            <label className="input-label">Фиксированная зарплата (с/мес) *</label>
             <div className="relative mt-1">
               <input type="number" min="0" step="0.01" value={fixedSalary}
                 onChange={e => setFixedSalary(e.target.value)} className="input pr-16" placeholder="3000" />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 pointer-events-none">TJS/мес</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 pointer-events-none">с/мес</span>
             </div>
           </div>
         )}

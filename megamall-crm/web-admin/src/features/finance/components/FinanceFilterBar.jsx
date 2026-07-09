@@ -27,8 +27,8 @@
  *   orderOptions                  {Array<{id, label}>}
  *   action                          {ReactNode}  optional, rendered before the chips (e.g. "Добавить расход")
  */
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, Search, X } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
 import BottomSheet from '../../../shared/components/BottomSheet'
 import { INCOME_EVENT_TYPES, EXPENSE_EVENT_TYPES, EXPENSE_CATEGORY_LABEL } from '../../hr/utils/hrHelpers'
 
@@ -177,6 +177,53 @@ function Radio({ active }) {
   )
 }
 
+// ── Desktop-only trigger + segmented control (bordered popover buttons,
+// distinct from the mobile pill Chip) ───────────────────────────────────────
+
+function DesktopTrigger({ icon, active, open, onClick, onClear, chevron = true, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      className={[
+        'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors',
+        active ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+      ].join(' ')}
+    >
+      {icon}
+      <span className="max-w-[200px] truncate">{children}</span>
+      {active && (
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label="Сбросить"
+          onClick={(e) => { e.stopPropagation(); onClear() }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onClear() } }}
+          className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full hover:bg-indigo-100"
+        >
+          <X size={11} />
+        </span>
+      )}
+      {!active && chevron && (
+        <ChevronDown size={13} className={`opacity-50 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      )}
+    </button>
+  )
+}
+
+function SegButton({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`h-[30px] rounded-md px-3 text-xs font-semibold transition-colors ${active ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+    >
+      {children}
+    </button>
+  )
+}
+
 export default function FinanceFilterBar({
   from, to, onDateChange,
   direction, onDirectionChange,
@@ -190,11 +237,13 @@ export default function FinanceFilterBar({
   const [sheet, setSheet] = useState(null) // null | 'period' | 'type' | 'amount' | 'user' | 'order'
   const [draft, setDraft] = useState({})
   const [monthCount, setMonthCount] = useState(2)
+  const [desktopMonth, setDesktopMonth] = useState(() => startOfMonth(new Date()))
 
   function openSheet(kind) {
     if (kind === 'period') {
       setDraft({ from, to, fromTxt: formatDMY(from), toTxt: formatDMY(to) })
       setMonthCount(2)
+      setDesktopMonth(startOfMonth(fromYMD(from) ?? fromYMD(to) ?? new Date()))
     } else if (kind === 'type') {
       setDraft({ value: eventType, category: expenseCategory })
     } else if (kind === 'amount') {
@@ -208,6 +257,16 @@ export default function FinanceFilterBar({
   }
   function closeSheet() { setSheet(null); setDraft({}) }
   function patchDraft(patch) { setDraft((d) => ({ ...d, ...patch })) }
+
+  // Desktop-only: same picker state as the mobile sheets, but the trigger
+  // toggles its own popover closed on a second click, and rows that don't
+  // need a two-step "Готово" confirmation (type/user/order) apply immediately.
+  function toggleSheet(kind) { if (sheet === kind) closeSheet(); else openSheet(kind) }
+  function resetPeriodDraft() { patchDraft({ from: '', to: '', fromTxt: '', toTxt: '' }) }
+  function pickTypeDesktop(value, category = '') { onEventTypeChange(value); onExpenseCategoryChange(category); closeSheet() }
+  function pickAllTypesDesktop() { onEventTypeChange(''); onExpenseCategoryChange(''); closeSheet() }
+  function pickUserDesktop(label) { onUserChange(userSearch === label ? '' : label); closeSheet() }
+  function pickOrderDesktop(label) { onOrderChange(orderSearch === label ? '' : label); closeSheet() }
 
   function pickDay(day) {
     const value = toYMD(day)
@@ -240,6 +299,9 @@ export default function FinanceFilterBar({
   const selectedTypeLabel = eventType === 'business_expense' && expenseCategory
     ? `Расход · ${EXPENSE_CATEGORY_LABEL[expenseCategory] ?? expenseCategory}`
     : EVENT_TYPE_OPTIONS.find((o) => o.value === eventType)?.label
+  const typeLabel = eventType ? selectedTypeLabel : 'Тип операции'
+  const userLabel = userSearch || 'Пользователь'
+  const orderLabel = orderSearch || 'Заказ'
 
   const userMatches = useMemo(() => {
     const q = (draft.q || '').toLowerCase()
@@ -380,8 +442,38 @@ export default function FinanceFilterBar({
     flipRectsRef.current = nextRects
   })
 
+  // Desktop popovers: close on outside click (viewport-guarded so it never
+  // fights the mobile BottomSheet's own close handling) or Escape.
+  const desktopRootRef = useRef(null)
+  useEffect(() => {
+    if (!sheet) return
+    function handlePointer(e) {
+      if (window.innerWidth < 768) return
+      if (desktopRootRef.current && !desktopRootRef.current.contains(e.target)) closeSheet()
+    }
+    function handleKey(e) { if (e.key === 'Escape') closeSheet() }
+    document.addEventListener('mousedown', handlePointer)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handlePointer)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [sheet])
+
+  const anyActive = periodActive || Boolean(direction) || Boolean(eventType) || amountOn || Boolean(userSearch) || Boolean(orderSearch)
+  function resetAll() {
+    onDateChange(thisMonthRange)
+    onDirectionChange('')
+    onEventTypeChange('')
+    onExpenseCategoryChange('')
+    onAmountChange('', '')
+    onUserChange('')
+    onOrderChange('')
+  }
+
   return (
     <div className="relative">
+      <div className="md:hidden">
       <div ref={rowRef} className="scrollbar-none -mx-5 flex flex-nowrap items-center gap-2 overflow-x-auto px-5 py-[5px]">
         {action}
 
@@ -499,7 +591,7 @@ export default function FinanceFilterBar({
         )}
       </BottomSheet>
 
-      <BottomSheet open={sheet === 'amount'} onClose={closeSheet} title="Сумма в сомони" footer={CTA}>
+      <BottomSheet open={sheet === 'amount'} onClose={closeSheet} title="Сумма в с" footer={CTA}>
         <div className="grid grid-cols-2 gap-6 py-3.5">
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-semibold text-slate-400">От</span>
@@ -537,6 +629,183 @@ export default function FinanceFilterBar({
       <BottomSheet open={sheet === 'order'} onClose={closeSheet} title="Заказ" footer={CTA}>
         <SearchPickerList q={draft.q ?? ''} onQ={(v) => patchDraft({ q: v })} placeholder="Номер заказа…" matches={orderMatches} selected={draft.sel} onPick={(label) => patchDraft({ sel: draft.sel === label ? '' : label })} />
       </BottomSheet>
+      </div>
+
+      <div ref={desktopRootRef} className="hidden md:flex md:flex-wrap md:items-center md:gap-2">
+        {action}
+
+        <div className="relative">
+          <DesktopTrigger icon={<CalendarDays size={14} className="opacity-60" />} active={periodActive} open={sheet === 'period'} onClick={() => toggleSheet('period')} onClear={() => onDateChange(thisMonthRange)}>
+            {periodLabel}
+          </DesktopTrigger>
+          {sheet === 'period' && (
+            <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[460px] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xl">
+              <div className="flex gap-3.5">
+                <div className="w-[168px] flex-shrink-0 border-r border-slate-100 pr-3">
+                  <p className="mb-1.5 ml-2 text-[11px] font-bold text-slate-500">Диапазоны дат</p>
+                  <div className="flex max-h-[262px] flex-col gap-0.5 overflow-y-auto">
+                    {DATE_PRESETS.map((preset) => {
+                      const range = preset.get()
+                      const active = draft.from === range.from && draft.to === range.to
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onClick={() => patchDraft({ ...range, fromTxt: formatDMY(range.from), toTxt: formatDMY(range.to) })}
+                          className={`flex min-h-[34px] items-center gap-2 rounded-lg px-2 text-left text-xs font-semibold transition-colors ${active ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+                        >
+                          <Radio active={active} />
+                          {preset.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 flex items-center justify-between">
+                    <button type="button" onClick={() => setDesktopMonth((m) => addMonths(m, -1))} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Предыдущий месяц">
+                      <ChevronLeft size={15} />
+                    </button>
+                    <span className="text-[13px] font-bold capitalize text-slate-900">{formatMonthLabel(desktopMonth)}</span>
+                    <button type="button" onClick={() => setDesktopMonth((m) => addMonths(m, 1))} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Следующий месяц">
+                      <ChevronRight size={15} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1 text-center">
+                    {WEEKDAYS.map((d) => <span key={d} className="text-[10px] font-bold text-slate-400">{d}</span>)}
+                  </div>
+                  <MonthGrid month={desktopMonth} from={draft.from} to={draft.to} onPick={pickDay} />
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-100 pt-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text" inputMode="numeric" placeholder="дд.мм.гггг"
+                    value={draft.fromTxt ?? ''} onChange={onTypeDateFrom} aria-label="Дата от"
+                    className="h-8 w-24 rounded-lg border border-slate-200 bg-slate-50 px-2 text-center text-xs font-semibold text-slate-900 outline-none focus:border-indigo-300 focus:bg-white"
+                  />
+                  <span className="text-xs text-slate-400">—</span>
+                  <input
+                    type="text" inputMode="numeric" placeholder="дд.мм.гггг"
+                    value={draft.toTxt ?? ''} onChange={onTypeDateTo} aria-label="Дата до"
+                    className="h-8 w-24 rounded-lg border border-slate-200 bg-slate-50 px-2 text-center text-xs font-semibold text-slate-900 outline-none focus:border-indigo-300 focus:bg-white"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={resetPeriodDraft} className="h-8 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Сброс</button>
+                  <button type="button" onClick={applySheet} className="h-8 rounded-full bg-indigo-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-indigo-700">Применить</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="inline-flex items-center gap-0.5 rounded-lg bg-slate-100 p-[3px]">
+          <SegButton active={!direction} onClick={() => onDirectionChange('')}>Все</SegButton>
+          <SegButton active={direction === 'income'} onClick={() => onDirectionChange(direction === 'income' ? '' : 'income')}>Пополнение</SegButton>
+          <SegButton active={direction === 'expense'} onClick={() => onDirectionChange(direction === 'expense' ? '' : 'expense')}>Списание</SegButton>
+        </div>
+
+        <div className="relative">
+          <DesktopTrigger active={Boolean(eventType)} open={sheet === 'type'} onClick={() => toggleSheet('type')} onClear={() => { onEventTypeChange(''); onExpenseCategoryChange('') }}>
+            {typeLabel}
+          </DesktopTrigger>
+          {sheet === 'type' && (
+            <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[660px] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xl">
+              <TypeRow label="Все типы операций" active={!eventType} onClick={pickAllTypesDesktop} />
+              <div className="mt-1.5 grid grid-cols-2 gap-x-5">
+                {direction !== 'expense' && (
+                  <TypeGroup title="Пополнение" options={scopedTypeOptions.income} selected={eventType} onPick={(v) => pickTypeDesktop(v)} />
+                )}
+                {direction !== 'income' && (
+                  <TypeGroup
+                    title="Списание"
+                    options={scopedTypeOptions.expense}
+                    selected={eventType}
+                    selectedCategory={expenseCategory}
+                    onPick={(v) => pickTypeDesktop(v)}
+                    onPickCategory={(c) => pickTypeDesktop('business_expense', c)}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="relative">
+          <DesktopTrigger active={amountOn} open={sheet === 'amount'} onClick={() => toggleSheet('amount')} onClear={() => onAmountChange('', '')}>
+            {amountOn ? (minAmount && maxAmount ? `${minAmount}–${maxAmount}` : minAmount ? `от ${minAmount}` : `до ${maxAmount}`) : 'Сумма'}
+          </DesktopTrigger>
+          {sheet === 'amount' && (
+            <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[300px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+              <div className="grid grid-cols-2 gap-3.5">
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold text-slate-400">От, с</span>
+                  <input
+                    type="number" min="0" step="0.01" placeholder="0"
+                    value={draft.min ?? ''} onChange={(e) => patchDraft({ min: e.target.value })}
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-sm font-bold text-slate-900 outline-none focus:border-indigo-300 focus:bg-white"
+                  />
+                </label>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold text-slate-400">До, с</span>
+                  <input
+                    type="number" min="0" step="0.01" placeholder="∞"
+                    value={draft.max ?? ''} onChange={(e) => patchDraft({ max: e.target.value })}
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-sm font-bold text-slate-900 outline-none focus:border-indigo-300 focus:bg-white"
+                  />
+                </label>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {AMOUNT_PRESETS.map((preset) => {
+                  const active = (draft.min || '') === preset.min && (draft.max || '') === preset.max
+                  return (
+                    <PresetPill key={preset.label} active={active} onClick={() => patchDraft({ min: preset.min, max: preset.max })}>
+                      {preset.label}
+                    </PresetPill>
+                  )
+                })}
+              </div>
+              <button type="button" onClick={applySheet} className="mt-3.5 h-9 w-full rounded-full bg-indigo-600 text-xs font-bold text-white shadow-sm hover:bg-indigo-700">
+                Применить
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="relative">
+          <DesktopTrigger active={Boolean(userSearch)} open={sheet === 'user'} onClick={() => toggleSheet('user')} onClear={() => onUserChange('')}>
+            {userLabel}
+          </DesktopTrigger>
+          {sheet === 'user' && (
+            <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[300px] rounded-2xl border border-slate-200 bg-white p-2.5 shadow-2xl">
+              <SearchPickerList q={draft.q ?? ''} onQ={(v) => patchDraft({ q: v })} placeholder="Имя сотрудника…" matches={userMatches} selected={userSearch} onPick={pickUserDesktop} />
+            </div>
+          )}
+        </div>
+
+        <div className="relative">
+          <DesktopTrigger active={Boolean(orderSearch)} open={sheet === 'order'} onClick={() => toggleSheet('order')} onClear={() => onOrderChange('')}>
+            {orderLabel}
+          </DesktopTrigger>
+          {sheet === 'order' && (
+            <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[320px] rounded-2xl border border-slate-200 bg-white p-2.5 shadow-2xl">
+              <SearchPickerList q={draft.q ?? ''} onQ={(v) => patchDraft({ q: v })} placeholder="Номер заказа…" matches={orderMatches} selected={orderSearch} onPick={pickOrderDesktop} />
+            </div>
+          )}
+        </div>
+
+        {anyActive && (
+          <button
+            type="button"
+            onClick={resetAll}
+            className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X size={12} />
+            Сбросить фильтры
+          </button>
+        )}
+      </div>
     </div>
   )
 }

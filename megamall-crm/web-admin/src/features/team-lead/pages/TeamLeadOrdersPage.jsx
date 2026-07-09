@@ -259,7 +259,7 @@ export default function TeamLeadOrdersPage() {
           </div>
           <div className="text-right flex-shrink-0">
             <StatusPill status={status} />
-            <div style={{ fontSize: 16, fontWeight: 800, color: M.ink, marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>{fmtAmount(amount)} смн</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: M.ink, marginTop: 8, fontVariantNumeric: 'tabular-nums' }}>{fmtAmount(amount)} с</div>
           </div>
         </div>
         <div className="flex gap-2" style={{ marginTop: 13 }}>

@@ -131,7 +131,7 @@ export default function NotificationsPanel({ open, onClose }) {
                   </div>
                   <p className="text-[12.5px] font-semibold text-slate-900 truncate">{customerName}</p>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    {Number(total).toLocaleString('ru-RU')} TJS · {timeAgo(order.created_at)}
+                    {Number(total).toLocaleString('ru-RU')} с · {timeAgo(order.created_at)}
                   </p>
                 </div>
               </button>

@@ -93,7 +93,7 @@ function RevenueTrend({ orders }) {
         <span className="text-[10px] text-slate-400">{data[0]?.[0]}</span>
         <span className="text-[10px] text-slate-400">{data[data.length-1]?.[0]}</span>
       </div>
-      <p className="text-xs text-slate-500 mt-2">Итого: <strong className="text-slate-700">{fmtAmount(total)} смн</strong></p>
+      <p className="text-xs text-slate-500 mt-2">Итого: <strong className="text-slate-700">{fmtAmount(total)} с</strong></p>
     </div>
   )
 }
@@ -264,7 +264,7 @@ export default function TeamLeadReportsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-violet-700">
-                {fmtAmount(orders.reduce((s,o)=>s+Number(o.net_revenue??o.total_amount??0),0))} смн
+                {fmtAmount(orders.reduce((s,o)=>s+Number(o.net_revenue??o.total_amount??0),0))} с
               </p>
               <p className="text-xs text-slate-400 mt-0.5">Выручка</p>
             </div>

@@ -116,7 +116,7 @@ function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, l
         <h2 className="text-[15px] font-bold text-slate-900 mb-1">{title}</h2>
         <p className="text-[11.5px] text-slate-400 mb-5">{sub}</p>
 
-        <label className="block text-[11.5px] font-semibold text-slate-500 mb-1.5">Сумма (смн)</label>
+        <label className="block text-[11.5px] font-semibold text-slate-500 mb-1.5">Сумма (с)</label>
         <input
           type="number"
           min="0"
@@ -138,7 +138,7 @@ function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, l
         {err && <p className="text-red-500 text-[11px] mt-1 mb-1">{err}</p>}
 
         <p className="text-[11px] text-slate-400 mb-5 mt-2">
-          Текущий баланс: <span className="font-bold text-slate-700">{fmt(balance)}</span> смн
+          Текущий баланс: <span className="font-bold text-slate-700">{fmt(balance)}</span> с
         </p>
 
         <div className="flex gap-2">
@@ -213,7 +213,7 @@ function MobileTxRow({ tx, onClick }) {
         </div>
       </div>
       <span className={`whitespace-nowrap text-[14.5px] font-extrabold tabular-nums ${cfg.amtClass}`}>
-        {cfg.sign}{fmt(tx.amount)} смн
+        {cfg.sign}{fmt(tx.amount)} с
       </span>
     </button>
   )
@@ -249,10 +249,10 @@ function MobileBudgetView({
       >
         <div className="text-[11px] font-bold uppercase tracking-[.08em] text-indigo-100/85">Баланс сейчас</div>
         <div className="mt-2 text-[40px] font-extrabold leading-none tracking-tight text-white tabular-nums">
-          {sumLoading || sumError ? '—' : fmt(balance)} <span className="text-[22px] font-bold text-indigo-100/80">смн</span>
+          {sumLoading || sumError ? '—' : fmt(balance)} <span className="text-[22px] font-bold text-indigo-100/80">с</span>
         </div>
         <div className="mt-2 text-[12px] font-semibold text-emerald-300">
-          {sumLoading || sumError || allTimeSumLoading ? '—' : `↗ ${fmt(allTimeProfit)} смн из чистой прибыли за всё время`}
+          {sumLoading || sumError || allTimeSumLoading ? '—' : `↗ ${fmt(allTimeProfit)} с из чистой прибыли за всё время`}
         </div>
         <div className="mt-[18px] flex gap-2.5">
           <button
@@ -451,27 +451,27 @@ export default function BudgetCompanyPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.4fr_1fr_1fr_1fr] gap-3">
         <KpiCard
           label="Баланс сейчас"
-          value={sumLoading || sumError ? '—' : `${fmt(balance)} смн`}
-          sub={sumLoading || sumError || allTimeSumLoading ? '—' : `${fmt(allTimeProfit)} смн из чистой прибыли за всё время`}
+          value={sumLoading || sumError ? '—' : `${fmt(balance)} с`}
+          sub={sumLoading || sumError || allTimeSumLoading ? '—' : `${fmt(allTimeProfit)} с из чистой прибыли за всё время`}
           subColor="text-emerald-500"
           valueClass="text-indigo-950"
           featured
         />
         <KpiCard
           label="Пополнения"
-          value={sumLoading || sumError ? '—' : `+${fmt(summary?.manual_top_ups)} смн`}
+          value={sumLoading || sumError ? '—' : `+${fmt(summary?.manual_top_ups)} с`}
           sub={`${incomeCount} ${incomeCount === 1 ? 'операция' : 'операции'}`}
           valueClass="text-emerald-600"
         />
         <KpiCard
           label="Списания"
-          value={sumLoading || sumError ? '—' : `-${fmt(summary?.owner_withdrawals)} смн`}
+          value={sumLoading || sumError ? '—' : `-${fmt(summary?.owner_withdrawals)} с`}
           sub={`${withdrawalCount} ${withdrawalCount === 1 ? 'операция' : 'операции'}`}
           valueClass="text-rose-600"
         />
         <KpiCard
           label="Прибыль за период"
-          value={sumLoading || sumError ? '—' : `${fmt(summary?.profit_from_finance)} смн`}
+          value={sumLoading || sumError ? '—' : `${fmt(summary?.profit_from_finance)} с`}
           sub="из финансов"
           valueClass="text-slate-950"
         />
@@ -554,7 +554,7 @@ export default function BudgetCompanyPage() {
                         </span>
                       </td>
                       <td className={`px-5 sm:px-6 py-4 text-[15px] font-extrabold whitespace-nowrap tabular-nums text-right ${cfg.amtClass}`}>
-                        {cfg.sign}{fmt(t.amount)} смн
+                        {cfg.sign}{fmt(t.amount)} с
                       </td>
                       <td className="px-5 sm:px-6 py-4 text-right">
                         <button

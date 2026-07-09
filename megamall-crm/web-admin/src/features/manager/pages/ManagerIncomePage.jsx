@@ -143,7 +143,7 @@ export default function ManagerIncomePage() {
                 return (
                   <div key={p.id} className="flex items-center justify-between px-5 py-4 gap-4">
                     <div>
-                      <p className="text-base font-black text-slate-900">{fmtAmount(p.amount)} смн</p>
+                      <p className="text-base font-black text-slate-900">{fmtAmount(p.amount)} с</p>
                       <p className="text-xs text-slate-400 mt-0.5">
                         {p.period_start} — {p.period_end}
                         {p.method && <span className="ml-2 text-slate-300">· {p.method}</span>}

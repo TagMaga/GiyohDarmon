@@ -127,11 +127,11 @@ export default function OwnerOrdersPage() {
 
         <div className="flex flex-wrap items-start justify-end gap-2">
           <DesktopDateRangePicker
+            variant="trigger"
             from={filters.from ?? ''}
             to={filters.to ?? ''}
             onChange={(range) => setFilters(f => ({ ...f, from: range.from, to: range.to, page: 1 }))}
             align="right"
-            buttonClassName="min-h-[44px] rounded-[10px]"
           />
           <div className="grid grid-cols-2 gap-2 md:hidden">
             <input

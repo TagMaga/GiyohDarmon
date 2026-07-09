@@ -26,7 +26,7 @@ function fmtDateTime(iso) {
 function HistoryItem({ edit }) {
   const changed = []
   if (edit.old_amount !== edit.new_amount)
-    changed.push({ key: 'amount', text: `сумма ${fmt(edit.old_amount)} → ${fmt(edit.new_amount)} смн` })
+    changed.push({ key: 'amount', text: `сумма ${fmt(edit.old_amount)} → ${fmt(edit.new_amount)} с` })
   if (edit.old_note !== edit.new_note)
     changed.push({ key: 'note', text: `примечание «${edit.old_note || '—'}» → «${edit.new_note || '—'}»` })
 
@@ -135,7 +135,7 @@ export default function EditFinanceExpenseModal({ expense, onClose, onSuccess })
 
           {/* Amount */}
           <div>
-            <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Сумма (смн)</label>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Сумма (с)</label>
             <input
               type="number"
               min="0"

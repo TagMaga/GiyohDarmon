@@ -618,6 +618,7 @@ export default function TeamProfilePage() {
       <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
         <h2 className="text-base font-bold text-slate-800">Показатели</h2>
         <DesktopDateRangePicker
+          variant="trigger"
           from={from}
           to={to}
           align="right"

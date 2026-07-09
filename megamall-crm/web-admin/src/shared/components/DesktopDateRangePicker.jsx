@@ -53,6 +53,13 @@ function formatMonth(date) {
   return date.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
 }
 
+function formatMonthShort(value) {
+  const date = fromYMD(value)
+  if (!date) return ''
+  const name = date.toLocaleDateString('ru-RU', { month: 'long' })
+  return name.charAt(0).toUpperCase() + name.slice(1)
+}
+
 function resolvePreset(value) {
   const today = new Date()
   const ymdToday = toYMD(today)
@@ -113,7 +120,7 @@ export default function DesktopDateRangePicker({
   to,
   onChange,
   onClear,
-  variant = 'button', // 'button' (default light trigger) | 'chip' (dark pill with clear ✕, always visible)
+  variant = 'button', // 'button' (default light trigger) | 'chip' (dark pill with clear ✕, always visible) | 'trigger' (bordered lg pill matching FinanceFilterBar's desktop chips)
   className = '',
   buttonClassName = '',
   align = 'left',
@@ -176,6 +183,14 @@ export default function DesktopDateRangePicker({
     if (from && to) return `${formatShort(from)} - ${formatShort(to)}`
     return 'Максимум'
   }, [from, to])
+  // Same fallback chain as `label`, but the current month collapses to its
+  // short name ("Июль") instead of "Этот месяц" — matches FinanceFilterBar's
+  // own period chip so the two controls driving the same page range read alike.
+  const triggerLabel = useMemo(() => {
+    const thisMonth = resolvePreset('this_month')
+    if (thisMonth && from === thisMonth.from && to === thisMonth.to) return formatMonthShort(from)
+    return label
+  }, [from, to, label])
 
   function applyPreset(value) {
     const range = resolvePreset(value)
@@ -227,7 +242,7 @@ export default function DesktopDateRangePicker({
       ref={popoverRef}
       className={[
         'relative inline-flex',
-        variant === 'button' ? 'hidden md:inline-flex' : '',
+        variant === 'button' || variant === 'trigger' ? 'hidden md:inline-flex' : '',
         className,
       ].filter(Boolean).join(' ')}
     >
@@ -241,6 +256,20 @@ export default function DesktopDateRangePicker({
           className={buttonClassName}
           maxWidthClass=""
         />
+      ) : variant === 'trigger' ? (
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          className={[
+            'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50',
+            buttonClassName,
+          ].join(' ')}
+        >
+          <CalendarDays size={14} className="opacity-60" />
+          <span className="max-w-[200px] truncate">{triggerLabel}</span>
+          <ChevronDown size={13} className={`opacity-50 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        </button>
       ) : (
         <button
           type="button"
@@ -257,7 +286,42 @@ export default function DesktopDateRangePicker({
         </button>
       )}
 
-      {open && (
+      {open && variant === 'trigger' ? (
+        <div
+          ref={panelRef}
+          style={{ left: `${panelOffset}px` }}
+          className="absolute left-0 top-[calc(100%+8px)] z-50 w-[460px] rounded-2xl border border-slate-200 bg-white p-3.5 text-slate-900 shadow-2xl"
+        >
+          <div className="flex gap-3.5">
+            <div className="w-[168px] flex-shrink-0 border-r border-slate-100 pr-3">
+              <PresetSection title="Диапазоны дат" presets={DATE_PRESETS} active={activePreset} onPick={applyPreset} />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="mb-2 flex items-center justify-between">
+                <button type="button" onClick={() => setBaseMonth((m) => addMonths(m, -1))} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Предыдущий месяц">
+                  <ChevronLeft size={15} />
+                </button>
+                <span className="text-[13px] font-bold capitalize text-slate-900">{formatMonth(baseMonth)}</span>
+                <button type="button" onClick={() => setBaseMonth((m) => addMonths(m, 1))} className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100" aria-label="Следующий месяц">
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+              <MonthGrid month={baseMonth} from={draftFrom} to={draftTo} onPick={pickDay} />
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-100 pt-3">
+            <div className="text-[11px] font-semibold text-slate-400">
+              {draftFrom && draftTo ? `${formatDMY(draftFrom)} — ${formatDMY(draftTo)}` : draftFrom ? formatDMY(draftFrom) : 'Выберите диапазон'}
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => { setDraftFrom(''); setDraftTo('') }} className="h-8 rounded-full border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Сброс</button>
+              <button type="button" onClick={apply} className="h-8 rounded-full bg-indigo-600 px-4 text-xs font-bold text-white shadow-sm hover:bg-indigo-700">Применить</button>
+            </div>
+          </div>
+        </div>
+      ) : open ? (
         <div
           ref={panelRef}
           style={{ left: `${panelOffset}px` }}
@@ -302,7 +366,7 @@ export default function DesktopDateRangePicker({
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

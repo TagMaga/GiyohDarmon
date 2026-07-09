@@ -110,7 +110,7 @@ function AddExpenseModal({ open, onClose, onSubmit, loading, error }) {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[11.5px] font-semibold text-slate-500">Сумма (смн)</label>
+            <label className="mb-1.5 block text-[11.5px] font-semibold text-slate-500">Сумма (с)</label>
             <input
               type="number"
               min="0"
@@ -213,6 +213,7 @@ export default function OwnerFinancePage() {
           </button>
 
           <DesktopDateRangePicker
+            variant="trigger"
             from={from}
             to={to}
             onChange={({ from: nextFrom, to: nextTo }) => setRange({ from: nextFrom, to: nextTo })}

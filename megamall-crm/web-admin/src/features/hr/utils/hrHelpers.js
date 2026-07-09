@@ -116,7 +116,7 @@ export const RATE_SOURCE_BADGE = { global: 'slate', team: 'indigo', employee: 'v
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 const currFmt = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-export const fmtMoney  = (n) => { const v = Number(n); return Number.isNaN(v) ? '—' : `${currFmt.format(v)} смн` }
+export const fmtMoney  = (n) => { const v = Number(n); return Number.isNaN(v) ? '—' : `${currFmt.format(v)} с` }
 export const fmtPct    = (n) => { const v = Number(n); return Number.isNaN(v) ? '—' : `${(v * 100).toFixed(2)}%` }
 
 const dtFmt = new Intl.DateTimeFormat('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })

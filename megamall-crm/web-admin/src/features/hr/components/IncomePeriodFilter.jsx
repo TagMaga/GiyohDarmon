@@ -80,6 +80,7 @@ export default function IncomePeriodFilter({ from, to, onChange }) {
   return (
     <div className="space-y-2">
       <DesktopDateRangePicker
+        variant="trigger"
         from={from ?? ''}
         to={to ?? ''}
         onChange={(range) => onChange(range.from, range.to)}

@@ -56,7 +56,7 @@ const dateFmt  = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-di
 
 export const fmtMoney = (v) => {
   if (v == null || isNaN(Number(v))) return '—'
-  return moneyFmt.format(Number(v)) + ' смн'
+  return moneyFmt.format(Number(v)) + ' с'
 }
 
 export const fmtPct = (v) => {

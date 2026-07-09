@@ -166,7 +166,7 @@ function OverviewTab() {
             Ваш личный доход за период
           </div>
           <div style={{ fontSize: 33, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', lineHeight: 1, margin: '10px 0' }}>
-            {fmtRu(payables?.personal_net)} <span style={{ fontSize: 17, fontWeight: 700, color: M.faint }}>смн</span>
+            {fmtRu(payables?.personal_net)} <span style={{ fontSize: 17, fontWeight: 700, color: M.faint }}>с</span>
           </div>
           <p style={{ fontSize: 11.5, color: M.sub, fontWeight: 500 }}>
             Ваша доля пула команды (40%) — уже за вычетом продавцов и менеджеров
@@ -202,7 +202,7 @@ function OverviewTab() {
         >
           <div className="flex-1">
             <p style={{ fontSize: 10, fontWeight: 700, color: M.muted, textTransform: 'uppercase' }}>Выбрано: {selected.size}</p>
-            <p style={{ fontSize: 16, fontWeight: 800, color: M.ink }}>Итого: {fmtRu(total)} смн</p>
+            <p style={{ fontSize: 16, fontWeight: 800, color: M.ink }}>Итого: {fmtRu(total)} с</p>
           </div>
           <button
             className="rounded-xl px-5 py-3 text-white font-black text-sm disabled:opacity-40"
@@ -248,12 +248,12 @@ function OverviewTab() {
                   </span>
                 </div>
                 <p style={{ fontSize: 11, color: M.muted, marginBottom: 8 }}>
-                  {m.orders_count} {m.orders_count === 1 ? 'заказ' : 'заказов'} · сумма {fmtAmount(m.gross_amount)} смн
+                  {m.orders_count} {m.orders_count === 1 ? 'заказ' : 'заказов'} · сумма {fmtAmount(m.gross_amount)} с
                 </p>
                 <div className="flex gap-3.5 flex-wrap" style={{ fontSize: 11, marginBottom: 8 }}>
-                  <div style={{ color: M.muted, fontWeight: 700 }}>Заработано<b style={{ display: 'block', color: M.ink, fontSize: 12, marginTop: 2 }}>{fmtAmount(m.earned)} смн</b></div>
-                  <div style={{ color: M.muted, fontWeight: 700 }}>Выплачено<b style={{ display: 'block', color: M.ink, fontSize: 12, marginTop: 2 }}>{fmtAmount(m.already_paid)} смн</b></div>
-                  <div style={{ color: M.muted, fontWeight: 700 }}>Осталось<b style={{ display: 'block', fontSize: 12, marginTop: 2, color: isFullyPaid ? M.green : M.indigoDeep }}>{fmtAmount(m.remaining)} смн</b></div>
+                  <div style={{ color: M.muted, fontWeight: 700 }}>Заработано<b style={{ display: 'block', color: M.ink, fontSize: 12, marginTop: 2 }}>{fmtAmount(m.earned)} с</b></div>
+                  <div style={{ color: M.muted, fontWeight: 700 }}>Выплачено<b style={{ display: 'block', color: M.ink, fontSize: 12, marginTop: 2 }}>{fmtAmount(m.already_paid)} с</b></div>
+                  <div style={{ color: M.muted, fontWeight: 700 }}>Осталось<b style={{ display: 'block', fontSize: 12, marginTop: 2, color: isFullyPaid ? M.green : M.indigoDeep }}>{fmtAmount(m.remaining)} с</b></div>
                 </div>
                 {isFullyPaid ? (
                   <span style={{ fontSize: 10.5, fontWeight: 700, color: M.green, background: M.greenBg, padding: '4px 8px', borderRadius: 7 }}>Выплачено полностью</span>
@@ -271,7 +271,7 @@ function OverviewTab() {
                     />
                     {isChecked && isAmountInvalid(m) && (
                       <p className="text-[10px] font-bold text-right mt-1" style={{ color: '#DC2626' }}>
-                        Не более {fmtAmount(m.remaining)} смн
+                        Не более {fmtAmount(m.remaining)} с
                       </p>
                     )}
                   </>
@@ -290,7 +290,7 @@ function OverviewTab() {
         >
           <div className="flex-1">
             <p style={{ fontSize: 10, fontWeight: 700, color: M.muted, textTransform: 'uppercase' }}>Выбрано: {selected.size}</p>
-            <p style={{ fontSize: 16, fontWeight: 800, color: M.ink }}>Итого: {fmtRu(total)} смн</p>
+            <p style={{ fontSize: 16, fontWeight: 800, color: M.ink }}>Итого: {fmtRu(total)} с</p>
           </div>
           <button
             className="rounded-xl px-5 py-3 text-white font-black text-sm disabled:opacity-40"
@@ -325,7 +325,7 @@ function OverviewTab() {
                   <p style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>{p.method ?? 'выплата'} · {p.status ?? 'оплачено'}</p>
                   <p style={{ fontSize: 11, color: M.muted }} className="truncate">{p.period_start} → {p.period_end}</p>
                 </div>
-                <span style={{ fontSize: 13.5, fontWeight: 800, color: M.ink }} className="whitespace-nowrap">{fmtAmount(p.amount)} смн</span>
+                <span style={{ fontSize: 13.5, fontWeight: 800, color: M.ink }} className="whitespace-nowrap">{fmtAmount(p.amount)} с</span>
               </div>
             ))}
           </div>
@@ -342,7 +342,7 @@ function OverviewTab() {
           {selectedMembers.map(m => (
             <div key={m.payee_id} className="flex items-center justify-between px-4 py-3">
               <span className="text-sm font-semibold text-slate-700">{m.full_name} · {ROLE_LABEL[m.role] ?? m.role}</span>
-              <span className="text-sm font-black text-slate-900">{fmtAmount(amounts[m.payee_id])} смн</span>
+              <span className="text-sm font-black text-slate-900">{fmtAmount(amounts[m.payee_id])} с</span>
             </div>
           ))}
         </div>
@@ -363,7 +363,7 @@ function OverviewTab() {
         </div>
         <div className="flex items-center justify-between py-3 border-t border-slate-100 mb-4">
           <span className="text-sm font-bold text-slate-500">Итого к выплате</span>
-          <span className="text-lg font-black text-indigo-600">{fmtRu(total)} смн</span>
+          <span className="text-lg font-black text-indigo-600">{fmtRu(total)} с</span>
         </div>
         <button
           className="w-full rounded-2xl py-3.5 text-white font-black text-sm disabled:opacity-50"
@@ -451,7 +451,7 @@ function BySellerTab() {
                   <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>{m.orders_count} заказ{m.orders_count === 1 ? '' : 'ов'}</div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <div style={{ fontSize: 15.5, fontWeight: 800, color: M.ink }}>{fmtRu(m.gross_amount)} смн</div>
+                  <div style={{ fontSize: 15.5, fontWeight: 800, color: M.ink }}>{fmtRu(m.gross_amount)} с</div>
                   <div style={{ fontSize: 11, color: M.muted, fontWeight: 600, marginTop: 2 }}>комиссия {commissionPct.toFixed(1).replace('.', ',')}%</div>
                 </div>
               </div>

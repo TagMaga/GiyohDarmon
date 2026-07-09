@@ -104,12 +104,12 @@ function LinkBtn({ onClick, children }) {
 function FinanceSummaryStrip({ orders, revenue, expenses, loading }) {
   const { teamPayouts, companyIncome } = ownerFinanceKpis(orders, expenses)
   const metrics = [
-    { label: 'Продажи товаров', value: `${fmtMoney(orders?.total_sales)} TJS`, dot: 'bg-sky-500', tone: 'text-sky-950', panel: 'from-sky-50 to-cyan-100' },
+    { label: 'Продажи товаров', value: `${fmtMoney(orders?.total_sales)} с`, dot: 'bg-sky-500', tone: 'text-sky-950', panel: 'from-sky-50 to-cyan-100' },
     { label: 'Доставлено заказов', value: fmtNum(orders?.delivered_count), dot: 'bg-indigo-500', tone: 'text-indigo-950', panel: 'from-indigo-50 to-violet-100' },
-    { label: 'Доставка курьерам', value: `${fmtMoney(orders?.courier_payout)} TJS`, dot: 'bg-violet-500', tone: 'text-violet-950', panel: 'from-violet-50 to-fuchsia-100' },
-    { label: 'Выплаты команде', value: `${fmtMoney(teamPayouts)} TJS`, dot: 'bg-amber-500', tone: 'text-amber-950', panel: 'from-amber-50 to-yellow-100' },
-    { label: 'Себестоимость товара', value: `${fmtMoney(orders?.product_cost)} TJS`, dot: 'bg-emerald-500', tone: 'text-emerald-950', panel: 'from-emerald-50 to-teal-100' },
-    { label: 'Доход компании', value: `${fmtMoney(companyIncome)} TJS`, dot: 'bg-rose-500', tone: 'text-rose-950', panel: 'from-rose-50 to-orange-100', result: true },
+    { label: 'Доставка курьерам', value: `${fmtMoney(orders?.courier_payout)} с`, dot: 'bg-violet-500', tone: 'text-violet-950', panel: 'from-violet-50 to-fuchsia-100' },
+    { label: 'Выплаты команде', value: `${fmtMoney(teamPayouts)} с`, dot: 'bg-amber-500', tone: 'text-amber-950', panel: 'from-amber-50 to-yellow-100' },
+    { label: 'Себестоимость товара', value: `${fmtMoney(orders?.product_cost)} с`, dot: 'bg-emerald-500', tone: 'text-emerald-950', panel: 'from-emerald-50 to-teal-100' },
+    { label: 'Доход компании', value: `${fmtMoney(companyIncome)} с`, dot: 'bg-rose-500', tone: 'text-rose-950', panel: 'from-rose-50 to-orange-100', result: true },
   ]
 
   if (loading) {
