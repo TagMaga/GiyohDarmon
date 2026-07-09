@@ -8,11 +8,11 @@
     "preview": {
       "distribution": "internal",
       "android": { "buildType": "apk" },
-      "env": { "EXPO_PUBLIC_API_URL": "http://134.122.81.40" }
+      "env": { "EXPO_PUBLIC_API_URL": "http://134.122.81.40:8080" }
     },
     "production": {
       "android": { "buildType": "app-bundle" },
-      "env": { "EXPO_PUBLIC_API_URL": "http://134.122.81.40" }
+      "env": { "EXPO_PUBLIC_API_URL": "http://134.122.81.40:8080" }
     }
   },
   "submit": {
