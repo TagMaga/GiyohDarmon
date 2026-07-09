@@ -31,6 +31,7 @@ import useEmployees  from '../../people/hooks/useEmployees'
 import useTeams      from '../../people/hooks/useTeams'
 import { buildUserMap } from '../../people/utils/peopleHelpers'
 import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
+import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -133,22 +134,12 @@ export default function OwnerOrdersPage() {
             onChange={(range) => setFilters(f => ({ ...f, from: range.from, to: range.to, page: 1 }))}
             align="right"
           />
-          <div className="grid grid-cols-2 gap-2 md:hidden">
-            <input
-              type="date"
-              value={filters.from ?? ''}
-              onChange={e => setFilters(f => ({ ...f, from: e.target.value, page: 1 }))}
-              className="input min-w-0"
-              title="Дата от"
-            />
-            <input
-              type="date"
-              value={filters.to ?? ''}
-              onChange={e => setFilters(f => ({ ...f, to: e.target.value, page: 1 }))}
-              className="input min-w-0"
-              title="Дата до"
-            />
-          </div>
+          <MobileDateRangeCalendar
+            className="w-full md:hidden"
+            from={filters.from ?? ''}
+            to={filters.to ?? ''}
+            onChange={(range) => setFilters(f => ({ ...f, from: range.from, to: range.to, page: 1 }))}
+          />
           <button
             onClick={() => refetch()}
             disabled={isFetching}

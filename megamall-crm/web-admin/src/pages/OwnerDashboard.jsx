@@ -33,6 +33,7 @@ import useSellerLeaderboard from '../features/owner/hooks/useSellerLeaderboard'
 import useTeamPerformance   from '../features/owner/hooks/useTeamPerformance'
 import { getStockStatus }   from '../features/warehouse/utils/warehouseHelpers'
 import DesktopDateRangePicker from '../shared/components/DesktopDateRangePicker'
+import MobileDateRangeCalendar from '../shared/components/MobileDateRangeCalendar'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 function toYMD(d) {
@@ -463,6 +464,12 @@ export default function OwnerDashboard() {
           />
         </div>
       </div>
+      <MobileDateRangeCalendar
+        className="w-full md:hidden"
+        from={range.from ?? ''}
+        to={range.to ?? ''}
+        onChange={(nextRange) => setRange({ from: nextRange.from, to: nextRange.to })}
+      />
 
       <FinanceSummaryStrip
         orders={summary?.orders}

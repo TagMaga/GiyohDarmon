@@ -417,7 +417,7 @@ function MonthGrid({ month, from, to, onPick }) {
           <div key={day} className="py-1 text-[10px] font-bold text-slate-400">{day}</div>
         ))}
         {days.map((day, index) => {
-          if (!day) return <div key={`empty-${index}`} className="h-8" />
+          if (!day) return <div key={`empty-${index}`} className="h-[42px]" />
           const value = toYMD(day)
           const selected = value === from || value === to
           const inRange = from && to && value > from && value < to
@@ -428,7 +428,7 @@ function MonthGrid({ month, from, to, onPick }) {
               type="button"
               onClick={() => onPick(day)}
               className={[
-                'h-8 rounded-lg text-xs font-semibold transition-colors',
+                'h-[42px] rounded-full text-[13.5px] font-semibold transition-colors',
                 selected ? 'bg-indigo-600 text-white shadow-sm' : inRange ? 'bg-indigo-50 text-indigo-700' : today ? 'text-indigo-700 ring-1 ring-indigo-200 hover:bg-slate-100' : 'text-slate-700 hover:bg-slate-100',
               ].join(' ')}
             >

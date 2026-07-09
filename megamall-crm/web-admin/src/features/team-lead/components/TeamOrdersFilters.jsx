@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Search, X } from 'lucide-react'
 import { STATUS_LABELS } from '../../../shared/orderStatusConfig'
 import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
+import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
 
 const ALL_STATUSES = Object.entries(STATUS_LABELS)
 
@@ -57,11 +58,13 @@ export default function TeamOrdersFilters({ filters, onChange, sellers = [] }) {
           onChange={(range) => onChange({ ...filters, from: range.from, to: range.to, page: 1 })}
           align="right"
         />
-        <div className="grid grid-cols-2 gap-2 md:hidden">
-          <input type="date" value={filters.from ?? ''} onChange={e => set('from', e.target.value)} className="input min-w-0" />
-          <input type="date" value={filters.to   ?? ''} onChange={e => set('to',   e.target.value)} className="input min-w-0" />
-        </div>
       </div>
+      <MobileDateRangeCalendar
+        className="w-full md:hidden"
+        from={filters.from ?? ''}
+        to={filters.to ?? ''}
+        onChange={(range) => onChange({ ...filters, from: range.from, to: range.to, page: 1 })}
+      />
 
       <div className="flex flex-wrap gap-3">
         <select value={filters.status ?? ''} onChange={e => set('status', e.target.value)} className="input flex-1 min-w-[140px]">

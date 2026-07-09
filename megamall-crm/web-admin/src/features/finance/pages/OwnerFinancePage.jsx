@@ -14,6 +14,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, PlusCircle, TrendingUp, X } from 'lucide-react'
 import Alert                     from '../../../shared/components/Alert'
 import DesktopDateRangePicker    from '../../../shared/components/DesktopDateRangePicker'
+import MobileDateRangeCalendar   from '../../../shared/components/MobileDateRangeCalendar'
 import { postFinanceExpense }    from '../api'
 import FinanceSummaryKpis        from '../components/FinanceSummaryKpis'
 import RevenueBreakdownCard      from '../components/RevenueBreakdownCard'
@@ -220,6 +221,12 @@ export default function OwnerFinancePage() {
           />
         </div>
       </div>
+      <MobileDateRangeCalendar
+        className="w-full md:hidden"
+        from={from}
+        to={to}
+        onChange={({ from: nextFrom, to: nextTo }) => setRange({ from: nextFrom, to: nextTo })}
+      />
 
       {/* ── Error alert ─────────────────────────────────────────────────────── */}
       {summaryError && (

@@ -38,6 +38,8 @@ import {
 } from '../../dispatcher/api'
 import { ALL_ROLES, ROLE_LABEL, COMMISSION_TYPE_LABEL, fmtDate, fmtMoney, fmtPct, isConfigActive } from '../utils/peopleHelpers'
 import Modal               from '../../../shared/components/Modal'
+import DesktopDateRangePicker  from '../../../shared/components/DesktopDateRangePicker'
+import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
 import Button              from '../../../shared/components/Button'
 import Alert               from '../../../shared/components/Alert'
 import Badge               from '../../../shared/components/Badge'
@@ -1982,7 +1984,7 @@ function AuditJournal({ history = [], userMap = {} }) {
 
   return (
     <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-      <div className="mb-4 grid gap-2 lg:grid-cols-[minmax(180px,1fr)_170px_170px_140px_140px]">
+      <div className="mb-2 grid gap-2 lg:grid-cols-[minmax(180px,1fr)_170px_170px_170px]">
         <input
           value={query}
           onChange={e => setQuery(e.target.value)}
@@ -2009,19 +2011,19 @@ function AuditJournal({ history = [], userMap = {} }) {
             <option key={item.id} value={item.id}>{item.label}</option>
           ))}
         </select>
-        <input
-          type="date"
-          value={from}
-          onChange={e => setFrom(e.target.value)}
-          className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-[12.5px] font-semibold text-slate-700 outline-none transition-colors focus:border-indigo-300"
-        />
-        <input
-          type="date"
-          value={to}
-          onChange={e => setTo(e.target.value)}
-          className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-[12.5px] font-semibold text-slate-700 outline-none transition-colors focus:border-indigo-300"
+        <DesktopDateRangePicker
+          from={from}
+          to={to}
+          onChange={(range) => { setFrom(range.from); setTo(range.to) }}
+          align="right"
         />
       </div>
+      <MobileDateRangeCalendar
+        className="mb-4 w-full md:hidden"
+        from={from}
+        to={to}
+        onChange={(range) => { setFrom(range.from); setTo(range.to) }}
+      />
       <div className="divide-y divide-slate-100">
         {filteredHistory.map(item => (
           <div key={item.id} className="grid gap-2 py-3 sm:grid-cols-[170px_minmax(0,1fr)_180px] sm:items-center">

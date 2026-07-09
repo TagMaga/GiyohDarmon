@@ -265,9 +265,13 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
           <div className="p-6">
             <div className="space-y-2">
               {TIMELINE_STEPS.map((step, idx) => {
-                const done   = idx <= currentIdx
-                const active = idx === currentIdx
                 const event  = timelineEvents.find(e => e.to_status === step.status)
+                const done   = !!event
+                const active = idx === currentIdx
+                // No event for a step this order has already passed means the workflow
+                // skipped it (e.g. no prepayment required) — it never happened, so don't
+                // render it as a completed step with a guessed role.
+                if (!done && idx <= currentIdx) return null
                 const rb = ROLE_BADGE[step.role]
                 return (
                   <div

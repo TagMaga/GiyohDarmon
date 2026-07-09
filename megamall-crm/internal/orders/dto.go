@@ -468,4 +468,6 @@ type ListOrdersFilter struct {
 	To        string `form:"to"`
 	OrderType string `form:"order_type"`
 	NoCourier bool   `form:"no_courier"`
+	// Search matches order_number, customer name/phone, and seller name.
+	Search string `form:"search"`
 }

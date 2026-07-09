@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -12,6 +12,7 @@ import { useToast }   from '../../../shared/components/ToastProvider'
 import { KEYS }       from '../../../shared/queryKeys'
 import AccountMenu    from '../../../shared/components/AccountMenu'
 import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
+import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
 
 import CreateOfficeOrderModal from '../components/CreateOfficeOrderModal'
 import AssignCourierModal    from '../components/AssignCourierModal'
@@ -1479,8 +1480,6 @@ function transactionNote(row) {
 
 function CashRangePicker({ range, open, onOpen, onRange }) {
   const activeLabel = cashRangeLabel(range)
-  const fromRef = useRef(null)
-  const toRef = useRef(null)
   const desktopPresetMap = {
     maximum: 'all',
     last_7d: 'last7',
@@ -1497,12 +1496,9 @@ function CashRangePicker({ range, open, onOpen, onRange }) {
     onRange({ preset, from: nextRange.from, to: nextRange.to })
   }
 
-  function applyCustomRange() {
-    const from = fromRef.current?.value ?? ''
-    const to = toRef.current?.value ?? ''
-    if (!from || !to) return
-    onRange({ preset: 'custom', from, to })
-    onOpen(false)
+  function applyMobileRange(nextRange) {
+    onRange({ preset: 'custom', from: nextRange.from, to: nextRange.to })
+    if (nextRange.from && nextRange.to) onOpen(false)
   }
 
   return (
@@ -1534,29 +1530,7 @@ function CashRangePicker({ range, open, onOpen, onRange }) {
               </button>
             ))}
           </div>
-          <div className="dv2-cash-custom">
-            <label>
-              <span>С</span>
-              <input
-                ref={fromRef}
-                type="date"
-                defaultValue={range.from}
-                aria-label="Дата с"
-              />
-            </label>
-            <label>
-              <span>По</span>
-              <input
-                ref={toRef}
-                type="date"
-                defaultValue={range.to}
-                aria-label="Дата по"
-              />
-            </label>
-            <button className="dv2-cash-apply" onClick={applyCustomRange}>
-              Применить
-            </button>
-          </div>
+          <MobileDateRangeCalendar from={range.from} to={range.to} onChange={applyMobileRange} />
         </div>
       )}
     </div>

@@ -141,6 +141,16 @@ func (r *Repository) List(ctx context.Context, f ListOrdersFilter, actorID uuid.
 		q = q.Joins("JOIN customers ON customers.id = orders.customer_id").
 			Where("customers.city ILIKE ?", "%"+f.City+"%")
 	}
+	if f.Search != "" {
+		// Subqueries (not joins) so this composes with the City filter's own
+		// unaliased `customers` join without alias collisions.
+		like := "%" + f.Search + "%"
+		q = q.Where(`
+			orders.order_number ILIKE ? OR
+			EXISTS (SELECT 1 FROM customers c WHERE c.id = orders.customer_id AND (c.full_name ILIKE ? OR c.phone ILIKE ?)) OR
+			EXISTS (SELECT 1 FROM users u WHERE u.id = orders.seller_id AND u.full_name ILIKE ?)
+		`, like, like, like, like)
+	}
 	// Resolve date aliases: "from"/"to" (frontend convention) fall back when
 	// explicit "date_from"/"date_to" are absent. date_from takes precedence.
 	dateFrom := f.DateFrom

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import useSellerOrders from '../hooks/useSellerOrders'
 import { useSellerCompensation, useSellerTeamRank, useSellerMe } from '../hooks/useSellerMe'
@@ -48,21 +48,13 @@ export default function SellerHome() {
       ═══════════════════════════════════════════════════════════ */}
       <div className="hidden lg:flex flex-col gap-[22px]" style={{ padding: '36px 44px', fontFamily: M.font }}>
 
-        {/* Greeting + search */}
+        {/* Greeting */}
         <div className="flex items-center justify-between">
           <div>
             <div style={{ fontSize: 14, color: M.sub, fontWeight: 500 }}>Добрый день,</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', marginTop: 2 }}>
               {firstName ?? '—'}
             </div>
-          </div>
-          <div className="relative" style={{ width: 320 }}>
-            <Search size={17} className="absolute left-[14px] top-1/2 -translate-y-1/2" style={{ color: M.muted }} />
-            <input
-              placeholder="Поиск по клиенту, номеру…"
-              className="w-full outline-none"
-              style={{ border: `1px solid ${M.borderAlt}`, background: '#fff', borderRadius: 13, padding: '11px 14px 11px 40px', fontFamily: 'inherit', fontSize: 13.5, color: M.ink }}
-            />
           </div>
         </div>
 

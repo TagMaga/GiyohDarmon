@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { Plus, Search, X } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { Search, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import SellerOrderMobileCard from '../components/SellerOrderMobileCard'
 import { M, MobileShell, Chip, StatusPill } from '../components/mobileUi'
@@ -178,14 +178,6 @@ export default function SellerOrders() {
                 <h1 style={{ fontSize: 22, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0 }}>Мои заказы</h1>
                 <span style={{ fontSize: 13, color: M.muted, fontWeight: 600 }}>{orders.length}</span>
               </div>
-              <Link
-                to="/seller/orders/create"
-                className="flex items-center gap-1.5 transition-transform active:scale-[0.97]"
-                style={{ background: M.indigo, color: '#fff', fontSize: 12.5, fontWeight: 700, padding: '7px 12px', borderRadius: 10 }}
-              >
-                <Plus size={13} />
-                Новый
-              </Link>
             </div>
             {filtersSection}
           </div>

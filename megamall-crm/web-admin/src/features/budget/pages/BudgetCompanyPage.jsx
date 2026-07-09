@@ -9,6 +9,7 @@ import useBudgetTransactions from '../hooks/useBudgetTransactions'
 import { postBudgetIncome, postBudgetWithdrawal } from '../api'
 import EditBudgetTransactionModal from '../components/EditBudgetTransactionModal'
 import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
+import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
 import Alert from '../../../shared/components/Alert'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -223,6 +224,7 @@ function MobileBudgetView({
   balance, sumLoading, sumError, onRetrySummary, allTimeProfit, allTimeSumLoading, summary,
   incomeCount, withdrawalCount, items, txLoading,
   typeFilter, onTypeFilter, onIncome, onWithdrawal, onEditTx,
+  range, onRangeChange,
 }) {
   const today = new Date()
   const todayItems = items.filter((t) => isSameDay(new Date(t.created_at), today))
@@ -234,6 +236,13 @@ function MobileBudgetView({
       <div className="flex items-center justify-between">
         <h1 className="text-[22px] font-extrabold tracking-tight text-slate-950">Бюджет</h1>
       </div>
+
+      <MobileDateRangeCalendar
+        className="w-full"
+        from={range?.from ?? ''}
+        to={range?.to ?? ''}
+        onChange={onRangeChange}
+      />
 
       {sumError && (
         <div className="flex items-center justify-between gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
@@ -400,6 +409,8 @@ export default function BudgetCompanyPage() {
           onIncome={() => setIncomeOpen(true)}
           onWithdrawal={() => setWithdrawalOpen(true)}
           onEditTx={setEditingTx}
+          range={range}
+          onRangeChange={(nextRange) => { setRange({ from: nextRange.from, to: nextRange.to }); setPage(1) }}
         />
       </div>
 

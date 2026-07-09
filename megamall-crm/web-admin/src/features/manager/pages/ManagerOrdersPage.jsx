@@ -10,15 +10,13 @@
  */
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery }                    from '@tanstack/react-query'
-import { Search, X, ClipboardList, ChevronDown } from 'lucide-react'
+import { Search, X, ClipboardList, ChevronDown, CalendarDays, ArrowUpDown } from 'lucide-react'
 import Badge                           from '../../../shared/components/Badge'
 import EmptyState                      from '../../../shared/components/EmptyState'
 import BottomSheet                     from '../../../shared/components/BottomSheet'
-import DesktopDateRangePicker          from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar         from '../../../shared/components/MobileDateRangeCalendar'
 import SellerOrderDetailPanel          from '../../seller/components/SellerOrderDetailPanel'
 import OrderDetailBottomSheet          from '../../seller/components/OrderDetailBottomSheet'
-import { M, InitialsAvatar, StatusPill, Chip } from '../../seller/components/mobileUi'
+import { M, InitialsAvatar, StatusPill }       from '../../seller/components/mobileUi'
 import { KEYS }                        from '../../../shared/queryKeys'
 import { fetchCities }                 from '../../seller/api'
 import { SELLER_STATUS_FILTERS, STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
@@ -96,14 +94,26 @@ const DATE_PRESETS = [
   { label: 'Этот месяц', get: () => ({ from: toYMD(startOfMonth(new Date())), to: toYMD(new Date()) }) },
 ]
 const WEEKDAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС']
+const SORTS = [
+  { key: 'newest',      label: 'Сначала новые' },
+  { key: 'oldest',      label: 'Сначала старые' },
+  { key: 'amount_desc', label: 'Сумма: больше' },
+  { key: 'amount_asc',  label: 'Сумма: меньше' },
+]
 
 const CHIP_BASE = 'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold transition duration-150 font-sans active:scale-[0.94]'
-const CHIP_OFF = `${CHIP_BASE} bg-slate-100 text-slate-600 hover:bg-slate-200`
-const CHIP_ON = `${CHIP_BASE} bg-indigo-600 text-white hover:bg-indigo-700`
 
 function FilterChip({ flipKey, active, onClick, onClear, children }) {
   return (
-    <button type="button" data-flip-key={flipKey} onClick={onClick} className={active ? CHIP_ON : CHIP_OFF}>
+    <button
+      type="button"
+      data-flip-key={flipKey}
+      onClick={onClick}
+      className={CHIP_BASE}
+      style={active
+        ? { color: '#fff', background: M.dark, border: '1px solid transparent' }
+        : { color: '#76766E', background: '#fff', border: `1px solid ${M.borderAlt}` }}
+    >
       {active && (
         <span
           role="button"
@@ -117,7 +127,7 @@ function FilterChip({ flipKey, active, onClick, onClear, children }) {
         </span>
       )}
       {children}
-      {!active && <ChevronDown size={13} className="opacity-50 transition-transform duration-200" />}
+      {!active && <ChevronDown size={13} style={{ opacity: 0.5, color: M.muted }} className="transition-transform duration-200" />}
     </button>
   )
 }
@@ -133,6 +143,38 @@ function PresetPill({ active, onClick, children }) {
       ].join(' ')}
     >
       {children}
+    </button>
+  )
+}
+
+function DesktopFilterTrigger({ icon, active, open, onClick, onClear, chevron = true, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      className={[
+        'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors',
+        active ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+      ].join(' ')}
+    >
+      {icon}
+      <span className="max-w-[200px] truncate">{children}</span>
+      {active && (
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label="Сбросить"
+          onClick={(e) => { e.stopPropagation(); onClear() }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onClear() } }}
+          className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full hover:bg-indigo-100"
+        >
+          <X size={11} />
+        </span>
+      )}
+      {!active && chevron && (
+        <ChevronDown size={13} className={`opacity-50 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      )}
     </button>
   )
 }
@@ -187,11 +229,13 @@ export default function ManagerOrdersPage() {
   const [rawSearch,    setRawSearch]    = useState('')
   const [minAmount,    setMinAmount]    = useState('')
   const [maxAmount,    setMaxAmount]    = useState('')
+  const [sort,         setSort]         = useState('newest')
   const [page,         setPage]         = useState(1)
   const [detailOrder,  setDetailOrder]  = useState(null)
-  const [sheet,        setSheet]        = useState(null) // null | 'period' | 'user' | 'amount'
+  const [sheet,        setSheet]        = useState(null) // null | 'status' | 'period' | 'user' | 'amount' | 'sort'
   const [draft,        setDraft]        = useState({})
   const [monthCount,   setMonthCount]   = useState(2)
+  const [desktopMonthCount, setDesktopMonthCount] = useState(1)
 
   const search = useDebounce(rawSearch, 400)
 
@@ -207,16 +251,21 @@ export default function ManagerOrdersPage() {
   )
   const selectedSeller = useMemo(() => sellers.find(u => u.id === sellerId) ?? null, [sellers, sellerId])
 
-  // Mobile chip row: Период / Пользователь / Сумма, each opening a bottom sheet.
+  // Chip / pill row: Статус / Период / Продавец / Сумма / Сортировка, each opening a
+  // popover (desktop) or bottom sheet (mobile). Статус and Сортировка commit
+  // immediately on pick; Период / Продавец / Сумма go through a draft + Apply step.
   function openSheet(kind) {
     if (kind === 'period') {
       setDraft({ from: dateFrom, to: dateTo, fromTxt: formatDMY(dateFrom), toTxt: formatDMY(dateTo) })
       setMonthCount(2)
+      setDesktopMonthCount(1)
     } else if (kind === 'user') setDraft({ sel: sellerId })
     else if (kind === 'amount') setDraft({ min: minAmount, max: maxAmount })
     setSheet(kind)
   }
   function closeSheet() { setSheet(null); setDraft({}) }
+  // Desktop: same trigger toggles its own popover closed on a second click.
+  function toggleSheet(kind) { if (sheet === kind) closeSheet(); else openSheet(kind) }
   function patchDraft(patch) { setDraft(d => ({ ...d, ...patch })) }
   function applySheet() {
     if (sheet === 'period') {
@@ -228,6 +277,8 @@ export default function ManagerOrdersPage() {
     }
     closeSheet()
   }
+  function pickStatus(key) { setStatusFilter(key); closeSheet() }
+  function pickSort(key) { setSort(key); closeSheet() }
 
   function pickDay(day) {
     const value = toYMD(day)
@@ -254,9 +305,14 @@ export default function ManagerOrdersPage() {
   const amountLabel = amountOn
     ? (minAmount && maxAmount ? `${minAmount}–${maxAmount}` : minAmount ? `от ${minAmount}` : `до ${maxAmount}`)
     : 'Сумма'
+  const statusActive = statusFilter !== 'all'
+  const statusLabel = statusActive ? (SELLER_STATUS_FILTERS.find(f => f.key === statusFilter)?.label ?? 'Статус') : 'Статус'
+  const sortActive = sort !== 'newest'
+  const sortLabel = SORTS.find(o => o.key === sort)?.label ?? 'Сортировка'
 
   const periodBaseMonth = useMemo(() => startOfMonth(fromYMD(dateFrom) ?? fromYMD(dateTo) ?? addMonths(new Date(), -1)), [dateFrom, dateTo])
   const periodMonths = useMemo(() => Array.from({ length: monthCount }, (_, i) => addMonths(periodBaseMonth, i)), [periodBaseMonth, monthCount])
+  const desktopPeriodMonths = useMemo(() => Array.from({ length: desktopMonthCount }, (_, i) => addMonths(periodBaseMonth, i)), [periodBaseMonth, desktopMonthCount])
   const periodCtaLabel = (() => {
     if (!draft.from) return 'Выберите даты'
     const toTxt = draft.to && draft.to !== draft.from ? ` – ${formatHuman(draft.to)}` : ''
@@ -299,16 +355,28 @@ export default function ManagerOrdersPage() {
 
   const { items, meta, isLoading, isError, error } = useManagerOrders(hookParams, memberIds)
 
-  // Сумма has no backend param — filter the current page client-side (mobile chip only).
+  // Сумма and Сортировка have no backend param — applied client-side on the
+  // current page only (same page, same total — just filtered/reordered).
   const visibleItems = useMemo(() => {
-    if (!amountOn) return items
-    const min = minAmount ? Number(minAmount) : -Infinity
-    const max = maxAmount ? Number(maxAmount) : Infinity
-    return items.filter(o => {
-      const amt = o.total_order_amount ?? o.total_amount ?? 0
-      return amt >= min && amt <= max
-    })
-  }, [items, amountOn, minAmount, maxAmount])
+    let arr = items
+    if (amountOn) {
+      const min = minAmount ? Number(minAmount) : -Infinity
+      const max = maxAmount ? Number(maxAmount) : Infinity
+      arr = arr.filter(o => {
+        const amt = o.total_order_amount ?? o.total_amount ?? 0
+        return amt >= min && amt <= max
+      })
+    }
+    if (sortActive) {
+      const amt = o => o.total_order_amount ?? o.total_amount ?? 0
+      arr = [...arr].sort((a, b) => {
+        if (sort === 'amount_desc') return amt(b) - amt(a)
+        if (sort === 'amount_asc') return amt(a) - amt(b)
+        return new Date(a.created_at) - new Date(b.created_at) // 'oldest'
+      })
+    }
+    return arr
+  }, [items, amountOn, minAmount, maxAmount, sort, sortActive])
 
   // Reset page when filters change (not page itself)
   const prevFilters = useRef({ dateFrom, dateTo, statusFilter, sellerId, search })
@@ -325,33 +393,54 @@ export default function ManagerOrdersPage() {
   const listRef = useRef(null)
   useEffect(() => {
     function handleKey(e) {
-      if (!items.length) return
+      if (!visibleItems.length) return
       if (e.key === 'Escape') { setDetailOrder(null); return }
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
       e.preventDefault()
-      const idx = detailOrder ? items.findIndex(o => o.id === detailOrder.id) : -1
+      const idx = detailOrder ? visibleItems.findIndex(o => o.id === detailOrder.id) : -1
       if (e.key === 'ArrowDown') {
-        const next = items[Math.min(idx + 1, items.length - 1)]
+        const next = visibleItems[Math.min(idx + 1, visibleItems.length - 1)]
         if (next) setDetailOrder(next)
       } else {
-        const prev = items[Math.max(idx - 1, 0)]
+        const prev = visibleItems[Math.max(idx - 1, 0)]
         if (prev) setDetailOrder(prev)
       }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [items, detailOrder])
+  }, [visibleItems, detailOrder])
+
+  // Desktop filter popovers: close on outside click or Escape (viewport-guarded
+  // so it never fights the mobile BottomSheet's own close handling).
+  const desktopFiltersRef = useRef(null)
+  useEffect(() => {
+    if (!sheet) return
+    function handlePointer(e) {
+      if (window.innerWidth < 1024) return
+      if (desktopFiltersRef.current && !desktopFiltersRef.current.contains(e.target)) closeSheet()
+    }
+    function handleKey(e) { if (e.key === 'Escape') closeSheet() }
+    document.addEventListener('mousedown', handlePointer)
+    document.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handlePointer)
+      document.removeEventListener('keydown', handleKey)
+    }
+  }, [sheet])
 
   // ── Filters (same split pattern as TeamLeadOrders) ────────────────────────
-  const quickFilters = (
-    <div className="space-y-2.5">
-      <div className="relative">
+  // Row 1: search + sort. Row 2: Статус/Период/Продавец/Сумма pills, each a
+  // popover (desktop) — status collapses into a single dropdown rather than
+  // an always-visible chip row so the panel stays compact.
+  const searchAndSort = (
+    <div className="relative flex items-center gap-2">
+      <div className="relative flex-1">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: M.muted }} />
         <input
           type="text"
           value={rawSearch}
           onChange={e => setRawSearch(e.target.value)}
-          placeholder="Поиск по продавцу, клиенту…"
+          placeholder="Поиск по номеру заказа, продавцу, клиенту…"
           className="w-full outline-none"
           style={{ border: `1px solid ${M.borderAlt}`, background: '#fff', borderRadius: 13, padding: '11px 14px 11px 40px', fontFamily: 'inherit', fontSize: 13.5, color: M.ink }}
         />
@@ -363,51 +452,173 @@ export default function ManagerOrdersPage() {
         )}
       </div>
 
-      <div className="flex gap-[7px] overflow-x-auto scrollbar-none pb-0.5">
-        {SELLER_STATUS_FILTERS.map(f => (
-          <Chip key={f.key} active={statusFilter === f.key} onClick={() => setStatusFilter(f.key)}>
-            {f.label}
-          </Chip>
-        ))}
-      </div>
+      <button
+        type="button"
+        onClick={() => toggleSheet('sort')}
+        aria-expanded={sheet === 'sort'}
+        className={[
+          'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors',
+          sortActive ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+        ].join(' ')}
+      >
+        <ArrowUpDown size={14} className="opacity-60" />
+        <span>{sortLabel}</span>
+        <ChevronDown size={13} className={`opacity-50 transition-transform duration-200 ${sheet === 'sort' ? 'rotate-180' : ''}`} />
+      </button>
+
+      {sheet === 'sort' && (
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[210px] rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl">
+          {SORTS.map(o => (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => pickSort(o.key)}
+              className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-[13px] font-semibold transition-colors ${sort === o.key ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 
+  const anyDesktopFilterActive = periodActive || Boolean(sellerId) || amountOn || statusActive || sortActive || Boolean(rawSearch)
+
   const advancedFilters = (
-    <div className="flex gap-2 flex-wrap">
-      <DesktopDateRangePicker
-        variant="trigger"
-        from={dateFrom}
-        to={dateTo}
-        onChange={(range) => { setDateFrom(range.from); setDateTo(range.to) }}
-      />
-      <MobileDateRangeCalendar
-        className="w-full md:hidden"
-        from={dateFrom}
-        to={dateTo}
-        onChange={(range) => { setDateFrom(range.from); setDateTo(range.to) }}
-      />
-      {sellers.length > 0 && (
-        <select value={sellerId} onChange={e => setSellerId(e.target.value)} className="input flex-1 min-w-[140px]">
-          <option value="">Все продавцы</option>
-          {sellers.map(u => <option key={u.id} value={u.id}>{u.full_name ?? u.id}</option>)}
-        </select>
-      )}
-      {(statusFilter !== 'all' || rawSearch || sellerId) && (
+    <div className="scrollbar-none relative flex flex-nowrap items-center gap-2 overflow-x-auto">
+      <DesktopFilterTrigger active={statusActive} open={sheet === 'status'} onClick={() => toggleSheet('status')} onClear={() => setStatusFilter('all')}>
+        {statusLabel}
+      </DesktopFilterTrigger>
+
+      <DesktopFilterTrigger
+        icon={<CalendarDays size={14} className="opacity-60" />}
+        active={periodActive}
+        open={sheet === 'period'}
+        onClick={() => toggleSheet('period')}
+        onClear={() => { setDateFrom(def.from); setDateTo(def.to) }}
+      >
+        {periodLabel}
+      </DesktopFilterTrigger>
+
+      <DesktopFilterTrigger active={amountOn} open={sheet === 'amount'} onClick={() => toggleSheet('amount')} onClear={() => { setMinAmount(''); setMaxAmount('') }}>
+        {amountLabel}
+      </DesktopFilterTrigger>
+
+      {anyDesktopFilterActive && (
         <button
           type="button"
-          onClick={() => { setStatusFilter('all'); setRawSearch(''); setSellerId('') }}
-          className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors"
+          onClick={() => {
+            setDateFrom(def.from); setDateTo(def.to)
+            setStatusFilter('all'); setRawSearch(''); setSellerId('')
+            setMinAmount(''); setMaxAmount(''); setSort('newest')
+          }}
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700"
         >
-          <X size={12} /> Сбросить
+          <X size={12} />
+          Сбросить фильтры
         </button>
+      )}
+
+      {/* Popovers anchor to the row itself (not the individual trigger) so a
+          trigger sitting far right in the narrow 400px list column never
+          pushes the panel past the column's edge. */}
+      {sheet === 'status' && (
+        <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[240px] rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl">
+          {SELLER_STATUS_FILTERS.map(f => (
+            <button
+              key={f.key}
+              type="button"
+              onClick={() => pickStatus(f.key)}
+              className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-[13px] font-semibold transition-colors ${statusFilter === f.key ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {sheet === 'period' && (
+        <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[340px] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xl">
+          <div className="mb-1 flex items-center gap-2">
+            <input
+              type="text" inputMode="numeric" placeholder="дд.мм.гггг"
+              value={draft.fromTxt ?? ''} onChange={onTypeDateFrom} aria-label="Дата от"
+              className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 text-center text-xs font-semibold text-slate-900 outline-none focus:border-indigo-300 focus:bg-white"
+            />
+            <span className="flex-shrink-0 text-xs font-semibold text-slate-400">—</span>
+            <input
+              type="text" inputMode="numeric" placeholder="дд.мм.гггг"
+              value={draft.toTxt ?? ''} onChange={onTypeDateTo} aria-label="Дата до"
+              className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-2 text-center text-xs font-semibold text-slate-900 outline-none focus:border-indigo-300 focus:bg-white"
+            />
+          </div>
+          <div className="mb-1 mt-2.5 flex flex-wrap gap-1.5">
+            {DATE_PRESETS.map((preset) => {
+              const range = preset.get()
+              const active = draft.from === range.from && draft.to === range.to
+              return (
+                <PresetPill key={preset.label} active={active} onClick={() => patchDraft({ ...range, fromTxt: formatDMY(range.from), toTxt: formatDMY(range.to) })}>
+                  {preset.label}
+                </PresetPill>
+              )
+            })}
+          </div>
+          <div className="mt-2.5 grid grid-cols-7 gap-1 text-center">
+            {WEEKDAYS.map((d) => <span key={d} className="text-[10px] font-bold text-slate-400">{d}</span>)}
+          </div>
+          {desktopPeriodMonths.map((month, i) => (
+            <MonthGrid key={i} month={month} from={draft.from} to={draft.to} onPick={pickDay} />
+          ))}
+          <button
+            type="button"
+            onClick={() => setDesktopMonthCount((c) => c + 1)}
+            className="w-full rounded-lg py-1.5 text-center text-[11px] font-bold text-indigo-600 hover:bg-indigo-50"
+          >
+            Показать следующий месяц
+          </button>
+          <button
+            type="button"
+            onClick={applySheet}
+            disabled={!draft.from}
+            className="mt-2 h-9 w-full rounded-full bg-indigo-600 text-xs font-bold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Применить
+          </button>
+        </div>
+      )}
+
+      {sheet === 'amount' && (
+        <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[280px] rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+          <div className="grid grid-cols-2 gap-3.5">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-slate-400">От</span>
+              <input
+                type="number" min="0" step="0.01" placeholder="0"
+                value={draft.min ?? ''} onChange={(e) => patchDraft({ min: e.target.value })}
+                className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-sm font-bold text-slate-900 outline-none focus:border-indigo-300 focus:bg-white"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[11px] font-semibold text-slate-400">До</span>
+              <input
+                type="number" min="0" step="0.01" placeholder="∞"
+                value={draft.max ?? ''} onChange={(e) => patchDraft({ max: e.target.value })}
+                className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 text-sm font-bold text-slate-900 outline-none focus:border-indigo-300 focus:bg-white"
+              />
+            </label>
+          </div>
+          <button type="button" onClick={applySheet} className="mt-3.5 h-9 w-full rounded-full bg-indigo-600 text-xs font-bold text-white shadow-sm hover:bg-indigo-700">
+            Применить
+          </button>
+        </div>
       )}
     </div>
   )
 
   const filtersSection = (
-    <div className="space-y-2.5">
-      {quickFilters}
+    <div ref={desktopFiltersRef} className="space-y-2.5">
+      {searchAndSort}
       {advancedFilters}
     </div>
   )
@@ -503,7 +714,9 @@ export default function ManagerOrdersPage() {
   }
 
   const totalCount = meta?.total ?? items.length
-  const mobileCount = amountOn ? visibleItems.length : totalCount
+  // Сумма filters client-side, so once it's on the header count must reflect
+  // what's actually rendered rather than the server's unfiltered page total.
+  const displayCount = amountOn ? visibleItems.length : totalCount
   const totalPages = meta?.total_pages ?? 1
 
   return (
@@ -514,12 +727,45 @@ export default function ManagerOrdersPage() {
       <div className="lg:hidden" style={{ background: M.bg, fontFamily: M.font, minHeight: '100vh', padding: '8px 20px 7.5rem' }}>
         <div className="flex items-baseline gap-[9px]">
           <h1 style={{ fontSize: 24, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0 }}>Заказы команды</h1>
-          <span style={{ fontSize: 14, color: M.muted, fontWeight: 600 }}>{mobileCount}</span>
+          <span style={{ fontSize: 14, color: M.muted, fontWeight: 600 }}>{displayCount}</span>
         </div>
 
         <div style={{ marginTop: 14 }} className="space-y-3">
-          {quickFilters}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search size={15} className="absolute left-[13px] top-1/2 -translate-y-1/2" style={{ color: M.muted }} />
+              <input
+                type="text"
+                value={rawSearch}
+                onChange={e => setRawSearch(e.target.value)}
+                placeholder="Поиск…"
+                className="w-full outline-none"
+                style={{ border: `1px solid ${M.borderAlt}`, background: '#fff', borderRadius: 13, padding: '0 14px 0 38px', height: 44, fontFamily: 'inherit', fontSize: 14, color: M.ink }}
+              />
+              {rawSearch && (
+                <button type="button" onClick={() => setRawSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: M.muted }}>
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => openSheet('sort')}
+              aria-label="Сортировка"
+              className="flex flex-shrink-0 items-center justify-center active:scale-95 transition-transform"
+              style={sortActive
+                ? { width: 44, height: 44, borderRadius: 13, background: M.dark, color: '#fff', border: '1px solid transparent' }
+                : { width: 44, height: 44, borderRadius: 13, background: '#fff', color: '#57534E', border: `1px solid ${M.borderAlt}` }}
+            >
+              <ArrowUpDown size={19} />
+            </button>
+          </div>
+
           <div className="scrollbar-none -mx-5 flex flex-nowrap items-center gap-2 overflow-x-auto px-5 py-[5px]">
+            <FilterChip flipKey="status" active={statusActive} onClick={() => openSheet('status')} onClear={() => setStatusFilter('all')}>
+              {statusLabel}
+            </FilterChip>
             <FilterChip flipKey="period" active={periodActive} onClick={() => openSheet('period')} onClear={() => { setDateFrom(def.from); setDateTo(def.to) }}>
               {periodLabel}
             </FilterChip>
@@ -531,6 +777,36 @@ export default function ManagerOrdersPage() {
             </FilterChip>
           </div>
         </div>
+
+        <BottomSheet open={sheet === 'status'} onClose={closeSheet} title="Статус">
+          <div className="flex flex-col gap-0.5 py-1">
+            {SELLER_STATUS_FILTERS.map(f => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => pickStatus(f.key)}
+                className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[13.5px] font-semibold transition-colors ${statusFilter === f.key ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </BottomSheet>
+
+        <BottomSheet open={sheet === 'sort'} onClose={closeSheet} title="Сортировка">
+          <div className="flex flex-col gap-0.5 py-1">
+            {SORTS.map(o => (
+              <button
+                key={o.key}
+                type="button"
+                onClick={() => pickSort(o.key)}
+                className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[13.5px] font-semibold transition-colors ${sort === o.key ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </BottomSheet>
 
         <BottomSheet open={sheet === 'period'} onClose={closeSheet} title="Выбор периода" footer={periodCTA}>
           <div className="mb-1 mt-1.5 flex items-center gap-2.5">
@@ -677,7 +953,7 @@ export default function ManagerOrdersPage() {
           <div className="px-5 py-4 flex-shrink-0" style={{ borderBottom: '1px solid rgba(226,232,240,0.7)' }}>
             <div className="mb-3">
               <h1 className="text-lg font-bold text-slate-900">Заказы команды</h1>
-              <p className="text-xs text-slate-400 mt-0.5">Всего: {totalCount}</p>
+              <p className="text-xs text-slate-400 mt-0.5">Всего: {displayCount}</p>
             </div>
             {filtersSection}
           </div>
@@ -691,12 +967,12 @@ export default function ManagerOrdersPage() {
                 ))}
               </div>
             )}
-            {!isLoading && items.length === 0 && (
+            {!isLoading && visibleItems.length === 0 && (
               <div className="p-6">
                 <EmptyState icon={<ClipboardList size={24} />} title="Нет заказов" description="Заказы вашей команды появятся здесь." />
               </div>
             )}
-            {!isLoading && items.map(o => <ListRow key={o.id} order={o} />)}
+            {!isLoading && visibleItems.map(o => <ListRow key={o.id} order={o} />)}
           </div>
 
           {/* Pagination + keyboard hint */}

@@ -6,7 +6,7 @@
  */
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronRight, Crown, TrendingUp } from 'lucide-react'
+import { ChevronRight, Crown, TrendingUp } from 'lucide-react'
 import { CardSkeleton } from '../../../shared/components/Skeleton'
 import { fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import { formatOrderLabel, getOrderId } from '../../dispatcher/utils/orderHelpers'
@@ -264,14 +264,6 @@ export default function ManagerDashboardPage() {
               {team?.name ? `Команда "${team.name}"` : 'Ваша команда'} · {monthLabel}
             </p>
           </div>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2"
-            style={{ background: '#fff', border: `1px solid ${M.borderAlt}`, borderRadius: 12, padding: '10px 14px', fontSize: 13, fontWeight: 700, color: M.ink }}
-          >
-            Этот месяц
-            <ChevronDown size={14} color={M.muted} />
-          </button>
         </div>
 
         <div style={{ marginTop: 22 }}>

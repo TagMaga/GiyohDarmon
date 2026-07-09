@@ -249,9 +249,13 @@ export default function OrderDetailBottomSheet({ order, onClose, citiesById = {}
             <div className="p-5">
               <div className="space-y-3">
                 {TIMELINE_STEPS.map((step, idx) => {
-                  const done = idx <= currentIdx
-                  const active = order.status === step.status
                   const event = timelineEvents.find(e => e.to_status === step.status)
+                  const done = !!event
+                  const active = order.status === step.status
+                  // No event for a step this order has already passed means the workflow
+                  // skipped it (e.g. no prepayment required) — it never happened, so don't
+                  // render it as a completed step with a guessed role.
+                  if (!done && idx <= currentIdx) return null
                   const rb = ROLE_BADGE[step.role]
                   return (
                     <div key={step.status} className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-all ${
