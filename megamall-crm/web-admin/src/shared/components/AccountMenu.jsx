@@ -16,6 +16,7 @@ import { updateEmployee } from '../../features/people/api'
 
 const ROLE_LABELS = {
   owner:             'Владелец',
+  it_specialist:     'IT-специалист',
   sales_team_lead:   'Руководитель группы',
   manager:           'Менеджер',
   seller:            'Продавец',
@@ -26,6 +27,7 @@ const ROLE_LABELS = {
 
 const ROLE_COLORS = {
   owner:             '#f59e0b',
+  it_specialist:     '#a855f7',
   sales_team_lead:   '#3b82f6',
   manager:           '#10b981',
   seller:            '#8b5cf6',

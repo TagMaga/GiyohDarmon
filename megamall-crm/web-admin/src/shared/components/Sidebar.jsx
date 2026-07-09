@@ -52,10 +52,13 @@ const NAV = {
   ],
   courier: [],
 }
+// it_specialist has full owner-level access — reuse the owner nav.
+NAV.it_specialist = NAV.owner
 
 // ─── Role display names ────────────────────────────────────────────────────────
 const ROLE_LABELS = {
   owner:             'Владелец',
+  it_specialist:     'IT-специалист',
   sales_team_lead:   'Руководитель группы',
   manager:           'Менеджер',
   seller:            'Продавец',

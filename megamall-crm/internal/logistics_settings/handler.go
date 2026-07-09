@@ -9,6 +9,7 @@ import (
 	"github.com/megamall/crm/internal/activity"
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/middleware"
+	"github.com/megamall/crm/pkg/rbac"
 	"github.com/megamall/crm/pkg/response"
 	"gorm.io/gorm"
 )
@@ -28,7 +29,7 @@ func (h *Handler) listCities(c *gin.Context) {
 	q := h.db.WithContext(c).Order("name ASC")
 	// Owners may request inactive cities too; everyone else sees active only.
 	role := middleware.ClaimsFromContext(c).Role
-	if !(role == "owner" && c.Query("include_inactive") == "true") {
+	if !(rbac.IsOwnerLevel(role) && c.Query("include_inactive") == "true") {
 		q = q.Where("is_active = ?", true)
 	}
 	var rows []City
@@ -265,7 +266,7 @@ func (h *Handler) updateCourierPayout(c *gin.Context) {
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 func (h *Handler) requireOwner(c *gin.Context) bool {
-	if middleware.ClaimsFromContext(c).Role != "owner" {
+	if !rbac.IsOwnerLevel(middleware.ClaimsFromContext(c).Role) {
 		response.HandleError(c, apperrors.Forbidden("owner only"))
 		return false
 	}
@@ -274,7 +275,7 @@ func (h *Handler) requireOwner(c *gin.Context) bool {
 
 func (h *Handler) requireOwnerOrDispatcher(c *gin.Context) bool {
 	role := middleware.ClaimsFromContext(c).Role
-	if role != "owner" && role != "dispatcher" {
+	if !rbac.IsOwnerLevel(role) && role != "dispatcher" {
 		response.HandleError(c, apperrors.Forbidden("owner or dispatcher only"))
 		return false
 	}

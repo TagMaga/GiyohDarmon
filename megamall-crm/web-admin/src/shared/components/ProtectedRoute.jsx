@@ -13,8 +13,9 @@ import { ROLE_HOME } from '../../app/router'
  *   4. Token + correct role → render <Outlet />
  *
  * Props:
- *   allowedRole  {string}  — the single role allowed to access this section.
- *                            If omitted, any authenticated user passes.
+ *   allowedRole  {string|string[]}  — the role(s) allowed to access this
+ *                            section. If omitted, any authenticated user
+ *                            passes.
  */
 export default function ProtectedRoute({ allowedRole }) {
   const { token, role, _hasHydrated } = useAuthStore()
@@ -37,7 +38,8 @@ export default function ProtectedRoute({ allowedRole }) {
   }
 
   // ── Wrong role — send user to their own dashboard ─────────────────────────
-  if (allowedRole && role !== allowedRole) {
+  const allowedList = allowedRole == null ? null : [].concat(allowedRole)
+  if (allowedList && !allowedList.includes(role)) {
     const home = ROLE_HOME[role] ?? '/login'
     return <Navigate to={home} replace />
   }

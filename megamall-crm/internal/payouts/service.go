@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/megamall/crm/internal/compensation"
 	apperrors "github.com/megamall/crm/pkg/errors"
+	"github.com/megamall/crm/pkg/rbac"
 )
 
 // Service holds payout business logic. It depends on compensation.Service for
@@ -193,7 +194,7 @@ func validatePayoutItems(items []CreatePayoutItem, allowed map[uuid.UUID]Payable
 // — mirrors the "your own team only" restriction already applied in
 // CreatePayouts/validatePayoutItems. Owner sees everything for the payee.
 func (s *Service) GetPayeePayoutHistory(ctx context.Context, actorID uuid.UUID, actorRole string, payeeID uuid.UUID) ([]PayoutResponse, error) {
-	if actorRole != "owner" && actorRole != "sales_team_lead" {
+	if !rbac.IsOwnerLevel(actorRole) && actorRole != "sales_team_lead" {
 		return nil, apperrors.Forbidden("only a team lead or owner can view payout history")
 	}
 	rows, err := s.repo.ListByPayee(ctx, payeeID)
@@ -222,7 +223,7 @@ func (s *Service) GetPayeePayoutHistory(ctx context.Context, actorID uuid.UUID, 
 // (network retry, double-click) with the same key replays the original
 // batch's result instead of creating a second set of payouts.
 func (s *Service) CreatePayouts(ctx context.Context, actorID uuid.UUID, actorRole string, req CreatePayoutsRequest) ([]PayoutResponse, error) {
-	if actorRole != "owner" && actorRole != "sales_team_lead" {
+	if !rbac.IsOwnerLevel(actorRole) && actorRole != "sales_team_lead" {
 		return nil, apperrors.Forbidden("only a team lead or owner can create payouts")
 	}
 
@@ -327,7 +328,7 @@ func (s *Service) VoidPayout(ctx context.Context, actorID uuid.UUID, actorRole s
 	if err != nil {
 		return apperrors.NotFound("payout not found")
 	}
-	if actorRole != "owner" && p.PayerID != actorID {
+	if !rbac.IsOwnerLevel(actorRole) && p.PayerID != actorID {
 		return apperrors.Forbidden("only the original payer or owner can void a payout")
 	}
 	if p.Status == "voided" {

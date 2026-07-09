@@ -26,6 +26,7 @@ import (
 	"github.com/megamall/crm/internal/teams"
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/pagination"
+	"github.com/megamall/crm/pkg/rbac"
 	"gorm.io/gorm"
 )
 
@@ -1008,7 +1009,7 @@ func (s *Service) AddOrderComment(ctx context.Context, orderID, actorID uuid.UUI
 	// Dispatchers and owners write internal-only notes; all other roles write
 	// seller_visible so the seller can see the comment thread.
 	visibility := "seller_visible"
-	if actorRole == "dispatcher" || actorRole == "owner" {
+	if actorRole == "dispatcher" || rbac.IsOwnerLevel(actorRole) {
 		visibility = "internal"
 	}
 
@@ -1274,7 +1275,7 @@ func (s *Service) ListPrepayments(ctx context.Context, orderID uuid.UUID) ([]Ord
 // ─── Prepayment verification ───────────────────────────────────────────────────
 
 func (s *Service) VerifyPrepayment(ctx context.Context, actorID uuid.UUID, actorRole string, orderID uuid.UUID, req VerifyPrepaymentRequest) (*Order, error) {
-	if actorRole != "dispatcher" && actorRole != "owner" {
+	if actorRole != "dispatcher" && !rbac.IsOwnerLevel(actorRole) {
 		return nil, apperrors.Forbidden("only dispatcher or owner can verify prepayment")
 	}
 
@@ -1340,7 +1341,7 @@ func (s *Service) VerifyPrepayment(ctx context.Context, actorID uuid.UUID, actor
 }
 
 func (s *Service) RejectPrepayment(ctx context.Context, actorID uuid.UUID, actorRole string, orderID uuid.UUID, req RejectPrepaymentRequest) (*Order, error) {
-	if actorRole != "dispatcher" && actorRole != "owner" {
+	if actorRole != "dispatcher" && !rbac.IsOwnerLevel(actorRole) {
 		return nil, apperrors.Forbidden("only dispatcher or owner can reject prepayment")
 	}
 	if req.Reason == "" {
@@ -1547,7 +1548,7 @@ func (s *Service) validateOrderTypeForRole(role string, ot OrderType) error {
 //	in_delivery → *:   dispatcher, owner  (courier added in Phase 5)
 //	owner:             override all
 func (s *Service) validateTransitionRole(role string, actorID uuid.UUID, o *Order, from, to OrderStatus) error {
-	if role == "owner" {
+	if rbac.IsOwnerLevel(role) {
 		return nil // owner overrides everything
 	}
 

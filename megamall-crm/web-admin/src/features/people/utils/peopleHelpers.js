@@ -2,6 +2,7 @@
 
 export const ROLE_LABEL = {
   owner:             'Владелец',
+  it_specialist:     'IT-специалист',
   sales_team_lead:   'Руководитель группы',
   manager:           'Менеджер',
   seller:            'Продавец',
@@ -12,6 +13,7 @@ export const ROLE_LABEL = {
 
 export const ROLE_BADGE = {
   owner:             'violet',
+  it_specialist:     'fuchsia',
   sales_team_lead:   'indigo',
   manager:           'sky',
   seller:            'emerald',

@@ -38,7 +38,7 @@ export default function Layout() {
   const location = useLocation()
   const { role } = useAuthStore()
   const isDispatcherBoard = location.pathname.startsWith('/dispatcher')
-  const isOwner   = role === 'owner'
+  const isOwner   = role === 'owner' || role === 'it_specialist'
   const isSeller  = role === 'seller'
   const isManager = role === 'manager'
   const isWarehouse = role === 'warehouse_manager'

@@ -17,10 +17,15 @@ import (
 //
 // Usage: router.GET("/route", middleware.RequireRoles("owner", "seller"), handler)
 func RequireRoles(roles ...string) gin.HandlerFunc {
-	// Pre-build an O(1) lookup set.
-	allowed := make(map[string]struct{}, len(roles))
+	// Pre-build an O(1) lookup set. "it_specialist" is always owner-equivalent
+	// (see pkg/rbac.IsOwnerLevel) — any route gated on "owner" implicitly
+	// also allows "it_specialist" without every call site listing it.
+	allowed := make(map[string]struct{}, len(roles)+1)
 	for _, r := range roles {
 		allowed[r] = struct{}{}
+		if r == "owner" {
+			allowed["it_specialist"] = struct{}{}
+		}
 	}
 
 	return func(c *gin.Context) {

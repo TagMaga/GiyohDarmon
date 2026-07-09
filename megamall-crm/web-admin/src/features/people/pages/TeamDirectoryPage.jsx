@@ -1799,7 +1799,7 @@ function EditPersonModal({ open, onClose, person, onSaved }) {
         <div style={{ marginBottom: 16 }}>
           <PTLabel required>Должность</PTLabel>
           <select style={ptField} value={role} onChange={e => setRole(e.target.value)}>
-            {ALL_ROLES.filter(r => r !== 'owner').map(r => (
+            {ALL_ROLES.map(r => (
               <option key={r} value={r}>{ROLE_LABEL[r]}</option>
             ))}
           </select>

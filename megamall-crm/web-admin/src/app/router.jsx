@@ -95,6 +95,7 @@ function Lazy({ children }) {
  */
 export const ROLE_HOME = {
   owner:             '/owner',
+  it_specialist:     '/owner',
   sales_team_lead:   '/team-lead',
   manager:           '/manager',
   seller:            '/seller',
@@ -112,7 +113,7 @@ const router = createBrowserRouter([
 
   // ── Owner ───────────────────────────────────────────────────────────────
   {
-    element: <ProtectedRoute allowedRole="owner" />,
+    element: <ProtectedRoute allowedRole={['owner', 'it_specialist']} />,
     children: [{
       path: '/owner',
       element: <Layout />,

@@ -57,7 +57,7 @@ export default function EditEmployeeModal({ open, onClose, user }) {
         </div>
         <div><label className="input-label">Роль *</label>
           <select value={role} onChange={e => setRole(e.target.value)} className="input mt-1">
-            {ALL_ROLES.filter(r => r !== 'owner').map(r => (
+            {ALL_ROLES.map(r => (
               <option key={r} value={r}>{ROLE_LABEL[r]}</option>
             ))}
           </select>

@@ -38,7 +38,7 @@ export default function EmployeeFilters({ roleFilter = '', teamFilter = '', sear
         className="input sm:w-48"
       >
         <option value="">Все роли</option>
-        {ALL_ROLES.filter(r => r !== 'owner').map(r => (
+        {ALL_ROLES.map(r => (
           <option key={r} value={r}>{ROLE_LABEL[r]}</option>
         ))}
       </select>

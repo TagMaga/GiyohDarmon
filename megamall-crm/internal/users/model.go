@@ -42,12 +42,13 @@ const (
 	RoleDispatcher       Role = "dispatcher"
 	RoleWarehouseManager Role = "warehouse_manager"
 	RoleCourier          Role = "courier"
+	RoleITSpecialist     Role = "it_specialist"
 )
 
 // AllRoles lists all valid roles for validation.
 var AllRoles = []Role{
 	RoleOwner, RoleSalesTeamLead, RoleManager, RoleSeller,
-	RoleDispatcher, RoleWarehouseManager, RoleCourier,
+	RoleDispatcher, RoleWarehouseManager, RoleCourier, RoleITSpecialist,
 }
 
 // IsValid returns true if the role is a known role.

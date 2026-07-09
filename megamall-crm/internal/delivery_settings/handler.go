@@ -7,6 +7,7 @@ import (
 	"github.com/megamall/crm/internal/activity"
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/middleware"
+	"github.com/megamall/crm/pkg/rbac"
 	"github.com/megamall/crm/pkg/response"
 	"gorm.io/gorm"
 )
@@ -36,7 +37,7 @@ func (h *Handler) get(c *gin.Context) {
 
 func (h *Handler) update(c *gin.Context) {
 	claims := middleware.ClaimsFromContext(c)
-	if claims.Role != "owner" {
+	if !rbac.IsOwnerLevel(claims.Role) {
 		response.HandleError(c, apperrors.Forbidden("only owner can change delivery settings"))
 		return
 	}

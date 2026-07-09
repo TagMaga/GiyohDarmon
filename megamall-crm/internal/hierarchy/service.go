@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	apperrors "github.com/megamall/crm/pkg/errors"
+	"github.com/megamall/crm/pkg/rbac"
 )
 
 // ExistsFn is an injected check for whether a user or team exists.
@@ -95,7 +96,7 @@ func (s *Service) Assign(ctx context.Context, req AssignRequest) (*UserHierarchy
 // team they manage/lead. Cross-scope access reports NotFound rather than
 // Forbidden, so a caller can't distinguish "doesn't exist" from "not yours".
 func (s *Service) GetUserChain(ctx context.Context, actorID uuid.UUID, actorRole string, userID uuid.UUID) ([]HierarchyResponse, error) {
-	if actorRole != "owner" && actorID != userID {
+	if !rbac.IsOwnerLevel(actorRole) && actorID != userID {
 		allowed, err := s.canAccessUser(ctx, actorID, actorRole, userID)
 		if err != nil {
 			return nil, apperrors.Internal(err)
