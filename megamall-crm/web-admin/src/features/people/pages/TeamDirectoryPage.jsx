@@ -39,7 +39,7 @@ import {
 import { ALL_ROLES, ROLE_LABEL, COMMISSION_TYPE_LABEL, fmtDate, fmtMoney, fmtPct, isConfigActive } from '../utils/peopleHelpers'
 import Modal               from '../../../shared/components/Modal'
 import DesktopDateRangePicker  from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import MobilePeriodPicker from '../../../shared/components/MobilePeriodPicker'
 import Button              from '../../../shared/components/Button'
 import Alert               from '../../../shared/components/Alert'
 import Badge               from '../../../shared/components/Badge'
@@ -2018,8 +2018,8 @@ function AuditJournal({ history = [], userMap = {} }) {
           align="right"
         />
       </div>
-      <MobileDateRangeCalendar
-        className="mb-4 w-full md:hidden"
+      <MobilePeriodPicker
+        className="mb-4 md:hidden"
         from={from}
         to={to}
         onChange={(range) => { setFrom(range.from); setTo(range.to) }}

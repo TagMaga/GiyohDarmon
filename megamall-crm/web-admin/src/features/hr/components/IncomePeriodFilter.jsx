@@ -1,5 +1,5 @@
 /**
- * IncomePeriodFilter — compact period selector: shared desktop popover + mobile calendar.
+ * IncomePeriodFilter — compact period selector: shared desktop popover + mobile sheet.
  *
  * Props:
  *   from      {string}  YYYY-MM-DD
@@ -7,7 +7,7 @@
  *   onChange  {fn}      (from, to) => void
  */
 import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import MobilePeriodPicker from '../../../shared/components/MobilePeriodPicker'
 
 export default function IncomePeriodFilter({ from, to, onChange }) {
   return (
@@ -18,8 +18,8 @@ export default function IncomePeriodFilter({ from, to, onChange }) {
         to={to ?? ''}
         onChange={(range) => onChange(range.from, range.to)}
       />
-      <MobileDateRangeCalendar
-        className="w-full md:hidden"
+      <MobilePeriodPicker
+        className="md:hidden"
         from={from ?? ''}
         to={to ?? ''}
         onChange={(range) => onChange(range.from, range.to)}

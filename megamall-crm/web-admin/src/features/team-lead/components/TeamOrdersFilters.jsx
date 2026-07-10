@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Search, X } from 'lucide-react'
 import { STATUS_LABELS } from '../../../shared/orderStatusConfig'
 import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import MobilePeriodPicker from '../../../shared/components/MobilePeriodPicker'
 
 const ALL_STATUSES = Object.entries(STATUS_LABELS)
 
@@ -59,8 +59,8 @@ export default function TeamOrdersFilters({ filters, onChange, sellers = [] }) {
           align="right"
         />
       </div>
-      <MobileDateRangeCalendar
-        className="w-full md:hidden"
+      <MobilePeriodPicker
+        className="md:hidden"
         from={filters.from ?? ''}
         to={filters.to ?? ''}
         onChange={(range) => onChange({ ...filters, from: range.from, to: range.to, page: 1 })}

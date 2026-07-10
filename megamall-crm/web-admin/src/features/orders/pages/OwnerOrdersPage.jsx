@@ -31,7 +31,7 @@ import useEmployees  from '../../people/hooks/useEmployees'
 import useTeams      from '../../people/hooks/useTeams'
 import { buildUserMap } from '../../people/utils/peopleHelpers'
 import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import MobilePeriodPicker from '../../../shared/components/MobilePeriodPicker'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -134,8 +134,8 @@ export default function OwnerOrdersPage() {
             onChange={(range) => setFilters(f => ({ ...f, from: range.from, to: range.to, page: 1 }))}
             align="right"
           />
-          <MobileDateRangeCalendar
-            className="w-full md:hidden"
+          <MobilePeriodPicker
+            className="md:hidden"
             from={filters.from ?? ''}
             to={filters.to ?? ''}
             onChange={(range) => setFilters(f => ({ ...f, from: range.from, to: range.to, page: 1 }))}

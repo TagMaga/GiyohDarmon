@@ -9,7 +9,7 @@ import useBudgetTransactions from '../hooks/useBudgetTransactions'
 import { postBudgetIncome, postBudgetWithdrawal } from '../api'
 import EditBudgetTransactionModal from '../components/EditBudgetTransactionModal'
 import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import MobilePeriodPicker from '../../../shared/components/MobilePeriodPicker'
 import Alert from '../../../shared/components/Alert'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -235,14 +235,12 @@ function MobileBudgetView({
     <div className="p-4 pb-8 space-y-3.5" style={{ background: '#F2F4F7' }}>
       <div className="flex items-center justify-between">
         <h1 className="text-[22px] font-extrabold tracking-tight text-slate-950">Бюджет</h1>
+        <MobilePeriodPicker
+          from={range?.from ?? ''}
+          to={range?.to ?? ''}
+          onChange={onRangeChange}
+        />
       </div>
-
-      <MobileDateRangeCalendar
-        className="w-full"
-        from={range?.from ?? ''}
-        to={range?.to ?? ''}
-        onChange={onRangeChange}
-      />
 
       {sumError && (
         <div className="flex items-center justify-between gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">

@@ -27,7 +27,7 @@ import {
   ROLE_LABEL, calcPerformance, isConfigActive,
 } from '../utils/peopleHelpers'
 import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import MobilePeriodPicker from '../../../shared/components/MobilePeriodPicker'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Date range helpers
@@ -625,13 +625,13 @@ export default function TeamProfilePage() {
           align="right"
           onChange={(range) => setDateRange({ from: range.from, to: range.to })}
         />
+        <MobilePeriodPicker
+          className="md:hidden"
+          from={from}
+          to={to}
+          onChange={(range) => setDateRange({ from: range.from, to: range.to })}
+        />
       </div>
-      <MobileDateRangeCalendar
-        className="w-full md:hidden"
-        from={from}
-        to={to}
-        onChange={(range) => setDateRange({ from: range.from, to: range.to })}
-      />
 
       {anyDataLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
