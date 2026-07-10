@@ -29,13 +29,13 @@
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
-      ],
-      "usesCleartextTraffic": true
+      ]
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-asset"
+      "expo-asset",
+      "./plugins/withScopedCleartext"
     ],
     "scheme": "megamall-courier",
     "experiments": {

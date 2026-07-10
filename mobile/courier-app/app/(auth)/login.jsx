@@ -48,10 +48,14 @@ export default function LoginScreen() {
         const msg = err.response.data?.error?.message || err.response.data?.error || 'Неверный логин или пароль'
         Alert.alert('Ошибка', String(msg))
       } else {
-        // No response = the request never reached the server (network / wrong IP).
+        // No response = the request never reached the server. Surface the actual
+        // cause (timeout, DNS, cleartext-blocked, connection refused, ...) instead
+        // of assuming a dev-mode "wrong WiFi" problem — this build talks to a
+        // fixed public IP, so that's rarely the real reason.
+        console.log('[login] network error:', err.code, err.message)
         Alert.alert(
           'Нет связи с сервером',
-          `Не удалось подключиться к ${API_URL}.\n\nПроверьте, что сервер запущен и телефон в той же Wi-Fi сети, что и компьютер.`
+          `Не удалось подключиться к ${API_URL}.\n\nОшибка: ${err.message || 'неизвестная сетевая ошибка'}${err.code ? ` (${err.code})` : ''}.\n\nПроверьте подключение к интернету и убедитесь, что сервер запущен.`
         )
       }
     } finally { setLoading(false) }
