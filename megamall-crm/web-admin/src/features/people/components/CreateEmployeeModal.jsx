@@ -14,7 +14,6 @@ export default function CreateEmployeeModal({ open, onClose }) {
 
   const [phone,       setPhone]       = useState('')
   const [fullName,    setFullName]    = useState('')
-  const [email,       setEmail]       = useState('')
   const [role,        setRole]        = useState('seller')
   const [password,    setPassword]    = useState('')
   const [hireDate,    setHireDate]    = useState('')
@@ -22,7 +21,7 @@ export default function CreateEmployeeModal({ open, onClose }) {
   const [address,     setAddress]     = useState('')
 
   function resetForm() {
-    setPhone(''); setFullName(''); setEmail(''); setPassword(''); setRole('seller')
+    setPhone(''); setFullName(''); setPassword(''); setRole('seller')
     setHireDate(''); setDob(''); setAddress('')
   }
 
@@ -34,7 +33,6 @@ export default function CreateEmployeeModal({ open, onClose }) {
       return createEmployee({
         phone:         phone.trim(),
         full_name:     fullName.trim(),
-        email:         email.trim() || undefined,
         role,
         password,
         hire_date:     hireDate ? hireDate + 'T00:00:00Z' : undefined,
@@ -71,17 +69,12 @@ export default function CreateEmployeeModal({ open, onClose }) {
             <input value={fullName} onChange={e => setFullName(e.target.value)} className="input mt-1" placeholder="Иван Иванов" />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div><label className="input-label">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input mt-1" placeholder="ivan@mail.ru" />
-          </div>
-          <div><label className="input-label">Роль *</label>
-            <select value={role} onChange={e => setRole(e.target.value)} className="input mt-1">
-              {ALL_ROLES.map(r => (
-                <option key={r} value={r}>{ROLE_LABEL[r]}</option>
-              ))}
-            </select>
-          </div>
+        <div><label className="input-label">Роль *</label>
+          <select value={role} onChange={e => setRole(e.target.value)} className="input mt-1">
+            {ALL_ROLES.map(r => (
+              <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+            ))}
+          </select>
         </div>
         <div><label className="input-label">Пароль *</label>
           <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input mt-1" placeholder="Минимум 8 символов" />

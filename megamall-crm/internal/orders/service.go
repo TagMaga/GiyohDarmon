@@ -550,9 +550,9 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*Order, error) {
 	return o, nil
 }
 
-func (s *Service) GetTimeline(ctx context.Context, orderID uuid.UUID) ([]OrderTimeline, error) {
-	// Verify order exists.
-	if _, err := s.GetByID(ctx, orderID); err != nil {
+func (s *Service) GetTimeline(ctx context.Context, orderID, actorID uuid.UUID, actorRole string) ([]OrderTimeline, error) {
+	// Verify order exists AND the caller has access to it (IDOR fix).
+	if err := s.CanAccessOrder(ctx, orderID, actorID, actorRole); err != nil {
 		return nil, err
 	}
 	return s.repo.GetTimeline(ctx, orderID)
@@ -560,8 +560,8 @@ func (s *Service) GetTimeline(ctx context.Context, orderID uuid.UUID) ([]OrderTi
 
 // GetSnapshot returns the frozen financial snapshot for an order.
 // Added Phase 6 for E2E validation. Delegates to the compensation service.
-func (s *Service) GetSnapshot(ctx context.Context, orderID uuid.UUID) (*compensation.OrderFinancialSnapshot, error) {
-	if _, err := s.GetByID(ctx, orderID); err != nil {
+func (s *Service) GetSnapshot(ctx context.Context, orderID, actorID uuid.UUID, actorRole string) (*compensation.OrderFinancialSnapshot, error) {
+	if err := s.CanAccessOrder(ctx, orderID, actorID, actorRole); err != nil {
 		return nil, err
 	}
 	snap, err := s.compSvc.GetSnapshotByOrderID(ctx, orderID)
@@ -580,11 +580,16 @@ func (s *Service) GetSnapshot(ctx context.Context, orderID uuid.UUID) (*compensa
 // Sellers may update notes, delivery_address, delivery_method, customer contact,
 // items (triggers full inventory re-reservation and financial recalculation),
 // and prepayment / attachment fields. Terminal orders are rejected.
-func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req UpdateOrderRequest) (*Order, error) {
+func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, actorRole string, req UpdateOrderRequest) (*Order, error) {
 	// Nil items slice  = "no change to items".
 	// Empty items slice = error; order must always have at least one item.
 	if req.Items != nil && len(req.Items) == 0 {
 		return nil, apperrors.BadRequest("items list must not be empty when provided")
+	}
+
+	// Caller must have access to this order (IDOR fix).
+	if err := s.CanAccessOrder(ctx, orderID, actorID, actorRole); err != nil {
+		return nil, err
 	}
 
 	var updated *Order
@@ -958,7 +963,9 @@ func (s *Service) CanAccessOrder(ctx context.Context, orderID, actorID uuid.UUID
 		}
 	}
 
-	return apperrors.Forbidden("you do not have access to this order")
+	// 404, not 403: a caller outside this order's scope must not be able to
+	// distinguish "exists but not yours" from "doesn't exist" (IDOR fix).
+	return apperrors.NotFound("order")
 }
 
 // GetOrderComments returns the shared order comment thread for any role that can
@@ -1059,6 +1066,14 @@ func (s *Service) AddOrderComment(ctx context.Context, orderID, actorID uuid.UUI
 func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole string, orderID uuid.UUID, req ChangeStatusRequest) (*Order, error) {
 	if !req.Status.IsValid() {
 		return nil, apperrors.BadRequest("invalid status value")
+	}
+
+	// Caller must have access to this order (IDOR fix — closes the gap where a
+	// manager/sales_team_lead could cancel any company-wide order, not just
+	// their own team's, since validateTransitionRole's StatusCancelled branch
+	// only checked role, never scope).
+	if err := s.CanAccessOrder(ctx, orderID, actorID, actorRole); err != nil {
+		return nil, err
 	}
 
 	var updated *Order
@@ -1205,7 +1220,12 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 
 // AddPrepayment records a partial payment and updates orders.prepayment_amount.
 // Total prepayments cannot exceed total_order_amount (products + client delivery).
-func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, req AddPrepaymentRequest) (*OrderPrepayment, error) {
+func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, actorRole string, req AddPrepaymentRequest) (*OrderPrepayment, error) {
+	// Caller must have access to this order (IDOR fix).
+	if err := s.CanAccessOrder(ctx, orderID, actorID, actorRole); err != nil {
+		return nil, err
+	}
+
 	var created *OrderPrepayment
 
 	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -1265,8 +1285,8 @@ func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID 
 	return created, nil
 }
 
-func (s *Service) ListPrepayments(ctx context.Context, orderID uuid.UUID) ([]OrderPrepayment, error) {
-	if _, err := s.GetByID(ctx, orderID); err != nil {
+func (s *Service) ListPrepayments(ctx context.Context, orderID, actorID uuid.UUID, actorRole string) ([]OrderPrepayment, error) {
+	if err := s.CanAccessOrder(ctx, orderID, actorID, actorRole); err != nil {
 		return nil, err
 	}
 	return s.repo.ListPrepayments(ctx, orderID)
@@ -1392,8 +1412,8 @@ func (s *Service) RejectPrepayment(ctx context.Context, actorID uuid.UUID, actor
 
 // ─── Attachment helpers ────────────────────────────────────────────────────────
 
-func (s *Service) ListAttachments(ctx context.Context, orderID uuid.UUID) ([]OrderAttachment, error) {
-	if _, err := s.GetByID(ctx, orderID); err != nil {
+func (s *Service) ListAttachments(ctx context.Context, orderID, actorID uuid.UUID, actorRole string) ([]OrderAttachment, error) {
+	if err := s.CanAccessOrder(ctx, orderID, actorID, actorRole); err != nil {
 		return nil, err
 	}
 	var attachments []OrderAttachment
@@ -1403,8 +1423,8 @@ func (s *Service) ListAttachments(ctx context.Context, orderID uuid.UUID) ([]Ord
 	return attachments, nil
 }
 
-func (s *Service) AddAttachment(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, fileType, fileURL string) (*OrderAttachment, error) {
-	if _, err := s.GetByID(ctx, orderID); err != nil {
+func (s *Service) AddAttachment(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, actorRole, fileType, fileURL string) (*OrderAttachment, error) {
+	if err := s.CanAccessOrder(ctx, orderID, actorID, actorRole); err != nil {
 		return nil, err
 	}
 	att := &OrderAttachment{

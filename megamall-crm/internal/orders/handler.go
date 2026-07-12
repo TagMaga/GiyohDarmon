@@ -133,6 +133,11 @@ func (h *Handler) GetOrder(c *gin.Context) {
 	if !ok {
 		return
 	}
+	claims := middleware.ClaimsFromContext(c)
+	if err := h.svc.CanAccessOrder(c.Request.Context(), id, claims.UserID, claims.Role); err != nil {
+		response.HandleError(c, err)
+		return
+	}
 	o, err := h.svc.GetByID(c.Request.Context(), id)
 	if err != nil {
 		response.HandleError(c, err)
@@ -154,7 +159,7 @@ func (h *Handler) UpdateOrder(c *gin.Context) {
 		return
 	}
 	claims := middleware.ClaimsFromContext(c)
-	o, err := h.svc.Update(c.Request.Context(), claims.UserID, id, req)
+	o, err := h.svc.Update(c.Request.Context(), claims.UserID, id, claims.Role, req)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -169,7 +174,8 @@ func (h *Handler) GetTimeline(c *gin.Context) {
 	if !ok {
 		return
 	}
-	entries, err := h.svc.GetTimeline(c.Request.Context(), id)
+	claims := middleware.ClaimsFromContext(c)
+	entries, err := h.svc.GetTimeline(c.Request.Context(), id, claims.UserID, claims.Role)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -223,7 +229,7 @@ func (h *Handler) AddPrepayment(c *gin.Context) {
 		return
 	}
 	claims := middleware.ClaimsFromContext(c)
-	p, err := h.svc.AddPrepayment(c.Request.Context(), claims.UserID, id, req)
+	p, err := h.svc.AddPrepayment(c.Request.Context(), claims.UserID, id, claims.Role, req)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -236,7 +242,8 @@ func (h *Handler) ListPrepayments(c *gin.Context) {
 	if !ok {
 		return
 	}
-	preps, err := h.svc.ListPrepayments(c.Request.Context(), id)
+	claims := middleware.ClaimsFromContext(c)
+	preps, err := h.svc.ListPrepayments(c.Request.Context(), id, claims.UserID, claims.Role)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -296,7 +303,8 @@ func (h *Handler) ListAttachments(c *gin.Context) {
 	if !ok {
 		return
 	}
-	atts, err := h.svc.ListAttachments(c.Request.Context(), id)
+	claims := middleware.ClaimsFromContext(c)
+	atts, err := h.svc.ListAttachments(c.Request.Context(), id, claims.UserID, claims.Role)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -335,7 +343,7 @@ func (h *Handler) AddAttachment(c *gin.Context) {
 		response.Error(c, appErr)
 		return
 	}
-	att, err := h.svc.AddAttachment(c.Request.Context(), claims.UserID, id, body.Type, body.FileURL)
+	att, err := h.svc.AddAttachment(c.Request.Context(), claims.UserID, id, claims.Role, body.Type, body.FileURL)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -357,7 +365,8 @@ func (h *Handler) GetSnapshot(c *gin.Context) {
 	if !ok {
 		return
 	}
-	snap, err := h.svc.GetSnapshot(c.Request.Context(), id)
+	claims := middleware.ClaimsFromContext(c)
+	snap, err := h.svc.GetSnapshot(c.Request.Context(), id, claims.UserID, claims.Role)
 	if err != nil {
 		response.HandleError(c, err)
 		return
