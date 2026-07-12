@@ -30,8 +30,7 @@ import OrderDetailsDrawer          from '../components/OrderDetailsDrawer'
 import useEmployees  from '../../people/hooks/useEmployees'
 import useTeams      from '../../people/hooks/useTeams'
 import { buildUserMap } from '../../people/utils/peopleHelpers'
-import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import PeriodRangeFilter from '../../../shared/components/PeriodRangeFilter'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -127,18 +126,11 @@ export default function OwnerOrdersPage() {
         </div>
 
         <div className="flex flex-wrap items-start justify-end gap-2">
-          <DesktopDateRangePicker
-            variant="trigger"
+          <PeriodRangeFilter
             from={filters.from ?? ''}
             to={filters.to ?? ''}
             onChange={(range) => setFilters(f => ({ ...f, from: range.from, to: range.to, page: 1 }))}
             align="right"
-          />
-          <MobileDateRangeCalendar
-            className="w-full md:hidden"
-            from={filters.from ?? ''}
-            to={filters.to ?? ''}
-            onChange={(range) => setFilters(f => ({ ...f, from: range.from, to: range.to, page: 1 }))}
           />
           <button
             onClick={() => refetch()}
