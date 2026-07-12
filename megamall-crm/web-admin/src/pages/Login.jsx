@@ -20,16 +20,6 @@ function decodeRole(token) {
   }
 }
 
-/** Quick-fill entries for demo — shown as small chips below the form */
-const DEMO_USERS = [
-  { label: 'Владелец',     phone: '+992900000001' },
-  { label: 'Продавец',     phone: '+992900000004' },
-  { label: 'Диспетчер',    phone: '+992900000005' },
-  { label: 'Склад',        phone: '+992900000006' },
-  { label: 'Тим-лид',      phone: '+992900000002' },
-  { label: 'Менеджер',     phone: '+992900000003' },
-]
-
 export default function Login() {
   const [phone,       setPhone]       = useState('')
   const [password,    setPassword]    = useState('')
@@ -179,27 +169,6 @@ export default function Login() {
                 : 'Войти'}
             </button>
           </form>
-        </div>
-
-        {/* Demo users quick-fill */}
-        <div className="mt-5">
-          <p className="text-xs text-slate-400 text-center mb-2.5">
-            Демо-пользователи (пароль: <code className="font-mono">password123</code>)
-          </p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {DEMO_USERS.map((u) => (
-              <button
-                key={u.phone}
-                type="button"
-                onClick={() => { setPhone(u.phone); setPassword('password123'); setError('') }}
-                className="text-xs px-3 py-1.5 rounded-full bg-white border border-slate-200
-                           text-slate-600 hover:border-indigo-300 hover:text-indigo-600
-                           transition-colors font-medium"
-              >
-                {u.label}
-              </button>
-            ))}
-          </div>
         </div>
 
         <p className="text-center text-[11px] text-slate-400 mt-6">
