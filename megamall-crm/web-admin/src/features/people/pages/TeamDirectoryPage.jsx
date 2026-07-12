@@ -18,7 +18,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useQueryClient, useQuery, useMutation, useQueries } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
-  Search, X, ChevronLeft, Edit2, Upload, Phone,
+  Search, X, ChevronLeft, ChevronDown, Edit2, Upload, Phone,
   MapPin, Calendar, Briefcase, Clock, Users,
   TrendingUp, Plus, Trash2, ShoppingCart, WalletCards, Crown,
 } from 'lucide-react'
@@ -36,10 +36,12 @@ import {
 import {
   fetchCourierTariffs, createCourierTariff, deleteCourierTariff,
 } from '../../dispatcher/api'
+import { fetchMe } from '../../seller/api'
 import { ALL_ROLES, ROLE_LABEL, COMMISSION_TYPE_LABEL, fmtDate, fmtMoney, fmtPct, isConfigActive } from '../utils/peopleHelpers'
 import Modal               from '../../../shared/components/Modal'
-import DesktopDateRangePicker  from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import PeriodRangeFilter from '../../../shared/components/PeriodRangeFilter'
+import BottomSheet from '../../../shared/components/BottomSheet'
+import FilterChip from '../../../shared/components/FilterChip'
 import Button              from '../../../shared/components/Button'
 import Alert               from '../../../shared/components/Alert'
 import Badge               from '../../../shared/components/Badge'
@@ -1943,6 +1945,7 @@ function AuditJournal({ history = [], userMap = {} }) {
   const [editorFilter, setEditorFilter] = useState('all')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const [sheet, setSheet] = useState(null) // null | 'field' | 'editor'
 
   const fieldOptions = useMemo(() => {
     const fields = Array.from(new Set(history.map(item => item.field_name))).filter(Boolean).sort()
@@ -1982,48 +1985,84 @@ function AuditJournal({ history = [], userMap = {} }) {
     )
   }
 
+  const fieldLabel = fieldFilter === 'all' ? 'Все поля' : (fieldOptions.find(item => item.field === fieldFilter)?.label ?? fieldFilter)
+  const editorLabel = editorFilter === 'all' ? 'Все авторы' : (editorOptions.find(item => item.id === editorFilter)?.label ?? editorFilter)
+
   return (
     <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-      <div className="mb-2 grid gap-2 lg:grid-cols-[minmax(180px,1fr)_170px_170px_170px]">
+      <div className="relative mb-1 mt-1.5">
+        <Search size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="Поиск по сотруднику или изменению"
-          className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-[13px] font-semibold text-slate-700 outline-none transition-colors focus:border-indigo-300"
+          className="h-11 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-[13px] font-semibold text-slate-700 outline-none transition-colors focus:border-indigo-300 focus:bg-white"
         />
-        <select
-          value={fieldFilter}
-          onChange={e => setFieldFilter(e.target.value)}
-          className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-[12.5px] font-semibold text-slate-700 outline-none transition-colors focus:border-indigo-300"
-        >
-          <option value="all">Все поля</option>
-          {fieldOptions.map(item => (
-            <option key={item.field} value={item.field}>{item.label}</option>
-          ))}
-        </select>
-        <select
-          value={editorFilter}
-          onChange={e => setEditorFilter(e.target.value)}
-          className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-[12.5px] font-semibold text-slate-700 outline-none transition-colors focus:border-indigo-300"
-        >
-          <option value="all">Все авторы</option>
-          {editorOptions.map(item => (
-            <option key={item.id} value={item.id}>{item.label}</option>
-          ))}
-        </select>
-        <DesktopDateRangePicker
+      </div>
+      <div className="scrollbar-none -mx-4 mb-2 mt-2.5 flex flex-nowrap items-center gap-2 overflow-x-auto px-4 py-[5px]">
+        <FilterChip
+          label={fieldLabel}
+          active={fieldFilter !== 'all'}
+          onClick={() => setSheet('field')}
+          onClear={() => setFieldFilter('all')}
+        />
+        <FilterChip
+          label={editorLabel}
+          active={editorFilter !== 'all'}
+          onClick={() => setSheet('editor')}
+          onClear={() => setEditorFilter('all')}
+        />
+        <PeriodRangeFilter
           from={from}
           to={to}
           onChange={(range) => { setFrom(range.from); setTo(range.to) }}
-          align="right"
+          align="left"
         />
       </div>
-      <MobileDateRangeCalendar
-        className="mb-4 w-full md:hidden"
-        from={from}
-        to={to}
-        onChange={(range) => { setFrom(range.from); setTo(range.to) }}
-      />
+
+      <BottomSheet open={sheet === 'field'} onClose={() => setSheet(null)} title="Поле">
+        <div className="flex flex-col gap-0.5 py-1">
+          <button
+            type="button"
+            onClick={() => { setFieldFilter('all'); setSheet(null) }}
+            className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[13.5px] font-semibold transition-colors ${fieldFilter === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+          >
+            Все поля
+          </button>
+          {fieldOptions.map(item => (
+            <button
+              key={item.field}
+              type="button"
+              onClick={() => { setFieldFilter(item.field); setSheet(null) }}
+              className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[13.5px] font-semibold transition-colors ${fieldFilter === item.field ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={sheet === 'editor'} onClose={() => setSheet(null)} title="Автор">
+        <div className="flex flex-col gap-0.5 py-1">
+          <button
+            type="button"
+            onClick={() => { setEditorFilter('all'); setSheet(null) }}
+            className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[13.5px] font-semibold transition-colors ${editorFilter === 'all' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+          >
+            Все авторы
+          </button>
+          {editorOptions.map(item => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => { setEditorFilter(item.id); setSheet(null) }}
+              className={`flex w-full items-center rounded-xl px-3 py-2.5 text-left text-[13.5px] font-semibold transition-colors ${editorFilter === item.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
       <div className="divide-y divide-slate-100">
         {filteredHistory.map(item => (
           <div key={item.id} className="grid gap-2 py-3 sm:grid-cols-[170px_minmax(0,1fr)_180px] sm:items-center">
@@ -2067,6 +2106,14 @@ export default function TeamDirectoryPage() {
     queryFn: fetchAllUserHistory,
     enabled: tab === 'audit',
   })
+  // The owner isn't part of the "employees" directory list, so their own
+  // edits wouldn't resolve to a name in the audit journal without this.
+  const { data: me } = useQuery({
+    queryKey: ['users-me'],
+    queryFn: fetchMe,
+    enabled: tab === 'audit',
+    staleTime: 5 * 60 * 1000,
+  })
 
   // Build a team name map
   const teamNameMap = useMemo(() => {
@@ -2078,8 +2125,9 @@ export default function TeamDirectoryPage() {
   const userMap = useMemo(() => {
     const m = {}
     employees.forEach(user => { m[user.id] = user })
+    if (me?.id) m[me.id] = me
     return m
-  }, [employees])
+  }, [employees, me])
 
   const teamMembersMap = useMemo(() => {
     const map = {}

@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/pagination"
+	"github.com/megamall/crm/pkg/rbac"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -88,7 +89,7 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 }
 
 func (s *Service) CanViewUser(ctx context.Context, actorID uuid.UUID, actorRole string, targetID uuid.UUID) (bool, error) {
-	if actorID == targetID || actorRole == string(RoleOwner) {
+	if actorID == targetID || rbac.IsOwnerLevel(actorRole) {
 		return true, nil
 	}
 
@@ -103,10 +104,11 @@ func (s *Service) CanViewUser(ctx context.Context, actorID uuid.UUID, actorRole 
 	return ok, nil
 }
 
-// List returns users matching filter. Non-owner callers (manager, sales_team_lead)
-// are scoped to their own hierarchy team — they can never list users outside it.
+// List returns users matching filter. Non-owner-level callers (manager,
+// sales_team_lead, ...) are scoped to their own hierarchy team — they can
+// never list users outside it.
 func (s *Service) List(ctx context.Context, actorID uuid.UUID, actorRole string, filter ListUsersFilter, p pagination.Params) ([]User, int, error) {
-	if actorRole != string(RoleOwner) {
+	if !rbac.IsOwnerLevel(actorRole) {
 		teamID, err := s.repo.GetTeamIDForUser(ctx, actorID)
 		if err != nil {
 			return nil, 0, apperrors.Internal(err)
