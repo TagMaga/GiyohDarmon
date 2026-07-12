@@ -420,7 +420,7 @@ export default function CreateOrder() {
 
   if (success) {
     return (
-      <div className="page-container">
+      <div className="page-container pb-32">
         <OrderSuccessScreen
           order={success.order}
           cartItems={success.cartItems}
