@@ -32,8 +32,7 @@ import useFinanceDaily      from '../features/owner/hooks/useFinanceDaily'
 import useSellerLeaderboard from '../features/owner/hooks/useSellerLeaderboard'
 import useTeamPerformance   from '../features/owner/hooks/useTeamPerformance'
 import { getStockStatus }   from '../features/warehouse/utils/warehouseHelpers'
-import DesktopDateRangePicker from '../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../shared/components/MobileDateRangeCalendar'
+import PeriodRangeFilter from '../shared/components/PeriodRangeFilter'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 function toYMD(d) {
@@ -456,7 +455,7 @@ export default function OwnerDashboard() {
           <p className="text-xs md:text-[12.5px] text-slate-400 mt-0.5">Командный центр компании</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <DesktopDateRangePicker
+          <PeriodRangeFilter
             from={range.from ?? ''}
             to={range.to ?? ''}
             onChange={(nextRange) => setRange({ from: nextRange.from, to: nextRange.to })}
@@ -464,12 +463,6 @@ export default function OwnerDashboard() {
           />
         </div>
       </div>
-      <MobileDateRangeCalendar
-        className="w-full md:hidden"
-        from={range.from ?? ''}
-        to={range.to ?? ''}
-        onChange={(nextRange) => setRange({ from: nextRange.from, to: nextRange.to })}
-      />
 
       <FinanceSummaryStrip
         orders={summary?.orders}

@@ -8,8 +8,7 @@ import useBudgetSummary from '../hooks/useBudgetSummary'
 import useBudgetTransactions from '../hooks/useBudgetTransactions'
 import { postBudgetIncome, postBudgetWithdrawal } from '../api'
 import EditBudgetTransactionModal from '../components/EditBudgetTransactionModal'
-import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import PeriodRangeFilter from '../../../shared/components/PeriodRangeFilter'
 import Alert from '../../../shared/components/Alert'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -233,16 +232,15 @@ function MobileBudgetView({
 
   return (
     <div className="p-4 pb-8 space-y-3.5" style={{ background: '#F2F4F7' }}>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-[22px] font-extrabold tracking-tight text-slate-950">Бюджет</h1>
+        <PeriodRangeFilter
+          from={range?.from ?? ''}
+          to={range?.to ?? ''}
+          onChange={onRangeChange}
+          align="right"
+        />
       </div>
-
-      <MobileDateRangeCalendar
-        className="w-full"
-        from={range?.from ?? ''}
-        to={range?.to ?? ''}
-        onChange={onRangeChange}
-      />
 
       {sumError && (
         <div className="flex items-center justify-between gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
@@ -423,7 +421,7 @@ export default function BudgetCompanyPage() {
           <p className="text-[15px] font-semibold text-slate-400 mt-1">Баланс, пополнения и списания владельца</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <DesktopDateRangePicker
+          <PeriodRangeFilter
             from={range?.from ?? ''}
             to={range?.to ?? ''}
             onChange={(nextRange) => { setRange({ from: nextRange.from, to: nextRange.to }); setPage(1) }}
