@@ -66,7 +66,7 @@ const ACTIONS = {
   cancelled:          [],
 }
 
-export default function OrderDrawer({ order, open, onClose, onAction, customerMap = {}, courierMap = {} }) {
+export default function OrderDrawer({ order, open, onClose, onAction, customerMap = {}, courierMap = {}, isConfirming = false, isVerifyingPrepayment = false }) {
   const orderId = order?.id ?? order?.order_id
 
   const { data: fullOrder, isLoading: loadingOrder } = useQuery({
@@ -325,14 +325,19 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
                 <div className="flex gap-2">
                   <button
                     onClick={() => onAction('verify_prepayment', order)}
-                    className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                    disabled={isVerifyingPrepayment}
+                    className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                     style={{ background: GREEN }}
                   >
-                    <CheckCircle size={11} className="inline mr-1" />Подтвердить
+                    {isVerifyingPrepayment
+                      ? <Loader2 size={11} className="inline mr-1 animate-spin" />
+                      : <CheckCircle size={11} className="inline mr-1" />}
+                    Подтвердить
                   </button>
                   <button
                     onClick={() => onAction('reject_prepayment', order)}
-                    className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-colors"
+                    disabled={isVerifyingPrepayment}
+                    className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-colors disabled:opacity-60"
                     style={{ border: `1px solid ${RED}40`, color: RED }}
                     onMouseEnter={e => e.currentTarget.style.background = `${RED}10`}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
@@ -523,9 +528,13 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
                 <button
                   key={a.key}
                   onClick={() => onAction(a.key, order)}
-                  className="flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  disabled={a.key === 'confirm' && isConfirming}
+                  className="flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                   style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}
                 >
+                  {a.key === 'confirm' && isConfirming
+                    ? <Loader2 size={13} className="inline mr-1 animate-spin" />
+                    : null}
                   {a.label}
                 </button>
               ))}
