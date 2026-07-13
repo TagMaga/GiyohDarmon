@@ -15,12 +15,13 @@ import { X }                from 'lucide-react'
  *   description {string}    — optional subtitle
  *   children    {ReactNode} — body content
  *   footer      {ReactNode} — action buttons row
- *   size        {string}    — 'sm'|'md'|'lg' (default 'md')
+ *   size        {string}    — 'sm'|'md'|'lg'|'xl' (default 'md')
  */
 const sizeClass = {
   sm: 'sm:max-w-sm',
   md: 'sm:max-w-lg',
   lg: 'sm:max-w-2xl',
+  xl: 'sm:max-w-[560px]',
 }
 
 export default function Modal({ open, onClose, title, description, children, footer, size = 'md' }) {

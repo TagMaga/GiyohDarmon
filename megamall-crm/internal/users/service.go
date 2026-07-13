@@ -167,6 +167,13 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateUserReques
 	if req.Address != nil {
 		u.Address = req.Address
 	}
+	if req.NewPassword != nil && *req.NewPassword != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(*req.NewPassword), bcryptCost)
+		if err != nil {
+			return nil, apperrors.Internal(fmt.Errorf("hash password: %w", err))
+		}
+		u.PasswordHash = string(hash)
+	}
 	u.UpdatedAt = time.Now().UTC()
 
 	if err := s.repo.Update(ctx, u); err != nil {
@@ -247,6 +254,17 @@ func (s *Service) recordProfileHistory(ctx context.Context, before *User, after 
 	}
 	if req.Address != nil {
 		add("address", before.Address, after.Address)
+	}
+	// Password resets are never diffed by value — only that a reset happened
+	// and who did it. before/after here are both password hashes, which must
+	// never appear in the audit trail even hashed.
+	if req.NewPassword != nil && *req.NewPassword != "" {
+		changes = append(changes, UserHistory{
+			ID:        uuid.New(),
+			UserID:    after.ID,
+			FieldName: "password_reset",
+			ChangedBy: changedBy,
+		})
 	}
 
 	for i := range changes {

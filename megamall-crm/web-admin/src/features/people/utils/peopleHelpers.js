@@ -22,6 +22,19 @@ export const ROLE_BADGE = {
   courier:           'orange',
 }
 
+// ── Status labels / colors (users.status enum) ───────────────────────────────
+
+export const STATUS_CFG = {
+  online:     { label: 'Online',       color: '#3DD68C', dot: 'online',  pulse: true  },
+  away:       { label: 'Away',         color: '#F0B23D', dot: 'away',    pulse: false },
+  offline:    { label: 'Offline',      color: '#6B7280', dot: 'offline', pulse: false },
+  vacation:   { label: 'В отпуске',    color: '#9B8CFF', dot: 'away',    pulse: false },
+  sick:       { label: 'Больничный',   color: '#FF6B5B', dot: 'away',    pulse: false },
+  terminated: { label: 'Уволен',       color: '#6B7280', dot: 'offline', pulse: false },
+}
+
+export const STATUS_OPTIONS = Object.entries(STATUS_CFG).map(([key, cfg]) => ({ key, ...cfg }))
+
 // Roles that can have commission configs (% earnings)
 export const COMMISSION_ROLES = ['seller', 'manager', 'sales_team_lead']
 

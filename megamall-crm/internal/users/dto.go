@@ -19,6 +19,12 @@ type CreateUserRequest struct {
 }
 
 // UpdateUserRequest is the payload for PATCH /users/:id.
+//
+// NewPassword is an owner-only administrative override — set it to reset the
+// target user's password without knowing their current one, in the same
+// atomic update as any other profile field. It's deliberately not exposed by
+// PatchMe (self-service uses ChangePassword/:id/password instead, which
+// requires the current password).
 type UpdateUserRequest struct {
 	Phone       *string    `json:"phone"         validate:"omitempty,min=7,max=20"`
 	FullName    *string    `json:"full_name"     validate:"omitempty,min=2,max=255"`
@@ -29,6 +35,7 @@ type UpdateUserRequest struct {
 	HireDate    *time.Time `json:"hire_date"     validate:"omitempty"`
 	DateOfBirth *time.Time `json:"date_of_birth" validate:"omitempty"`
 	Address     *string    `json:"address"       validate:"omitempty,max=500"`
+	NewPassword *string    `json:"new_password"  validate:"omitempty,min=8,max=72"`
 }
 
 // ChangePasswordRequest is the payload for PATCH /users/:id/password.

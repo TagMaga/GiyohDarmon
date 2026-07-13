@@ -135,6 +135,119 @@ func TestUsers_Delete_ClearsHierarchyParentReferences(t *testing.T) {
 	}
 }
 
+func TestUsers_Update_PasswordReset_ChangesHashWithoutCurrentPassword(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	svc := NewService(repo)
+	ctx := context.Background()
+
+	owner := createTestUser(t, db, RoleOwner)
+	target := createTestUser(t, db, RoleSeller)
+	originalHash := target.PasswordHash
+
+	newPassword := "brand-new-pass"
+	if _, err := svc.Update(ctx, target.ID, UpdateUserRequest{NewPassword: &newPassword}, owner.ID); err != nil {
+		t.Fatalf("Update with new_password: %v", err)
+	}
+
+	reloaded, err := repo.GetByID(ctx, target.ID)
+	if err != nil {
+		t.Fatalf("reload target user: %v", err)
+	}
+	if reloaded.PasswordHash == originalHash {
+		t.Fatal("password hash unchanged after reset")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(reloaded.PasswordHash), []byte(newPassword)); err != nil {
+		t.Fatalf("new password does not match stored hash: %v", err)
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(reloaded.PasswordHash), []byte("testpass")); err == nil {
+		t.Fatal("old password still matches stored hash after reset")
+	}
+}
+
+// Password reset alongside other profile fields must be one atomic update —
+// there is no scenario where the profile fields save but the password
+// silently doesn't (or vice versa), since both are set on the same struct
+// before the single repo.Update call.
+func TestUsers_Update_PasswordReset_AtomicWithOtherFields(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	svc := NewService(repo)
+	ctx := context.Background()
+
+	owner := createTestUser(t, db, RoleOwner)
+	target := createTestUser(t, db, RoleSeller)
+
+	newPassword := "brand-new-pass"
+	newName := "Updated Name"
+	updated, err := svc.Update(ctx, target.ID, UpdateUserRequest{FullName: &newName, NewPassword: &newPassword}, owner.ID)
+	if err != nil {
+		t.Fatalf("Update with new_password + full_name: %v", err)
+	}
+	if updated.FullName != newName {
+		t.Errorf("full_name = %q, want %q", updated.FullName, newName)
+	}
+
+	reloaded, err := repo.GetByID(ctx, target.ID)
+	if err != nil {
+		t.Fatalf("reload target user: %v", err)
+	}
+	if reloaded.FullName != newName {
+		t.Errorf("reloaded full_name = %q, want %q", reloaded.FullName, newName)
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(reloaded.PasswordHash), []byte(newPassword)); err != nil {
+		t.Fatalf("new password does not match stored hash: %v", err)
+	}
+}
+
+func TestUsers_Update_PasswordReset_RecordsHistoryWithoutPassword(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	svc := NewService(repo)
+	ctx := context.Background()
+
+	owner := createTestUser(t, db, RoleOwner)
+	target := createTestUser(t, db, RoleSeller)
+
+	newPassword := "brand-new-pass"
+	if _, err := svc.Update(ctx, target.ID, UpdateUserRequest{NewPassword: &newPassword}, owner.ID); err != nil {
+		t.Fatalf("Update with new_password: %v", err)
+	}
+
+	history, err := repo.ListHistory(ctx, target.ID)
+	if err != nil {
+		t.Fatalf("list history: %v", err)
+	}
+	if len(history) != 1 {
+		t.Fatalf("history entries = %d, want 1", len(history))
+	}
+	entry := history[0]
+	if entry.FieldName != "password_reset" {
+		t.Errorf("field_name = %q, want password_reset", entry.FieldName)
+	}
+	if entry.OldValue != nil || entry.NewValue != nil {
+		t.Errorf("history should never store password values, got old=%v new=%v", entry.OldValue, entry.NewValue)
+	}
+	if entry.ChangedBy == nil || *entry.ChangedBy != owner.ID {
+		t.Errorf("changed_by = %v, want %s", entry.ChangedBy, owner.ID)
+	}
+}
+
+func TestUsers_Update_PasswordReset_UnknownUserNotFound(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	svc := NewService(repo)
+	ctx := context.Background()
+
+	owner := createTestUser(t, db, RoleOwner)
+
+	newPassword := "brand-new-pass"
+	_, err := svc.Update(ctx, uuid.New(), UpdateUserRequest{NewPassword: &newPassword}, owner.ID)
+	if err == nil {
+		t.Fatal("expected error for unknown user, got nil")
+	}
+}
+
 func TestUsers_GetByIDs_ExcludesDeactivatedAndDeleted(t *testing.T) {
 	db := newTestDB(t)
 	repo := NewRepository(db)

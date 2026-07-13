@@ -39,6 +39,8 @@ export async function createEmployee(payload) {
   return unwrap(res)
 }
 
+// payload may include new_password (owner-only override — resets the
+// employee's password in the same request, without knowing the current one).
 export async function updateEmployee(userId, payload) {
   const res = await client.patch(`/users/${userId}`, payload)
   return unwrap(res)
