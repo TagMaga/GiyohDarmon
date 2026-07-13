@@ -1611,27 +1611,16 @@ function PayPanel({ person, teamId, teamName, teamColor, teams, employees, empCo
 }
 
 // ── Edit modal ────────────────────────────────────────────────────────────────
-// Dark panel chrome matches the dispatcher's courier edit modal
-// (features/dispatcher/components/CourierManageModals.jsx) for UI consistency
-// between the two "edit a person" flows.
-const PT = {
-  panel:  '#0d1525',
-  card:   '#111d30',
-  border: 'rgba(255,255,255,0.07)',
-  text1:  '#f0f4ff',
-  text2:  '#8fa3c8',
-  text3:  '#4a6080',
-  violet: '#8b5cf6',
-  red:    '#ef4444',
-}
+// Light panel chrome — this modal lives on the light TeamDirectoryPage, so it
+// intentionally no longer shares the dark chrome used by the dispatcher's
+// courier edit modal (features/dispatcher/components/CourierManageModals.jsx),
+// which stays dark to match its host page (DispatcherBoardV2/V3).
+const ptField =
+  'w-full box-border px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl ' +
+  'text-slate-900 text-sm font-sans outline-none transition-colors ' +
+  'focus:border-indigo-400 focus:ring-[3px] focus:ring-indigo-500/15'
 
-const ptField = {
-  width: '100%', background: PT.card, border: `1px solid ${PT.border}`,
-  borderRadius: 10, color: PT.text1, fontSize: 14, padding: '9px 12px',
-  outline: 'none', boxSizing: 'border-box',
-}
-
-function PTModalShell({ title, subtitle, onClose, children, width = 560 }) {
+function PTModalShell({ title, subtitle, onClose, children, footer, width = 560 }) {
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKey)
@@ -1642,38 +1631,30 @@ function PTModalShell({ title, subtitle, onClose, children, width = 560 }) {
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
-        background: 'rgba(0,0,0,0.72)', display: 'flex',
+        background: 'rgba(15,23,42,0.5)', display: 'flex',
         alignItems: 'center', justifyContent: 'center', padding: 20,
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{
-        width: '100%', maxWidth: width, maxHeight: '90vh',
-        background: PT.panel, borderRadius: 18,
-        border: `1px solid ${PT.border}`,
-        boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-          padding: '20px 24px 16px', borderBottom: `1px solid ${PT.border}`, flexShrink: 0,
-        }}>
+      <div
+        className="bg-white rounded-[20px] flex flex-col overflow-hidden shadow-[0_1px_2px_rgba(16,24,40,0.04),0_24px_60px_rgba(16,24,40,0.18)]"
+        style={{ width: '100%', maxWidth: width, maxHeight: '92vh' }}
+      >
+        <div className="flex items-start justify-between px-5 pt-5 pb-4 border-b border-slate-100 flex-shrink-0">
           <div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: PT.text1 }}>{title}</div>
-            {subtitle && <div style={{ fontSize: 13, color: PT.text2, marginTop: 4 }}>{subtitle}</div>}
+            <div className="text-base font-semibold text-slate-900 tracking-tight">{title}</div>
+            {subtitle && <div className="text-xs text-slate-400 font-medium mt-[3px]">{subtitle}</div>}
           </div>
           <button
             onClick={onClose}
-            style={{
-              background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8,
-              color: PT.text2, cursor: 'pointer', padding: '6px 10px', fontSize: 16,
-              marginLeft: 12, flexShrink: 0,
-            }}
+            className="ml-4 flex-shrink-0 p-1.5 min-h-9 min-w-9 rounded-xl border-none bg-transparent text-slate-400 cursor-pointer flex items-center justify-center transition-colors hover:bg-slate-100 hover:text-slate-700"
+            aria-label="Закрыть"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
-        <div style={{ overflowY: 'auto', flex: 1 }}>{children}</div>
+        <div className="overflow-y-auto flex-1">{children}</div>
+        {footer && <div className="flex-shrink-0">{footer}</div>}
       </div>
     </div>
   )
@@ -1681,9 +1662,9 @@ function PTModalShell({ title, subtitle, onClose, children, width = 560 }) {
 
 function PTLabel({ children, required }) {
   return (
-    <div style={{ fontSize: 11, fontWeight: 700, color: PT.text2, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
-      {children}{required && <span style={{ color: PT.red, marginLeft: 3 }}>*</span>}
-    </div>
+    <label className="block text-[13px] font-semibold text-slate-700 mb-1.5">
+      {children}{required && <span className="text-red-500 ml-0.5">*</span>}
+    </label>
   )
 }
 
@@ -1692,14 +1673,13 @@ function PTPrimaryBtn({ onClick, disabled, loading, children }) {
     <button
       onClick={onClick}
       disabled={disabled || loading}
-      style={{
-        background: disabled || loading ? 'rgba(139,92,246,0.4)' : PT.violet,
-        color: '#fff', border: 'none', borderRadius: 10,
-        padding: '11px 20px', fontWeight: 700, fontSize: 14,
-        cursor: disabled || loading ? 'not-allowed' : 'pointer',
-        opacity: disabled || loading ? 0.7 : 1, minWidth: 100,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-      }}
+      className={
+        'text-white border-none rounded-full px-6 py-[11px] font-bold text-sm font-sans ' +
+        'min-w-[110px] inline-flex items-center justify-center gap-1.5 transition-colors ' +
+        (disabled || loading
+          ? 'bg-indigo-300 cursor-not-allowed'
+          : 'bg-indigo-600 hover:bg-indigo-700 cursor-pointer shadow-[0_4px_12px_rgba(79,70,229,0.3)]')
+      }
     >
       {loading ? '...' : children}
     </button>
@@ -1710,11 +1690,7 @@ function PTGhostBtn({ onClick, children }) {
   return (
     <button
       onClick={onClick}
-      style={{
-        background: 'transparent', color: PT.text2,
-        border: `1px solid ${PT.border}`, borderRadius: 10,
-        padding: '11px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer',
-      }}
+      className="bg-slate-100 hover:bg-slate-200 text-slate-700 border-none rounded-full px-[22px] py-[11px] font-semibold text-sm font-sans cursor-pointer transition-colors"
     >
       {children}
     </button>
@@ -1780,27 +1756,33 @@ function EditPersonModal({ open, onClose, person, onSaved }) {
 
   return (
     <PTModalShell
-      title="✏️ Редактировать сотрудника"
+      title="Редактировать сотрудника"
       subtitle={`ID: ${person.id?.slice(0, 8)}…`}
       onClose={close}
+      footer={
+        <div className="flex gap-2.5 justify-end px-5 pt-3.5 pb-5 border-t border-slate-100">
+          <PTGhostBtn onClick={close}>Отмена</PTGhostBtn>
+          <PTPrimaryBtn onClick={() => mutate()} loading={isPending}>Сохранить</PTPrimaryBtn>
+        </div>
+      }
     >
-      <div style={{ padding: '20px 24px 24px' }}>
+      <div className="px-5 pt-[18px] pb-1">
         {/* Row 1 — name + phone */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <PTLabel required>Полное имя</PTLabel>
-            <input style={ptField} value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Имя Фамилия" />
+            <input className={ptField} value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Имя Фамилия" />
           </div>
           <div>
             <PTLabel>Телефон</PTLabel>
-            <input style={ptField} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+992 93 000 00 00" />
+            <input className={ptField} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+992 93 000 00 00" />
           </div>
         </div>
 
         {/* Row 2 — role */}
-        <div style={{ marginBottom: 16 }}>
+        <div className="mb-4">
           <PTLabel required>Должность</PTLabel>
-          <select style={ptField} value={role} onChange={e => setRole(e.target.value)}>
+          <select className={ptField} value={role} onChange={e => setRole(e.target.value)}>
             {ALL_ROLES.map(r => (
               <option key={r} value={r}>{ROLE_LABEL[r]}</option>
             ))}
@@ -1808,54 +1790,49 @@ function EditPersonModal({ open, onClose, person, onSaved }) {
         </div>
 
         {/* Row 3 — hire date + dob */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <PTLabel>Дата найма</PTLabel>
-            <input style={ptField} type="date" value={hireDate} onChange={e => setHireDate(e.target.value)} />
+            <input className={ptField} type="date" value={hireDate} onChange={e => setHireDate(e.target.value)} />
           </div>
           <div>
             <PTLabel>Дата рождения</PTLabel>
-            <input style={ptField} type="date" value={dob} onChange={e => setDob(e.target.value)} />
+            <input className={ptField} type="date" value={dob} onChange={e => setDob(e.target.value)} />
           </div>
         </div>
 
         {/* Row 4 — status + is_active */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16, alignItems: 'end' }}>
+        <div className="grid grid-cols-2 gap-4 mb-[18px] items-end">
           <div>
             <PTLabel>Статус</PTLabel>
-            <select style={ptField} value={status} onChange={e => setStatus(e.target.value)}>
+            <select className={ptField} value={status} onChange={e => setStatus(e.target.value)}>
               {STATUS_OPTIONS.map(o => (
                 <option key={o.key} value={o.key}>{o.label}</option>
               ))}
             </select>
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', minHeight: 44 }}>
+          <label className="flex items-center gap-2.5 cursor-pointer min-h-11">
             <input
               type="checkbox"
               checked={isActive}
               onChange={e => setIsActive(e.target.checked)}
-              style={{ width: 16, height: 16, borderRadius: 4, accentColor: PT.violet }}
+              className="w-[17px] h-[17px] rounded accent-indigo-600 cursor-pointer"
             />
-            <span style={{ fontSize: 13.5, color: PT.text2, fontWeight: 600 }}>Активный сотрудник</span>
+            <span className="text-[13.5px] text-slate-700 font-semibold">Активный сотрудник</span>
           </label>
         </div>
 
         {/* Row 5 — address */}
-        <div style={{ marginBottom: 4 }}>
+        <div className="mb-4">
           <PTLabel>Адрес</PTLabel>
-          <input style={ptField} value={address} onChange={e => setAddress(e.target.value)} placeholder="г. Душанбе, ул. ..." />
+          <input className={ptField} value={address} onChange={e => setAddress(e.target.value)} placeholder="г. Душанбе, ул. ..." />
         </div>
 
         {error && (
-          <div style={{ marginTop: 12, fontSize: 13, color: PT.red }}>
+          <div className="mt-3 text-[13px] text-red-500">
             {error.response?.data?.error?.message ?? error.message}
           </div>
         )}
-
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-          <PTGhostBtn onClick={close}>Отмена</PTGhostBtn>
-          <PTPrimaryBtn onClick={() => mutate()} loading={isPending}>Сохранить</PTPrimaryBtn>
-        </div>
       </div>
     </PTModalShell>
   )
