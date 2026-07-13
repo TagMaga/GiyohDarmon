@@ -36,7 +36,8 @@ import {
 import {
   fetchCourierTariffs, createCourierTariff, deleteCourierTariff,
 } from '../../dispatcher/api'
-import { ALL_ROLES, ROLE_LABEL, COMMISSION_TYPE_LABEL, fmtDate, fmtMoney, fmtPct, isConfigActive } from '../utils/peopleHelpers'
+import { ALL_ROLES, ROLE_LABEL, COMMISSION_TYPE_LABEL, STATUS_CFG, STATUS_OPTIONS, fmtDate, fmtMoney, fmtPct, isConfigActive } from '../utils/peopleHelpers'
+import EditEmployeeModal   from '../components/EditEmployeeModal'
 import Modal               from '../../../shared/components/Modal'
 import DesktopDateRangePicker  from '../../../shared/components/DesktopDateRangePicker'
 import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
@@ -48,18 +49,6 @@ import AssignTeamModal     from '../components/AssignTeamModal'
 import CreateEmployeeModal from '../components/CreateEmployeeModal'
 import CreateTeamModal     from '../components/CreateTeamModal'
 
-// ── Status config ─────────────────────────────────────────────────────────────
-
-const STATUS_CFG = {
-  online:     { label: 'Online',       color: '#3DD68C', dot: 'online',  pulse: true  },
-  away:       { label: 'Away',         color: '#F0B23D', dot: 'away',    pulse: false },
-  offline:    { label: 'Offline',      color: '#6B7280', dot: 'offline', pulse: false },
-  vacation:   { label: 'В отпуске',    color: '#9B8CFF', dot: 'away',    pulse: false },
-  sick:       { label: 'Больничный',   color: '#FF6B5B', dot: 'away',    pulse: false },
-  terminated: { label: 'Уволен',       color: '#6B7280', dot: 'offline', pulse: false },
-}
-
-const STATUS_OPTIONS = Object.entries(STATUS_CFG).map(([key, cfg]) => ({ key, ...cfg }))
 const PERSON_GRID_CLASS = 'grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-[7px]'
 
 // Team colors — cycled when a team doesn't have a pre-assigned colour
@@ -265,6 +254,9 @@ function userHistoryText(item) {
   if (item.field_name === 'document_status') {
     return `Изменён статус документа: ${oldValue} → ${newValue}`
   }
+  if (item.field_name === 'password_reset') {
+    return 'Пароль сброшен владельцем'
+  }
   const labels = {
     full_name: 'ФИО',
     phone: 'Телефон',
@@ -292,6 +284,7 @@ function auditFieldLabel(field) {
     document_verified: 'Документ проверен',
     document_rejected: 'Документ отклонён',
     document_status: 'Статус документа',
+    password_reset: 'Сброс пароля',
   }
   return labels[field] ?? field
 }
@@ -852,7 +845,7 @@ function DetailPanel({ person, teamId, teamColor, teamName, teams, employees, on
         </div>
       </div>
 
-      <EditPersonModal
+      <EditEmployeeModal
         open={editOpen}
         onClose={() => setEditOpen(false)}
         person={person}
@@ -1605,257 +1598,6 @@ function PayPanel({ person, teamId, teamName, teamColor, teams, employees, empCo
         />
       )}
     </div>
-  )
-}
-
-// ── Edit modal ────────────────────────────────────────────────────────────────
-// Dark panel chrome matches the dispatcher's courier edit modal
-// (features/dispatcher/components/CourierManageModals.jsx) for UI consistency
-// between the two "edit a person" flows.
-const PT = {
-  panel:  '#0d1525',
-  card:   '#111d30',
-  border: 'rgba(255,255,255,0.07)',
-  text1:  '#f0f4ff',
-  text2:  '#8fa3c8',
-  text3:  '#4a6080',
-  violet: '#8b5cf6',
-  red:    '#ef4444',
-}
-
-const ptField = {
-  width: '100%', background: PT.card, border: `1px solid ${PT.border}`,
-  borderRadius: 10, color: PT.text1, fontSize: 14, padding: '9px 12px',
-  outline: 'none', boxSizing: 'border-box',
-}
-
-function PTModalShell({ title, subtitle, onClose, children, width = 560 }) {
-  useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9999,
-        background: 'rgba(0,0,0,0.72)', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', padding: 20,
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div style={{
-        width: '100%', maxWidth: width, maxHeight: '90vh',
-        background: PT.panel, borderRadius: 18,
-        border: `1px solid ${PT.border}`,
-        boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-          padding: '20px 24px 16px', borderBottom: `1px solid ${PT.border}`, flexShrink: 0,
-        }}>
-          <div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: PT.text1 }}>{title}</div>
-            {subtitle && <div style={{ fontSize: 13, color: PT.text2, marginTop: 4 }}>{subtitle}</div>}
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8,
-              color: PT.text2, cursor: 'pointer', padding: '6px 10px', fontSize: 16,
-              marginLeft: 12, flexShrink: 0,
-            }}
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <div style={{ overflowY: 'auto', flex: 1 }}>{children}</div>
-      </div>
-    </div>
-  )
-}
-
-function PTLabel({ children, required }) {
-  return (
-    <div style={{ fontSize: 11, fontWeight: 700, color: PT.text2, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
-      {children}{required && <span style={{ color: PT.red, marginLeft: 3 }}>*</span>}
-    </div>
-  )
-}
-
-function PTPrimaryBtn({ onClick, disabled, loading, children }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled || loading}
-      style={{
-        background: disabled || loading ? 'rgba(139,92,246,0.4)' : PT.violet,
-        color: '#fff', border: 'none', borderRadius: 10,
-        padding: '11px 20px', fontWeight: 700, fontSize: 14,
-        cursor: disabled || loading ? 'not-allowed' : 'pointer',
-        opacity: disabled || loading ? 0.7 : 1, minWidth: 100,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-      }}
-    >
-      {loading ? '...' : children}
-    </button>
-  )
-}
-
-function PTGhostBtn({ onClick, children }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: 'transparent', color: PT.text2,
-        border: `1px solid ${PT.border}`, borderRadius: 10,
-        padding: '11px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer',
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-function EditPersonModal({ open, onClose, person, onSaved }) {
-  const qc    = useQueryClient()
-  const toast = useToast()
-
-  const [fullName,    setFullName]    = useState('')
-  const [phone,       setPhone]       = useState('')
-  const [role,        setRole]        = useState('seller')
-  const [isActive,    setIsActive]    = useState(true)
-  const [status,      setStatus]      = useState('offline')
-  const [hireDate,    setHireDate]    = useState('')
-  const [dob,         setDob]         = useState('')
-  const [address,     setAddress]     = useState('')
-
-  useEffect(() => {
-    if (!person) return
-    setFullName(person.full_name ?? '')
-    setPhone(person.phone ?? '')
-    setRole(person.role ?? 'seller')
-    setIsActive(person.is_active !== false)
-    setStatus(person.status ?? 'offline')
-    setHireDate(person.hire_date ? person.hire_date.slice(0, 10) : '')
-    setDob(person.date_of_birth ? person.date_of_birth.slice(0, 10) : '')
-    setAddress(person.address ?? '')
-  }, [person])
-
-  const { mutate, isPending, error, reset } = useMutation({
-    mutationFn: () => {
-      if (!fullName.trim()) throw new Error('Имя обязательно')
-      return updateEmployee(person.id, {
-        full_name:     fullName.trim(),
-        phone:         phone.trim()   || undefined,
-        role,
-        is_active:     isActive,
-        status,
-        hire_date:     hireDate ? hireDate + 'T00:00:00Z' : undefined,
-        date_of_birth: dob     ? dob + 'T00:00:00Z'     : undefined,
-        address:       address.trim() || undefined,
-      })
-    },
-    onSuccess: (updated) => {
-      qc.setQueryData(['people'], (old) =>
-        Array.isArray(old) ? old.map(u => u.id === updated.id ? updated : u) : old
-      )
-      qc.invalidateQueries({ queryKey: ['people'] })
-      qc.invalidateQueries({ queryKey: ['user-history', person.id] })
-      qc.invalidateQueries({ queryKey: ['users-history'] })
-      toast.success('Данные обновлены')
-      reset()
-      onSaved?.()
-      onClose()
-    },
-  })
-
-  if (!open || !person) return null
-
-  const close = () => { reset(); onClose() }
-
-  return (
-    <PTModalShell
-      title="✏️ Редактировать сотрудника"
-      subtitle={`ID: ${person.id?.slice(0, 8)}…`}
-      onClose={close}
-    >
-      <div style={{ padding: '20px 24px 24px' }}>
-        {/* Row 1 — name + phone */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-          <div>
-            <PTLabel required>Полное имя</PTLabel>
-            <input style={ptField} value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Имя Фамилия" />
-          </div>
-          <div>
-            <PTLabel>Телефон</PTLabel>
-            <input style={ptField} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+992 93 000 00 00" />
-          </div>
-        </div>
-
-        {/* Row 2 — role */}
-        <div style={{ marginBottom: 16 }}>
-          <PTLabel required>Должность</PTLabel>
-          <select style={ptField} value={role} onChange={e => setRole(e.target.value)}>
-            {ALL_ROLES.map(r => (
-              <option key={r} value={r}>{ROLE_LABEL[r]}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Row 3 — hire date + dob */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-          <div>
-            <PTLabel>Дата найма</PTLabel>
-            <input style={ptField} type="date" value={hireDate} onChange={e => setHireDate(e.target.value)} />
-          </div>
-          <div>
-            <PTLabel>Дата рождения</PTLabel>
-            <input style={ptField} type="date" value={dob} onChange={e => setDob(e.target.value)} />
-          </div>
-        </div>
-
-        {/* Row 4 — status + is_active */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16, alignItems: 'end' }}>
-          <div>
-            <PTLabel>Статус</PTLabel>
-            <select style={ptField} value={status} onChange={e => setStatus(e.target.value)}>
-              {STATUS_OPTIONS.map(o => (
-                <option key={o.key} value={o.key}>{o.label}</option>
-              ))}
-            </select>
-          </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', minHeight: 44 }}>
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={e => setIsActive(e.target.checked)}
-              style={{ width: 16, height: 16, borderRadius: 4, accentColor: PT.violet }}
-            />
-            <span style={{ fontSize: 13.5, color: PT.text2, fontWeight: 600 }}>Активный сотрудник</span>
-          </label>
-        </div>
-
-        {/* Row 5 — address */}
-        <div style={{ marginBottom: 4 }}>
-          <PTLabel>Адрес</PTLabel>
-          <input style={ptField} value={address} onChange={e => setAddress(e.target.value)} placeholder="г. Душанбе, ул. ..." />
-        </div>
-
-        {error && (
-          <div style={{ marginTop: 12, fontSize: 13, color: PT.red }}>
-            {error.response?.data?.error?.message ?? error.message}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
-          <PTGhostBtn onClick={close}>Отмена</PTGhostBtn>
-          <PTPrimaryBtn onClick={() => mutate()} loading={isPending}>Сохранить</PTPrimaryBtn>
-        </div>
-      </div>
-    </PTModalShell>
   )
 }
 
