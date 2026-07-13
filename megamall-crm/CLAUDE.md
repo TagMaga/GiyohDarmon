@@ -89,3 +89,30 @@ Goose, sequential `migrations/NNNNN_description.sql` files with `-- +goose Up` /
 - `shared/hooks/useCurrentUser.js` decodes the JWT client-side for `{userId, role}`; `shared/store/authStore` (zustand) holds the token.
 - `Modal.jsx` (`shared/components/`) is the shared dialog primitive and already renders as a bottom sheet on mobile (`items-end` + `rounded-t-*`) / centered modal on desktop — reuse it instead of building a new sheet/drawer component.
 - Currency is always shown as the "смн" abbreviation in copy, never a symbol.
+
+## Workflow rules (permanent)
+
+### Always, before starting any task
+
+- Check `git status`, current branch, remote, and `gh auth status`.
+- Never work directly on `main` — create/use a feature branch.
+- Never include unrelated files in a commit (review `git status`/`git diff` before staging).
+- Give a final report only after the change is merged, deployed, and verified live — not before.
+
+### FAST MODE — small frontend-only UI changes
+
+Applies only to small, purely visual/UI changes confined to the frontend (e.g. `web-admin/src`), with no backend, database, auth, or business-logic impact.
+
+- Get exactly one preview approval before proceeding — do not ask again after that.
+- After approval, proceed straight through: commit, push, open PR, wait for CI, merge, deploy to production, verify live. No intermediate approval checkpoints.
+- Do not send repeated progress messages while this runs.
+- Stop and report only on: CI failure, merge conflict, auth problem, or deploy failure. Otherwise proceed to completion silently and report once at the end.
+
+### SAFE MODE — backend, database, auth, finance, permissions, commissions, or any destructive change
+
+Applies to anything touching the Go backend, migrations/schema, auth, `internal/finance`, `internal/compensation`, RBAC/permissions, or any change that deletes/overwrites data.
+
+- Audit the relevant code first and share findings before proposing changes.
+- Ask clarifying questions before writing code.
+- Wait for explicit approval of the implementation plan before writing/changing code.
+- Wait for explicit approval before merging — do not auto-merge even if CI is green.
