@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { Pencil, Trash2, Plus, X, MapPin } from 'lucide-react'
+import PasswordInput from '../../../shared/components/PasswordInput'
 import {
   updateCourier,
   updateCourierOrderIntake,
@@ -258,8 +259,9 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
 
         <FieldGroup>
           <Label>Пароль</Label>
-          <input
-            style={field.base} type="password"
+          <PasswordInput
+            theme="dark"
+            style={field.base}
             value={form.password} onChange={set('password')}
             placeholder="Оставьте пустым, чтобы не менять"
           />

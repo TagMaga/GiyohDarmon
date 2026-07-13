@@ -3,6 +3,8 @@ import { useMutation, useQueryClient }  from '@tanstack/react-query'
 import Button  from '../../../shared/components/Button'
 import Alert   from '../../../shared/components/Alert'
 import Modal   from '../../../shared/components/Modal'
+import DateInput     from '../../../shared/components/DateInput'
+import PasswordInput from '../../../shared/components/PasswordInput'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { updateEmployee } from '../api'
 import { ALL_ROLES, ROLE_LABEL, STATUS_OPTIONS } from '../utils/peopleHelpers'
@@ -34,6 +36,8 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
   const [address,         setAddress]         = useState('')
   const [newPassword,     setNewPassword]     = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [hireDateValid,   setHireDateValid]   = useState(true)
+  const [dobValid,        setDobValid]        = useState(true)
 
   useEffect(() => {
     if (!person || !open) return
@@ -47,6 +51,8 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
     setAddress(person.address ?? '')
     setNewPassword('')
     setConfirmPassword('')
+    setHireDateValid(true)
+    setDobValid(true)
   }, [person, open])
 
   const wantsPasswordChange = newPassword !== '' || confirmPassword !== ''
@@ -56,7 +62,7 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
     newPassword.length < MIN_PASSWORD_LENGTH ||
     newPassword !== confirmPassword
   )
-  const canSave = fullName.trim() !== '' && !passwordInvalid
+  const canSave = fullName.trim() !== '' && !passwordInvalid && hireDateValid && dobValid
 
   function patchCache(updated) {
     qc.setQueryData(['people'], (old) =>
@@ -139,14 +145,8 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="input-label">Дата найма</label>
-            <input type="date" value={hireDate} onChange={e => setHireDate(e.target.value)} className="input" />
-          </div>
-          <div>
-            <label className="input-label">Дата рождения</label>
-            <input type="date" value={dob} onChange={e => setDob(e.target.value)} className="input" />
-          </div>
+          <DateInput label="Дата найма" value={hireDate} onChange={setHireDate} onValidityChange={setHireDateValid} />
+          <DateInput label="Дата рождения" value={dob} onChange={setDob} onValidityChange={setDobValid} />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
@@ -174,16 +174,16 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="input-label">Новый пароль</label>
-              <input
-                type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                className="input" placeholder="Оставьте пустым, чтобы не менять"
+              <PasswordInput
+                value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                className="input" placeholder="Оставьте пустым, чтобы не менять" autoComplete="new-password"
               />
             </div>
             <div>
               <label className="input-label">Повторите пароль</label>
-              <input
-                type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                className="input" placeholder="Оставьте пустым, чтобы не менять"
+              <PasswordInput
+                value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                className="input" placeholder="Оставьте пустым, чтобы не менять" autoComplete="new-password"
               />
             </div>
           </div>

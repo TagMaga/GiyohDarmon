@@ -10,6 +10,7 @@ import useProfile        from '../hooks/useProfile'
 import useTheme          from '../hooks/useTheme'
 import useAppSettings    from '../hooks/useAppSettings'
 import { useToast }      from './ToastProvider'
+import PasswordInput     from './PasswordInput'
 import { updateEmployee } from '../../features/people/api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -275,8 +276,8 @@ function ProfileView({ onBack, fullName, phone, role, employee, userId }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <p style={{ margin: '4px 0 8px', fontSize: 11, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Смена пароля</p>
-            <input
-              type="password"
+            <PasswordInput
+              theme="dark"
               placeholder="Новый пароль"
               value={pw.next}
               onChange={e => setPw(p => ({ ...p, next: e.target.value }))}
@@ -284,8 +285,8 @@ function ProfileView({ onBack, fullName, phone, role, employee, userId }) {
               onFocus={e => (e.target.style.borderColor = '#6366f1')}
               onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')}
             />
-            <input
-              type="password"
+            <PasswordInput
+              theme="dark"
               placeholder="Повторите пароль"
               value={pw.confirm}
               onChange={e => setPw(p => ({ ...p, confirm: e.target.value }))}

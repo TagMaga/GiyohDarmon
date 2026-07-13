@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { jwtDecode } from 'jwt-decode'
-import { Eye, EyeOff, ShoppingBag, AlertCircle, Loader2 } from 'lucide-react'
+import { ShoppingBag, AlertCircle, Loader2 } from 'lucide-react'
 import { login } from '../shared/api/auth'
 import useAuthStore from '../shared/store/authStore'
+import PasswordInput from '../shared/components/PasswordInput'
 import { ROLE_HOME } from '../app/router'
 
 /**
@@ -23,7 +24,6 @@ function decodeRole(token) {
 export default function Login() {
   const [phone,       setPhone]       = useState('')
   const [password,    setPassword]    = useState('')
-  const [showPass,    setShowPass]    = useState(false)
   const [error,       setError]       = useState('')
   const [loading,     setLoading]     = useState(false)
 
@@ -136,26 +136,14 @@ export default function Login() {
             {/* Password */}
             <div className="mb-6">
               <label className="input-label">Пароль</label>
-              <div className="relative">
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError('') }}
-                  placeholder="••••••••"
-                  className="input pr-11"
-                  autoComplete="current-password"
-                  disabled={loading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400
-                             hover:text-slate-600 transition-colors"
-                  tabIndex={-1}
-                >
-                  {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+              <PasswordInput
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError('') }}
+                placeholder="••••••••"
+                className="input"
+                autoComplete="current-password"
+                disabled={loading}
+              />
             </div>
 
             {/* Submit */}
