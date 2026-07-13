@@ -85,7 +85,7 @@ type UpdateProductRequest struct {
 }
 
 type AddProductImageRequest struct {
-	ImageURL  string `json:"image_url"  validate:"required,url"`
+	ImageURL  string `json:"image_url"  validate:"required"`
 	IsPrimary bool   `json:"is_primary"`
 	SortOrder int    `json:"sort_order"`
 }
