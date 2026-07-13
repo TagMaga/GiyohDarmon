@@ -40,7 +40,7 @@ import { ALL_ROLES, ROLE_LABEL, COMMISSION_TYPE_LABEL, STATUS_CFG, STATUS_OPTION
 import EditEmployeeModal   from '../components/EditEmployeeModal'
 import Modal               from '../../../shared/components/Modal'
 import DesktopDateRangePicker  from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import DateRangeBottomSheet    from '../../../shared/components/DateRangeBottomSheet'
 import Button              from '../../../shared/components/Button'
 import Alert               from '../../../shared/components/Alert'
 import Badge               from '../../../shared/components/Badge'
@@ -1835,21 +1835,13 @@ function AuditJournal({ history = [], userMap = {} }) {
         </div>
       </BottomSheet>
 
-      <BottomSheet
+      <DateRangeBottomSheet
         open={openSheet === 'period'}
         onClose={() => setOpenSheet(null)}
-        title="Период"
-        footer={<Button variant="primary" fullWidth onClick={() => setOpenSheet(null)}>Готово</Button>}
-      >
-        <MobileDateRangeCalendar
-          from={from}
-          to={to}
-          onChange={(range) => {
-            setFrom(range.from); setTo(range.to)
-            if (range.from && range.to) setOpenSheet(null)
-          }}
-        />
-      </BottomSheet>
+        from={from}
+        to={to}
+        onChange={(range) => { setFrom(range.from); setTo(range.to) }}
+      />
       <div className="divide-y divide-slate-100">
         {filteredHistory.map(item => (
           <div key={item.id} className="grid gap-2 py-3 sm:grid-cols-[170px_minmax(0,1fr)_180px] sm:items-center">
