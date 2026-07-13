@@ -1703,7 +1703,7 @@ function AuditJournal({ history = [], userMap = {} }) {
   const [editorFilter, setEditorFilter] = useState('all')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
-  const [openSheet, setOpenSheet] = useState(null) // null | 'search' | 'field' | 'author' | 'period'
+  const [openSheet, setOpenSheet] = useState(null) // null | 'field' | 'author' | 'period'
 
   const fieldOptions = useMemo(() => {
     const fields = Array.from(new Set(history.map(item => item.field_name))).filter(Boolean).sort()
@@ -1784,16 +1784,6 @@ function AuditJournal({ history = [], userMap = {} }) {
       {/* ── Mobile pill row ──────────────────────────────────────────────── */}
       <div className="mb-4 scrollbar-none flex flex-nowrap items-center gap-2 overflow-x-auto lg:hidden">
         <FilterChip
-          icon={<Search size={13} />}
-          active={Boolean(query.trim())}
-          onClick={() => setOpenSheet('search')}
-          onClear={() => setQuery('')}
-          ariaExpanded={openSheet === 'search'}
-        >
-          {query.trim() || 'Поиск'}
-        </FilterChip>
-
-        <FilterChip
           active={fieldFilter !== 'all'}
           onClick={() => setOpenSheet('field')}
           onClear={() => setFieldFilter('all')}
@@ -1823,16 +1813,6 @@ function AuditJournal({ history = [], userMap = {} }) {
       </div>
 
       {/* ── Sheets ───────────────────────────────────────────────────────── */}
-      <BottomSheet open={openSheet === 'search'} onClose={() => setOpenSheet(null)} title="Поиск">
-        <input
-          autoFocus
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Сотрудник или изменение"
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[14px] font-medium text-slate-700 outline-none focus:border-indigo-300 focus:bg-white"
-        />
-      </BottomSheet>
-
       <BottomSheet open={openSheet === 'field'} onClose={() => setOpenSheet(null)} title="Поле">
         <div className="space-y-0.5 pb-1">
           <AuditPickerRow active={fieldFilter === 'all'} onClick={() => { setFieldFilter('all'); setOpenSheet(null) }}>Все поля</AuditPickerRow>
