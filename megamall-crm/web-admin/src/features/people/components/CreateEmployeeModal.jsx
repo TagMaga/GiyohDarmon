@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import Button  from '../../../shared/components/Button'
 import Alert   from '../../../shared/components/Alert'
 import Modal   from '../../../shared/components/Modal'
+import DateInput     from '../../../shared/components/DateInput'
+import PasswordInput from '../../../shared/components/PasswordInput'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS }     from '../../../shared/queryKeys'
 import { createEmployee } from '../api'
@@ -20,10 +22,13 @@ export default function CreateEmployeeModal({ open, onClose }) {
   const [hireDate,    setHireDate]    = useState('')
   const [dob,         setDob]         = useState('')
   const [address,     setAddress]     = useState('')
+  const [hireDateValid, setHireDateValid] = useState(true)
+  const [dobValid,      setDobValid]      = useState(true)
 
   function resetForm() {
     setPhone(''); setFullName(''); setEmail(''); setPassword(''); setRole('seller')
     setHireDate(''); setDob(''); setAddress('')
+    setHireDateValid(true); setDobValid(true)
   }
 
   const { mutate, isPending, error, reset } = useMutation({
@@ -54,11 +59,13 @@ export default function CreateEmployeeModal({ open, onClose }) {
     reset(); resetForm(); onClose()
   }
 
+  const canSubmit = hireDateValid && dobValid
+
   return (
     <Modal open={open} onClose={handleClose} title="Новый сотрудник" size="md"
       footer={<>
         <Button variant="secondary" onClick={handleClose} disabled={isPending}>Отмена</Button>
-        <Button variant="primary" onClick={() => mutate()} loading={isPending}>Создать</Button>
+        <Button variant="primary" onClick={() => mutate()} loading={isPending} disabled={!canSubmit}>Создать</Button>
       </>}
     >
       {error && <Alert variant="error" className="mb-4">{error.response?.data?.error?.message ?? error.message}</Alert>}
@@ -84,15 +91,11 @@ export default function CreateEmployeeModal({ open, onClose }) {
           </div>
         </div>
         <div><label className="input-label">Пароль *</label>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input mt-1" placeholder="Минимум 8 символов" />
+          <PasswordInput value={password} onChange={e => setPassword(e.target.value)} className="input mt-1" placeholder="Минимум 8 символов" autoComplete="new-password" />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <div><label className="input-label">Дата найма</label>
-            <input type="date" value={hireDate} onChange={e => setHireDate(e.target.value)} className="input mt-1" />
-          </div>
-          <div><label className="input-label">Дата рождения</label>
-            <input type="date" value={dob} onChange={e => setDob(e.target.value)} className="input mt-1" />
-          </div>
+          <DateInput label="Дата найма" value={hireDate} onChange={setHireDate} onValidityChange={setHireDateValid} />
+          <DateInput label="Дата рождения" value={dob} onChange={setDob} onValidityChange={setDobValid} />
         </div>
         <div><label className="input-label">Адрес</label>
           <input value={address} onChange={e => setAddress(e.target.value)} className="input mt-1" placeholder="г. Душанбе, ул. ..." />

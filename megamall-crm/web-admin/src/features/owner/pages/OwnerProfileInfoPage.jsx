@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Alert from '../../../shared/components/Alert'
+import PasswordInput from '../../../shared/components/PasswordInput'
 import { useSellerMe, usePatchMe, useChangePassword } from '../../seller/hooks/useSellerMe'
 import useCurrentUser from '../../../shared/hooks/useCurrentUser'
 import { useToast } from '../../../shared/components/ToastProvider'
@@ -80,8 +81,7 @@ export default function OwnerProfileInfoPage() {
     <>
       <div style={{ padding: '13px 0', borderBottom: `1px solid ${M.bg}` }}>
         <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Текущий пароль</div>
-        <input
-          type="password"
+        <PasswordInput
           value={currentPassword}
           onChange={e => setCurrentPassword(e.target.value)}
           style={desktopInputStyle}
@@ -91,8 +91,7 @@ export default function OwnerProfileInfoPage() {
       </div>
       <div style={{ padding: '13px 0', borderBottom: `1px solid ${M.bg}` }}>
         <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Новый пароль</div>
-        <input
-          type="password"
+        <PasswordInput
           value={newPassword}
           onChange={e => setNewPassword(e.target.value)}
           style={desktopInputStyle}
@@ -102,8 +101,7 @@ export default function OwnerProfileInfoPage() {
       </div>
       <div style={{ padding: '13px 0' }}>
         <div style={{ fontSize: 11.5, color: M.muted, fontWeight: 600 }}>Повторите новый пароль</div>
-        <input
-          type="password"
+        <PasswordInput
           value={confirmPassword}
           onChange={e => setConfirmPassword(e.target.value)}
           style={desktopInputStyle}
