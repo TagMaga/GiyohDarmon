@@ -70,9 +70,6 @@ export default defineConfig({
           'feature-warehouse': [
             './src/features/warehouse/pages/WarehouseDashboard.jsx',
           ],
-          'feature-courier': [
-            './src/features/courier/pages/CourierDashboard.jsx',
-          ],
         },
       },
     },

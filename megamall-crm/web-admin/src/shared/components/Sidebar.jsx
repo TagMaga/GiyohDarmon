@@ -50,7 +50,6 @@ const NAV = {
     { label: 'Остатки и товары', icon: Package,      path: '/warehouse/inventory' },
     { label: 'Приёмка и списания', icon: PackagePlus, path: '/warehouse/receiving' },
   ],
-  courier: [],
 }
 // it_specialist has full owner-level access — reuse the owner nav.
 NAV.it_specialist = NAV.owner

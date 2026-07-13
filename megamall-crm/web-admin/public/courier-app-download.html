@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>MegaMall Courier — скачать приложение</title>
+  <meta name="description" content="Приложение курьера MegaMall. Скачайте и установите на Android." />
+  <meta name="theme-color" content="#ec4899" />
+  <style>
+    :root {
+      --brand: #ec4899;
+      --brand-dark: #db2777;
+      --brand-darker: #be185d;
+      --ink: #1a1025;
+      --muted: #7c6f85;
+      --line: #f0dce8;
+      --panel: #ffffff;
+      --bg-top: #fdf2f8;
+      --android-green: #3ddc84;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      color: var(--ink);
+      background:
+        radial-gradient(560px 360px at 50% -60px, rgba(236, 72, 153, 0.16), transparent 70%),
+        var(--bg-top);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      display: flex;
+      justify-content: center;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 460px;
+      min-height: 100vh;
+      min-height: 100dvh;
+      padding: max(28px, env(safe-area-inset-top)) 20px max(28px, env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---- header / brand ---- */
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding-top: 12px;
+    }
+
+    .logo {
+      width: 84px;
+      height: 84px;
+      border-radius: 24px;
+      background: linear-gradient(155deg, var(--brand), var(--brand-darker));
+      display: grid;
+      place-items: center;
+      box-shadow: 0 16px 32px -12px rgba(219, 39, 119, 0.55);
+    }
+
+    .logo svg { width: 42px; height: 42px; }
+
+    .brand h1 {
+      margin: 18px 0 4px;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+    }
+
+    .brand .tagline {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14.5px;
+    }
+
+    /* ---- welcome card ---- */
+
+    .welcome {
+      margin-top: 28px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 22px 22px 20px;
+      box-shadow: 0 12px 30px -18px rgba(190, 24, 93, 0.25);
+    }
+
+    .welcome .wave { font-size: 26px; line-height: 1; }
+
+    .welcome h2 {
+      margin: 10px 0 8px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .welcome p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14.5px;
+      line-height: 1.55;
+    }
+
+    /* ---- download button ---- */
+
+    .download-block {
+      margin-top: 22px;
+    }
+
+    .download-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border: 0;
+      border-radius: 16px;
+      padding: 18px 20px;
+      background: linear-gradient(155deg, var(--brand), var(--brand-dark));
+      color: #fff;
+      font-size: 16.5px;
+      font-weight: 800;
+      text-decoration: none;
+      box-shadow: 0 18px 34px -14px rgba(219, 39, 119, 0.6);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .download-btn:active {
+      transform: scale(0.97);
+      box-shadow: 0 10px 22px -14px rgba(219, 39, 119, 0.6);
+    }
+
+    .download-btn svg { width: 22px; height: 22px; flex: none; }
+
+    .btn-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.25; }
+    .btn-text small { font-weight: 600; font-size: 11.5px; opacity: 0.85; letter-spacing: 0.02em; }
+    .btn-text span { font-size: 16.5px; }
+
+    .android-badge {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+
+    .android-badge svg { width: 14px; height: 14px; color: var(--android-green); }
+
+    /* ---- steps ---- */
+
+    .steps {
+      margin-top: 26px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .steps h3 {
+      margin: 0;
+      padding: 16px 18px 4px;
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .step {
+      display: flex;
+      gap: 12px;
+      padding: 12px 18px;
+      align-items: flex-start;
+    }
+
+    .step:not(:last-child) {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .step-num {
+      flex: none;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: #fce7f3;
+      color: var(--brand-darker);
+      font-weight: 800;
+      font-size: 13px;
+      display: grid;
+      place-items: center;
+    }
+
+    .step p {
+      margin: 3px 0 0;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--ink);
+    }
+
+    .step p b { font-weight: 700; }
+
+    /* ---- footer ---- */
+
+    .footer {
+      margin-top: auto;
+      padding-top: 26px;
+      text-align: center;
+    }
+
+    .footer p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.6;
+    }
+
+    .footer a {
+      color: var(--brand-darker);
+      font-weight: 700;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <header class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 7.5C3 6.67 3.67 6 4.5 6H14V16.5H3V7.5Z" fill="#fff" fill-opacity="0.95"/>
+          <path d="M14 9.5H17.7C18.16 9.5 18.58 9.75 18.8 10.15L20.5 13.2V16.5H14V9.5Z" fill="#fff" fill-opacity="0.75"/>
+          <circle cx="7.5" cy="17.5" r="1.8" fill="#be185d"/>
+          <circle cx="17.5" cy="17.5" r="1.8" fill="#be185d"/>
+        </svg>
+      </div>
+      <h1>MegaMall Courier</h1>
+      <p class="tagline">Приложение для курьеров MegaMall</p>
+    </header>
+
+    <section class="welcome">
+      <div class="wave">👋</div>
+      <h2>Добро пожаловать в команду!</h2>
+      <p>
+        Рады видеть тебя в команде MegaMall! Это приложение поможет получать заказы,
+        обновлять статусы доставки и сдавать наличные — всё в одном месте.
+        Установи его на телефон, чтобы начать работу.
+      </p>
+    </section>
+
+    <div class="download-block">
+      <a
+        class="download-btn"
+        id="downloadBtn"
+        href="https://expo.dev/accounts/mahmadnazaralif/projects/megamall-courier/builds/0aa9281d-b419-44c4-9825-c72fba972ffc"
+        target="_blank"
+        rel="noopener"
+      >
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M17.523 15.34c-.5 0-.905-.406-.905-.906V9.566a.906.906 0 1 1 1.81 0v4.868c0 .5-.405.906-.905.906ZM6.477 15.34a.906.906 0 0 1-.905-.906V9.566a.906.906 0 1 1 1.81 0v4.868c0 .5-.405.906-.905.906ZM7.5 16.6c0 .663.537 1.2 1.2 1.2h.55v2.4a1.15 1.15 0 0 0 2.3 0v-2.4h1v2.4a1.15 1.15 0 0 0 2.3 0v-2.4h.55c.663 0 1.2-.537 1.2-1.2V8.9h-9v7.7ZM15.1 4.62l.92-1.593a.383.383 0 0 0-.663-.383l-.955 1.654A6.94 6.94 0 0 0 12 3.7c-1.03 0-2 .217-2.402.598L8.643 2.644a.383.383 0 1 0-.663.383l.92 1.593C7.36 5.55 6.6 6.99 6.5 8.65h11c-.1-1.66-.86-3.1-2.4-4.03ZM9.9 6.9a.55.55 0 1 1 0-1.1.55.55 0 0 1 0 1.1Zm4.2 0a.55.55 0 1 1 0-1.1.55.55 0 0 1 0 1.1Z"/>
+        </svg>
+        <span class="btn-text">
+          <small>СКАЧАТЬ ДЛЯ</small>
+          <span>Android</span>
+        </span>
+      </a>
+      <div class="android-badge">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>
+        Только для Android · APK-файл
+      </div>
+    </div>
+
+    <section class="steps">
+      <h3>Как установить</h3>
+      <div class="step">
+        <div class="step-num">1</div>
+        <p>Нажми кнопку <b>«Скачать для Android»</b> выше и дождись загрузки файла.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <p>Если телефон спросит — разреши <b>установку из неизвестных источников</b> для браузера.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <p>Открой скачанный файл и нажми <b>«Установить»</b>.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <p>Запусти приложение и войди под своим логином курьера.</p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>Возникли проблемы с установкой?<br />Напиши своему руководителю или в поддержку MegaMall.</p>
+    </footer>
+
+  </div>
+</body>
+</html>
