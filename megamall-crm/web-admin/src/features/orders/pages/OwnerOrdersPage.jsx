@@ -36,17 +36,16 @@ import PeriodRangeFilter from '../../../shared/components/PeriodRangeFilter'
 
 function toYMD(d) { return d.toISOString().slice(0, 10) }
 
-function currentMonthDefault() {
-  const now   = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth(), 1)
-  return { from: toYMD(start), to: toYMD(now) }
+function todayDefault() {
+  const now = new Date()
+  return { from: toYMD(now), to: toYMD(now) }
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function OwnerOrdersPage() {
   const [searchParams] = useSearchParams()
-  const def = currentMonthDefault()
+  const def = todayDefault()
 
   // ── Filters state ────────────────────────────────────────────────────────
   // Read initial status from URL param so KPI tiles can deep-link here
