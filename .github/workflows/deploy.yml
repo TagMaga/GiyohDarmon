@@ -123,4 +123,4 @@ jobs:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
         run: |
           curl --fail --silent --show-error --retry 5 --retry-delay 2 \
-            --max-time 10 "http://$SERVER_HOST/api/v1/ready" >/dev/null
+            --max-time 10 "https://$SERVER_HOST/api/v1/ready" >/dev/null
