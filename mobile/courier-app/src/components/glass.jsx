@@ -13,7 +13,7 @@
  * stays on chrome, which is also how Apple applies materials.
  */
 import { createContext, useContext, useMemo, useState } from 'react'
-import { Platform, View, StyleSheet, useColorScheme, useWindowDimensions } from 'react-native'
+import { Platform, View, StyleSheet, useColorScheme } from 'react-native'
 import { BlurView } from 'expo-blur'
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg'
 
@@ -52,6 +52,17 @@ export const DARK = {
 
 // Legacy alias kept for older imports.
 export const G = LIGHT
+
+/**
+ * Android-safe elevation. `elevation` on a View that also has a translucent
+ * (rgba) backgroundColor + borderRadius makes Android paint its shadow-casting
+ * backdrop as an opaque, incorrectly-sized rectangle with square corners —
+ * visible as a white/light box sitting inset behind the card's content. Glass
+ * cards are translucent by design, so elevation must stay off on Android;
+ * `shadowColor`/`shadowOffset`/`shadowOpacity`/`shadowRadius` keep driving the
+ * shadow on iOS exactly as before (Android never reads those props).
+ */
+export const glassElevation = (n) => (Platform.OS === 'android' ? 0 : n)
 
 // ── Theme context ────────────────────────────────────────────────────────────
 
@@ -159,11 +170,16 @@ function Wash({ id, cx, cy, r, color, opacity }) {
 }
 
 /**
- * Full-screen colorful backdrop. Render as the first child of the screen root.
+ * Full-screen colorful backdrop. Mount it in an unpadded `flex: 1` wrapper
+ * that sits BEHIND a SafeAreaView, not as a child of the SafeAreaView itself —
+ * SafeAreaView applies insets as padding, so a backdrop mounted inside it
+ * only ever measures the inset content box and leaves the status-bar/gesture-
+ * bar strip uncovered. Sizes itself from onLayout, so there's no dimension
+ * guessing and no gap regardless of inset size on a given device.
  * Follows the active theme; pass `dark` to force an appearance (login/profile).
  */
 export function GlassBackdrop({ dark: forced }) {
-  const { width, height } = useWindowDimensions()
+  const [layout, setLayout] = useState(null)
   const { dark: themeDark } = useGlass()
   const dark = forced ?? themeDark
   const base = dark ? '#0b101e' : '#eef2fa'
@@ -179,25 +195,22 @@ export function GlassBackdrop({ dark: forced }) {
         { id: 'w3', cx: '20%', cy: '80%', r: '60%', color: '#34c759', opacity: 0.13 },
         { id: 'w4', cx: '85%', cy: '95%', r: '55%', color: '#ff9500', opacity: 0.12 },
       ]
-  // Bleed 120px beyond the parent on top/bottom: screens mount this inside a
-  // SafeAreaView, whose insets are padding — a plain absoluteFill would leave
-  // an unwashed strip under the status bar and home indicator.
-  const BLEED = 120
-  const h = height + BLEED * 2
   return (
     <View
-      style={{ position: 'absolute', top: -BLEED, left: 0, right: 0, height: h }}
+      style={[StyleSheet.absoluteFill, { backgroundColor: base }]}
       pointerEvents="none"
+      onLayout={(e) => setLayout(e.nativeEvent.layout)}
     >
-      <Svg width={width} height={h}>
-        <Defs>
-          {washes.map(w => <Wash key={w.id} {...w} />)}
-        </Defs>
-        <Rect x="0" y="0" width={width} height={h} fill={base} />
-        {washes.map(w => (
-          <Rect key={w.id} x="0" y="0" width={width} height={h} fill={`url(#${w.id})`} />
-        ))}
-      </Svg>
+      {layout && (
+        <Svg width={layout.width} height={layout.height}>
+          <Defs>
+            {washes.map(w => <Wash key={w.id} {...w} />)}
+          </Defs>
+          {washes.map(w => (
+            <Rect key={w.id} x="0" y="0" width={layout.width} height={layout.height} fill={`url(#${w.id})`} />
+          ))}
+        </Svg>
+      )}
     </View>
   )
 }

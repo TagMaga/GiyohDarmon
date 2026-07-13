@@ -39,8 +39,9 @@ export default function ProfileScreen() {
     : null
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
+    <View style={{ flex: 1, backgroundColor: T.base }}>
       <GlassBackdrop />
+      <SafeAreaView style={s.safe}>
       <StatusBar style={dark ? 'light' : 'dark'} />
       <ScrollView contentContainerStyle={s.content}>
         {/* Avatar block */}
@@ -81,7 +82,8 @@ export default function ProfileScreen() {
           <Text style={[s.logoutText, { color: T.red }]}>Выйти из аккаунта</Text>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   )
 }
 

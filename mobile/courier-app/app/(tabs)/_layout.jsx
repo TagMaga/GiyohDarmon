@@ -59,12 +59,13 @@ const styles = StyleSheet.create({
 })
 
 export default function TabsLayout() {
-  const { dark } = useGlass()
+  const { dark, T } = useGlass()
   const inactive = dark ? 'rgba(200,212,232,0.55)' : 'rgba(72,88,112,0.62)'
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        sceneStyle: { backgroundColor: T.base },
         tabBarActiveTintColor: BLUE,
         tabBarInactiveTintColor: inactive,
         // Floating liquid-glass pill: real blur over the content scrolling under it

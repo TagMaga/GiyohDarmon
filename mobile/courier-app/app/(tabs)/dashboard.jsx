@@ -8,7 +8,7 @@ import { OrderDetailSheet, C } from '../../src/components/OrderDetailSheet'
 import { OrderCard } from '../../src/components/OrderCard'
 import Avatar from '../../src/components/Avatar'
 import { FadeSlideIn, PressScale, CountUp, PulseDot, Skeleton, OrderCardSkeleton, animateLayout } from '../../src/components/motion'
-import { GlassBackdrop, Sheen, useGlass } from '../../src/components/glass'
+import { GlassBackdrop, Sheen, useGlass, glassElevation } from '../../src/components/glass'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 dayjs.locale('ru')
@@ -73,8 +73,9 @@ export default function DashboardScreen() {
   const collected = summary?.cash_to_handover || 0
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
+    <View style={{ flex: 1, backgroundColor: T.base }}>
       <GlassBackdrop />
+      <SafeAreaView style={s.safe}>
       <ScrollView
         style={{ flex: 1 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchAll() }} tintColor={C.blue} />}
@@ -201,6 +202,7 @@ export default function DashboardScreen() {
         </>
         )}
       </ScrollView>
+      </SafeAreaView>
 
       {/* Modern light bottom sheet — same component as Deliveries screen */}
       <OrderDetailSheet
@@ -211,7 +213,7 @@ export default function DashboardScreen() {
         actionLoading={actionLoading}
         onRefresh={fetchAll}
       />
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -232,15 +234,15 @@ const s = StyleSheet.create({
   heroMoney:  { fontSize: 52, fontWeight: '700', letterSpacing: -2, lineHeight: 56, color: '#fff' },
   heroParagraph: { marginTop: 12, fontSize: 15, color: 'rgba(255,255,255,0.82)', fontWeight: '700' },
   kpis:    { flexDirection: 'row', gap: 10, marginBottom: 24 },
-  kpi:     { flex: 1, backgroundColor: 'rgba(255,255,255,0.55)', borderRadius: 22, paddingVertical: 16, paddingHorizontal: 8, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)', shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 14, elevation: 2 },
+  kpi:     { flex: 1, backgroundColor: 'rgba(255,255,255,0.55)', borderRadius: 22, paddingVertical: 16, paddingHorizontal: 8, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)', shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 14, elevation: glassElevation(2) },
   kpiNum:  { fontSize: 28, fontWeight: '700', lineHeight: 34 },
   kpiLabel: { fontSize: 12, color: C.muted, fontWeight: '600', marginTop: 4 },
   sectionHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13, paddingHorizontal: 4 },
   sectionTitle: { fontSize: 22, fontWeight: '700', color: C.ink },
   link:    { fontSize: 15, fontWeight: '700', color: C.blue },
-  card:    { backgroundColor: C.card, borderRadius: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)', shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 18, elevation: 2 },
+  card:    { backgroundColor: C.card, borderRadius: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)', shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 18, elevation: glassElevation(2) },
   statusCard:  { flexDirection: 'row', alignItems: 'center', gap: 15, padding: 18 },
-  iconBox:     { width: 60, height: 60, borderRadius: 22, backgroundColor: 'rgba(10,132,255,0.12)', justifyContent: 'center', alignItems: 'center' },
+  iconBox:     { width: 60, height: 60, borderRadius: 22, backgroundColor: 'rgba(10,132,255,0.12)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   statusTitle: { fontSize: 19, fontWeight: '700', color: C.ink, marginBottom: 6 },
   statusSub:   { fontSize: 14, color: C.muted, fontWeight: '600' },
   errorCard:   { alignItems: 'center', padding: 28, gap: 8 },

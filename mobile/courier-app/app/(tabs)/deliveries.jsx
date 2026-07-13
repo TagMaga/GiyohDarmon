@@ -72,8 +72,9 @@ export default function DeliveriesScreen() {
   }
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
+    <View style={{ flex: 1, backgroundColor: T.base }}>
       <GlassBackdrop />
+      <SafeAreaView style={s.safe}>
       {/* Header */}
       <View style={s.header}>
         <View>
@@ -153,7 +154,8 @@ export default function DeliveriesScreen() {
         onRefresh={fetchOrders}
         initialStep={openStep}
       />
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   )
 }
 

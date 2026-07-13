@@ -7,7 +7,7 @@ import { resolveCreator } from '../../src/lib/creator'
 import { C } from '../../src/components/OrderDetailSheet'
 import Avatar from '../../src/components/Avatar'
 import { FadeSlideIn, PressScale, OrderCardSkeleton, animateLayout } from '../../src/components/motion'
-import { GlassBackdrop, Sheen, useGlass } from '../../src/components/glass'
+import { GlassBackdrop, Sheen, useGlass, glassElevation } from '../../src/components/glass'
 
 // Canonical DB value is "fast"; "express" kept as legacy fallback.
 // Defensive check across all possible field-name shapes from the API.
@@ -54,8 +54,9 @@ export default function ClaimableScreen() {
   const fmt = (n) => Number(n || 0).toLocaleString()
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
+    <View style={{ flex: 1, backgroundColor: T.base }}>
       <GlassBackdrop />
+      <SafeAreaView style={s.safe}>
       <View style={s.header}>
         <Text style={[s.headTitle, { color: T.ink }]}>Общий заказ</Text>
         <Text style={[s.headSub, { color: T.muted }]}>{orders.length} заказов рядом</Text>
@@ -154,7 +155,8 @@ export default function ClaimableScreen() {
             })
         }
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   )
 }
 
@@ -173,12 +175,12 @@ const s = StyleSheet.create({
     backgroundColor: C.card, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)',
     padding: 16, gap: 12,
     shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05, shadowRadius: 14, elevation: 2,
+    shadowOpacity: 0.05, shadowRadius: 14, elevation: glassElevation(2),
   },
   cardUrgent: {
     borderColor: C.orange, borderWidth: 2,
     shadowColor: C.orange, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
+    shadowOpacity: 0.28, shadowRadius: 16, elevation: glassElevation(6),
   },
   cardTop:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   topBadges:    { flexDirection: 'row', alignItems: 'center', gap: 6 },

@@ -9,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker'
 import { getCashSummary, submitHandover, getHandoverHistory, getMyOrders } from '../../src/api/orders'
 import client, { API_URL } from '../../src/api/client'
 import { FadeSlideIn, PressScale, CountUp, Skeleton, animateLayout } from '../../src/components/motion'
-import { GlassBackdrop, GlassFill, Sheen, useGlass } from '../../src/components/glass'
+import { GlassBackdrop, GlassFill, Sheen, useGlass, glassElevation } from '../../src/components/glass'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 dayjs.locale('ru')
@@ -199,8 +199,9 @@ export default function CashScreen() {
   const hasDiff = amtNum > 0
 
   return (
-    <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
+    <View style={{ flex: 1, backgroundColor: T.base }}>
       <GlassBackdrop />
+      <SafeAreaView style={s.safe}>
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData() }} tintColor={C.blue} />}
         contentContainerStyle={s.content}
@@ -375,6 +376,7 @@ export default function CashScreen() {
           </>
         }
       </ScrollView>
+      </SafeAreaView>
 
       {/* Handover bottom sheet */}
       <Modal visible={showHandover} animationType="slide" transparent statusBarTranslucent>
@@ -468,7 +470,7 @@ export default function CashScreen() {
           )}
         </Pressable>
       </Modal>
-    </SafeAreaView>
+    </View>
   )
 }
 
@@ -479,7 +481,7 @@ const s = StyleSheet.create({
   headTitle: { fontSize: 28, fontWeight: '700', color: C.ink, letterSpacing: -0.8 },
   headSub: { fontSize: 13, color: C.muted, fontWeight: '600', marginTop: 6 },
   // Cash hero
-  cashHero: { marginHorizontal: 18, backgroundColor: 'rgba(255,255,255,0.60)', borderWidth: 1, borderColor: 'rgba(255,149,0,0.30)', borderRadius: 32, padding: 24, marginBottom: 16, shadowColor: C.orange, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.08, shadowRadius: 34, elevation: 3, overflow: 'hidden' },
+  cashHero: { marginHorizontal: 18, backgroundColor: 'rgba(255,255,255,0.60)', borderWidth: 1, borderColor: 'rgba(255,149,0,0.30)', borderRadius: 32, padding: 24, marginBottom: 16, shadowColor: C.orange, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.08, shadowRadius: 34, elevation: glassElevation(3), overflow: 'hidden' },
   cashLabel: { fontSize: 13, color: '#c47c00', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   cashSum: { fontSize: 52, fontWeight: '700', letterSpacing: -2, color: C.orange, marginTop: 14, marginBottom: 16, lineHeight: 58 },
   formula: { backgroundColor: 'rgba(255,255,255,0.50)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', borderRadius: 22, padding: 15, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
@@ -497,7 +499,7 @@ const s = StyleSheet.create({
   // KPI cards (tab switcher)
   kpiRow:        { flexDirection: 'row', marginHorizontal: 18, gap: 12, marginBottom: 16 },
   kpiCard:       { flex: 1, backgroundColor: 'rgba(255,255,255,0.50)', borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.62)', padding: 16 },
-  kpiCardActive: { backgroundColor: 'rgba(255,255,255,0.72)', borderColor: C.blue, shadowColor: C.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: 3 },
+  kpiCardActive: { backgroundColor: 'rgba(255,255,255,0.72)', borderColor: C.blue, shadowColor: C.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: glassElevation(3) },
   kpiLabel:      { fontSize: 12, color: C.muted, fontWeight: '600', marginBottom: 6 },
   kpiValue:      { fontSize: 28, fontWeight: '700', color: C.ink, letterSpacing: -1 },
   kpiUnit:       { fontSize: 12, color: C.muted, fontWeight: '700', marginTop: 2 },
@@ -507,7 +509,7 @@ const s = StyleSheet.create({
   filterChipActive:   { backgroundColor: 'rgba(10,132,255,0.14)', borderColor: C.blue },
   filterChipText:     { fontSize: 13, fontWeight: '600', color: C.muted },
   filterChipTextActive: { color: C.blue },
-  histCard: { marginHorizontal: 18, backgroundColor: C.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)', borderRadius: 28, overflow: 'hidden', shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 18, elevation: 2 },
+  histCard: { marginHorizontal: 18, backgroundColor: C.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)', borderRadius: 28, overflow: 'hidden', shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 18, elevation: glassElevation(2) },
   cashItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderBottomWidth: 1, borderBottomColor: C.line },
   receipt: { width: 50, height: 62, borderRadius: 10, backgroundColor: '#f8f8f8' },
   cashItemTime: { fontSize: 12, color: C.muted, fontWeight: '600', marginBottom: 6 },

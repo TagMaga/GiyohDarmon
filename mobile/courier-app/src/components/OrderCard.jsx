@@ -6,7 +6,7 @@
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native'
 import { C, STATUS_LABEL, STATUS_COLOR } from './OrderDetailSheet'
 import { PressScale } from './motion'
-import { Sheen, useGlass } from './glass'
+import { Sheen, useGlass, glassElevation } from './glass'
 
 const isUrgent = (o) => {
   const m = String(o?.delivery_method ?? o?.DeliveryMethod ?? o?.deliveryMethod ?? '').toLowerCase()
@@ -102,12 +102,12 @@ const oc = StyleSheet.create({
     backgroundColor: C.card, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)',
     padding: 16, gap: 12,
     shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05, shadowRadius: 14, elevation: 2,
+    shadowOpacity: 0.05, shadowRadius: 14, elevation: glassElevation(2),
   },
   cardUrgent: {
     borderColor: C.orange, borderWidth: 2,
     shadowColor: C.orange, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
+    shadowOpacity: 0.28, shadowRadius: 16, elevation: glassElevation(6),
   },
   topRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   orderNum:  { fontSize: 15, fontWeight: '700', color: C.ink, letterSpacing: -0.2 },
