@@ -123,64 +123,67 @@ export default function OrdersFilters({
       </div>
 
       {/* ── Mobile pill row ──────────────────────────────────────────────── */}
-      <div className="md:hidden scrollbar-none flex flex-nowrap items-center gap-2 overflow-x-auto px-4 py-3">
-        <FilterChip
-          icon={<Search size={13} />}
-          active={Boolean(searchRaw.trim())}
-          onClick={() => setOpenSheet('search')}
-          onClear={() => setSearchRaw('')}
-          ariaExpanded={openSheet === 'search'}
-        >
-          {searchRaw.trim() || 'Поиск'}
-        </FilterChip>
-
-        <FilterChip
-          active={Boolean(filters.status)}
-          onClick={() => setOpenSheet('status')}
-          onClear={() => set('status', '')}
-          ariaExpanded={openSheet === 'status'}
-        >
-          {filters.status ? STATUS_LABELS[filters.status] : 'Статус'}
-        </FilterChip>
-
-        {teams.length > 0 && (
+      <div className="md:hidden">
+        <div className="scrollbar-none flex flex-nowrap items-center gap-2 overflow-x-auto px-4 py-3">
           <FilterChip
-            active={Boolean(filters.team_id)}
-            onClick={() => setOpenSheet('team')}
-            onClear={() => set('team_id', '')}
-            ariaExpanded={openSheet === 'team'}
+            icon={<Search size={13} />}
+            active={Boolean(searchRaw.trim())}
+            onClick={() => setOpenSheet(openSheet === 'search' ? null : 'search')}
+            onClear={() => setSearchRaw('')}
+            ariaExpanded={openSheet === 'search'}
           >
-            {activeTeam?.name ?? 'Команда'}
+            {searchRaw.trim() || 'Поиск'}
           </FilterChip>
-        )}
 
-        {sellers.length > 0 && (
           <FilterChip
-            active={Boolean(filters.seller_id)}
-            onClick={() => setOpenSheet('seller')}
-            onClear={() => set('seller_id', '')}
-            ariaExpanded={openSheet === 'seller'}
+            active={Boolean(filters.status)}
+            onClick={() => setOpenSheet('status')}
+            onClear={() => set('status', '')}
+            ariaExpanded={openSheet === 'status'}
           >
-            {activeSeller?.full_name ?? activeSeller?.FullName ?? 'Продавец'}
+            {filters.status ? STATUS_LABELS[filters.status] : 'Статус'}
           </FilterChip>
+
+          {teams.length > 0 && (
+            <FilterChip
+              active={Boolean(filters.team_id)}
+              onClick={() => setOpenSheet('team')}
+              onClear={() => set('team_id', '')}
+              ariaExpanded={openSheet === 'team'}
+            >
+              {activeTeam?.name ?? 'Команда'}
+            </FilterChip>
+          )}
+
+          {sellers.length > 0 && (
+            <FilterChip
+              active={Boolean(filters.seller_id)}
+              onClick={() => setOpenSheet('seller')}
+              onClear={() => set('seller_id', '')}
+              ariaExpanded={openSheet === 'seller'}
+            >
+              {activeSeller?.full_name ?? activeSeller?.FullName ?? 'Продавец'}
+            </FilterChip>
+          )}
+        </div>
+
+        {/* Inline search field — expands in place, no bottom sheet */}
+        {openSheet === 'search' && (
+          <div className="relative px-4 pb-3">
+            <Search size={14} className="absolute left-7 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              autoFocus
+              value={searchRaw}
+              onChange={e => setSearchRaw(e.target.value)}
+              placeholder="№ заказа, клиент, телефон…"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-[14px] font-medium text-slate-700 outline-none focus:border-indigo-300 focus:bg-white"
+            />
+          </div>
         )}
       </div>
 
       {/* ── Sheets ───────────────────────────────────────────────────────── */}
-      <BottomSheet open={openSheet === 'search'} onClose={() => setOpenSheet(null)} title="Поиск">
-        <div className="relative">
-          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            autoFocus
-            value={searchRaw}
-            onChange={e => setSearchRaw(e.target.value)}
-            placeholder="№ заказа, клиент, телефон…"
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-3 text-[14px] font-medium text-slate-700 outline-none focus:border-indigo-300 focus:bg-white"
-          />
-        </div>
-      </BottomSheet>
-
       <BottomSheet open={openSheet === 'status'} onClose={() => setOpenSheet(null)} title="Статус">
         <div className="space-y-0.5 pb-1">
           <PickerRow active={!filters.status} onClick={() => { set('status', ''); setOpenSheet(null) }}>Все статусы</PickerRow>
