@@ -16,7 +16,6 @@ megamall-crm/venv/
 megamall-crm/web-admin/node_modules/
 megamall-crm/web-admin/dist/
 mobile/courier-app/node_modules/
-package-lock.json
 
 # Uploads (runtime data)
 megamall-crm/uploads/

@@ -1,28 +1,127 @@
-name: Deploy to DigitalOcean
+name: Build and deploy production
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: production-deployment
+  group: megamall-production
   cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    environment: production
+    env:
+      FRONTEND_DIR: megamall-crm/web-admin
+      BACKEND_DIR: megamall-crm
 
     steps:
-      - name: Deploy MegaMall CRM
-        uses: appleboy/ssh-action@v1.2.5
+      - name: Check out the exact revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: 22
-          command_timeout: 12m
-          script: |
-            set -e
-            /var/www/megamall-crm/deploy.sh
+          node-version: 22
+          cache: npm
+          cache-dependency-path: megamall-crm/web-admin/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Build frontend
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run build
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: megamall-crm/go.mod
+          cache-dependency-path: megamall-crm/go.sum
+
+      - name: Compile all backend packages
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test -run '^$' ./...
+
+      - name: Run database-independent backend tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: |
+          go test \
+            ./internal/compensation \
+            ./internal/courier \
+            ./internal/finance \
+            ./internal/inventory \
+            ./internal/payouts \
+            ./internal/products \
+            ./internal/seed \
+            ./internal/uploads \
+            ./internal/users \
+            ./pkg/middleware
+
+      - name: Test deployment and rollback logic
+        run: bash scripts/test-deploy.sh
+
+      - name: Build Linux backend
+        working-directory: ${{ env.BACKEND_DIR }}
+        env:
+          CGO_ENABLED: 0
+          GOOS: linux
+          GOARCH: amd64
+        run: go build -trimpath -ldflags="-w -s" -o ../release/megamall-crm ./cmd/server
+
+      - name: Package immutable release
+        run: |
+          set -Eeuo pipefail
+          mkdir -p release/frontend
+          cp -a "$FRONTEND_DIR/dist/." release/frontend/
+          printf '%s\n' "$GITHUB_SHA" > release/REVISION
+          tar -C release -czf "megamall-$GITHUB_SHA.tar.gz" .
+          bash -n deploy.sh
+
+      - name: Configure verified SSH access
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$SERVER_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          printf '%s %s\n' "$SERVER_HOST" \
+            'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOyShTb8NPuH+bPPBFOjV0e/8PI+Tg0pXPbq/V3dlUmq' \
+            > "$HOME/.ssh/known_hosts"
+
+      - name: Upload release artifact
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          set -Eeuo pipefail
+          SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
+          scp "${SSH_ARGS[@]}" "megamall-$GITHUB_SHA.tar.gz" deploy.sh \
+            "$SERVER_USER@$SERVER_HOST:/tmp/"
+
+      - name: Deploy with automatic rollback
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          set -Eeuo pipefail
+          SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
+          ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" \
+            "bash /tmp/deploy.sh '$GITHUB_SHA' '/tmp/megamall-$GITHUB_SHA.tar.gz'"
+
+      - name: Verify public application path
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 \
+            --max-time 10 "http://$SERVER_HOST/api/v1/ready" >/dev/null
