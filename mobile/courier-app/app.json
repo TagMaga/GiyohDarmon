@@ -34,8 +34,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-asset",
-      "./plugins/withScopedCleartext"
+      "expo-asset"
     ],
     "scheme": "megamall-courier",
     "experiments": {
