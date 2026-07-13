@@ -21,6 +21,7 @@ jobs:
     env:
       FRONTEND_DIR: megamall-crm/web-admin
       BACKEND_DIR: megamall-crm
+      SERVER_USER: deploy
 
     steps:
       - name: Check out the exact revision
@@ -102,22 +103,20 @@ jobs:
       - name: Upload release artifact
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
           set -Eeuo pipefail
           SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
-          scp "${SSH_ARGS[@]}" "megamall-$GITHUB_SHA.tar.gz" deploy.sh \
+          scp "${SSH_ARGS[@]}" "megamall-$GITHUB_SHA.tar.gz" \
             "$SERVER_USER@$SERVER_HOST:/tmp/"
 
       - name: Deploy with automatic rollback
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          SERVER_USER: ${{ secrets.SERVER_USER }}
         run: |
           set -Eeuo pipefail
           SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
           ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" \
-            "bash /tmp/deploy.sh '$GITHUB_SHA' '/tmp/megamall-$GITHUB_SHA.tar.gz'"
+            "sudo --non-interactive /var/www/megamall-crm/deploy.sh '$GITHUB_SHA' '/tmp/megamall-$GITHUB_SHA.tar.gz'"
 
       - name: Verify public application path
         env:
