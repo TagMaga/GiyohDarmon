@@ -44,6 +44,8 @@ import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeC
 import Button              from '../../../shared/components/Button'
 import Alert               from '../../../shared/components/Alert'
 import Badge               from '../../../shared/components/Badge'
+import BottomSheet         from '../../../shared/components/BottomSheet'
+import FilterChip          from '../../../shared/components/FilterChip'
 import { useToast }        from '../../../shared/components/ToastProvider'
 import AssignTeamModal     from '../components/AssignTeamModal'
 import CreateEmployeeModal from '../components/CreateEmployeeModal'
@@ -1679,12 +1681,29 @@ function SelectBox({ label, value, onChange, mobileDisplay, children }) {
   )
 }
 
+function AuditPickerRow({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        'flex w-full items-center justify-between rounded-xl px-3.5 py-3 text-left text-[13.5px] font-semibold transition-colors',
+        active ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50',
+      ].join(' ')}
+    >
+      {children}
+      {active && <span className="h-2 w-2 flex-shrink-0 rounded-full bg-indigo-600" />}
+    </button>
+  )
+}
+
 function AuditJournal({ history = [], userMap = {} }) {
   const [query, setQuery] = useState('')
   const [fieldFilter, setFieldFilter] = useState('all')
   const [editorFilter, setEditorFilter] = useState('all')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const [openSheet, setOpenSheet] = useState(null) // null | 'search' | 'field' | 'author' | 'period'
 
   const fieldOptions = useMemo(() => {
     const fields = Array.from(new Set(history.map(item => item.field_name))).filter(Boolean).sort()
@@ -1726,7 +1745,8 @@ function AuditJournal({ history = [], userMap = {} }) {
 
   return (
     <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-      <div className="mb-2 grid gap-2 lg:grid-cols-[minmax(180px,1fr)_170px_170px_170px]">
+      {/* ── Desktop toolbar — unchanged ─────────────────────────────────── */}
+      <div className="mb-4 hidden gap-2 lg:grid lg:grid-cols-[minmax(180px,1fr)_170px_170px_170px]">
         <input
           value={query}
           onChange={e => setQuery(e.target.value)}
@@ -1760,12 +1780,96 @@ function AuditJournal({ history = [], userMap = {} }) {
           align="right"
         />
       </div>
-      <MobileDateRangeCalendar
-        className="mb-4 w-full md:hidden"
-        from={from}
-        to={to}
-        onChange={(range) => { setFrom(range.from); setTo(range.to) }}
-      />
+
+      {/* ── Mobile pill row ──────────────────────────────────────────────── */}
+      <div className="mb-4 scrollbar-none flex flex-nowrap items-center gap-2 overflow-x-auto lg:hidden">
+        <FilterChip
+          icon={<Search size={13} />}
+          active={Boolean(query.trim())}
+          onClick={() => setOpenSheet('search')}
+          onClear={() => setQuery('')}
+          ariaExpanded={openSheet === 'search'}
+        >
+          {query.trim() || 'Поиск'}
+        </FilterChip>
+
+        <FilterChip
+          active={fieldFilter !== 'all'}
+          onClick={() => setOpenSheet('field')}
+          onClear={() => setFieldFilter('all')}
+          ariaExpanded={openSheet === 'field'}
+        >
+          {fieldFilter === 'all' ? 'Поле' : (fieldOptions.find(o => o.field === fieldFilter)?.label ?? fieldFilter)}
+        </FilterChip>
+
+        <FilterChip
+          active={editorFilter !== 'all'}
+          onClick={() => setOpenSheet('author')}
+          onClear={() => setEditorFilter('all')}
+          ariaExpanded={openSheet === 'author'}
+        >
+          {editorFilter === 'all' ? 'Автор' : (editorOptions.find(o => o.id === editorFilter)?.label ?? editorFilter)}
+        </FilterChip>
+
+        <FilterChip
+          active={Boolean(from || to)}
+          onClick={() => setOpenSheet('period')}
+          onClear={() => { setFrom(''); setTo('') }}
+          ariaExpanded={openSheet === 'period'}
+          maxWidthClass="max-w-[220px]"
+        >
+          {from && to ? `${fmtDate(from)} – ${fmtDate(to)}` : 'Период'}
+        </FilterChip>
+      </div>
+
+      {/* ── Sheets ───────────────────────────────────────────────────────── */}
+      <BottomSheet open={openSheet === 'search'} onClose={() => setOpenSheet(null)} title="Поиск">
+        <input
+          autoFocus
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Сотрудник или изменение"
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 text-[14px] font-medium text-slate-700 outline-none focus:border-indigo-300 focus:bg-white"
+        />
+      </BottomSheet>
+
+      <BottomSheet open={openSheet === 'field'} onClose={() => setOpenSheet(null)} title="Поле">
+        <div className="space-y-0.5 pb-1">
+          <AuditPickerRow active={fieldFilter === 'all'} onClick={() => { setFieldFilter('all'); setOpenSheet(null) }}>Все поля</AuditPickerRow>
+          {fieldOptions.map(item => (
+            <AuditPickerRow key={item.field} active={fieldFilter === item.field} onClick={() => { setFieldFilter(item.field); setOpenSheet(null) }}>
+              {item.label}
+            </AuditPickerRow>
+          ))}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet open={openSheet === 'author'} onClose={() => setOpenSheet(null)} title="Автор">
+        <div className="space-y-0.5 pb-1">
+          <AuditPickerRow active={editorFilter === 'all'} onClick={() => { setEditorFilter('all'); setOpenSheet(null) }}>Все авторы</AuditPickerRow>
+          {editorOptions.map(item => (
+            <AuditPickerRow key={item.id} active={editorFilter === item.id} onClick={() => { setEditorFilter(item.id); setOpenSheet(null) }}>
+              {item.label}
+            </AuditPickerRow>
+          ))}
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={openSheet === 'period'}
+        onClose={() => setOpenSheet(null)}
+        title="Период"
+        footer={<Button variant="primary" fullWidth onClick={() => setOpenSheet(null)}>Готово</Button>}
+      >
+        <MobileDateRangeCalendar
+          from={from}
+          to={to}
+          onChange={(range) => {
+            setFrom(range.from); setTo(range.to)
+            if (range.from && range.to) setOpenSheet(null)
+          }}
+        />
+      </BottomSheet>
       <div className="divide-y divide-slate-100">
         {filteredHistory.map(item => (
           <div key={item.id} className="grid gap-2 py-3 sm:grid-cols-[170px_minmax(0,1fr)_180px] sm:items-center">

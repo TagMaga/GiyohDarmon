@@ -11,7 +11,7 @@ const IN_PROGRESS_STATUSES = new Set([
   'assigned', 'in_delivery',
 ])
 
-function KpiTile({ label, value, accent = 'default', loading }) {
+function KpiTile({ label, value, accent = 'default', loading, hideOnMobile = false }) {
   const accentMap = {
     default: 'bg-white border-slate-100',
     rose:    'bg-rose-50 border-rose-100',
@@ -25,9 +25,10 @@ function KpiTile({ label, value, accent = 'default', loading }) {
     rose:    'text-rose-500',
   }
   const cls = accentMap[accent] ?? accentMap.default
+  const display = hideOnMobile ? 'hidden sm:flex' : 'flex'
 
   return (
-    <div className={`rounded-2xl border px-4 py-4 flex flex-col gap-2 ${cls}`}>
+    <div className={`rounded-2xl border px-4 py-4 ${display} flex-col gap-2 ${cls}`}>
       <p className={`text-[10.5px] font-bold uppercase tracking-wide leading-tight ${labelColorMap[accent] ?? labelColorMap.default}`}>
         {label}
       </p>
@@ -44,7 +45,11 @@ export default function OrdersKpiBar({ orders = [], loading }) {
   if (loading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        {[1,2,3,4,5].map(i => <CardSkeleton key={i} />)}
+        {[1,2,3,4,5].map(i => (
+          <div key={i} className={i === 3 ? 'hidden sm:block' : ''}>
+            <CardSkeleton />
+          </div>
+        ))}
       </div>
     )
   }
@@ -59,7 +64,7 @@ export default function OrdersKpiBar({ orders = [], loading }) {
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
       <KpiTile label="Всего заказов"  value={total}       />
       <KpiTile label="Новые"          value={newCount}     />
-      <KpiTile label="В обработке"    value={inProgress}   />
+      <KpiTile label="В обработке"    value={inProgress}   hideOnMobile />
       <KpiTile label="Доставлено"     value={delivered}    />
       <KpiTile label="Отменено"       value={cancelled}    accent="rose" />
     </div>
