@@ -90,13 +90,6 @@ export const KEYS = {
   settings: {
     delivery: ['settings', 'delivery'],
   },
-  courier: {
-    me:          ['courier', 'me'],
-    myOrders:    ['courier', 'my-orders'],
-    available:   ['courier', 'available'],
-    cashSummary: ['courier', 'cash', 'summary'],
-    handovers:   ['courier', 'cash', 'handovers'],
-  },
   // ── Phase 15: Owner Finance Dashboard ─────────────────────────────────────
   finance: {
     summary:     (params) => ['finance', 'summary', params ?? {}],

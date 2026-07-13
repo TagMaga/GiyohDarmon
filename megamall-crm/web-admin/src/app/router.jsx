@@ -77,8 +77,8 @@ const WarehouseMovementsPage = lazy(() => import('../features/warehouse/pages/Wa
 const WarehouseReceivingPage = lazy(() => import('../features/warehouse/pages/WarehouseReceivingPage'))
 const WarehouseProfilePage   = lazy(() => import('../features/warehouse/pages/WarehouseProfilePage'))
 
-// Courier
-const CourierDashboard = lazy(() => import('../features/courier/pages/CourierDashboard'))
+// Courier — web panel removed; couriers use the mobile app (see docs).
+const CourierAppNotice = lazy(() => import('../shared/components/CourierAppNotice'))
 
 // ── Suspense wrapper — used at route element level ────────────────────────────
 function Lazy({ children }) {
@@ -278,15 +278,14 @@ const router = createBrowserRouter([
   },
 
   // ── Courier ─────────────────────────────────────────────────────────────
+  // Web fallback is retired — couriers use the mobile app exclusively.
+  // Login still succeeds normally; this just shows where to get the app
+  // instead of the old web dashboard.
   {
     element: <ProtectedRoute allowedRole="courier" />,
     children: [{
       path: '/courier',
-      element: <Layout />,
-      children: [
-        { index: true, element: <Lazy><CourierDashboard /></Lazy> },
-        { path: '*',   element: <Navigate to="/courier" replace /> },
-      ],
+      element: <Lazy><CourierAppNotice /></Lazy>,
     }],
   },
 
