@@ -1,0 +1,56 @@
+name: PR checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FRONTEND_DIR: megamall-crm/web-admin
+      BACKEND_DIR: megamall-crm
+
+    steps:
+      - name: Check out the PR revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: megamall-crm/web-admin/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Build frontend
+        working-directory: ${{ env.FRONTEND_DIR }}
+        run: npm run build
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: megamall-crm/go.mod
+          cache-dependency-path: megamall-crm/go.sum
+
+      - name: Compile all backend packages
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go build ./...
+
+      - name: Vet all backend packages
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go vet ./...
+
+      - name: Run users module tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test ./internal/users/...
