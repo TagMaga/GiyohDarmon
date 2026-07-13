@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Truck, UserCheck, Package, UserX, Flame, Banknote, Flag,
   ClipboardList, Wallet, Check, AlertTriangle, CalendarDays, ChevronDown, WifiOff, Search, Image as ImageIcon, X,
-  Pencil, DollarSign, Power, Plus, Phone, Send,
+  Pencil, DollarSign, Power, Plus, Phone, Send, Loader2,
 } from 'lucide-react'
 import { EditCourierModal, TariffsModal, ToggleOrderIntakeModal } from '../components/CourierManageModals'
 import useAuthStore   from '../../../shared/store/authStore'
@@ -248,7 +248,7 @@ export default function DispatcherBoardV3() {
     [toast],
   )
 
-  const { mutate: doConfirm } = useMutation({
+  const { mutate: doConfirm, isPending: isConfirming } = useMutation({
     mutationFn: (order) => confirmOrder(requiredOrderId(order)),
     onSuccess: () => { invalidate(); toast.success('Заказ подтверждён') },
     onError: onErr,
@@ -258,7 +258,7 @@ export default function DispatcherBoardV3() {
     onSuccess: () => { invalidate(); toast.success('Заказ переведён в возврат') },
     onError: onErr,
   })
-  const { mutate: doVerifyPrepayment } = useMutation({
+  const { mutate: doVerifyPrepayment, isPending: isVerifyingPrepayment } = useMutation({
     mutationFn: (order) => verifyPrepayment(requiredOrderId(order)),
     onSuccess: () => { invalidate(); toast.success('Предоплата подтверждена') },
     onError: onErr,
@@ -312,9 +312,9 @@ export default function DispatcherBoardV3() {
   }
 
   const handleAction = useCallback((action, order) => {
-    if (action === 'confirm') { doConfirm(order); return }
+    if (action === 'confirm') { if (!isConfirming) doConfirm(order); return }
     if (action === 'return') { doReturn(order); return }
-    if (action === 'verify_prepayment') { doVerifyPrepayment(order); return }
+    if (action === 'verify_prepayment') { if (!isVerifyingPrepayment) doVerifyPrepayment(order); return }
     if (action === 'reject_prepayment') { setActiveOrder(order); setModal('reject_prepayment'); return }
     const key = ACTION_MODAL[action]
     if (key) {
@@ -322,7 +322,7 @@ export default function DispatcherBoardV3() {
       setActiveOrder(order)
       setModal(key)
     }
-  }, [doConfirm, doReturn, doVerifyPrepayment, toast])
+  }, [doConfirm, doReturn, doVerifyPrepayment, isConfirming, isVerifyingPrepayment, toast])
 
   const handleRefresh = useCallback(async () => {
     await Promise.all([board.refetch(), news.refetch(), issues.refetch(), delivered.refetch(), couriers.refetch(), handovers.refetch(), cashSettlement.refetch(), cashTransactions.refetch(), orderHistory.refetch()])
@@ -369,14 +369,14 @@ export default function DispatcherBoardV3() {
       if (e.key === 'Enter' && selectedOrder) {
         e.preventDefault()
         if (pendingCourierId) { quickAssign(); return }
-        if (selectedOrder.status === 'new') doConfirm(selectedOrder)
+        if (selectedOrder.status === 'new' && !isConfirming) doConfirm(selectedOrder)
         return
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paletteOpen, modal, handleRefresh, selectedOrder, pendingCourierId, grouped])
+  }, [paletteOpen, modal, handleRefresh, selectedOrder, pendingCourierId, grouped, isConfirming])
 
   useEffect(() => {
     window.localStorage.setItem('dispatch-v3-theme', theme)
@@ -510,6 +510,7 @@ export default function DispatcherBoardV3() {
                   selectedOrder={selectedOrder}
                   onSelect={setSelectedOrder}
                   onAction={handleAction}
+                  isConfirming={isConfirming}
                 />
               ))}
             </div>
@@ -520,6 +521,7 @@ export default function DispatcherBoardV3() {
               pendingCourierId={pendingCourierId}
               pendingCourierName={pendingCourierName}
               isMutating={isMutating}
+              isConfirming={isConfirming}
               onAssign={quickAssign}
               onClearPending={() => setPendingCourierId(null)}
               onConfirm={() => selectedOrder && doConfirm(selectedOrder)}
@@ -554,6 +556,7 @@ export default function DispatcherBoardV3() {
                       selected={selectedOrder && getOrderId(selectedOrder) === getOrderId(order)}
                       onSelect={setSelectedOrder}
                       onAction={handleAction}
+                      isConfirming={isConfirming}
                     />
                   ))
                 )}
@@ -567,6 +570,8 @@ export default function DispatcherBoardV3() {
               courierMap={courierMap}
               onClose={() => setSelectedOrder(null)}
               onAction={handleAction}
+              isConfirming={isConfirming}
+              isVerifyingPrepayment={isVerifyingPrepayment}
             />
           </section>
         )}
@@ -817,7 +822,7 @@ function CourierCard({ courier, selected, pending, hasSelectedOrder, onSelect })
 }
 
 // V3: Sticky action bar at bottom of kanban board
-function StickyActionBar({ order, pendingCourierId, pendingCourierName, isMutating, onAssign, onClearPending, onConfirm, onAction }) {
+function StickyActionBar({ order, pendingCourierId, pendingCourierName, isMutating, isConfirming, onAssign, onClearPending, onConfirm, onAction }) {
   if (!order) return null
 
   const status = order.status
@@ -870,16 +875,17 @@ function StickyActionBar({ order, pendingCourierId, pendingCourierName, isMutati
         <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text3)' }}>← клик на курьера для назначения</span>
       </div>
       <button
+        disabled={primaryAction.key === 'confirm' && isConfirming}
         onClick={() => onAction(primaryAction.key)}
-        style={{ fontSize: 12, fontWeight: 600, padding: '6px 16px', borderRadius: 8, background: 'rgba(59,130,246,0.18)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', cursor: 'pointer' }}
+        style={{ fontSize: 12, fontWeight: 600, padding: '6px 16px', borderRadius: 8, background: 'rgba(59,130,246,0.18)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.3)', cursor: primaryAction.key === 'confirm' && isConfirming ? 'default' : 'pointer', opacity: primaryAction.key === 'confirm' && isConfirming ? 0.6 : 1 }}
       >
-        {primaryAction.label}
+        {primaryAction.key === 'confirm' && isConfirming ? '...' : primaryAction.label}
       </button>
     </div>
   )
 }
 
-function Column({ col, orders, loading, customerMap, courierMap, selectedOrder, onSelect, onAction }) {
+function Column({ col, orders, loading, customerMap, courierMap, selectedOrder, onSelect, onAction, isConfirming }) {
   return (
     <section className="dv2-col" style={{ '--col-color': col.color }}>
       <div className="dv2-col-head">
@@ -901,6 +907,7 @@ function Column({ col, orders, loading, customerMap, courierMap, selectedOrder, 
               selected={selectedOrder && getOrderId(selectedOrder) === getOrderId(order)}
               onSelect={onSelect}
               onAction={onAction}
+              isConfirming={isConfirming}
             />
           ))
         )}
@@ -909,7 +916,7 @@ function Column({ col, orders, loading, customerMap, courierMap, selectedOrder, 
   )
 }
 
-function OrderCard({ order, customerMap, courierMap, selected, onSelect, onAction }) {
+function OrderCard({ order, customerMap, courierMap, selected, onSelect, onAction, isConfirming }) {
   const customer = resolveCustomer(order, customerMap)
   const courierDisp = resolveCourierDisplay(order, courierMap)
   const address = resolveAddress(order) || customer?.address || resolveCity(order) || customer?.city || '—'
@@ -952,7 +959,16 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
         <div className="dv2-oc-courier"><span className="dv2-oc-dot" /><span>{courierDisp.name || 'Без курьера'}</span></div>
       </div>
       <div className="dv2-oc-actions" onClick={(e) => e.stopPropagation()}>
-        {order.status === 'new' && <button className="dv2-oc-action" aria-label="Подтвердить" onClick={() => onAction('confirm', order)}><Check size={15} /></button>}
+        {order.status === 'new' && (
+          <button
+            className="dv2-oc-action"
+            aria-label="Подтвердить"
+            disabled={isConfirming}
+            onClick={() => onAction('confirm', order)}
+          >
+            {isConfirming ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+          </button>
+        )}
         {order.status === 'confirmed' && <button className="dv2-oc-action" aria-label="Назначить курьера" onClick={() => onAction('assign', order)}><Truck size={15} /></button>}
         {!['delivered', 'cancelled'].includes(order.status) && <button className="dv2-oc-action" aria-label="Проблема" onClick={() => onAction('issue', order)}><AlertTriangle size={15} /></button>}
       </div>
