@@ -726,6 +726,8 @@ func (r *Repository) GetDailyRevenue(
 
 // GetSellerPerformance returns top sellers ranked by total_revenue for [from, to].
 // Only orders that transitioned to 'delivered' in the period are counted.
+// house_order rows are excluded — they're owner-created with no real seller
+// attribution (seller_id is the owner's own account) and would skew rankings.
 func (r *Repository) GetSellerPerformance(
 	ctx context.Context,
 	from, to time.Time,
@@ -744,6 +746,7 @@ func (r *Repository) GetSellerPerformance(
 			FROM orders o
 			JOIN order_timeline tl ON tl.order_id = o.id
 			WHERE o.deleted_at  IS NULL
+			  AND o.order_type  != 'house_order'
 			  AND tl.to_status  = 'delivered'
 			  AND tl.created_at >= ?
 			  AND tl.created_at <= ?

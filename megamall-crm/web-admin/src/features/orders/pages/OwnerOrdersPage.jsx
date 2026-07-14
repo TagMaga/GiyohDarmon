@@ -15,8 +15,9 @@
  *   - userMap / teamMap built from /employees and /teams (cached globally).
  *
  * The order list/workflow itself stays read-only (no status edits/deletes
- * from this page) — the one write action is creating a new order, always
- * attributed to a seller the owner explicitly selects (see /owner/orders/create).
+ * from this page) — the one write action is creating a new order (see
+ * /owner/orders/create). Owner-created orders are "house orders": no
+ * seller/team attribution, no commission paid to anyone.
  */
 import { useState, useMemo }  from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
