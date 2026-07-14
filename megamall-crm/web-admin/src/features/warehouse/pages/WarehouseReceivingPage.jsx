@@ -30,7 +30,7 @@ export default function WarehouseReceivingPage() {
           </div>
         }
       />
-      <MovementList rows={rows} data={data} emptyTitle="Операций пока нет" showEntryActions onlyLatestEntryEditable />
+      <MovementList rows={rows} data={data} emptyTitle="Операций пока нет" showEntryActions />
       <ReceivingModal open={receivingOpen} onClose={() => setReceivingOpen(false)} products={data.products} inventory={data.inventory} />
       <WriteoffModal open={writeoffOpen} onClose={() => setWriteoffOpen(false)} products={data.products} inventory={data.inventory} />
     </div>

@@ -74,10 +74,9 @@ export default function WarehouseMovementsPage() {
   )
 }
 
-export function MovementList({ rows, data, emptyTitle = 'Движения не найдены', showEntryActions = false, onlyLatestEntryEditable = false }) {
+export function MovementList({ rows, data, emptyTitle = 'Движения не найдены', showEntryActions = false }) {
   const [detailMovement, setDetailMovement] = useState(null)
   const [editReceiving, setEditReceiving] = useState(null)
-  const latestEditableId = onlyLatestEntryEditable ? getId(rows.find(canEditMovement)) : null
   if (!rows.length) return <EmptyState icon={<ArrowLeftRight size={22} />} title={emptyTitle} description="Измените фильтры или выполните складскую операцию." />
   return (
     <>
@@ -97,18 +96,18 @@ export function MovementList({ rows, data, emptyTitle = 'Движения не �
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rows.map((m) => <MovementRow key={getId(m)} m={m} data={data} onOpen={setDetailMovement} onEdit={setEditReceiving} showActions={showEntryActions} latestEditableId={latestEditableId} />)}
+            {rows.map((m) => <MovementRow key={getId(m)} m={m} data={data} onOpen={setDetailMovement} onEdit={setEditReceiving} showActions={showEntryActions} />)}
           </tbody>
         </table>
       </div>
       <div className="space-y-3 lg:hidden">
-        {rows.map((m) => <MovementCard key={getId(m)} m={m} data={data} onOpen={setDetailMovement} onEdit={setEditReceiving} showActions={showEntryActions} latestEditableId={latestEditableId} />)}
+        {rows.map((m) => <MovementCard key={getId(m)} m={m} data={data} onOpen={setDetailMovement} onEdit={setEditReceiving} showActions={showEntryActions} />)}
       </div>
       <MovementDetailModal
         movement={detailMovement}
         product={detailMovement ? data.productMap[detailMovement.product_id ?? detailMovement.ProductID] : null}
         onClose={() => setDetailMovement(null)}
-        canEdit={showEntryActions && canEditMovement(detailMovement) && (!latestEditableId || getId(detailMovement) === latestEditableId)}
+        canEdit={showEntryActions && canEditMovement(detailMovement)}
         onEditReceiving={(movement) => {
           setDetailMovement(null)
           setEditReceiving(movement)
@@ -158,8 +157,8 @@ function ProductThumb({ product }) {
   )
 }
 
-function MovementActions({ m, onEdit, latestEditableId }) {
-  if (!canEditMovement(m) || (latestEditableId && getId(m) !== latestEditableId)) return null
+function MovementActions({ m, onEdit }) {
+  if (!canEditMovement(m)) return null
   return (
     <div className="flex justify-end gap-1.5">
       <Button size="sm" variant="secondary" icon={<Pencil size={13} />} onClick={(e) => { e.stopPropagation(); onEdit(m) }}>Изменить</Button>
@@ -167,7 +166,7 @@ function MovementActions({ m, onEdit, latestEditableId }) {
   )
 }
 
-function MovementRow({ m, data, onOpen, onEdit, showActions, latestEditableId }) {
+function MovementRow({ m, data, onOpen, onEdit, showActions }) {
   const type = getMovementType(m)
   const product = data.productMap[m.product_id ?? m.ProductID]
   return (
@@ -190,12 +189,12 @@ function MovementRow({ m, data, onOpen, onEdit, showActions, latestEditableId })
       <td className="max-w-[220px] px-3 py-2.5 text-xs text-slate-500">
         <MovementReason m={m} className="truncate" />
       </td>
-      {showActions && <td className="px-3 py-2.5 text-right"><MovementActions m={m} onEdit={onEdit} latestEditableId={latestEditableId} /></td>}
+      {showActions && <td className="px-3 py-2.5 text-right"><MovementActions m={m} onEdit={onEdit} /></td>}
     </tr>
   )
 }
 
-function MovementCard({ m, data, onOpen, onEdit, showActions, latestEditableId }) {
+function MovementCard({ m, data, onOpen, onEdit, showActions }) {
   const type = getMovementType(m)
   const product = data.productMap[m.product_id ?? m.ProductID]
   return (
@@ -217,7 +216,7 @@ function MovementCard({ m, data, onOpen, onEdit, showActions, latestEditableId }
       <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
         <MovementReason m={m} />
       </div>
-      {showActions && canEditMovement(m) && (!latestEditableId || getId(m) === latestEditableId) && (
+      {showActions && canEditMovement(m) && (
         <div className="mt-3 flex gap-2">
           <Button size="sm" variant="secondary" icon={<Pencil size={13} />} onClick={(e) => { e.stopPropagation(); onEdit(m) }}>Изменить</Button>
         </div>
