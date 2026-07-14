@@ -12,20 +12,20 @@ import { resolveCustomer, resolveAddress, resolveCity } from '../utils/resolveCu
 import { resolveCourier, resolveCourierDisplay, formatOrderLabel, getCourierId } from '../utils/orderHelpers'
 import { fetchOrderDetail, fetchOrderTimeline, fetchOrderPrepayments, fetchComments, addComment } from '../api'
 
-/* ── Design tokens (dark CRM) ──────────────────────────────────────── */
-const BG      = '#0a111e'
-const PANEL   = '#0d1525'
-const CARD    = '#111d30'
-const BORDER  = 'rgba(255,255,255,0.07)'
-const BORDER2 = 'rgba(255,255,255,0.04)'
-const TEXT1   = 'rgba(255,255,255,0.90)'
-const TEXT2   = 'rgba(255,255,255,0.55)'
-const TEXT3   = 'rgba(255,255,255,0.28)'
-const BLUE    = '#3b82f6'
-const GREEN   = '#10b981'
-const AMBER   = '#f59e0b'
-const RED     = '#ef4444'
-const VIOLET  = '#8b5cf6'
+/* ── Design tokens (warm light — matches dispatcher board) ───────────── */
+const BG      = '#FFFFFF'
+const PANEL   = '#FFFFFF'
+const CARD    = '#FBFAF7'
+const BORDER  = '#EAE8E2'
+const BORDER2 = '#F0EFEA'
+const TEXT1   = '#1C1C1A'
+const TEXT2   = '#76766E'
+const TEXT3   = '#A3A39A'
+const BLUE    = '#0369A1'
+const GREEN   = '#047857'
+const AMBER   = '#B45309'
+const RED     = '#BE123C'
+const VIOLET  = '#4338CA'
 
 const STATUS_LABELS = {
   new: 'Новый', confirmed: 'Подтверждён', assigned: 'Назначен',
@@ -148,7 +148,7 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
       >
         {/* Mobile drag handle */}
         <div className="flex-shrink-0 flex justify-center pt-2.5 pb-1 sm:hidden">
-          <div className="w-10 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.12)' }} />
+          <div className="w-10 h-1 rounded-full" style={{ background: BORDER2 }} />
         </div>
 
         {/* ── HEADER: ID · Status · Express · Total · Date · Close ──── */}
@@ -175,7 +175,7 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
             onClick={onClose}
             className="p-1.5 rounded-lg transition-colors flex-shrink-0"
             style={{ color: TEXT3 }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+            onMouseEnter={e => e.currentTarget.style.background = '#F0EFEA'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             aria-label="Закрыть"
           >
@@ -413,7 +413,7 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
                           </div>
                         )}
                         <div className="absolute bottom-1 left-1">
-                          <span className="text-[8px] px-1 py-0.5 rounded" style={{ background: 'rgba(0,0,0,0.65)', color: TEXT2 }}>
+                          <span className="text-[8px] px-1 py-0.5 rounded" style={{ background: 'rgba(0,0,0,0.65)', color: 'rgba(255,255,255,0.85)' }}>
                             {att.type === 'payment_proof' ? 'Оплата' : att.type === 'customer_chat' ? 'Чат' : 'Файл'}
                           </span>
                         </div>
@@ -546,7 +546,7 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
                   onClick={() => onAction(a.key, order)}
                   className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-colors"
                   style={{ border: `1px solid ${BORDER}`, color: TEXT2 }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                  onMouseEnter={e => e.currentTarget.style.background = '#F0EFEA'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
                   {a.label}
@@ -591,7 +591,7 @@ function CollapsibleSection({ title, icon, children, defaultCollapsed = false })
       <button
         onClick={() => setCollapsed(c => !c)}
         className="w-full flex items-center gap-1.5 px-4 pt-3 pb-3 transition-colors"
-        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+        onMouseEnter={e => e.currentTarget.style.background = '#F7F6F2'}
         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
       >
         <span style={{ color: TEXT3 }}>{icon}</span>
@@ -674,7 +674,7 @@ function CommentsSection({ orderId, open }) {
           className="self-end flex items-center justify-center rounded-xl transition-opacity"
           style={{
             width: 36, height: 36, flexShrink: 0,
-            background: text.trim() ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(255,255,255,0.05)',
+            background: text.trim() ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : '#F0EFEA',
             color: text.trim() ? '#fff' : TEXT3,
             opacity: sending ? 0.6 : 1,
           }}
@@ -691,7 +691,7 @@ function Skeleton({ lines = 3 }) {
   return (
     <div className="space-y-2 py-1">
       {Array.from({ length: lines }).map((_, i) => (
-        <div key={i} className="h-3 rounded animate-pulse" style={{ background: 'rgba(255,255,255,0.06)', width: `${60 + (i % 3) * 15}%` }} />
+        <div key={i} className="h-3 rounded animate-pulse" style={{ background: '#F0EFEA', width: `${60 + (i % 3) * 15}%` }} />
       ))}
     </div>
   )

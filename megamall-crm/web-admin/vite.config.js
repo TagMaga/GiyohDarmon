@@ -65,7 +65,7 @@ export default defineConfig({
             './src/features/seller/pages/SellerIncomePage.jsx',
           ],
           'feature-dispatcher': [
-            './src/features/dispatcher/pages/DispatcherBoard.jsx',
+            './src/features/dispatcher/pages/DispatcherBoardV3.jsx',
           ],
           'feature-warehouse': [
             './src/features/warehouse/pages/WarehouseDashboard.jsx',
