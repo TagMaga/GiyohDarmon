@@ -1,23 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Phone, UserCheck, UserPlus } from 'lucide-react'
+import { PHONE_COUNTRIES as COUNTRIES, detectPhoneCountry as detectCountry, isValidPhone } from '../../../shared/components/PhoneInput'
 
-const COUNTRIES = [
-  { code: 'TJ', dial: '+992', digits: 9, flag: '🇹🇯', placeholder: '90 000 0000' },
-  { code: 'RU', dial: '+7', digits: 10, flag: '🇷🇺', placeholder: '912 345 67 89' },
-]
-
-// Detects country + national number from a phone string regardless of spacing/plus sign.
-function detectCountry(phone) {
-  const digits = (phone ?? '').replace(/\D/g, '')
-  if (digits.startsWith('992')) return { country: COUNTRIES[0], national: digits.slice(3) }
-  if (digits.startsWith('7')) return { country: COUNTRIES[1], national: digits.slice(1) }
-  return null
-}
-
-export function isValidPhone(phone) {
-  const detected = detectCountry(phone)
-  return !!detected && detected.national.length === detected.country.digits
-}
+export { isValidPhone }
 
 /**
  * PhoneSearchField — phone input that searches existing customers.

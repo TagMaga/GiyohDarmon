@@ -5,6 +5,7 @@ import Alert   from '../../../shared/components/Alert'
 import Modal   from '../../../shared/components/Modal'
 import DateInput     from '../../../shared/components/DateInput'
 import PasswordInput from '../../../shared/components/PasswordInput'
+import PhoneInput    from '../../../shared/components/PhoneInput'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS }     from '../../../shared/queryKeys'
 import { createEmployee } from '../api'
@@ -72,7 +73,7 @@ export default function CreateEmployeeModal({ open, onClose }) {
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div><label className="input-label">Телефон *</label>
-            <input value={phone} onChange={e => setPhone(e.target.value)} className="input mt-1" placeholder="+996 700 000000" />
+            <PhoneInput value={phone} onChange={setPhone} className="mt-1" />
           </div>
           <div><label className="input-label">Полное имя *</label>
             <input value={fullName} onChange={e => setFullName(e.target.value)} className="input mt-1" placeholder="Иван Иванов" />
