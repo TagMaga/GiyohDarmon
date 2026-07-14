@@ -5,8 +5,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Search, X } from 'lucide-react'
 import { STATUS_LABELS } from '../../../shared/orderStatusConfig'
-import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import PeriodRangeFilter from '../../../shared/components/PeriodRangeFilter'
 
 const ALL_STATUSES = Object.entries(STATUS_LABELS)
 
@@ -52,19 +51,13 @@ export default function TeamOrdersFilters({ filters, onChange, sellers = [] }) {
             </button>
           )}
         </div>
-        <DesktopDateRangePicker
+        <PeriodRangeFilter
           from={filters.from ?? ''}
           to={filters.to ?? ''}
           onChange={(range) => onChange({ ...filters, from: range.from, to: range.to, page: 1 })}
           align="right"
         />
       </div>
-      <MobileDateRangeCalendar
-        className="w-full md:hidden"
-        from={filters.from ?? ''}
-        to={filters.to ?? ''}
-        onChange={(range) => onChange({ ...filters, from: range.from, to: range.to, page: 1 })}
-      />
 
       <div className="flex flex-wrap gap-3">
         <select value={filters.status ?? ''} onChange={e => set('status', e.target.value)} className="input flex-1 min-w-[140px]">

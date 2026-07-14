@@ -16,8 +16,7 @@ import { useHandovers, useUpdateHandover, useDeleteHandover } from '../hooks/use
 import useLogisticsCouriers from '../hooks/useLogisticsCouriers'
 import Badge   from '../../../shared/components/Badge'
 import Modal   from '../../../shared/components/Modal'
-import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import PeriodRangeFilter from '../../../shared/components/PeriodRangeFilter'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -462,19 +461,13 @@ export default function CashHandoversPage({ courierId } = {}) {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Date range */}
-        <DesktopDateRangePicker
+        <PeriodRangeFilter
           from={fromDate}
           to={toDate}
           onChange={(range) => { setFromDate(range.from); setToDate(range.to); setPage(1) }}
           align="right"
         />
       </div>
-      <MobileDateRangeCalendar
-        className="w-full md:hidden"
-        from={fromDate}
-        to={toDate}
-        onChange={(range) => { setFromDate(range.from); setToDate(range.to); setPage(1) }}
-      />
 
       {/* Table */}
       <div className="card overflow-hidden">
