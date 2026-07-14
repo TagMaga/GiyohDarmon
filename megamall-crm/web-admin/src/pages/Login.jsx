@@ -4,6 +4,7 @@ import { jwtDecode } from 'jwt-decode'
 import { ShoppingBag, AlertCircle, Loader2 } from 'lucide-react'
 import { login } from '../shared/api/auth'
 import useAuthStore from '../shared/store/authStore'
+import { queryClient } from '../shared/queryClient'
 import PasswordInput from '../shared/components/PasswordInput'
 import { ROLE_HOME } from '../app/router'
 
@@ -56,6 +57,9 @@ export default function Login() {
         return
       }
 
+      // Purge any cached query data from a previous account on this tab
+      // before the new account's pages mount and start fetching.
+      queryClient.clear()
       setAuth(access_token, refresh_token, decodedRole, phone.trim())
       navigate(ROLE_HOME[decodedRole] ?? '/', { replace: true })
     } catch (err) {
