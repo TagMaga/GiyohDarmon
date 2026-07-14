@@ -219,6 +219,16 @@ func main() {
 		compensationSvc,
 		activityLogger,
 		db,
+		func(ctx context.Context, id uuid.UUID) (*orders.SellerLookupResult, error) {
+			u, err := userRepo.GetByID(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			if u == nil {
+				return nil, nil
+			}
+			return &orders.SellerLookupResult{IsActive: u.IsActive, Role: string(u.Role)}, nil
+		},
 	)
 	orderHandler := orders.NewHandler(orderSvc)
 

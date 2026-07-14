@@ -14,11 +14,13 @@
  *     If backend supports it, we use the summary. Otherwise derive client-side.
  *   - userMap / teamMap built from /employees and /teams (cached globally).
  *
- * No write actions — owner view is fully read-only for order workflow.
+ * The order list/workflow itself stays read-only (no status edits/deletes
+ * from this page) — the one write action is creating a new order, always
+ * attributed to a seller the owner explicitly selects (see /owner/orders/create).
  */
 import { useState, useMemo }  from 'react'
-import { useSearchParams }    from 'react-router-dom'
-import { RefreshCw } from 'lucide-react'
+import { useSearchParams, Link } from 'react-router-dom'
+import { RefreshCw, Plus } from 'lucide-react'
 
 import Alert from '../../../shared/components/Alert'
 import useOwnerOrders              from '../hooks/useOwnerOrders'
@@ -140,6 +142,13 @@ export default function OwnerOrdersPage() {
             <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
             <span className="hidden sm:inline">Обновить</span>
           </button>
+          <Link
+            to="/owner/orders/create"
+            className="flex items-center gap-2 px-3 py-2 rounded-[10px] text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-all min-h-[44px] flex-shrink-0"
+          >
+            <Plus size={14} />
+            <span>Создать заказ</span>
+          </Link>
         </div>
       </div>
 

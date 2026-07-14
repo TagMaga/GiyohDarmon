@@ -30,15 +30,29 @@ import (
 	"gorm.io/gorm"
 )
 
+// SellerLookupResult is the cross-module view of a candidate seller, used to
+// validate an owner-supplied seller_id without injecting the whole users
+// repository.
+type SellerLookupResult struct {
+	IsActive bool
+	Role     string
+}
+
+// SellerLookupFn is an injected dependency to look up a user's active status
+// and role across the module boundary, for owner-order seller validation.
+// Returns (nil, nil) if no such user exists.
+type SellerLookupFn func(ctx context.Context, id uuid.UUID) (*SellerLookupResult, error)
+
 // Service encapsulates all order business logic.
 type Service struct {
-	repo     *Repository
-	invRepo  *inventory.Repository
-	hierRepo *hierarchy.Repository
-	teamRepo *teams.Repository
-	compSvc  *compensation.Service
-	logger   *activity.Logger
-	db       *gorm.DB
+	repo         *Repository
+	invRepo      *inventory.Repository
+	hierRepo     *hierarchy.Repository
+	teamRepo     *teams.Repository
+	compSvc      *compensation.Service
+	logger       *activity.Logger
+	db           *gorm.DB
+	sellerLookup SellerLookupFn
 }
 
 // NewService wires up the order service and its dependencies.
@@ -50,15 +64,17 @@ func NewService(
 	compSvc *compensation.Service,
 	logger *activity.Logger,
 	db *gorm.DB,
+	sellerLookup SellerLookupFn,
 ) *Service {
 	return &Service{
-		repo:     repo,
-		invRepo:  invRepo,
-		hierRepo: hierRepo,
-		teamRepo: teamRepo,
-		compSvc:  compSvc,
-		logger:   logger,
-		db:       db,
+		repo:         repo,
+		invRepo:      invRepo,
+		hierRepo:     hierRepo,
+		teamRepo:     teamRepo,
+		compSvc:      compSvc,
+		logger:       logger,
+		db:           db,
+		sellerLookup: sellerLookup,
 	}
 }
 
@@ -210,9 +226,41 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		return nil, apperrors.BadRequest("dispatcher must supply seller_id when creating an office order")
 	}
 
-	// Effective seller: for dispatcher it's the supplied seller_id; for everyone else it's themselves.
+	// Owner must supply a validated seller_id + team_id — there is no
+	// owner-personal-order fallback. The order must always be attributed to a
+	// real, active seller who belongs to the chosen team.
+	if actorRole == "owner" {
+		if req.SellerID == nil || *req.SellerID == uuid.Nil {
+			return nil, apperrors.BadRequest("owner must supply seller_id when creating an order")
+		}
+		if req.TeamID == nil || *req.TeamID == uuid.Nil {
+			return nil, apperrors.BadRequest("owner must supply team_id when creating an order")
+		}
+		seller, err := s.sellerLookup(ctx, *req.SellerID)
+		if err != nil {
+			return nil, fmt.Errorf("lookup seller: %w", err)
+		}
+		if seller == nil {
+			return nil, apperrors.BadRequest("seller not found")
+		}
+		if !seller.IsActive {
+			return nil, apperrors.BadRequest("seller is inactive")
+		}
+		if seller.Role != "seller" {
+			return nil, apperrors.BadRequest("selected user is not a seller")
+		}
+		sellerHier, err := s.hierRepo.GetByUserID(ctx, *req.SellerID)
+		if err != nil {
+			return nil, fmt.Errorf("resolve seller team: %w", err)
+		}
+		if sellerHier == nil || sellerHier.TeamID == nil || *sellerHier.TeamID != *req.TeamID {
+			return nil, apperrors.BadRequest("seller does not belong to the selected team")
+		}
+	}
+
+	// Effective seller: for dispatcher/owner it's the supplied seller_id; for everyone else it's themselves.
 	effectiveSellerID := actorID
-	if actorRole == "dispatcher" && req.SellerID != nil && *req.SellerID != uuid.Nil {
+	if (actorRole == "dispatcher" || actorRole == "owner") && req.SellerID != nil && *req.SellerID != uuid.Nil {
 		effectiveSellerID = *req.SellerID
 	}
 
@@ -1525,7 +1573,11 @@ func (s *Service) validateOrderTypeForRole(role string, ot OrderType) error {
 			return apperrors.Forbidden("sales team leads can only create team_lead_personal_order")
 		}
 	case "owner":
-		// owner may create any type
+		// owner always creates on behalf of a validated seller — same as a
+		// dispatcher office order, never a personal owner order.
+		if ot != OrderTypeSeller {
+			return apperrors.Forbidden("owner can only create seller_order (on behalf of a seller)")
+		}
 	case "dispatcher":
 		// dispatcher creates office orders on behalf of a seller
 		if ot != OrderTypeSeller {

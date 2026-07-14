@@ -84,7 +84,19 @@ func main() {
 
 	loc := cfg.Server.Location()
 	orderRepo := orders.NewRepository(db, loc)
-	orderSvc := orders.NewService(orderRepo, inventoryRepo, hierRepo, teamRepo, compSvc, activityLogger, db)
+	seedUserRepo := users.NewRepository(db)
+	orderSvc := orders.NewService(orderRepo, inventoryRepo, hierRepo, teamRepo, compSvc, activityLogger, db,
+		func(ctx context.Context, id uuid.UUID) (*orders.SellerLookupResult, error) {
+			u, err := seedUserRepo.GetByID(ctx, id)
+			if err != nil {
+				return nil, err
+			}
+			if u == nil {
+				return nil, nil
+			}
+			return &orders.SellerLookupResult{IsActive: u.IsActive, Role: string(u.Role)}, nil
+		},
+	)
 
 	dispatchSvc := dispatch.NewService(dispatch.NewRepository(db), orderSvc, activityLogger, db)
 

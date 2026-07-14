@@ -19,7 +19,10 @@ import PaymentModeSelector from '../components/PaymentModeSelector'
 import OrderSuccessScreen from '../components/OrderSuccessScreen'
 import Alert from '../../../shared/components/Alert'
 import { fmtAmount } from '../../../shared/orderStatusConfig'
-import { M } from '../components/mobileUi'
+import { M, Card, SectionLabel } from '../components/mobileUi'
+import useEmployees from '../../people/hooks/useEmployees'
+import useTeams from '../../people/hooks/useTeams'
+import useTeamMembers from '../../people/hooks/useTeamMembers'
 
 // ── Draft ──────────────────────────────────────────────────────────────────────
 const DRAFT_KEY = 'seller_create_order_draft_v2'
@@ -160,6 +163,7 @@ const ORDER_TYPE_BY_ROLE = {
   manager: 'manager_personal_order',
   sales_team_lead: 'team_lead_personal_order',
   seller: 'seller_order',
+  owner: 'seller_order',
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────
@@ -189,6 +193,46 @@ export default function CreateOrder() {
 
   const customers  = Array.isArray(customersRaw)  ? customersRaw  : []
   const products   = Array.isArray(productsRaw)   ? productsRaw   : []
+
+  // ── Owner-only: mandatory team → seller attribution ──────────────────────
+  // The owner has no personal order type — every order they create must be
+  // attributed to a real, active seller within a chosen team.
+  const isOwner = role === 'owner'
+  const [ownerTeamId, setOwnerTeamId] = useState('')
+  const [ownerSellerId, setOwnerSellerId] = useState('')
+
+  const { data: ownerTeamsRaw = [] } = useTeams({}, { enabled: isOwner })
+  const { data: ownerEmployeesRaw = [] } = useEmployees({}, { enabled: isOwner })
+  const { data: ownerTeamMembersRaw = [] } = useTeamMembers(isOwner ? ownerTeamId : '')
+
+  const ownerTeams = Array.isArray(ownerTeamsRaw) ? ownerTeamsRaw : []
+  const ownerEmployees = Array.isArray(ownerEmployeesRaw) ? ownerEmployeesRaw : []
+  const ownerTeamMembers = Array.isArray(ownerTeamMembersRaw) ? ownerTeamMembersRaw : []
+
+  const ownerTeamSellers = useMemo(() => {
+    const memberIds = new Set(ownerTeamMembers.map((m) => m.user_id ?? m.UserID))
+    return ownerEmployees.filter((e) =>
+      memberIds.has(e.id) &&
+      (e.role ?? e.Role) === 'seller' &&
+      (e.is_active ?? e.IsActive) !== false
+    )
+  }, [ownerTeamMembers, ownerEmployees])
+
+  function handleOwnerTeamChange(teamId) {
+    setOwnerTeamId(teamId)
+    setOwnerSellerId('')
+  }
+
+  const ownerSelectedSellerName = useMemo(
+    () => ownerTeamSellers.find((s) => s.id === ownerSellerId)?.full_name
+      ?? ownerTeamSellers.find((s) => s.id === ownerSellerId)?.FullName
+      ?? '',
+    [ownerTeamSellers, ownerSellerId]
+  )
+  const ownerSelectedTeamName = useMemo(
+    () => ownerTeams.find((t) => t.id === ownerTeamId)?.name ?? '',
+    [ownerTeams, ownerTeamId]
+  )
 
   const globalNormalFee = deliverySettings?.normal_fee ?? 0
   const globalFastFee   = deliverySettings?.fast_fee   ?? 0
@@ -322,6 +366,7 @@ export default function CreateOrder() {
           quantity:   it.quantity,
           unit_price: calcPayloadUnitPrice(it),
         })),
+        ...(isOwner ? { seller_id: ownerSellerId, team_id: ownerTeamId } : {}),
         city:             form.city || undefined,
         delivery_address: form.address.trim() || undefined,
         notes:            notes ?? null,
@@ -404,6 +449,7 @@ export default function CreateOrder() {
 
   // ── Validation ───────────────────────────────────────────────────────────────
   const canSubmit = (() => {
+    if (isOwner && (!ownerTeamId || !ownerSellerId)) return false
     if (!form.phone.trim()) return false
     // Existing customers may have legacy phone formats — only enforce strict
     // country/digit validation when entering a brand-new number.
@@ -417,6 +463,65 @@ export default function CreateOrder() {
     }
     return true
   })()
+
+  // Owner must pick a team, then an active seller within that team, before
+  // the order-building form is shown — there is no owner-personal order.
+  if (isOwner && (!ownerTeamId || !ownerSellerId)) {
+    return (
+      <div className="min-h-screen" style={{ background: M.bg, fontFamily: M.font, paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingBottom: '4rem' }}>
+        <div className="max-w-lg mx-auto px-4">
+          <div style={{ padding: '8px 0 4px' }}>
+            <h1 style={{ fontSize: 20, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', margin: 0 }}>Новый заказ</h1>
+            <div style={{ fontSize: 12, color: M.muted, fontWeight: 500, marginTop: 2 }}>
+              Выберите команду и продавца, от имени которого создаётся заказ
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <SectionLabel>Команда</SectionLabel>
+            <Card style={{ padding: 4 }}>
+              <select
+                value={ownerTeamId}
+                onChange={(e) => handleOwnerTeamChange(e.target.value)}
+                className="input"
+                style={{ border: 'none' }}
+              >
+                <option value="">Выберите команду</option>
+                {ownerTeams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </Card>
+          </div>
+
+          {ownerTeamId && (
+            <div className="mt-4">
+              <SectionLabel>Продавец</SectionLabel>
+              {ownerTeamSellers.length === 0 ? (
+                <Card style={{ padding: 16 }}>
+                  <p style={{ fontSize: 13, color: M.muted, margin: 0 }}>
+                    В этой команде нет активных продавцов
+                  </p>
+                </Card>
+              ) : (
+                <Card style={{ padding: 4 }}>
+                  <select
+                    value={ownerSellerId}
+                    onChange={(e) => setOwnerSellerId(e.target.value)}
+                    className="input"
+                    style={{ border: 'none' }}
+                  >
+                    <option value="">Выберите продавца</option>
+                    {ownerTeamSellers.map((s) => (
+                      <option key={s.id} value={s.id}>{s.full_name ?? s.FullName ?? s.phone}</option>
+                    ))}
+                  </select>
+                </Card>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   if (success) {
     return (
@@ -465,6 +570,18 @@ export default function CreateOrder() {
             <div style={{ fontSize: 12, color: M.muted, fontWeight: 500, marginTop: 2 }}>Быстрое оформление</div>
           </div>
         </div>
+
+        {isOwner && (
+          <div className="flex items-center justify-between" style={{ background: M.indigoBg, borderRadius: 14, padding: '10px 14px', marginBottom: 12 }}>
+            <div style={{ fontSize: 12.5, color: M.indigoDeep, fontWeight: 600 }}>
+              От имени: <strong>{ownerSelectedSellerName}</strong> · {ownerSelectedTeamName}
+            </div>
+            <button type="button" onClick={() => { setOwnerTeamId(''); setOwnerSellerId('') }}
+              style={{ background: 'none', border: 'none', fontSize: 12, fontWeight: 700, color: M.indigoDeep, cursor: 'pointer', padding: 0 }}>
+              Изменить
+            </button>
+          </div>
+        )}
 
         <div className="space-y-3">
 
@@ -683,8 +800,19 @@ export default function CreateOrder() {
         DESKTOP LAYOUT — Seller Panel Redesign
     ═══════════════════════════════════════════════════════════ */}
     <div className="hidden lg:flex flex-col gap-5" style={{ padding: '36px 44px', minHeight: '100vh', background: M.bg, fontFamily: M.font }}>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
         <h1 style={{ fontSize: 28, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0 }}>Новый заказ</h1>
+        {isOwner && (
+          <div className="flex items-center gap-3" style={{ background: M.indigoBg, borderRadius: 14, padding: '10px 16px' }}>
+            <div style={{ fontSize: 13, color: M.indigoDeep, fontWeight: 600 }}>
+              От имени: <strong>{ownerSelectedSellerName}</strong> · {ownerSelectedTeamName}
+            </div>
+            <button type="button" onClick={() => { setOwnerTeamId(''); setOwnerSellerId('') }}
+              style={{ background: 'none', border: 'none', fontSize: 12.5, fontWeight: 700, color: M.indigoDeep, cursor: 'pointer', padding: 0 }}>
+              Изменить
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-[22px] flex-1 min-h-0" style={{ gridTemplateColumns: '1fr 400px' }}>
