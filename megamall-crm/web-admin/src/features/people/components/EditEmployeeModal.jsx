@@ -5,6 +5,7 @@ import Alert   from '../../../shared/components/Alert'
 import Modal   from '../../../shared/components/Modal'
 import DateInput     from '../../../shared/components/DateInput'
 import PasswordInput from '../../../shared/components/PasswordInput'
+import PhoneInput    from '../../../shared/components/PhoneInput'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { updateEmployee } from '../api'
 import { ALL_ROLES, ROLE_LABEL, STATUS_OPTIONS } from '../utils/peopleHelpers'
@@ -131,7 +132,7 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
           </div>
           <div>
             <label className="input-label">Телефон</label>
-            <input value={phone} onChange={e => setPhone(e.target.value)} className="input" placeholder="+992 93 000 00 00" />
+            <PhoneInput value={phone} onChange={setPhone} />
           </div>
         </div>
 
