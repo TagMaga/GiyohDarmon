@@ -253,7 +253,7 @@ export default function OwnerWarehousePage() {
             <Button variant="primary" icon={<PackagePlus size={15} />} onClick={() => setReceiveProduct(null)}>Новая приёмка</Button>
             <Button variant="danger" icon={<Trash2 size={15} />} onClick={() => setWriteoffProduct(null)}>Новое списание</Button>
           </div>
-          <MovementList rows={receivingRows} data={data} emptyTitle="Операций пока нет" showEntryActions onlyLatestEntryEditable />
+          <MovementList rows={receivingRows} data={data} emptyTitle="Операций пока нет" showEntryActions />
         </div>
       )}
 

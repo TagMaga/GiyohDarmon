@@ -298,7 +298,7 @@ export default function OwnerWarehouseMobile({
               <Trash2 size={18} /><span className="text-[11.5px] font-bold text-slate-700">Новое списание</span>
             </button>
           </div>
-          <MovementList rows={receivingRows} data={data} emptyTitle="Операций пока нет" showEntryActions onlyLatestEntryEditable />
+          <MovementList rows={receivingRows} data={data} emptyTitle="Операций пока нет" showEntryActions />
         </div>
       )}
 
