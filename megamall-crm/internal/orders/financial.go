@@ -147,6 +147,13 @@ func (s *Service) emitFinancialEvents(
 			{compensation.EventTeamLeadPoolEarned, ptrOf(order.SellerID), breakdown.TeamLeadPool},
 		}
 
+	case OrderTypeHouse:
+		// house_order: company revenue only — no seller/manager/team-lead
+		// attribution, so no one earns a commission on it.
+		specs = []eventSpec{
+			{compensation.EventCompanyRevenueEarned, nil, breakdown.CompanyRevenue},
+		}
+
 	default:
 		return fmt.Errorf("financial engine: unknown order type %q", order.OrderType)
 	}

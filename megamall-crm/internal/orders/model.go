@@ -16,11 +16,14 @@ const (
 	OrderTypeSeller        OrderType = "seller_order"
 	OrderTypeManagerPersonal  OrderType = "manager_personal_order"
 	OrderTypeTeamLeadPersonal OrderType = "team_lead_personal_order"
+	// OrderTypeHouse is an owner-created order with no seller/team
+	// attribution — no seller/manager/team-lead commission is paid on it.
+	OrderTypeHouse OrderType = "house_order"
 )
 
 func (t OrderType) IsValid() bool {
 	switch t {
-	case OrderTypeSeller, OrderTypeManagerPersonal, OrderTypeTeamLeadPersonal:
+	case OrderTypeSeller, OrderTypeManagerPersonal, OrderTypeTeamLeadPersonal, OrderTypeHouse:
 		return true
 	}
 	return false

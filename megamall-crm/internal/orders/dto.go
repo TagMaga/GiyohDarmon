@@ -35,11 +35,8 @@ type CreateOrderRequest struct {
 	DeliveryAddress *string            `json:"delivery_address"`
 	DeliveryMethod  string             `json:"delivery_method"` // "normal" | "fast" ("express" accepted as legacy alias); defaults to "normal"
 
-	// Dispatcher/owner: create order on behalf of a specific seller.
+	// Dispatcher-only: create order on behalf of a specific seller.
 	SellerID *uuid.UUID `json:"seller_id"`
-	// Owner-only: the seller's team, required so the backend can verify the
-	// selected seller actually belongs to it.
-	TeamID *uuid.UUID `json:"team_id"`
 	// Dispatcher-only: override the initial status (e.g. "confirmed" to skip confirmation step).
 	ForceStatus *string `json:"force_status"`
 

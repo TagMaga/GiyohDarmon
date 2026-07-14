@@ -87,6 +87,13 @@ const (
 //	  team_lead_pool             = commission_base × team_lead_pool_rate − manager
 //	  company_revenue            = commission_base − commission_base × team_lead_pool_rate
 //
+//	house_order (owner-created, no seller/team attribution):
+//	  seller_commission          = 0
+//	  manager_team_commission    = 0
+//	  manager_personal_commission = 0
+//	  team_lead_pool             = 0
+//	  company_revenue            = commission_base   ← no one earns a cut
+//
 // ──────────────────────────────────────────────────────────────────────────────
 type OrderType string
 
@@ -94,6 +101,7 @@ const (
 	OrderTypeSellerOrder           OrderType = "seller_order"
 	OrderTypeManagerPersonalOrder  OrderType = "manager_personal_order"
 	OrderTypeTeamLeadPersonalOrder OrderType = "team_lead_personal_order"
+	OrderTypeHouseOrder            OrderType = "house_order"
 )
 
 // AllOrderTypes lists all valid order types.
@@ -101,6 +109,7 @@ var AllOrderTypes = []OrderType{
 	OrderTypeSellerOrder,
 	OrderTypeManagerPersonalOrder,
 	OrderTypeTeamLeadPersonalOrder,
+	OrderTypeHouseOrder,
 }
 
 // IsValid returns true if the OrderType is a known value.

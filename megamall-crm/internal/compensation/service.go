@@ -559,6 +559,15 @@ func ApplyCommissionRules(
 		b.TeamLeadPool = round2(poolGross - b.ManagerTeamCommission)
 		b.CompanyRevenue = round2(netRevenue - poolGross)
 
+	case OrderTypeHouseOrder:
+		// Owner-created order with no seller/team attribution — no one earns
+		// a commission; the full commission base is company revenue.
+		b.SellerCommission = 0
+		b.ManagerTeamCommission = 0
+		b.ManagerPersonalCommission = 0
+		b.TeamLeadPool = 0
+		b.CompanyRevenue = round2(netRevenue)
+
 	default:
 		return b, fmt.Errorf("ApplyCommissionRules: unknown order_type %q", orderType)
 	}
