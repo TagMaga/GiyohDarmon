@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import { queryClient } from '../queryClient'
 
 /**
  * Auth store — persisted to localStorage.
@@ -25,8 +26,12 @@ const useAuthStore = create(
       setAuth: (token, refreshToken, role, phone) =>
         set({ token, refreshToken, role, phone }),
 
-      clearAuth: () =>
-        set({ token: null, refreshToken: null, role: null, phone: null }),
+      clearAuth: () => {
+        // Purge cached query data so the next account to log in on this tab
+        // never sees a previous account's stale profile/data.
+        queryClient.clear()
+        set({ token: null, refreshToken: null, role: null, phone: null })
+      },
 
       _setHydrated: () => set({ _hasHydrated: true }),
     }),
