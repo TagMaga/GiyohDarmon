@@ -26,8 +26,7 @@ import {
   buildUserMap, fmtMoney, fmtPct,
   ROLE_LABEL, calcPerformance, isConfigActive,
 } from '../utils/peopleHelpers'
-import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
+import PeriodRangeFilter from '../../../shared/components/PeriodRangeFilter'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Date range helpers
@@ -618,20 +617,13 @@ export default function TeamProfilePage() {
       {/* ── Period selector ────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
         <h2 className="text-base font-bold text-slate-800">Показатели</h2>
-        <DesktopDateRangePicker
-          variant="trigger"
+        <PeriodRangeFilter
           from={from}
           to={to}
           align="right"
           onChange={(range) => setDateRange({ from: range.from, to: range.to })}
         />
       </div>
-      <MobileDateRangeCalendar
-        className="w-full md:hidden"
-        from={from}
-        to={to}
-        onChange={(range) => setDateRange({ from: range.from, to: range.to })}
-      />
 
       {anyDataLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">

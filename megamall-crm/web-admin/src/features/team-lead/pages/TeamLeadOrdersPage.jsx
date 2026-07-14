@@ -13,8 +13,7 @@ import { useQuery }                    from '@tanstack/react-query'
 import { Search, X, ClipboardList, SlidersHorizontal } from 'lucide-react'
 import Badge                           from '../../../shared/components/Badge'
 import EmptyState                      from '../../../shared/components/EmptyState'
-import DesktopDateRangePicker          from '../../../shared/components/DesktopDateRangePicker'
-import MobileDateRangeCalendar         from '../../../shared/components/MobileDateRangeCalendar'
+import PeriodRangeFilter               from '../../../shared/components/PeriodRangeFilter'
 import SellerOrderDetailPanel          from '../../seller/components/SellerOrderDetailPanel'
 import OrderDetailBottomSheet          from '../../seller/components/OrderDetailBottomSheet'
 import { KEYS }                        from '../../../shared/queryKeys'
@@ -154,13 +153,7 @@ export default function TeamLeadOrdersPage() {
 
   const advancedFilters = (
     <div className="flex gap-2 flex-wrap">
-      <DesktopDateRangePicker
-        from={dateFrom}
-        to={dateTo}
-        onChange={(range) => { setDateFrom(range.from); setDateTo(range.to) }}
-      />
-      <MobileDateRangeCalendar
-        className="w-full md:hidden"
+      <PeriodRangeFilter
         from={dateFrom}
         to={dateTo}
         onChange={(range) => { setDateFrom(range.from); setDateTo(range.to) }}
