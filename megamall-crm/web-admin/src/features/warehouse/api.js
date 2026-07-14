@@ -1,4 +1,5 @@
 import client from '../../shared/api/client'
+import { compressImage } from '../../shared/api/compressImage'
 import { isUUID } from './utils/warehouseHelpers'
 
 const unwrap = (res) => {
@@ -62,11 +63,15 @@ export async function addProductImage(productId, payload) {
 
 // Uploads a file to the shared /uploads endpoint and returns its served URL
 // (e.g. "/uploads/<uuid>.jpg"), instead of embedding the image as base64.
+// Downscaled client-side first and given extra timeout headroom, since phone-
+// camera photos over mobile connections can otherwise exceed the default 12s.
 export async function uploadImageFile(file) {
+  const upload = await compressImage(file)
   const form = new FormData()
-  form.append('file', file)
+  form.append('file', upload)
   const res = await client.post('/uploads', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 30_000,
   })
   return unwrap(res) // { url: "/uploads/<filename>" }
 }
