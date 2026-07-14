@@ -37,3 +37,5 @@ npx expo start
 ```
 
 See [`megamall-crm/CLAUDE.md`](megamall-crm/CLAUDE.md) and [`mobile/courier-app/CLAUDE.md`](mobile/courier-app/CLAUDE.md) for full command references.
+
+Cloud sessions connected
