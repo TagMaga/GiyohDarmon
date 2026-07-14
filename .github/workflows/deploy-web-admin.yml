@@ -1,0 +1,70 @@
+name: Deploy web-admin
+
+# Builds the React admin panel and rsyncs the production build to the server.
+#
+# Required repository secret:
+#   DEPLOY_SSH_KEY  - private SSH key (PEM) that can log in as root@134.122.81.40
+#
+# Optional repository variables (Settings -> Secrets and variables -> Variables):
+#   DEPLOY_HOST     - server host/IP     (default: 134.122.81.40)
+#   DEPLOY_USER     - ssh user           (default: root)
+#   DEPLOY_PATH     - target dist dir    (default: /var/www/megamall-crm/dist)
+
+on:
+  push:
+    branches:
+      - claude/remove-demo-users-6mskm1
+      - main
+    paths:
+      - 'megamall-crm/web-admin/**'
+      - '.github/workflows/deploy-web-admin.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web-admin
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST || '134.122.81.40' }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER || 'root' }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/var/www/megamall-crm/dist' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: megamall-crm/web-admin/package-lock.json
+
+      - name: Install dependencies
+        working-directory: megamall-crm/web-admin
+        run: npm ci
+
+      - name: Build
+        working-directory: megamall-crm/web-admin
+        run: npm run build
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Backup current build
+        run: |
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "rm -rf ${DEPLOY_PATH}.prev && cp -r ${DEPLOY_PATH} ${DEPLOY_PATH}.prev || true"
+
+      - name: Deploy build
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            megamall-crm/web-admin/dist/ \
+            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
