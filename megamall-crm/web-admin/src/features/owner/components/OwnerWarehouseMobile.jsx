@@ -1,5 +1,5 @@
 import {
-  Download, FilterX, Package, PackagePlus, RefreshCw, Search, Trash2,
+  AlertTriangle, Download, FilterX, Package, PackagePlus, PackageX, RefreshCw, Search, Trash2,
 } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
 import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'
@@ -9,6 +9,7 @@ import {
   fmtMoney,
   getAvailableQty,
   getId,
+  getLowStockThreshold,
   getProductImage,
   getProductName,
   getProductSku,
@@ -19,6 +20,11 @@ import {
   getStockStatus,
   isProductActive,
 } from '../../warehouse/utils/warehouseHelpers'
+
+const INK = '#0B1020'
+const MUTED = '#8A91A3'
+const GRADIENT = 'linear-gradient(135deg, #4F46E5, #6D28D9)'
+const CARD_SHADOW = '0 2px 8px rgba(15,23,42,.05)'
 
 const TABS = [
   { id: 'dashboard', label: 'Дашборд' },
@@ -39,11 +45,11 @@ const MOVEMENT_TYPES = [
 function MobileProductThumb({ product }) {
   const image = getProductImage(product)
   if (image) {
-    return <img src={image} alt={getProductName(product)} className="h-10 w-10 flex-shrink-0 rounded-lg border border-slate-200 object-cover" />
+    return <img src={image} alt={getProductName(product)} className="h-11 w-11 flex-shrink-0 rounded-[13px] border border-slate-200 object-cover" />
   }
   return (
-    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400">
-      <Package size={16} />
+    <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[13px] bg-slate-100 text-slate-400">
+      <Package size={18} />
     </div>
   )
 }
@@ -52,7 +58,8 @@ function MobileSearchBar({ value, onChange, placeholder, onSubmit }) {
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); onSubmit?.() }}
-      className="flex min-h-11 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 shadow-sm"
+      className="flex min-h-11 items-center gap-2 rounded-[15px] border border-[#E7EAF0] bg-white px-3.5"
+      style={{ boxShadow: CARD_SHADOW }}
     >
       <Search size={17} className="flex-shrink-0 text-slate-400" />
       <input
@@ -67,14 +74,15 @@ function MobileSearchBar({ value, onChange, placeholder, onSubmit }) {
 
 function MobileTabPills({ tab, onChange }) {
   return (
-    <div className="flex gap-1 overflow-x-auto rounded-full bg-[#E9EDF2] p-[3px]">
+    <div className="flex gap-1 rounded-[15px] bg-white p-1" style={{ boxShadow: CARD_SHADOW }}>
       {TABS.map((item) => {
         const active = tab === item.id
         return (
           <button
             key={item.id}
             onClick={() => onChange(item.id)}
-            className={`flex-shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12.5px] font-bold transition-all ${active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+            className="flex-1 rounded-[11px] py-2 text-[12.5px] font-bold transition-all"
+            style={active ? { background: '#4F46E5', color: '#fff' } : { color: '#64748B' }}
           >
             {item.label}
           </button>
@@ -84,26 +92,61 @@ function MobileTabPills({ tab, onChange }) {
   )
 }
 
-function MobileAttentionRow({ inventory, product, onOpen, onReceive }) {
+function StatMini({ value, label }) {
+  return (
+    <div>
+      <p className="text-[17px] font-extrabold leading-none">{value}</p>
+      <p className="mt-1 text-[11px] font-semibold text-indigo-100/80">{label}</p>
+    </div>
+  )
+}
+
+function AlertTile({ icon, tone, value, label }) {
+  const tones = {
+    amber: { bg: '#FFFBEB', color: '#D97706' },
+    rose: { bg: '#FFF1F2', color: '#E11D48' },
+  }
+  const t = tones[tone]
+  return (
+    <div className="flex items-center gap-3 rounded-[18px] bg-white p-3.5" style={{ boxShadow: CARD_SHADOW }}>
+      <div className="flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-[13px]" style={{ background: t.bg, color: t.color }}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-[23px] font-extrabold leading-none" style={{ color: INK }}>{value}</p>
+        <p className="mt-1 text-[11.5px] font-semibold" style={{ color: MUTED }}>{label}</p>
+      </div>
+    </div>
+  )
+}
+
+function AttentionCard({ inventory, product, onOpen, onReceive }) {
   const status = getStockStatus(inventory)
   const available = getAvailableQty(inventory)
-  const label = status === 'out_of_stock' ? 'нет в наличии' : `доступно ${available}`
+  const threshold = getLowStockThreshold(inventory)
+  const pct = threshold > 0 ? Math.min(100, Math.round((available / threshold) * 100)) : (status === 'out_of_stock' ? 0 : 100)
+  const accent = status === 'out_of_stock' ? '#E11D48' : '#D97706'
   return (
-    <div className="flex items-center gap-3 border-t border-slate-50 px-4 py-2.5 first:border-t-0 min-h-[44px]">
-      <button onClick={onOpen} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+    <div className="rounded-[18px] bg-white p-3.5" style={{ boxShadow: CARD_SHADOW }}>
+      <button onClick={onOpen} className="flex w-full min-w-0 items-center gap-3 text-left">
         <MobileProductThumb product={product} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[13.5px] font-bold text-slate-950">{getProductName(product)}</p>
-          <p className="mt-0.5 truncate text-[11px] text-slate-400">
-            <span className="font-mono">{getProductSku(product)}</span> · <b className={status === 'out_of_stock' ? 'text-rose-600' : 'text-amber-600'}>{label}</b>
-          </p>
+          <p className="truncate text-[14px] font-bold" style={{ color: INK }}>{getProductName(product)}</p>
+          <p className="mt-0.5 truncate font-mono text-[11px] text-slate-400">{getProductSku(product)}</p>
         </div>
+        <Badge variant={STOCK_STATUS_BADGE[status]} dot>{STOCK_STATUS_LABEL[status]}</Badge>
       </button>
+      <div className="mt-3 flex items-center gap-2.5">
+        <div className="h-[7px] flex-1 overflow-hidden rounded-full bg-[#EEF1F6]">
+          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: accent }} />
+        </div>
+        <span className="flex-shrink-0 text-[11px] font-semibold text-slate-500">{available} / {threshold || '—'}</span>
+      </div>
       <button
         onClick={onReceive}
-        className="flex min-h-[34px] flex-shrink-0 items-center justify-center rounded-full bg-indigo-50 px-3.5 text-[12px] font-bold text-indigo-700"
+        className="mt-3 flex min-h-10 w-full items-center justify-center gap-1.5 rounded-[13px] bg-indigo-50 text-[13px] font-bold text-indigo-700"
       >
-        Пополнить
+        <PackagePlus size={16} />Пополнить
       </button>
     </div>
   )
@@ -112,12 +155,12 @@ function MobileAttentionRow({ inventory, product, onOpen, onReceive }) {
 function MobileInventoryCard({ product, inv, onReceive, onWriteoff, onEdit }) {
   const status = getStockStatus(inv)
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+    <div className="rounded-[18px] bg-white p-3.5" style={{ boxShadow: CARD_SHADOW }}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 items-center gap-3">
           <MobileProductThumb product={product} />
           <div className="min-w-0">
-            <p className="truncate text-[13.5px] font-bold text-slate-950">{getProductName(product)}</p>
+            <p className="truncate text-[13.5px] font-bold" style={{ color: INK }}>{getProductName(product)}</p>
             <p className="truncate font-mono text-[11px] text-slate-400">{getProductSku(product)}</p>
           </div>
         </div>
@@ -125,28 +168,28 @@ function MobileInventoryCard({ product, inv, onReceive, onWriteoff, onEdit }) {
           {isProductActive(product) ? STOCK_STATUS_LABEL[status] : 'Неактивен'}
         </Badge>
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+      <div className="mt-3.5 grid grid-cols-3 gap-2 text-center">
         <div>
-          <p className="text-[15px] font-extrabold tabular-nums text-slate-950">{getQuantity(inv)}</p>
-          <p className="text-[10px] font-semibold text-slate-400">На складе</p>
+          <p className="text-[16px] font-extrabold tabular-nums" style={{ color: INK }}>{getQuantity(inv)}</p>
+          <p className="mt-0.5 text-[10px] font-semibold" style={{ color: MUTED }}>На складе</p>
         </div>
         <div>
-          <p className="text-[15px] font-extrabold tabular-nums text-emerald-700">{getAvailableQty(inv)}</p>
-          <p className="text-[10px] font-semibold text-slate-400">Доступно</p>
+          <p className="text-[16px] font-extrabold tabular-nums text-emerald-700">{getAvailableQty(inv)}</p>
+          <p className="mt-0.5 text-[10px] font-semibold" style={{ color: MUTED }}>Доступно</p>
         </div>
         <div>
-          <p className="text-[15px] font-extrabold tabular-nums text-amber-700">{getReservedQty(inv)}</p>
-          <p className="text-[10px] font-semibold text-slate-400">Резерв</p>
+          <p className="text-[16px] font-extrabold tabular-nums text-amber-700">{getReservedQty(inv)}</p>
+          <p className="mt-0.5 text-[10px] font-semibold" style={{ color: MUTED }}>Резерв</p>
         </div>
       </div>
-      <div className="mt-2.5 flex items-center justify-between text-[11.5px] text-slate-500">
+      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-[12px] text-slate-500">
         <span>Закупка <b className="text-slate-700">{fmtMoney(getPurchasePrice(product))}</b></span>
         <span>Продажа <b className="text-indigo-700">{fmtMoney(getSalePrice(product))}</b></span>
       </div>
       <div className="mt-3 flex gap-2">
-        <button onClick={() => onReceive(product)} className="flex min-h-[34px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-100 text-[11.5px] font-bold text-slate-700"><Download size={13} />Приход</button>
-        <button onClick={() => onWriteoff(product)} className="flex min-h-[34px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-rose-50 text-[11.5px] font-bold text-rose-600"><Trash2 size={13} />Списание</button>
-        <button onClick={() => onEdit(product)} className="flex min-h-[34px] flex-1 items-center justify-center gap-1.5 rounded-xl bg-indigo-50 text-[11.5px] font-bold text-indigo-700"><PackagePlus size={13} />Изменить</button>
+        <button onClick={() => onReceive(product)} className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-slate-100 text-[11.5px] font-bold text-slate-700"><Download size={14} />Приход</button>
+        <button onClick={() => onWriteoff(product)} className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-rose-50 text-[11.5px] font-bold text-rose-600"><Trash2 size={14} />Списание</button>
+        <button onClick={() => onEdit(product)} className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-indigo-50 text-[11.5px] font-bold text-indigo-700"><PackagePlus size={14} />Изменить</button>
       </div>
     </div>
   )
@@ -154,7 +197,7 @@ function MobileInventoryCard({ product, inv, onReceive, onWriteoff, onEdit }) {
 
 function MobileEmpty({ title }) {
   return (
-    <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-[12.5px] text-slate-400">
+    <div className="rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-[12.5px] text-slate-400">
       {title}
     </div>
   )
@@ -182,69 +225,66 @@ export default function OwnerWarehouseMobile({
   }).length
 
   return (
-    <div className="space-y-3.5 p-4 pb-8" style={{ background: '#F2F4F7' }}>
-      <div className="flex items-center justify-between">
-        <h1 className="text-[22px] font-extrabold tracking-tight text-slate-950">Склад</h1>
+    <div className="space-y-4 p-4 pb-8" style={{ background: '#F4F5F9' }}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[27px] font-extrabold leading-none tracking-tight" style={{ color: INK, letterSpacing: '-0.7px' }}>Склад</h1>
+          <p className="mt-1.5 text-[12.5px] font-medium" style={{ color: MUTED }}>Обзор остатков и движения</p>
+        </div>
         <button
           onClick={onRefresh}
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm"
+          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[14px] border border-[#E7EAF0] bg-white text-slate-600"
+          style={{ boxShadow: CARD_SHADOW }}
         >
-          <RefreshCw size={15} />
+          <RefreshCw size={17} />
         </button>
       </div>
-
-      <MobileSearchBar
-        value={inventorySearch}
-        onChange={onInventorySearch}
-        placeholder="Товар, SKU или штрихкод…"
-        onSubmit={() => onTab('inventory')}
-      />
 
       <MobileTabPills tab={tab} onChange={onTab} />
 
       {tab === 'dashboard' && (
-        <div className="space-y-3.5">
+        <div className="space-y-4">
+          <div className="relative overflow-hidden rounded-[24px] p-5 text-white" style={{ background: GRADIENT, boxShadow: '0 14px 34px rgba(79,70,229,.34)' }}>
+            <div className="pointer-events-none absolute -right-10 -top-14 h-[200px] w-[200px] rounded-full bg-white/10" />
+            <div className="relative">
+              <p className="text-[10.5px] font-bold uppercase tracking-[1px] text-indigo-100/85">Стоимость склада</p>
+              <p className="mt-1.5 text-[37px] font-extrabold leading-none tracking-tight">{fmtMoney(stockValue)}</p>
+              <div className="mt-4 flex items-center gap-5">
+                <StatMini value={data.products.length} label="товаров" />
+                <div className="h-[30px] w-px bg-white/20" />
+                <StatMini value={totalUnits} label="единиц" />
+                <div className="h-[30px] w-px bg-white/20" />
+                <StatMini value={movementsToday} label="сегодня" />
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-2.5">
-            <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-indigo-600" />
-                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Стоимость склада</span>
-              </div>
-              <div className="mt-2 text-[19px] font-extrabold tracking-tight tabular-nums text-slate-950">
-                {fmtMoney(stockValue)}
-              </div>
-              <div className="mt-0.5 text-[10.5px] font-semibold text-slate-400">{data.products.length} товара · {totalUnits} ед.</div>
-            </div>
-            <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-amber-400" />
-                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Риски остатков</span>
-              </div>
-              <div className="mt-2 text-[19px] font-extrabold tabular-nums">
-                <span className="text-amber-600">{lowStock}</span> <span className="text-[12px] font-bold text-slate-400">мало</span> · <span className="text-rose-700">{outStock}</span> <span className="text-[12px] font-bold text-slate-400">нет</span>
-              </div>
-              <div className="mt-0.5 text-[10.5px] font-semibold text-slate-400">{movementsToday} движений сегодня</div>
+            <AlertTile icon={<AlertTriangle size={20} />} tone="amber" value={lowStock} label="Мало на складе" />
+            <AlertTile icon={<PackageX size={20} />} tone="rose" value={outStock} label="Нет в наличии" />
+          </div>
+
+          <div className="space-y-2.5">
+            <button
+              onClick={() => onReceive(null)}
+              className="flex min-h-14 w-full items-center justify-center gap-2.5 rounded-[18px] text-[15px] font-bold text-white"
+              style={{ background: GRADIENT, boxShadow: '0 8px 20px rgba(79,70,229,.35)' }}
+            >
+              <Download size={20} />Оформить приход
+            </button>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button onClick={() => onWriteoff(null)} className="flex min-h-12 items-center justify-center gap-2 rounded-[15px] bg-rose-50 text-[13.5px] font-bold text-rose-700">
+                <Trash2 size={17} />Списание
+              </button>
+              <button onClick={onProduct} className="flex min-h-12 items-center justify-center gap-2 rounded-[15px] bg-indigo-50 text-[13.5px] font-bold text-indigo-700">
+                <PackagePlus size={17} />Товар
+              </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2.5">
-            <button onClick={() => onReceive(null)} className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-2xl bg-indigo-600 text-white shadow-[0_4px_12px_rgba(79,70,229,.25)]">
-              <Download size={18} />
-              <span className="text-[11px] font-bold">Приход</span>
-            </button>
-            <button onClick={() => onWriteoff(null)} className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white text-rose-600 shadow-sm">
-              <Trash2 size={18} />
-              <span className="text-[11px] font-bold text-slate-700">Списание</span>
-            </button>
-            <button onClick={onProduct} className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white text-indigo-600 shadow-sm">
-              <PackagePlus size={18} />
-              <span className="text-[11px] font-bold text-slate-700">Товар</span>
-            </button>
-          </div>
-
-          <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
-            <div className="flex items-center justify-between px-4 pb-2.5 pt-3.5">
-              <span className="text-[15px] font-extrabold text-slate-950">Требует внимания</span>
+          <div>
+            <div className="mb-2.5 flex items-center justify-between px-0.5">
+              <span className="text-[16px] font-extrabold" style={{ color: INK }}>Требует внимания</span>
               {stockAlerts.length > 0 && (
                 <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">{stockAlerts.length} позиций</span>
               )}
@@ -252,30 +292,40 @@ export default function OwnerWarehouseMobile({
             {stockAlerts.length === 0 ? (
               <MobileEmpty title="Критичных остатков нет" />
             ) : (
-              stockAlerts.map((inv) => {
-                const product = data.productMap[inv.product_id ?? inv.ProductID]
-                return (
-                  <MobileAttentionRow
-                    key={getId(inv)}
-                    inventory={inv}
-                    product={product}
-                    onOpen={() => onOpenAlert(product)}
-                    onReceive={() => onReceive(product ?? null)}
-                  />
-                )
-              })
+              <div className="space-y-2.5">
+                {stockAlerts.map((inv) => {
+                  const product = data.productMap[inv.product_id ?? inv.ProductID]
+                  return (
+                    <AttentionCard
+                      key={getId(inv)}
+                      inventory={inv}
+                      product={product}
+                      onOpen={() => onOpenAlert(product)}
+                      onReceive={() => onReceive(product ?? null)}
+                    />
+                  )
+                })}
+              </div>
             )}
           </div>
 
           <div>
-            <h2 className="mb-2 px-1 text-[15px] font-extrabold text-slate-950">Движения</h2>
-            <MovementList rows={data.movements} data={data} />
+            <div className="mb-2.5 flex items-center justify-between px-0.5">
+              <span className="text-[16px] font-extrabold" style={{ color: INK }}>Последние движения</span>
+              <button onClick={() => onTab('movements')} className="text-[13px] font-bold text-indigo-600">Все ›</button>
+            </div>
+            <MovementList rows={data.movements.slice(0, 5)} data={data} />
           </div>
         </div>
       )}
 
       {tab === 'inventory' && (
         <div className="space-y-2.5">
+          <MobileSearchBar
+            value={inventorySearch}
+            onChange={onInventorySearch}
+            placeholder="Товар, SKU или штрихкод…"
+          />
           {inventoryRows.length === 0 ? (
             <MobileEmpty title="Остатки не найдены" />
           ) : (
@@ -291,10 +341,14 @@ export default function OwnerWarehouseMobile({
       {tab === 'receiving' && (
         <div className="space-y-3.5">
           <div className="grid grid-cols-2 gap-2.5">
-            <button onClick={() => onReceive(null)} className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-2xl bg-indigo-600 text-white shadow-[0_4px_12px_rgba(79,70,229,.25)]">
+            <button
+              onClick={() => onReceive(null)}
+              className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-[18px] text-white"
+              style={{ background: GRADIENT, boxShadow: '0 8px 20px rgba(79,70,229,.3)' }}
+            >
               <PackagePlus size={18} /><span className="text-[11.5px] font-bold">Новая приёмка</span>
             </button>
-            <button onClick={() => onWriteoff(null)} className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white text-rose-600 shadow-sm">
+            <button onClick={() => onWriteoff(null)} className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-[18px] bg-white text-rose-600" style={{ boxShadow: CARD_SHADOW }}>
               <Trash2 size={18} /><span className="text-[11.5px] font-bold text-slate-700">Новое списание</span>
             </button>
           </div>
@@ -306,14 +360,14 @@ export default function OwnerWarehouseMobile({
         <div className="space-y-2.5">
           <MobileSearchBar value={movementSearch} onChange={onMovementSearch} placeholder="Товар, пользователь, комментарий…" />
           <div className="flex gap-2">
-            <select className="input min-h-11 flex-1 rounded-2xl text-[12.5px]" value={movementType} onChange={(e) => onMovementType(e.target.value)}>
+            <select className="input min-h-11 flex-1 rounded-[15px] text-[12.5px]" value={movementType} onChange={(e) => onMovementType(e.target.value)}>
               {MOVEMENT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
-            <button onClick={clearMovementFilters} className="flex min-h-11 items-center gap-1.5 rounded-2xl border border-slate-200 bg-white px-3 text-[12.5px] font-semibold text-slate-600">
+            <button onClick={clearMovementFilters} className="flex min-h-11 items-center gap-1.5 rounded-[15px] border border-[#E7EAF0] bg-white px-3 text-[12.5px] font-semibold text-slate-600" style={{ boxShadow: CARD_SHADOW }}>
               <FilterX size={14} />Сброс
             </button>
           </div>
-          <select className="input min-h-11 w-full rounded-2xl text-[12.5px]" value={movementProductId} onChange={(e) => onMovementProductId(e.target.value)}>
+          <select className="input min-h-11 w-full rounded-[15px] text-[12.5px]" value={movementProductId} onChange={(e) => onMovementProductId(e.target.value)}>
             <option value="">Все товары</option>
             {validProducts.map((product) => <option key={getId(product)} value={getId(product)}>{getProductName(product)}</option>)}
           </select>
