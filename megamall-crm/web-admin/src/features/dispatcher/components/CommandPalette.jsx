@@ -64,16 +64,16 @@ export default function CommandPalette({ open, onClose, onCommand, orders = [] }
     <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]" onClick={onClose}>
       <div
         className="relative w-full max-w-lg mx-4 rounded-2xl overflow-hidden shadow-2xl"
-        style={{ background: '#131929', border: '1px solid rgba(255,255,255,0.12)' }}
+        style={{ background: '#FFFFFF', border: '1px solid #EAE8E2' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Backdrop blur bg */}
-        <div className="absolute inset-0 backdrop-blur-xl" style={{ background: 'rgba(9,12,25,0.95)' }} />
+        <div className="absolute inset-0 backdrop-blur-xl" style={{ background: 'rgba(255,255,255,0.95)' }} />
 
         <div className="relative">
           {/* Search input */}
-          <div className="flex items-center gap-3 px-4 py-3.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-            <Search size={16} className="text-white/40 flex-shrink-0" />
+          <div className="flex items-center gap-3 px-4 py-3.5" style={{ borderBottom: '1px solid #EAE8E2' }}>
+            <Search size={16} className="text-[#A3A39A] flex-shrink-0" />
             <input
               ref={inputRef}
               type="text"
@@ -81,9 +81,9 @@ export default function CommandPalette({ open, onClose, onCommand, orders = [] }
               onChange={(e) => { setQuery(e.target.value); setSelected(0) }}
               onKeyDown={handleKey}
               placeholder="Поиск команд или заказов…"
-              className="flex-1 bg-transparent text-sm text-white/90 placeholder-white/25 outline-none"
+              className="flex-1 bg-transparent text-sm text-[#1C1C1A] placeholder-[#A3A39A] outline-none"
             />
-            <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors">
+            <button onClick={onClose} className="text-[#A3A39A] hover:text-[#1C1C1A] transition-colors">
               <X size={14} />
             </button>
           </div>
@@ -91,15 +91,15 @@ export default function CommandPalette({ open, onClose, onCommand, orders = [] }
           {/* Results */}
           <div className="max-h-80 overflow-y-auto py-2">
             {!query.trim() && (
-              <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest px-4 pb-1">Команды</p>
+              <p className="text-[10px] font-bold text-[#A3A39A] uppercase tracking-widest px-4 pb-1">Команды</p>
             )}
             {query.trim() && orderResults.length > 0 && (
-              <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest px-4 pb-1">Заказы</p>
+              <p className="text-[10px] font-bold text-[#A3A39A] uppercase tracking-widest px-4 pb-1">Заказы</p>
             )}
 
             {allResults.length === 0 && (
               <div className="py-8 text-center">
-                <p className="text-sm text-white/30">Ничего не найдено</p>
+                <p className="text-sm text-[#A3A39A]">Ничего не найдено</p>
               </div>
             )}
 
@@ -110,26 +110,26 @@ export default function CommandPalette({ open, onClose, onCommand, orders = [] }
                 onClick={() => handleSelect(r)}
                 className={[
                   'w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors',
-                  i === selected ? 'bg-white/8' : 'hover:bg-white/5',
+                  i === selected ? '' : 'hover:bg-[#F0EFEA]',
                 ].join(' ')}
-                style={i === selected ? { background: 'rgba(255,255,255,0.08)' } : {}}
+                style={i === selected ? { background: '#F0EFEA' } : {}}
               >
                 {r.type === 'command' && (
                   <>
-                    <span className="text-white/40 flex-shrink-0">{r.icon}</span>
-                    <span className="text-sm text-white/80 flex-1">{r.label}</span>
-                    <kbd className="text-[10px] text-white/30 px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                    <span className="text-[#A3A39A] flex-shrink-0">{r.icon}</span>
+                    <span className="text-sm text-[#1C1C1A] flex-1">{r.label}</span>
+                    <kbd className="text-[10px] text-[#76766E] px-1.5 py-0.5 rounded" style={{ background: '#F0EFEA' }}>
                       {r.kbd}
                     </kbd>
                   </>
                 )}
                 {r.type === 'order' && (
                   <>
-                    <span className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-indigo-400 flex-shrink-0" style={{ background: 'rgba(99,102,241,0.2)' }}>
+                    <span className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-[#4338CA] flex-shrink-0" style={{ background: '#ECEBFE' }}>
                       #
                     </span>
-                    <span className="text-sm text-white/80 flex-1 font-mono">{r.label}</span>
-                    <span className="text-[10px] text-white/30">{r.order?.customer?.full_name ?? ''}</span>
+                    <span className="text-sm text-[#1C1C1A] flex-1 font-mono">{r.label}</span>
+                    <span className="text-[10px] text-[#A3A39A]">{r.order?.customer?.full_name ?? ''}</span>
                   </>
                 )}
               </button>
@@ -137,10 +137,10 @@ export default function CommandPalette({ open, onClose, onCommand, orders = [] }
           </div>
 
           {/* Footer */}
-          <div className="flex items-center gap-4 px-4 py-2.5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            <span className="text-[10px] text-white/25">↑↓ навигация</span>
-            <span className="text-[10px] text-white/25">↵ выбрать</span>
-            <span className="text-[10px] text-white/25">Esc закрыть</span>
+          <div className="flex items-center gap-4 px-4 py-2.5" style={{ borderTop: '1px solid #EAE8E2' }}>
+            <span className="text-[10px] text-[#A3A39A]">↑↓ навигация</span>
+            <span className="text-[10px] text-[#A3A39A]">↵ выбрать</span>
+            <span className="text-[10px] text-[#A3A39A]">Esc закрыть</span>
           </div>
         </div>
       </div>

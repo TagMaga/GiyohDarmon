@@ -114,12 +114,12 @@ export default function DispatcherBoardV3() {
   }))
   const [photoPreview, setPhotoPreview] = useState(null)
   const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') return 'dark'
-    if (!localStorage.getItem('dispatch-v3-migrated')) {
+    if (typeof window === 'undefined') return 'light'
+    if (!localStorage.getItem('dispatch-v3-migrated-v2')) {
       localStorage.removeItem('dispatch-v3-theme')
-      localStorage.setItem('dispatch-v3-migrated', '1')
+      localStorage.setItem('dispatch-v3-migrated-v2', '1')
     }
-    return window.localStorage.getItem('dispatch-v3-theme') || 'dark'
+    return window.localStorage.getItem('dispatch-v3-theme') || 'light'
   })
 
   const board = useQuery({ queryKey: KEYS.dispatcher.board, queryFn: fetchBoard, refetchInterval: 30_000, staleTime: 25_000 })
@@ -657,16 +657,16 @@ function KpiBar({ counts, couriers, setFilters, onCreateOrder }) {
 
   return (
     <div className="dv2-kpibar">
-      <Kpi icon={<Truck size={18} />} value={couriers.length} label="Курьеров" />
-      <Kpi icon={<Package size={18} />} value={active} label="Активные" />
+      <Kpi tone="indigo" icon={<Truck size={18} />} value={couriers.length} label="Курьеров" />
+      <Kpi tone="blue" icon={<Package size={18} />} value={active} label="Активные" />
       <div className="dv2-kpi-sep" />
-      <Kpi mobileExtra alert={counts.unassigned > 0} icon={<UserX size={18} />} value={counts.unassigned} label="Без курьера" onClick={() => setFilters((p) => ({ ...p, courier: p.courier === 'unassigned' ? '' : 'unassigned' }))} />
+      <Kpi tone="rose" mobileExtra alert={counts.unassigned > 0} icon={<UserX size={18} />} value={counts.unassigned} label="Без курьера" onClick={() => setFilters((p) => ({ ...p, courier: p.courier === 'unassigned' ? '' : 'unassigned' }))} />
       <div className="dv2-kpi-sep dv2-hide-mobile" />
       <button
         className="dv2-kpi dv2-hide-mobile"
         onClick={onCreateOrder}
         title="Создать офисный заказ"
-        style={{ cursor: 'pointer', color: 'var(--blue)', gap: 6 }}
+        style={{ cursor: 'pointer', background: '#1A1A20', color: '#fff', border: 'none', gap: 6 }}
       >
         <span className="dv2-kpi-icon"><Plus size={18} /></span>
         <div>
@@ -678,13 +678,13 @@ function KpiBar({ counts, couriers, setFilters, onCreateOrder }) {
   )
 }
 
-function Kpi({ icon, value, label, alert, onClick, mobileExtra }) {
+function Kpi({ icon, value, label, alert, onClick, mobileExtra, tone }) {
   const Comp = onClick ? 'button' : 'div'
   return (
     <Comp className={`dv2-kpi ${alert ? 'alert' : ''} ${mobileExtra ? 'dv2-kpi-mobile-extra' : ''}`} onClick={onClick}>
-      <span className="dv2-kpi-icon">{icon}</span>
+      <span className={`dv2-kpi-icon ${tone ?? ''}`}>{icon}</span>
       <div>
-        <div className="dv2-kpi-val">{value}</div>
+        <div className="dv2-kpi-val" style={tone === 'rose' ? { color: 'var(--red-text)' } : undefined}>{value}</div>
         <div className="dv2-kpi-lbl">{label}</div>
       </div>
     </Comp>
@@ -715,7 +715,7 @@ function CourierRail({ couriers, activeCourier, mobileOpen, onSelect, unassigned
       <div className="dv2-cs-header">
         <div className="dv2-section-label">Флот курьеров</div>
         {hasSelectedOrder && (
-          <div style={{ fontSize: 10, color: 'var(--blue)', marginTop: 4, fontWeight: 600 }}>
+          <div style={{ fontSize: 10, color: 'var(--blue-text)', marginTop: 4, fontWeight: 600 }}>
             ↑ Нажмите курьера для назначения
           </div>
         )}
@@ -751,7 +751,7 @@ function CourierCard({ courier, selected, pending, hasSelectedOrder, onSelect })
   const tgId  = courier.telegram_chat_id ?? courier.courier?.telegram_chat_id
 
   const pendingStyle = pending
-    ? { outline: '2px solid #3b82f6', outlineOffset: 1, background: 'rgba(59,130,246,0.10)' }
+    ? { outline: '2px solid var(--accent)', outlineOffset: 1, background: 'var(--accent-glow)' }
     : {}
 
   return (
@@ -761,10 +761,10 @@ function CourierCard({ courier, selected, pending, hasSelectedOrder, onSelect })
       onClick={() => onSelect(id)}
     >
       <div className="dv2-courier-top">
-        <div className="dv2-courier-avatar" style={{ background: avatarColor(name) }}>{initials(name)}</div>
+        <div className="dv2-courier-avatar" style={avatarPalette(name)}>{initials(name)}</div>
         <div className="dv2-courier-name">{name}</div>
         {pending && (
-          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: 'rgba(59,130,246,0.25)', color: '#93c5fd', marginLeft: 4 }}>
+          <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: 'var(--accent)', color: '#fff', marginLeft: 4 }}>
             → Назначить
           </span>
         )}
@@ -800,7 +800,7 @@ function CourierCard({ courier, selected, pending, hasSelectedOrder, onSelect })
           {phone && (
             <a
               href={`tel:${phone}`}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#34d399', padding: '3px 8px', borderRadius: 6, background: 'rgba(52,211,153,0.12)', textDecoration: 'none' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--green-text)', padding: '3px 8px', borderRadius: 6, background: 'var(--green-dim)', textDecoration: 'none' }}
             >
               <Phone size={10} /> Позвонить
             </a>
@@ -810,7 +810,7 @@ function CourierCard({ courier, selected, pending, hasSelectedOrder, onSelect })
               href={`https://t.me/${tgId}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#60a5fa', padding: '3px 8px', borderRadius: 6, background: 'rgba(96,165,250,0.12)', textDecoration: 'none' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--blue-text)', padding: '3px 8px', borderRadius: 6, background: 'var(--blue-dim)', textDecoration: 'none' }}
             >
               <Send size={10} /> Telegram
             </a>
@@ -944,12 +944,12 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
       <div className="dv2-oc-head">
         <span className="dv2-oc-num">#{formatOrderLabel(order)}</span>
         <span className="dv2-oc-badges">
-          {isCash && <span className="dv2-badge cash">cash</span>}
-          {!isCash && order.payment_method && <span className="dv2-badge card">card</span>}
-          {hasPrepay && <span className="dv2-badge claimable">prepay</span>}
-          {order.status === 'issue' && <span className="dv2-badge issue">issue</span>}
-          {isToday(order.scheduled_at || order.delivery_date) && <span className="dv2-badge today">today</span>}
-          {isTomorrow(order.scheduled_at || order.delivery_date) && <span className="dv2-badge tomorrow">tomorrow</span>}
+          {isCash && <span className="dv2-badge cash">нал</span>}
+          {!isCash && order.payment_method && <span className="dv2-badge card">карта</span>}
+          {hasPrepay && <span className="dv2-badge claimable">предопл</span>}
+          {order.status === 'issue' && <span className="dv2-badge issue">проблема</span>}
+          {isToday(order.scheduled_at || order.delivery_date) && <span className="dv2-badge today">сегодня</span>}
+          {isTomorrow(order.scheduled_at || order.delivery_date) && <span className="dv2-badge tomorrow">завтра</span>}
         </span>
       </div>
       <div className="dv2-oc-name">{customer.full_name || customer.phone || 'Клиент —'}</div>
@@ -1009,7 +1009,7 @@ function DetailPanel({ order, customerMap, courierMap, onClose, onAction }) {
                 <div className="dv2-dp-title">Курьер</div>
                 {courier?.full_name ? (
                   <div className="dv2-dp-courier">
-                    <div className="dv2-courier-avatar" style={{ background: avatarColor(courier.full_name) }}>{initials(courier.full_name)}</div>
+                    <div className="dv2-courier-avatar" style={avatarPalette(courier.full_name)}>{initials(courier.full_name)}</div>
                     <div>
                       <div className="dv2-courier-name">{courier.full_name}</div>
                       <div className="dv2-oc-courier">{courier.phone || 'Назначен'}</div>
@@ -1435,7 +1435,7 @@ const ORDER_STATUS_OPTIONS = [
 function TransactionCourier({ row }) {
   return (
     <div className="dv2-cash-courier">
-      <div className="dv2-courier-avatar" style={{ background: avatarColor(row.courier_name) }}>{initials(row.courier_name)}</div>
+      <div className="dv2-courier-avatar" style={avatarPalette(row.courier_name)}>{initials(row.courier_name)}</div>
       <div>
         <div className="dv2-cash-courier-name">{row.courier_name || 'Курьер'}</div>
         <div className="dv2-cash-courier-phone">{row.courier_phone || '—'}</div>
@@ -1577,7 +1577,7 @@ function CashMetric({ label, value, tone }) {
 function CourierCell({ row }) {
   return (
     <div className="dv2-cash-courier">
-      <div className="dv2-courier-avatar" style={{ background: avatarColor(row.courier_name) }}>{initials(row.courier_name)}</div>
+      <div className="dv2-courier-avatar" style={avatarPalette(row.courier_name)}>{initials(row.courier_name)}</div>
       <div>
         <div className="dv2-cash-courier-name">{row.courier_name || 'Курьер'}</div>
         <div className="dv2-cash-courier-phone">{row.courier_phone || '—'}</div>
@@ -1740,8 +1740,16 @@ function initials(name = '') {
   return name.trim().split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase() || '?'
 }
 
-function avatarColor(name = '') {
-  const colors = ['#6366f1', '#10b981', '#f59e0b', '#3b82f6', '#a78bfa', '#ef4444']
-  const index = name.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) % colors.length
-  return colors[index]
+const AVATAR_PALETTE = [
+  { background: '#E7E5FB', color: '#4338CA' },
+  { background: '#FBEFD6', color: '#B45309' },
+  { background: '#DCEEFB', color: '#0369A1' },
+  { background: '#DDF3E7', color: '#047857' },
+  { background: '#F0EFEA', color: '#76766E' },
+  { background: '#FDE7EC', color: '#BE123C' },
+]
+
+function avatarPalette(name = '') {
+  const index = name.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) % AVATAR_PALETTE.length
+  return AVATAR_PALETTE[index]
 }

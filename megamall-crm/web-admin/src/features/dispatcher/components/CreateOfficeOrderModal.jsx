@@ -173,7 +173,7 @@ export default function CreateOfficeOrderModal({ open, onClose }) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex items-center gap-2">
-            <Store size={18} style={{ color: 'var(--blue)' }} />
+            <Store size={18} style={{ color: 'var(--blue-text)' }} />
             <span className="font-semibold" style={{ color: 'var(--text1)', fontSize: 15 }}>Офисный заказ</span>
           </div>
           <button onClick={onClose} className="dv2-icon-btn"><X size={16} /></button>
@@ -214,7 +214,7 @@ export default function CreateOfficeOrderModal({ open, onClose }) {
             {form.customerId ? (
               <div className="flex items-center justify-between px-3 py-2 rounded-xl" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)' }}>
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 size={14} style={{ color: 'var(--blue)' }} />
+                  <CheckCircle2 size={14} style={{ color: 'var(--blue-text)' }} />
                   <div>
                     <div className="text-xs font-semibold" style={{ color: 'var(--text1)' }}>{form.fullName}</div>
                     <div className="text-[10px]" style={{ color: 'var(--text3)' }}>{form.phone}</div>
@@ -238,7 +238,7 @@ export default function CreateOfficeOrderModal({ open, onClose }) {
                       <button
                         key={c.id}
                         onClick={() => selectCustomer(c)}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-white/5"
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--bg2)]"
                         style={{ color: 'var(--text1)', borderBottom: '1px solid var(--border)' }}
                       >
                         <span className="font-medium">{c.full_name}</span>
@@ -307,7 +307,7 @@ export default function CreateOfficeOrderModal({ open, onClose }) {
                   onClick={() => setField('deliveryMode', val)}
                   className="px-4 py-1.5 rounded-lg text-xs font-medium transition-colors"
                   style={{
-                    background: form.deliveryMode === val ? 'var(--blue)' : 'rgba(255,255,255,0.06)',
+                    background: form.deliveryMode === val ? 'var(--accent)' : 'var(--bg2)',
                     color: form.deliveryMode === val ? '#fff' : 'var(--text2)',
                     border: '1px solid ' + (form.deliveryMode === val ? 'var(--blue)' : 'var(--border)'),
                   }}
@@ -334,7 +334,7 @@ export default function CreateOfficeOrderModal({ open, onClose }) {
             {prodLoading ? (
               <div className="grid grid-cols-3 gap-2">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-14 rounded-xl animate-pulse" style={{ background: 'rgba(255,255,255,0.05)' }} />
+                  <div key={i} className="h-14 rounded-xl animate-pulse" style={{ background: 'var(--bg2)' }} />
                 ))}
               </div>
             ) : (
@@ -343,13 +343,13 @@ export default function CreateOfficeOrderModal({ open, onClose }) {
                   <button
                     key={p.id}
                     onClick={() => { addToCart(p); setProductSearch('') }}
-                    className="text-left p-2.5 rounded-xl transition-colors hover:bg-white/10"
-                    style={{ border: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)' }}
+                    className="text-left p-2.5 rounded-xl transition-colors hover:bg-[var(--bg2)]"
+                    style={{ border: '1px solid var(--border)', background: 'var(--bg3)' }}
                   >
                     <Package size={12} style={{ color: 'var(--text3)', marginBottom: 4 }} />
                     <div className="text-[11px] font-semibold leading-tight" style={{ color: 'var(--text1)' }}>{p.name}</div>
                     {(p.sale_price ?? p.base_price) != null && (
-                      <div className="text-[10px] mt-0.5" style={{ color: 'var(--blue)' }}>
+                      <div className="text-[10px] mt-0.5" style={{ color: 'var(--blue-text)' }}>
                         {Number(p.sale_price ?? p.base_price).toLocaleString('ru-RU')} с
                       </div>
                     )}
@@ -364,13 +364,13 @@ export default function CreateOfficeOrderModal({ open, onClose }) {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="dv2-field-label" style={{ marginBottom: 0 }}>Корзина</label>
-                <span className="text-xs font-bold" style={{ color: 'var(--blue)' }}>
+                <span className="text-xs font-bold" style={{ color: 'var(--blue-text)' }}>
                   {productTotal.toLocaleString('ru-RU')} с
                 </span>
               </div>
               <div className="space-y-2">
                 {cartItems.map((item, idx) => (
-                  <div key={item.product_id} className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)' }}>
+                  <div key={item.product_id} className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'var(--bg3)', border: '1px solid var(--border)' }}>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-medium truncate" style={{ color: 'var(--text1)' }}>{item.name}</div>
                       <div className="text-[10px]" style={{ color: 'var(--text3)' }}>{item.unit_price.toLocaleString('ru-RU')} с / шт</div>

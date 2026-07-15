@@ -20,18 +20,18 @@ import {
 
 // ── Design tokens (match DispatcherBoardV2) ──────────────────────────────────
 const T = {
-  bg:     '#0a111e',
-  panel:  '#0d1525',
-  card:   '#111d30',
-  border: 'rgba(255,255,255,0.07)',
-  text1:  '#f0f4ff',
-  text2:  '#8fa3c8',
-  text3:  '#4a6080',
-  violet: '#8b5cf6',
-  green:  '#10b981',
-  red:    '#ef4444',
-  amber:  '#f59e0b',
-  blue:   '#3b82f6',
+  bg:     '#F4F3EF',
+  panel:  '#FFFFFF',
+  card:   '#FBFAF7',
+  border: '#EAE8E2',
+  text1:  '#1C1C1A',
+  text2:  '#76766E',
+  text3:  '#A3A39A',
+  violet: '#6366f1',
+  green:  '#047857',
+  red:    '#BE123C',
+  amber:  '#B45309',
+  blue:   '#0369A1',
 }
 
 const field = {
@@ -83,7 +83,7 @@ function ModalShell({ title, subtitle, onClose, children, width = 520 }) {
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8,
+              background: '#F0EFEA', border: 'none', borderRadius: 8,
               color: T.text2, cursor: 'pointer', padding: '6px 10px', fontSize: 16,
               marginLeft: 12, flexShrink: 0,
             }}
@@ -123,7 +123,7 @@ function PrimaryBtn({ onClick, disabled, loading, children, color = T.violet }) 
       onClick={onClick}
       disabled={disabled || loading}
       style={{
-        background: disabled || loading ? 'rgba(139,92,246,0.4)' : color,
+        background: disabled || loading ? 'rgba(99,102,241,0.4)' : color,
         color: '#fff', border: 'none', borderRadius: 10,
         padding: '11px 20px', fontWeight: 700, fontSize: 14,
         cursor: disabled || loading ? 'not-allowed' : 'pointer',
@@ -260,7 +260,7 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
         <FieldGroup>
           <Label>Пароль</Label>
           <PasswordInput
-            theme="dark"
+            theme="light"
             style={field.base}
             value={form.password} onChange={set('password')}
             placeholder="Оставьте пустым, чтобы не менять"
@@ -304,7 +304,7 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
                     style={{
                       padding: '5px 12px', borderRadius: 20, fontSize: 13, fontWeight: 600,
                       cursor: 'pointer', transition: 'all 0.15s',
-                      background: selected ? T.violet : 'rgba(255,255,255,0.06)',
+                      background: selected ? T.violet : '#F0EFEA',
                       color: selected ? '#fff' : T.text2,
                       border: selected ? `1px solid ${T.violet}` : `1px solid ${T.border}`,
                     }}
@@ -330,7 +330,7 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
               onClick={handleAddCity}
               disabled={addingCity || !newCityName.trim()}
               style={{
-                background: addingCity || !newCityName.trim() ? 'rgba(255,255,255,0.06)' : T.blue,
+                background: addingCity || !newCityName.trim() ? '#F0EFEA' : T.blue,
                 color: addingCity || !newCityName.trim() ? T.text3 : '#fff',
                 border: 'none', borderRadius: 10, padding: '9px 14px',
                 fontWeight: 700, fontSize: 13, cursor: addingCity || !newCityName.trim() ? 'not-allowed' : 'pointer',
@@ -543,7 +543,7 @@ export function TariffsModal({ courier, onClose }) {
                 <button
                   onClick={() => handleDelete(r)}
                   style={{
-                    background: 'rgba(239,68,68,0.12)', border: 'none', borderRadius: 7,
+                    background: 'rgba(190,18,60,0.12)', border: 'none', borderRadius: 7,
                     color: T.red, cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center',
                   }}
                   title="Удалить"
