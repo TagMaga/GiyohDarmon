@@ -406,10 +406,7 @@ export default function DispatcherBoardV3() {
     <div className="dispatch-v2" data-theme={theme}>
       <TopbarV2
         phone={phone}
-        problemCount={counts.issues + counts.overdue}
         onPalette={() => setPaletteOpen(true)}
-        onShortcuts={() => setShortcutsOpen((open) => !open)}
-        onRefresh={handleRefresh}
         onLogout={logout}
         onCouriers={() => setCouriersOpen(true)}
         theme={theme}
@@ -601,7 +598,7 @@ export default function DispatcherBoardV3() {
   )
 }
 
-function TopbarV2({ problemCount, onPalette, onShortcuts, onRefresh, onCouriers, theme, onToggleTheme }) {
+function TopbarV2({ onPalette, onCouriers, theme, onToggleTheme }) {
   return (
     <header className="dv2-topbar">
       <div className="dv2-brand">
@@ -615,11 +612,7 @@ function TopbarV2({ problemCount, onPalette, onShortcuts, onRefresh, onCouriers,
       <button className="dv2-cmd" onClick={onPalette}>⌘ <span>Команды</span><kbd>K</kbd></button>
       <button className="dv2-icon-btn dv2-mobile-action" onClick={onCouriers}>☰</button>
       <div className="dv2-spacer" />
-      <div className="dv2-pill"><span className="dv2-dot-live" /> Онлайн</div>
-      <button className="dv2-icon-btn" onClick={onRefresh} title="Обновить">↻</button>
-      <button className="dv2-icon-btn tb-icon-btn dv2-hide-mobile" id="tb-shortcuts-btn" onClick={onShortcuts} title="Горячие клавиши">⌨️</button>
       <button className="dv2-icon-btn" onClick={onToggleTheme} title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>{theme === 'dark' ? '☀️' : '🌙'}</button>
-      <button className="dv2-icon-btn dv2-hide-mobile" title="Уведомления">🔔{problemCount > 0 && <span className="dv2-notif">{problemCount}</span>}</button>
       <AccountMenu variant="dark" />
     </header>
   )

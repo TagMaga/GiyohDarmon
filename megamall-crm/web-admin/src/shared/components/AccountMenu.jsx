@@ -2,12 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronDown, ChevronLeft, ChevronRight,
-  User, Settings, Bell, Moon, Sun, LogOut, Lock, Loader2,
+  LogOut, Lock, Loader2,
 } from 'lucide-react'
 import { useMutation } from '@tanstack/react-query'
 import useAuthStore      from '../store/authStore'
 import useProfile        from '../hooks/useProfile'
-import useTheme          from '../hooks/useTheme'
 import useAppSettings    from '../hooks/useAppSettings'
 import { useToast }      from './ToastProvider'
 import PasswordInput     from './PasswordInput'
@@ -150,9 +149,8 @@ function Divider() {
 
 // ── Main menu ─────────────────────────────────────────────────────────────────
 
-function MainView({ fullName, phone, role, initials, theme, onToggleTheme, onGo }) {
+function MainView({ fullName, phone, role, initials, onGo }) {
   const roleLabel = ROLE_LABELS[role] ?? role
-  const isDark = theme === 'dark'
   return (
     <>
       {/* Account header */}
@@ -169,19 +167,6 @@ function MainView({ fullName, phone, role, initials, theme, onToggleTheme, onGo 
             )}
           </div>
         </div>
-      </div>
-
-      {/* Actions */}
-      <div style={{ padding: '6px' }}>
-        <MenuRow icon={User}     label="Мой профиль"  onClick={() => onGo('profile')} />
-        <MenuRow icon={Settings} label="Настройки"     onClick={() => onGo('settings')} />
-        <MenuRow icon={Bell}     label="Уведомления"   onClick={() => onGo('notifications')} />
-        <MenuRow
-          icon={isDark ? Sun : Moon}
-          label={isDark ? 'Светлая тема' : 'Тёмная тема'}
-          onClick={onToggleTheme}
-          trailing={<ToggleSwitch active={isDark} onChange={() => onToggleTheme()} />}
-        />
       </div>
 
       <Divider />
@@ -461,7 +446,6 @@ export default function AccountMenu({ variant = 'light' }) {
   const triggerRef        = useRef(null)
 
   const { fullName, initials, phone, role, userId, employee } = useProfile()
-  const { theme, toggle: toggleTheme }  = useTheme()
   const { settings, update, updateNotification } = useAppSettings()
   const { clearAuth }  = useAuthStore()
   const navigate       = useNavigate()
@@ -567,8 +551,6 @@ export default function AccountMenu({ variant = 'light' }) {
               phone={phone}
               role={role}
               initials={initials}
-              theme={theme}
-              onToggleTheme={toggleTheme}
               onGo={setView}
             />
           )}
