@@ -35,6 +35,11 @@ export function getReservedQty(obj) {
   return obj.reserved_quantity ?? obj.ReservedQuantity ?? 0
 }
 
+export function getLowStockThreshold(obj) {
+  if (!obj) return 0
+  return obj.low_stock_threshold ?? obj.LowStockThreshold ?? 0
+}
+
 export function isLowStock(obj) {
   if (!obj) return false
   return obj.is_low_stock ?? obj.IsLowStock ?? false
