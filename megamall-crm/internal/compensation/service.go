@@ -602,16 +602,6 @@ func (s *Service) BuildSnapshot(
 
 // ─── Financial event API (called by Phase 4 Financial Engine) ─────────────────
 
-// ListFinancialEventsByOrderID returns all ledger events for an order.
-// Added Phase 6 — used by the reporting endpoint and E2E validation.
-func (s *Service) ListFinancialEventsByOrderID(ctx context.Context, orderID uuid.UUID) ([]FinancialEvent, error) {
-	events, err := s.repo.ListFinancialEventsByOrderID(ctx, orderID)
-	if err != nil {
-		return nil, apperrors.Internal(err)
-	}
-	return events, nil
-}
-
 // RecordFinancialEvent persists an immutable financial ledger entry inside a transaction.
 // Phase 4 Financial Engine calls this when processing order status transitions.
 func (s *Service) RecordFinancialEvent(

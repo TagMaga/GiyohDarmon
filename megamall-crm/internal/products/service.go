@@ -62,17 +62,6 @@ func (s *Service) ListSuppliers(ctx context.Context, p pagination.Params) ([]Sup
 	return s.repo.ListSuppliers(ctx, p)
 }
 
-func (s *Service) GetSupplierByID(ctx context.Context, id uuid.UUID) (*Supplier, error) {
-	sup, err := s.repo.GetSupplierByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if sup == nil {
-		return nil, apperrors.NotFound("supplier")
-	}
-	return sup, nil
-}
-
 func (s *Service) CreateSupplier(ctx context.Context, actorID uuid.UUID, req CreateSupplierRequest) (*Supplier, error) {
 	sup := &Supplier{
 		ID:       uuid.New(),

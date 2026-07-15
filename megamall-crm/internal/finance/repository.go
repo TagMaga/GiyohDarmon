@@ -288,19 +288,6 @@ func (r *Repository) AddExpense(ctx context.Context, userID uuid.UUID, amount fl
 	return row, err
 }
 
-// GetExpense returns a single business expense by id.
-func (r *Repository) GetExpense(ctx context.Context, id uuid.UUID) (*BusinessExpense, error) {
-	var row BusinessExpense
-	err := r.db.WithContext(ctx).Where("id = ?", id).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrExpenseNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
-}
-
 // UpdateExpense updates amount/note on a business expense and writes an audit
 // entry. Category is intentionally not editable.
 func (r *Repository) UpdateExpense(ctx context.Context, id uuid.UUID, editorID uuid.UUID, newAmount float64, newNote string) error {
@@ -822,8 +809,3 @@ func (r *Repository) GetTeamPerformance(
 	}
 	return rows, nil
 }
-
-// ─── UUID helper for testing ──────────────────────────────────────────────────
-
-// mustNewUUID returns a new random UUID. Used in tests; panics on failure.
-func mustNewUUID() uuid.UUID { return uuid.New() }

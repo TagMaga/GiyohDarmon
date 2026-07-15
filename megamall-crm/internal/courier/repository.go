@@ -24,8 +24,6 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) DB() *gorm.DB { return r.db }
-
 // ─── Assignment helpers (internal; avoids importing dispatch package) ─────────
 
 // activeAssignmentRow is a thin local struct for reading assignment data.
@@ -34,19 +32,6 @@ type activeAssignmentRow struct {
 	CourierID  uuid.UUID `gorm:"column:courier_id"`
 	AssignedAt time.Time `gorm:"column:assigned_at"`
 	IsActive   bool      `gorm:"column:is_active"`
-}
-
-// hasActiveAssignment returns true if orderID has an is_active=true assignment.
-func (r *Repository) hasActiveAssignment(ctx context.Context, orderID uuid.UUID) (bool, error) {
-	var count int64
-	err := r.db.WithContext(ctx).
-		Table("order_assignments").
-		Where("order_id = ? AND is_active = TRUE", orderID).
-		Count(&count).Error
-	if err != nil {
-		return false, fmt.Errorf("check active assignment: %w", err)
-	}
-	return count > 0, nil
 }
 
 // createAssignment inserts a new order_assignment row within a tx.
@@ -758,17 +743,6 @@ func (r *Repository) CreateAttempt(ctx context.Context, a *DeliveryAttempt) erro
 		return fmt.Errorf("create delivery attempt: %w", err)
 	}
 	return nil
-}
-
-func (r *Repository) ListAttempts(ctx context.Context, orderID uuid.UUID) ([]DeliveryAttempt, error) {
-	var rows []DeliveryAttempt
-	if err := r.db.WithContext(ctx).
-		Where("order_id = ?", orderID).
-		Order("attempt_no ASC").
-		Find(&rows).Error; err != nil {
-		return nil, fmt.Errorf("list delivery attempts: %w", err)
-	}
-	return rows, nil
 }
 
 // ─── Courier Status ───────────────────────────────────────────────────────────

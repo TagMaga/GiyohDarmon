@@ -24,8 +24,6 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) DB() *gorm.DB { return r.db }
-
 // ─── Board ────────────────────────────────────────────────────────────────────
 
 // ListBoardOrders returns all orders in confirmed/assigned/in_delivery status

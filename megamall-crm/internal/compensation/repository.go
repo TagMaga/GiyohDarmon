@@ -199,18 +199,6 @@ func (r *Repository) CreateSnapshot(ctx context.Context, tx *gorm.DB, s *OrderFi
 	return nil
 }
 
-// GetSnapshotByID loads a snapshot by its primary key. Returns nil, nil if not found.
-func (r *Repository) GetSnapshotByID(ctx context.Context, id uuid.UUID) (*OrderFinancialSnapshot, error) {
-	var s OrderFinancialSnapshot
-	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&s).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("get snapshot by id: %w", err)
-	}
-	return &s, nil
-}
-
 // GetSnapshotByOrderID loads the snapshot for a specific order.
 // Returns nil, nil if not found.
 func (r *Repository) GetSnapshotByOrderID(ctx context.Context, orderID uuid.UUID) (*OrderFinancialSnapshot, error) {
@@ -235,18 +223,6 @@ func (r *Repository) CreateFinancialEvent(ctx context.Context, tx *gorm.DB, e *F
 	return nil
 }
 
-// ListFinancialEventsByOrderID returns all financial events for a given order,
-// ordered chronologically. Added in Phase 6 for E2E validation and reporting.
-func (r *Repository) ListFinancialEventsByOrderID(ctx context.Context, orderID uuid.UUID) ([]FinancialEvent, error) {
-	var rows []FinancialEvent
-	if err := r.db.WithContext(ctx).
-		Where("order_id = ?", orderID).
-		Order("created_at ASC").
-		Find(&rows).Error; err != nil {
-		return nil, fmt.Errorf("list financial events by order: %w", err)
-	}
-	return rows, nil
-}
 
 // ─── Employee compensation ─────────────────────────────────────────────────────
 
