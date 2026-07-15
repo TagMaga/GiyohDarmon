@@ -276,21 +276,6 @@ func (r *Repository) AddWithdrawal(ctx context.Context, tx *gorm.DB, userID uuid
 	return r.CurrentBalance(ctx)
 }
 
-// GetTransaction returns a single manual_income/owner_withdrawal row by id.
-func (r *Repository) GetTransaction(ctx context.Context, id uuid.UUID) (*Transaction, error) {
-	var row Transaction
-	err := r.db.WithContext(ctx).
-		Where("id = ? AND transaction_type IN ('manual_income','owner_withdrawal')", id).
-		First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrTransactionNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &row, nil
-}
-
 var ErrTransactionNotFound = errors.New("transaction not found")
 
 // UpdateTransaction updates amount/note on a top-up or withdrawal row, writes an

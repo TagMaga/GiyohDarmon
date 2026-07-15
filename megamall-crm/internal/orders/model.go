@@ -1,7 +1,6 @@
 package orders
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -290,14 +289,3 @@ type OrderPrepayment struct {
 }
 
 func (OrderPrepayment) TableName() string { return "order_prepayments" }
-
-// ErrInvalidTransition is returned when the requested status change is not
-// permitted by the state machine.
-type ErrInvalidTransition struct {
-	From OrderStatus
-	To   OrderStatus
-}
-
-func (e *ErrInvalidTransition) Error() string {
-	return fmt.Sprintf("invalid transition: %s → %s", e.From, e.To)
-}

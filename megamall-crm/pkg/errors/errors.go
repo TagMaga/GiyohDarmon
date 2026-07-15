@@ -83,15 +83,6 @@ func Unprocessable(message string) *AppError {
 	return New(CodeUnprocessable, http.StatusUnprocessableEntity, message)
 }
 
-// Is checks if an error is an AppError with a specific code.
-func Is(err error, code Code) bool {
-	var appErr *AppError
-	if errors.As(err, &appErr) {
-		return appErr.Code == code
-	}
-	return false
-}
-
 // AsAppError extracts AppError from error chain.
 func AsAppError(err error) (*AppError, bool) {
 	var appErr *AppError

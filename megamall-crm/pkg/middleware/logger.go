@@ -29,8 +29,3 @@ func RequestLogger() gin.HandlerFunc {
 			status, method, path, ip, latency)
 	}
 }
-
-// Recovery returns a middleware that recovers from panics.
-func Recovery() gin.HandlerFunc {
-	return gin.RecoveryWithWriter(nil)
-}

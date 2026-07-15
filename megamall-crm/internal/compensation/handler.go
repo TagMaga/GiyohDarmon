@@ -241,25 +241,6 @@ func (h *Handler) Preview(c *gin.Context) {
 	response.OK(c, result)
 }
 
-// ─── Financial Events (Phase 6) ───────────────────────────────────────────────
-
-// ListEventsByOrder handles GET /hr/events?order_id=<uuid>
-// Returns all ledger events for a specific order (owner only).
-// Used for E2E validation and finance reporting.
-func (h *Handler) ListEventsByOrder(c *gin.Context) {
-	orderID, ok := parseOptionalUUID(c, "order_id")
-	if !ok || orderID == nil {
-		response.Error(c, apperrors.BadRequest("order_id query param is required"))
-		return
-	}
-	events, err := h.svc.ListFinancialEventsByOrderID(c.Request.Context(), *orderID)
-	if err != nil {
-		response.HandleError(c, err)
-		return
-	}
-	response.OK(c, events)
-}
-
 // ─── Employee compensation (fixed salary) handlers ───────────────────────────
 
 // GetEmployeeCompensation handles GET /hr/compensation/employees/:user_id/salary

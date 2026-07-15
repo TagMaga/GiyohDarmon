@@ -25,9 +25,6 @@ func NewRepository(db *gorm.DB, loc *time.Location) *Repository {
 	return &Repository{db: db, loc: loc}
 }
 
-// DB exposes the underlying connection so the service can open transactions.
-func (r *Repository) DB() *gorm.DB { return r.db }
-
 // Stats returns the order-health breakdown for the owner dashboard.
 // from/to are optional [from, to] created_at bounds; nil means unbounded (all time).
 func (r *Repository) Stats(ctx context.Context, from, to *time.Time) (*OrderStatsResponse, error) {

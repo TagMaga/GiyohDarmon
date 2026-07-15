@@ -127,21 +127,6 @@ func (r *Repository) ListByPayee(ctx context.Context, payeeID uuid.UUID) ([]Payo
 	return rows, err
 }
 
-// ListByPayer returns all payouts made by a payer within an optional period,
-// newest first — used to show "payments I've already made" history.
-func (r *Repository) ListByPayer(ctx context.Context, payerID uuid.UUID, from, to *time.Time) ([]Payout, error) {
-	q := r.db.WithContext(ctx).Where("payer_id = ?", payerID)
-	if from != nil {
-		q = q.Where("period_end >= ?", *from)
-	}
-	if to != nil {
-		q = q.Where("period_start <= ?", *to)
-	}
-	var rows []Payout
-	err := q.Order("created_at DESC").Find(&rows).Error
-	return rows, err
-}
-
 // SumPaidGroupedByPayee returns, for a given payer and period, how much has
 // already been paid to each payee (period overlap semantics: any payout whose
 // [period_start, period_end] overlaps the requested window counts).
