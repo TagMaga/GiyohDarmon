@@ -113,14 +113,6 @@ export default function DispatcherBoardV3() {
     page: 1,
   }))
   const [photoPreview, setPhotoPreview] = useState(null)
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === 'undefined') return 'light'
-    if (!localStorage.getItem('dispatch-v3-migrated-v2')) {
-      localStorage.removeItem('dispatch-v3-theme')
-      localStorage.setItem('dispatch-v3-migrated-v2', '1')
-    }
-    return window.localStorage.getItem('dispatch-v3-theme') || 'light'
-  })
 
   const board = useQuery({ queryKey: KEYS.dispatcher.board, queryFn: fetchBoard, refetchInterval: 30_000, staleTime: 25_000 })
   const news = useQuery({ queryKey: KEYS.dispatcher.newOrders, queryFn: fetchNewOrders, refetchInterval: 30_000, staleTime: 25_000 })
@@ -378,10 +370,6 @@ export default function DispatcherBoardV3() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paletteOpen, modal, handleRefresh, selectedOrder, pendingCourierId, grouped, isConfirming])
 
-  useEffect(() => {
-    window.localStorage.setItem('dispatch-v3-theme', theme)
-  }, [theme])
-
   const closeModal = useCallback(() => {
     setModal(null)
     setActiveOrder(null)
@@ -403,13 +391,11 @@ export default function DispatcherBoardV3() {
   }
 
   return (
-    <div className="dispatch-v2" data-theme={theme}>
+    <div className="dispatch-v2">
       <TopbarV2
         phone={phone}
         onLogout={logout}
         onCouriers={() => setCouriersOpen(true)}
-        theme={theme}
-        onToggleTheme={() => setTheme((current) => current === 'dark' ? 'light' : 'dark')}
       />
 
       <KpiBar counts={counts} couriers={courierList} setFilters={setFilters} onCreateOrder={() => setCreateOrderOpen(true)} />
@@ -597,7 +583,7 @@ export default function DispatcherBoardV3() {
   )
 }
 
-function TopbarV2({ onCouriers, theme, onToggleTheme }) {
+function TopbarV2({ onCouriers }) {
   return (
     <header className="dv2-topbar">
       <div className="dv2-brand">
@@ -610,7 +596,6 @@ function TopbarV2({ onCouriers, theme, onToggleTheme }) {
       <div className="dv2-sep" />
       <button className="dv2-icon-btn dv2-mobile-action" onClick={onCouriers}>☰</button>
       <div className="dv2-spacer" />
-      <button className="dv2-icon-btn" onClick={onToggleTheme} title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>{theme === 'dark' ? '☀️' : '🌙'}</button>
       <AccountMenu variant="dark" />
     </header>
   )
