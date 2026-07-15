@@ -775,12 +775,22 @@
 .dv2-history-filters .dv2-cash-range-btn {
   min-height: 40px;
 }
-.dv2-history-filters .dv2-cash-range,
-.dv2-history-filters .dv2-cash-range-btn { width: 100%; }
 /* Desktop-only: Status/Курьер/Seller/Товар filters stay off mobile, where the search bar is primary */
 .dv2-history-filters--desktop-only { display: none; }
 @media (min-width: 768px) {
   .dv2-history-filters--desktop-only { display: flex; }
+  /* Keep the filter row on one line on desktop; scroll horizontally instead of wrapping */
+  .dv2-history-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .dv2-history-filters > .dv2-cash-range,
+  .dv2-history-filters > .dv2-cash-select,
+  .dv2-history-filters > .dv2-search-field {
+    flex: 0 0 auto;
+  }
+  .dv2-history-filters .dv2-cash-select { min-width: 150px; }
+  .dv2-history-filters .dv2-search-field { min-width: 130px; }
 }
 .dv2-filter-row {
   display: flex;
