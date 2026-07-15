@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Truck, UserCheck, Package, UserX, Flame, Banknote, Flag,
   ClipboardList, Wallet, Check, AlertTriangle, CalendarDays, ChevronDown, WifiOff, Search, Image as ImageIcon, X,
-  Pencil, DollarSign, Power, Plus, Phone, Send, Loader2,
+  Pencil, DollarSign, Power, Plus, Loader2,
 } from 'lucide-react'
 import { EditCourierModal, TariffsModal, ToggleOrderIntakeModal } from '../components/CourierManageModals'
 import useAuthStore   from '../../../shared/store/authStore'
@@ -713,7 +713,7 @@ function CourierRail({ couriers, activeCourier, mobileOpen, onSelect, unassigned
 }
 
 
-// V3: CourierCard — pending glow, phone/telegram links
+// V3: CourierCard — pending glow
 function CourierCard({ courier, selected, pending, hasSelectedOrder, onSelect }) {
   const id = courier.courier_id ?? courier.id
   const name = courier.full_name ?? courier.courier?.full_name ?? 'Курьер'
@@ -723,8 +723,6 @@ function CourierCard({ courier, selected, pending, hasSelectedOrder, onSelect })
   const loadPct = Math.min(100, Math.round((active / 6) * 100))
   const loadTone = active >= 5 ? 'red' : active >= 3 ? 'amber' : 'green'
   const dot = !intakeEnabled ? 'overloaded' : active >= 5 ? 'overloaded' : active > 0 ? 'busy' : 'available'
-  const phone = courier.phone ?? courier.courier?.phone
-  const tgId  = courier.telegram_chat_id ?? courier.courier?.telegram_chat_id
 
   const pendingStyle = pending
     ? { outline: '2px solid var(--accent)', outlineOffset: 1, background: 'var(--accent-glow)' }
@@ -765,32 +763,6 @@ function CourierCard({ courier, selected, pending, hasSelectedOrder, onSelect })
         <div className="dv2-courier-intake-off">
           <strong>Приём заказов: выключен</strong>
           {courier.order_intake_reason ? <span>{courier.order_intake_reason}</span> : null}
-        </div>
-      )}
-      {/* V3: quick contact links */}
-      {(phone || tgId) && (
-        <div
-          style={{ display: 'flex', gap: 6, marginTop: 6 }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {phone && (
-            <a
-              href={`tel:${phone}`}
-              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--green-text)', padding: '3px 8px', borderRadius: 6, background: 'var(--green-dim)', textDecoration: 'none' }}
-            >
-              <Phone size={10} /> Позвонить
-            </a>
-          )}
-          {tgId && (
-            <a
-              href={`https://t.me/${tgId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--blue-text)', padding: '3px 8px', borderRadius: 6, background: 'var(--blue-dim)', textDecoration: 'none' }}
-            >
-              <Send size={10} /> Telegram
-            </a>
-          )}
         </div>
       )}
     </button>
