@@ -406,7 +406,6 @@ export default function DispatcherBoardV3() {
     <div className="dispatch-v2" data-theme={theme}>
       <TopbarV2
         phone={phone}
-        onPalette={() => setPaletteOpen(true)}
         onLogout={logout}
         onCouriers={() => setCouriersOpen(true)}
         theme={theme}
@@ -598,7 +597,7 @@ export default function DispatcherBoardV3() {
   )
 }
 
-function TopbarV2({ onPalette, onCouriers, theme, onToggleTheme }) {
+function TopbarV2({ onCouriers, theme, onToggleTheme }) {
   return (
     <header className="dv2-topbar">
       <div className="dv2-brand">
@@ -609,7 +608,6 @@ function TopbarV2({ onPalette, onCouriers, theme, onToggleTheme }) {
         </div>
       </div>
       <div className="dv2-sep" />
-      <button className="dv2-cmd" onClick={onPalette}>⌘ <span>Команды</span><kbd>K</kbd></button>
       <button className="dv2-icon-btn dv2-mobile-action" onClick={onCouriers}>☰</button>
       <div className="dv2-spacer" />
       <button className="dv2-icon-btn" onClick={onToggleTheme} title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>{theme === 'dark' ? '☀️' : '🌙'}</button>
