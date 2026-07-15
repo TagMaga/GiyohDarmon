@@ -51,35 +51,6 @@
   -webkit-font-smoothing: antialiased;
 }
 
-.dispatch-v2[data-theme="dark"] {
-  --bg: #0d0f14;
-  --bg2: #13161e;
-  --bg3: #1a1d27;
-  --surface: #1e2130;
-  --surface2: #252838;
-  --border: rgba(255,255,255,.07);
-  --border2: rgba(255,255,255,.12);
-  --text: #f0f2f8;
-  --text1: #f0f2f8;
-  --text2: #9095a8;
-  --text3: #5e6478;
-  --accent-glow: rgba(99,102,241,.35);
-  --green-text: #10b981;
-  --green-dim: rgba(16,185,129,.15);
-  --amber-text: #f59e0b;
-  --amber-dim: rgba(245,158,11,.15);
-  --red-text: #ef4444;
-  --red-dim: rgba(239,68,68,.15);
-  --blue: #3b82f6;
-  --blue-text: #3b82f6;
-  --blue-dim: rgba(59,130,246,.15);
-  --purple: #a78bfa;
-  --purple-text: #a78bfa;
-  --purple-dim: rgba(167,139,250,.15);
-  --sh: 0 1px 3px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
-  --sh-card: 0 1px 2px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.4);
-}
-
 .dispatch-v2 *, .dispatch-v2 *::before, .dispatch-v2 *::after { box-sizing: border-box; }
 .dispatch-v2 button { font-family: var(--font); cursor: pointer; border: 0; outline: 0; }
 .dispatch-v2 input, .dispatch-v2 select { font-family: var(--font); outline: 0; border: 0; font-size: 16px; }
