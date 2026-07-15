@@ -1310,7 +1310,7 @@ function OrderHistoryView({ rows, pageMeta, couriers, range, filters, loading, e
           <Search size={15} />
           <input value={filters.search} onChange={(e) => onFilters({ search: e.target.value })} placeholder="Поиск по ID, клиенту, телефону, адресу…" aria-label="Поиск заказов" />
         </label>
-        <div className="dv2-history-filters">
+        <div className="dv2-history-filters dv2-history-filters--desktop-only">
           <CashRangePicker range={range} open={rangeOpen} onOpen={setRangeOpen} onRange={onRange} />
           <select className="dv2-cash-select" value={filters.status} onChange={(e) => onFilters({ status: e.target.value })} aria-label="Статус">
             <option value="">Все статусы</option>

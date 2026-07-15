@@ -777,6 +777,11 @@
 }
 .dv2-history-filters .dv2-cash-range,
 .dv2-history-filters .dv2-cash-range-btn { width: 100%; }
+/* Desktop-only: Status/Курьер/Seller/Товар filters stay off mobile, where the search bar is primary */
+.dv2-history-filters--desktop-only { display: none; }
+@media (min-width: 768px) {
+  .dv2-history-filters--desktop-only { display: flex; }
+}
 .dv2-filter-row {
   display: flex;
   align-items: center;
