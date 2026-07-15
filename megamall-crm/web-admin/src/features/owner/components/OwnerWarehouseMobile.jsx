@@ -1,5 +1,5 @@
 import {
-  AlertTriangle, Download, FilterX, Package, PackagePlus, PackageX, RefreshCw, Search, Trash2,
+  AlertTriangle, ChevronDown, Download, FilterX, Package, PackagePlus, PackageX, RefreshCw, Search, Trash2,
 } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
 import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'
@@ -69,6 +69,21 @@ function MobileSearchBar({ value, onChange, placeholder, onSubmit }) {
         className="w-full bg-transparent text-[13.5px] outline-none placeholder:text-slate-400"
       />
     </form>
+  )
+}
+
+function MobilePillSelect({ value, onChange, options, className = '' }) {
+  return (
+    <div className={`relative flex-shrink-0 ${className}`}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9 w-full appearance-none rounded-full border-0 bg-slate-100 pl-3.5 pr-8 text-xs font-semibold text-slate-600 outline-none"
+      >
+        {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
+      <ChevronDown size={13} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+    </div>
   )
 }
 
@@ -360,17 +375,17 @@ export default function OwnerWarehouseMobile({
         <div className="space-y-2.5">
           <MobileSearchBar value={movementSearch} onChange={onMovementSearch} placeholder="Товар, пользователь, комментарий…" />
           <div className="flex gap-2">
-            <select className="input min-h-11 flex-1 rounded-[15px] text-[12.5px]" value={movementType} onChange={(e) => onMovementType(e.target.value)}>
-              {MOVEMENT_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-            <button onClick={clearMovementFilters} className="flex min-h-11 items-center gap-1.5 rounded-[15px] border border-[#E7EAF0] bg-white px-3 text-[12.5px] font-semibold text-slate-600" style={{ boxShadow: CARD_SHADOW }}>
-              <FilterX size={14} />Сброс
+            <MobilePillSelect className="flex-1" value={movementType} onChange={onMovementType} options={MOVEMENT_TYPES} />
+            <button onClick={clearMovementFilters} className="flex h-9 flex-shrink-0 items-center gap-1.5 rounded-full bg-slate-100 px-3.5 text-xs font-semibold text-slate-600">
+              <FilterX size={13} />Сброс
             </button>
           </div>
-          <select className="input min-h-11 w-full rounded-[15px] text-[12.5px]" value={movementProductId} onChange={(e) => onMovementProductId(e.target.value)}>
-            <option value="">Все товары</option>
-            {validProducts.map((product) => <option key={getId(product)} value={getId(product)}>{getProductName(product)}</option>)}
-          </select>
+          <MobilePillSelect
+            className="w-full"
+            value={movementProductId}
+            onChange={onMovementProductId}
+            options={[{ value: '', label: 'Все товары' }, ...validProducts.map((product) => ({ value: getId(product), label: getProductName(product) }))]}
+          />
           <MovementList rows={movementRows} data={data} />
         </div>
       )}
