@@ -1,0 +1,9 @@
+/* Dispatcher mobile UI — matches the "Dispatcher Mobile" Claude Design mock. */
+.dm-scroll::-webkit-scrollbar { width: 0; height: 0; }
+
+@keyframes dmSheetIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes dmFade    { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dmCardIn  { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+.dm-root * { box-sizing: border-box; }
+.dm-root a { color: #4338CA; text-decoration: none; }

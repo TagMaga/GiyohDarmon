@@ -35,6 +35,8 @@ import {
 import { getOrderId, getCourierId, buildCourierMap, resolveCourier, resolveCourierDisplay, formatOrderLabel } from '../utils/orderHelpers'
 import { resolveCustomer, resolveAddress, resolveCity } from '../utils/resolveCustomer'
 import { fmt, fmtDate, isOverdue, isToday, isTomorrow, orderAge, orderAgeMinutes } from '../statusConfig'
+import useIsMobile from '../../../shared/hooks/useIsMobile'
+import DispatcherMobileApp from './DispatcherMobileApp'
 import './DispatcherBoardV2.css'
 
 const arr = (d) => Array.isArray(d) ? d : (d?.orders ?? d?.data ?? d?.items ?? d?.handovers ?? [])
@@ -82,6 +84,12 @@ const CASH_PRESETS = [
 ]
 
 export default function DispatcherBoardV3() {
+  const isMobile = useIsMobile()
+  if (isMobile) return <DispatcherMobileApp />
+  return <DispatcherBoardDesktop />
+}
+
+function DispatcherBoardDesktop() {
   const qc = useQueryClient()
   const toast = useToast()
   const navigate = useNavigate()
