@@ -20,7 +20,8 @@ import {
   getId,
   getLastMovementForProduct,
   getProductBarcode,
-  getProductImage,
+  getProductImageSrcSet,
+  getProductImageVariant,
   getProductName,
   getProductSku,
   getPurchasePrice,
@@ -251,8 +252,19 @@ function getInventoryFifoValue(inv, batches = []) {
 }
 
 function ProductThumb({ product }) {
-  const image = getProductImage(product)
-  if (image) return <img src={image} alt={getProductName(product)} className="h-10 w-10 flex-shrink-0 rounded-lg border border-slate-200 object-cover" />
+  const image = getProductImageVariant(product, 'thumbnail')
+  if (image) {
+    return (
+      <img
+        src={image}
+        srcSet={getProductImageSrcSet(product)}
+        sizes="40px"
+        loading="lazy"
+        alt={getProductName(product)}
+        className="h-10 w-10 flex-shrink-0 rounded-lg border border-slate-200 object-cover"
+      />
+    )
+  }
   return <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-400"><Package size={16} /></div>
 }
 

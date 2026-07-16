@@ -201,13 +201,7 @@ func (h *Handler) AddProductImage(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
-	response.Created(c, ProductImageResponse{
-		ID:        img.ID,
-		ImageURL:  img.ImageURL,
-		IsPrimary: img.IsPrimary,
-		SortOrder: img.SortOrder,
-		CreatedAt: img.CreatedAt,
-	})
+	response.Created(c, ToProductImageResponse(img))
 }
 
 func (h *Handler) DeleteProductImage(c *gin.Context) {

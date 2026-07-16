@@ -104,6 +104,57 @@ export function getProductImage(p) {
   return image?.image_url ?? image?.ImageURL ?? image?.url ?? image?.URL ?? null
 }
 
+function getPrimaryImage(p) {
+  if (!p) return null
+  const images = Array.isArray(p.images) ? p.images : (Array.isArray(p.Images) ? p.Images : [])
+  return images.find((img) => img.is_primary ?? img.IsPrimary) ?? images[0] ?? null
+}
+
+// getProductImageVariant returns the URL for a specific media-pipeline
+// variant ('thumbnail' | 'card' | 'detail') of a product's primary image.
+// Falls back to getProductImage's single legacy URL whenever that variant
+// isn't available — a legacy (pre-Phase-2) image_url-only row, or the
+// media pipeline being disabled — so every call site keeps rendering
+// something even when the richer variant data doesn't exist.
+export function getProductImageVariant(p, variant) {
+  const image = getPrimaryImage(p)
+  const key = variant === 'thumbnail' ? 'thumbnail_url'
+    : variant === 'detail' ? 'detail_url'
+    : 'card_url'
+  const altKey = variant === 'thumbnail' ? 'ThumbnailURL'
+    : variant === 'detail' ? 'DetailURL'
+    : 'CardURL'
+  const url = image?.[key] ?? image?.[altKey]
+  return url ?? getProductImage(p)
+}
+
+// getProductImageDims returns { width, height } for the product's primary
+// image (from the media pipeline's stored source dimensions) or null when
+// unavailable (legacy images carry no dimensions) — used for <img>
+// width/height attributes to prevent layout shift while loading.
+export function getProductImageDims(p) {
+  const image = getPrimaryImage(p)
+  const width = image?.width ?? image?.Width
+  const height = image?.height ?? image?.Height
+  if (!width || !height) return null
+  return { width, height }
+}
+
+// getProductImageSrcSet builds a srcset string from whichever media-
+// pipeline variants are present (thumbnail=320w, card=768w, detail=1440w).
+// Returns '' for legacy (variant-less) images — spreading an empty srcset
+// prop onto an <img> is a no-op, so call sites don't need their own check.
+export function getProductImageSrcSet(p) {
+  const image = getPrimaryImage(p)
+  if (!image) return ''
+  const entries = [
+    [image.thumbnail_url ?? image.ThumbnailURL, 320],
+    [image.card_url ?? image.CardURL, 768],
+    [image.detail_url ?? image.DetailURL, 1440],
+  ].filter(([url]) => Boolean(url))
+  return entries.map(([url, w]) => `${url} ${w}w`).join(', ')
+}
+
 export function getSupplierName(supplier) {
   if (!supplier) return '—'
   return supplier.name ?? supplier.Name ?? '—'

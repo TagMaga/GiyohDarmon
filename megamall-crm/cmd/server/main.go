@@ -34,6 +34,7 @@ import (
 	"github.com/megamall/crm/internal/orders"
 	"github.com/megamall/crm/internal/payouts"
 	"github.com/megamall/crm/internal/products"
+	"github.com/megamall/crm/internal/products/mediabridge"
 	"github.com/megamall/crm/internal/teams"
 	"github.com/megamall/crm/internal/uploads"
 	"github.com/megamall/crm/internal/users"
@@ -187,9 +188,53 @@ func main() {
 	compensationSvc := compensation.NewService(compensationRepo, activityLogger, db)
 	compensationHandler := compensation.NewHandler(compensationSvc)
 
+	// ── Phase 1: centralized secure media pipeline ────────────────────────────
+	// Gated behind MEDIA_PIPELINE_ENABLED (config.MediaConfig.Enabled,
+	// defaults to false). When disabled, nothing below runs at all: no
+	// repository/service/handler is constructed, no route is registered
+	// (see the media.RegisterRoutes call further down), and the quarantine-
+	// purge goroutine never starts — the feature is fully inert in the
+	// running process, not just "routes return an error." The legacy
+	// /uploads endpoint and every other route are completely unaffected
+	// either way.
+	//
+	// Constructed here, before Phase 3, specifically so the Phase 2
+	// mediabridge.Adapters() below are available to inject into
+	// products.NewService immediately after. Both stay nil when disabled;
+	// every products.Service method that would use them checks for nil
+	// first and behaves exactly as before when they're absent — see
+	// products/service.go's requireMedia.
+	var mediaHandler *media.Handler
+	var attachProductImageFn products.AttachProductImageFn
+	var releaseMediaFn products.ReleaseMediaFn
+	if cfg.Media.Enabled {
+		mediaRepo := media.NewRepository(db)
+		mediaSvc := media.NewService(mediaRepo, cfg.Media)
+		mediaHandler = media.NewHandler(mediaSvc)
+		attachProductImageFn, releaseMediaFn = mediabridge.Adapters(mediaSvc)
+
+		// Quarantine purge: physically removes files whose retention window
+		// has elapsed (internal/media.Service.PurgeExpiredQuarantine). DB
+		// rows are deliberately left in place as a permanent audit trail —
+		// see the method's doc comment. Runs hourly; a single missed/slow
+		// run just means purge happens on the next tick, so no locking/
+		// leader-election needed for this single-instance deployment.
+		go func() {
+			ticker := time.NewTicker(time.Hour)
+			defer ticker.Stop()
+			for range ticker.C {
+				if n, err := mediaSvc.PurgeExpiredQuarantine(context.Background(), 500); err != nil {
+					log.Printf("[media] quarantine purge error: %v", err)
+				} else if n > 0 {
+					log.Printf("[media] quarantine purge: removed %d expired file set(s)", n)
+				}
+			}
+		}()
+	}
+
 	// ── Phase 3: Products / Inventory ─────────────────────────────────────────
 	productsRepo := products.NewRepository(db)
-	productsSvc := products.NewService(productsRepo, activityLogger)
+	productsSvc := products.NewService(productsRepo, activityLogger, db, attachProductImageFn, releaseMediaFn)
 	productsHandler := products.NewHandler(productsSvc)
 
 	inventoryRepo := inventory.NewRepository(db)
@@ -253,42 +298,6 @@ func main() {
 
 	// ── Rate-limit store (in-memory; swap for Redis store in production) ─────
 	rateLimitStore := middleware.NewMemoryStore()
-
-	// ── Phase 1: centralized secure media pipeline ────────────────────────────
-	// Gated behind MEDIA_PIPELINE_ENABLED (config.MediaConfig.Enabled,
-	// defaults to false). When disabled, nothing below runs at all: no
-	// repository/service/handler is constructed, no route is registered
-	// (see the media.RegisterRoutes call further down), and the quarantine-
-	// purge goroutine never starts — the feature is fully inert in the
-	// running process, not just "routes return an error." The legacy
-	// /uploads endpoint and every other route are completely unaffected
-	// either way. mediaHandler stays nil when disabled; it is only ever
-	// passed to media.RegisterRoutes, which itself never dereferences it
-	// unless cfg.Media.Enabled is true.
-	var mediaHandler *media.Handler
-	if cfg.Media.Enabled {
-		mediaRepo := media.NewRepository(db)
-		mediaSvc := media.NewService(mediaRepo, cfg.Media)
-		mediaHandler = media.NewHandler(mediaSvc)
-
-		// Quarantine purge: physically removes files whose retention window
-		// has elapsed (internal/media.Service.PurgeExpiredQuarantine). DB
-		// rows are deliberately left in place as a permanent audit trail —
-		// see the method's doc comment. Runs hourly; a single missed/slow
-		// run just means purge happens on the next tick, so no locking/
-		// leader-election needed for this single-instance deployment.
-		go func() {
-			ticker := time.NewTicker(time.Hour)
-			defer ticker.Stop()
-			for range ticker.C {
-				if n, err := mediaSvc.PurgeExpiredQuarantine(context.Background(), 500); err != nil {
-					log.Printf("[media] quarantine purge error: %v", err)
-				} else if n > 0 {
-					log.Printf("[media] quarantine purge: removed %d expired file set(s)", n)
-				}
-			}
-		}()
-	}
 
 	// ── Handlers ─────────────────────────────────────────────────────────────
 	authHandler := auth.NewHandler(authSvc)

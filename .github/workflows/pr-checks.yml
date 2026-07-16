@@ -75,3 +75,12 @@ jobs:
       - name: Run request-logger redaction tests
         working-directory: ${{ env.BACKEND_DIR }}
         run: go test ./pkg/middleware/... -run 'TestRedactSensitiveQuery|TestRequestLogger'
+
+      # internal/products' dto_test.go is DB-independent (pure request
+      # validation); media_integration_test.go/handler_media_test.go
+      # (Phase 2: product images) need a real Postgres via DB_DSN, same as
+      # internal/media's own DB-backed tests, so only this filtered subset
+      # runs in CI.
+      - name: Run products no-DB tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test ./internal/products/... -run 'TestCreateProductRequest|TestUpdateProductRequest'

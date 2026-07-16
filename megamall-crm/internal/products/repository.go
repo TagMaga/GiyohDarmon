@@ -174,6 +174,20 @@ func (r *Repository) SoftDeleteProduct(ctx context.Context, id uuid.UUID) error 
 	return nil
 }
 
+// HardDeleteProduct permanently removes a product row. Used only as a
+// compensating rollback in Service.CreateProduct when attaching a
+// requested primary image fails right after the product row was created —
+// at that point nothing else could possibly reference the brand-new
+// product yet (this is the same request, no other row was inserted first),
+// so a hard delete is safe and correct here specifically. Never used for
+// a real, user-facing product deletion — that's SoftDeleteProduct.
+func (r *Repository) HardDeleteProduct(ctx context.Context, id uuid.UUID) error {
+	if err := r.db.WithContext(ctx).Unscoped().Delete(&Product{}, "id = ?", id).Error; err != nil {
+		return fmt.Errorf("hard delete product (rollback): %w", err)
+	}
+	return nil
+}
+
 // ─── Product Images ───────────────────────────────────────────────────────────
 
 func (r *Repository) AddProductImage(ctx context.Context, img *ProductImage) error {
@@ -181,6 +195,23 @@ func (r *Repository) AddProductImage(ctx context.Context, img *ProductImage) err
 		return fmt.Errorf("add product image: %w", err)
 	}
 	return nil
+}
+
+// GetProductImageByID fetches a single image row, scoped to productID so a
+// caller can't reference an image belonging to a different product. Needed
+// before deleting one — the caller must know its MediaAssetID (if any) to
+// quarantine the underlying asset as part of the delete.
+func (r *Repository) GetProductImageByID(ctx context.Context, imageID, productID uuid.UUID) (*ProductImage, error) {
+	var img ProductImage
+	err := r.db.WithContext(ctx).
+		First(&img, "id = ? AND product_id = ?", imageID, productID).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get product image: %w", err)
+	}
+	return &img, nil
 }
 
 func (r *Repository) DeleteProductImage(ctx context.Context, imageID, productID uuid.UUID) error {

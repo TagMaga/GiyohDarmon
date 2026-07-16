@@ -108,6 +108,29 @@ func (r *Repository) ListPurgeable(ctx context.Context, olderThan time.Time, lim
 	return rows, nil
 }
 
+// UpdateOwner sets owner_entity_type/owner_entity_id on a not-yet-attached
+// asset (owner_entity_id IS NULL), used by Service.AttachToOwner to claim a
+// previously-uploaded, unattached asset for a specific business object. The
+// "owner_entity_id IS NULL" guard is enforced here at the DB layer (not
+// just checked-then-set in Go) so two concurrent attach attempts on the
+// same asset can't both succeed — the second UPDATE simply matches zero
+// rows. Returns (false, nil) — not an error — when the asset was already
+// attached, already deleted, or doesn't exist, so the caller can
+// distinguish "already claimed" from a real DB failure.
+func (r *Repository) UpdateOwner(ctx context.Context, id uuid.UUID, ownerEntityType string, ownerEntityID uuid.UUID) (bool, error) {
+	result := r.db.WithContext(ctx).Model(&Asset{}).
+		Where("id = ? AND deleted_at IS NULL AND owner_entity_id IS NULL", id).
+		Updates(map[string]any{
+			"owner_entity_type": ownerEntityType,
+			"owner_entity_id":   ownerEntityID,
+			"updated_at":        time.Now(),
+		})
+	if result.Error != nil {
+		return false, fmt.Errorf("update media asset owner: %w", result.Error)
+	}
+	return result.RowsAffected > 0, nil
+}
+
 // ListOrphanedByOwner returns non-deleted assets whose owning record no
 // longer exists — used by the "old comments/orders do not leave
 // permanently public orphan files" reconciliation job. ownerTable/ownerIDs

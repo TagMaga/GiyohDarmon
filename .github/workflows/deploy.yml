@@ -72,7 +72,6 @@ jobs:
             ./internal/finance \
             ./internal/inventory \
             ./internal/payouts \
-            ./internal/products \
             ./internal/seed \
             ./internal/uploads \
             ./internal/users \
@@ -85,6 +84,15 @@ jobs:
       - name: Run media config tests (MEDIA_PIPELINE_ENABLED production-safety contract)
         working-directory: ${{ env.BACKEND_DIR }}
         run: go test ./config/... -v -run TestLoad_Media
+
+      # internal/products' dto_test.go is DB-independent (pure request
+      # validation), but media_integration_test.go and handler_media_test.go
+      # (Phase 2: product images) need a real Postgres via DB_DSN, same as
+      # internal/media's own repository/service/handler tests — so, like
+      # those, they aren't run in CI; only the -run filter below is.
+      - name: Run products no-DB tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test ./internal/products/... -run 'TestCreateProductRequest|TestUpdateProductRequest'
 
       - name: Test deployment and rollback logic
         run: bash scripts/test-deploy.sh
