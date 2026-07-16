@@ -15,7 +15,9 @@ import {
   getId,
   getMovementType,
   getProductBarcode,
-  getProductImage,
+  getProductImageDims,
+  getProductImageSrcSet,
+  getProductImageVariant,
   getProductName,
   getProductSku,
   getQuantity,
@@ -57,7 +59,14 @@ export default function ProductDrawer({
   const recentMovements = movements
     .filter((m) => (m.product_id ?? m.ProductID) === productId)
     .slice(0, 6)
-  const image = getProductImage(product)
+  // The drawer is this admin app's closest thing to a "product detail"
+  // view, so it uses the largest (detail) variant even though it's
+  // displayed small here — avoids upscale artifacts if the display size
+  // grows later (e.g. a future zoom/lightbox), per the detail-variant
+  // convention for detail views.
+  const image = getProductImageVariant(product, 'detail')
+  const imageDims = getProductImageDims(product)
+  const imageSrcSet = getProductImageSrcSet(product)
 
   // Compute inventory value from batch remaining quantities × unit costs.
   const inventoryValue = batches.reduce(
@@ -81,7 +90,7 @@ export default function ProductDrawer({
       <aside className="relative z-10 flex h-full w-full max-w-xl animate-slide-in flex-col bg-white shadow-2xl">
         <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
           <div className="flex min-w-0 items-start gap-3">
-            <ProductImage image={image} name={getProductName(product)} />
+            <ProductImage image={image} srcSet={imageSrcSet} dims={imageDims} name={getProductName(product)} />
             <div className="min-w-0">
               <p className="truncate text-base font-bold text-slate-950">{getProductName(product)}</p>
               <p className="mt-1 font-mono text-xs text-slate-400">{getProductSku(product)}</p>
@@ -171,9 +180,19 @@ export default function ProductDrawer({
   )
 }
 
-function ProductImage({ image, name }) {
+function ProductImage({ image, srcSet, dims, name }) {
   if (image) {
-    return <img src={image} alt={name} className="h-14 w-14 flex-shrink-0 rounded-xl border border-slate-200 object-cover" />
+    return (
+      <img
+        src={image}
+        srcSet={srcSet}
+        sizes="56px"
+        width={dims?.width}
+        height={dims?.height}
+        alt={name}
+        className="h-14 w-14 flex-shrink-0 rounded-xl border border-slate-200 object-cover"
+      />
+    )
   }
   return (
     <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-slate-400">

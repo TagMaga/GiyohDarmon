@@ -230,6 +230,107 @@ func (s *Service) PublicURL(key string) string {
 	return "/media/public/" + key
 }
 
+// VariantsOf decodes an asset's stored variant metadata, returning an empty
+// (non-nil) map if there is none yet (e.g. still processing). Exported so
+// domain modules integrating with a category (e.g. internal/products for
+// product images) can build their own response shapes without duplicating
+// the JSON decode.
+func (s *Service) VariantsOf(asset *Asset) (map[string]Variant, error) {
+	variants := map[string]Variant{}
+	if len(asset.VariantMetadataJSON) == 0 {
+		return variants, nil
+	}
+	if err := json.Unmarshal(asset.VariantMetadataJSON, &variants); err != nil {
+		return nil, fmt.Errorf("decode variant metadata: %w", err)
+	}
+	return variants, nil
+}
+
+// ErrAssetNotFound is returned by AttachToOwner/ReleaseByID when the given
+// asset ID doesn't resolve to a live (non-deleted) asset.
+var ErrAssetNotFound = errors.New("media asset not found")
+
+// ErrCategoryMismatch is returned by AttachToOwner when the asset's
+// category doesn't match what the caller expected — e.g. a domain module
+// trying to attach an avatar upload as a product image.
+var ErrCategoryMismatch = errors.New("media asset category does not match expected category")
+
+// ErrAlreadyAttached is returned by AttachToOwner when the asset already
+// belongs to a different owning object — an asset can only ever be
+// attached once; a replacement upload is always a new asset (see
+// internal/products/service.go's image-replace flow, which attaches the
+// new asset then releases the old one rather than re-attaching).
+var ErrAlreadyAttached = errors.New("media asset is already attached to an owner")
+
+// AttachToOwner claims a previously-uploaded, unattached asset (one with no
+// owner_entity_id yet — the "upload-then-attach" flow: the file exists on
+// disk and has an ID, but nothing points at it as its permanent owner) for
+// a specific business object, after verifying its category matches what
+// the caller expects. This is the integration point domain modules (e.g.
+// internal/products) use to connect an upload to their own row — see that
+// package's doc comments for the full create/replace/delete flow built on
+// top of this.
+//
+// Deliberately does not accept a *gorm.DB transaction parameter: the
+// caller's own transaction (e.g. a product row insert) and this update
+// happen as separate operations, with the caller responsible for
+// compensating (calling ReleaseByID) if its own operation fails after this
+// one succeeds. This mirrors the codebase's existing cross-module
+// convention of narrow, independent calls rather than a shared transaction
+// spanning two modules' repositories — seemed the more honest tradeoff
+// than either giving internal/media a `*gorm.DB` parameter on every public
+// method (leaking a transaction implementation detail into its API) or
+// giving internal/products direct access to internal/media's repository
+// (the exact coupling CLAUDE.md's cross-module convention says to avoid).
+func (s *Service) AttachToOwner(ctx context.Context, assetID uuid.UUID, expectCategory Category, ownerEntityType string, ownerEntityID uuid.UUID) (*Asset, error) {
+	asset, err := s.repo.GetByID(ctx, assetID)
+	if err != nil {
+		return nil, err
+	}
+	if asset == nil {
+		return nil, ErrAssetNotFound
+	}
+	if asset.Category != expectCategory {
+		return nil, ErrCategoryMismatch
+	}
+	if asset.OwnerEntityID != nil {
+		return nil, ErrAlreadyAttached
+	}
+
+	claimed, err := s.repo.UpdateOwner(ctx, assetID, ownerEntityType, ownerEntityID)
+	if err != nil {
+		return nil, err
+	}
+	if !claimed {
+		// Lost a race with a concurrent attach between the read above and
+		// the conditional UPDATE — the DB-level "owner_entity_id IS NULL"
+		// guard (see Repository.UpdateOwner) is what actually prevents two
+		// callers from both succeeding; this is that guard reporting back.
+		return nil, ErrAlreadyAttached
+	}
+
+	asset.OwnerEntityType = &ownerEntityType
+	asset.OwnerEntityID = &ownerEntityID
+	return asset, nil
+}
+
+// ReleaseByID quarantines an asset by ID — the compensating action for
+// AttachToOwner (undo an attach when the caller's own subsequent step
+// fails) and for a domain module replacing or deleting one of its images.
+// Idempotent: a missing or already-deleted asset is not an error, since
+// compensation logic may call this defensively without first checking
+// whether there's anything to release.
+func (s *Service) ReleaseByID(ctx context.Context, assetID uuid.UUID) error {
+	asset, err := s.repo.GetByID(ctx, assetID)
+	if err != nil {
+		return err
+	}
+	if asset == nil {
+		return nil
+	}
+	return s.Delete(ctx, asset)
+}
+
 // SignedURL mints a short-lived HMAC URL for a private asset's original or
 // a named variant. Returns ErrForbidden's sibling (a plain error, not
 // ErrForbidden itself — callers already ran Authorize before calling this)

@@ -11,7 +11,7 @@ import { STATUS_LABELS, STATUS_BADGE } from '../../../shared/orderStatusConfig'
 import ReceivingEditModal from '../components/ReceivingEditModal'
 import useWarehouseData from '../hooks/useWarehouseData'
 import { fetchReceivingHistory } from '../api'
-import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getId, getMovementType, getProductImage, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
+import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getId, getMovementType, getProductImageSrcSet, getProductImageVariant, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
 
 const TYPES = [
   { value: '', label: 'Все типы' },
@@ -143,13 +143,20 @@ function canEditMovement(m) {
 }
 
 function ProductThumb({ product }) {
-  const image = getProductImage(product)
+  const image = getProductImageVariant(product, 'thumbnail')
   const name = getProductName(product)
   const letter = name && name !== '—' ? name[0].toUpperCase() : '•'
   return (
     <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
       {image ? (
-        <img src={image} alt={name} className="h-full w-full object-cover" loading="lazy" />
+        <img
+          src={image}
+          srcSet={getProductImageSrcSet(product)}
+          sizes="40px"
+          alt={name}
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
       ) : (
         <span className="text-sm font-bold text-slate-400">{letter}</span>
       )}

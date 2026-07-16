@@ -6,10 +6,12 @@ import Button from '../../../shared/components/Button'
 import Alert from '../../../shared/components/Alert'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
-import { addProductImage, createProduct, updateProduct, uploadImageFile } from '../api'
+import { translateMediaError } from '../../../shared/api/mediaErrors'
+import { addProductImage, createProduct, updateProduct, uploadProductImageSmart } from '../api'
 import {
   getId,
   getProductImage,
+  getProductImageVariant,
   getProductName,
   getProductSku,
   getPurchasePrice,
@@ -30,7 +32,12 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
   const isEdit = Boolean(product)
   const [form, setForm] = useState(emptyForm)
   const [imagePreview, setImagePreview] = useState(null) // local blob URL or existing URL
-  const [imageFile, setImageFile] = useState(null)       // File object for new uploads
+  // Upload state for the currently-picked file, if any — the file uploads
+  // immediately on selection (not on form submit), so its progress/result/
+  // error can be shown inline before the user even clicks Save.
+  const [uploadProgress, setUploadProgress] = useState(null) // 0-100, or null when idle
+  const [uploadError, setUploadError] = useState(null)       // Russian message, or null
+  const [uploadResult, setUploadResult] = useState(null)     // { kind: 'media', asset } | { kind: 'legacy', url } | null
   const fileRef = useRef()
 
   useEffect(() => {
@@ -38,7 +45,7 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
     if (!product) {
       setForm(emptyForm)
       setImagePreview(null)
-      setImageFile(null)
+      resetUpload()
       return
     }
     const existingImage = getProductImage(product)
@@ -49,23 +56,56 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
       sale_price: getSalePrice(product) ?? '',
       image_url: existingImage ?? '',
     })
-    setImagePreview(existingImage || null)
-    setImageFile(null)
+    // Detail variant for the edit-form preview when available — falls back
+    // to the legacy single URL automatically (see getProductImageVariant).
+    setImagePreview(getProductImageVariant(product, 'detail') || null)
+    resetUpload()
   }, [open, product])
 
-  function handleFileChange(e) {
+  function resetUpload() {
+    setUploadProgress(null)
+    setUploadError(null)
+    setUploadResult(null)
+  }
+
+  async function handleFileChange(e) {
     const file = e.target.files?.[0]
+    e.target.value = '' // reset input so the same file can be re-selected
     if (!file) return
-    setImageFile(file)
+
     setImagePreview(URL.createObjectURL(file))
-    // reset input so same file can be re-selected
-    e.target.value = ''
+    setUploadError(null)
+    setUploadResult(null)
+    setUploadProgress(0)
+
+    try {
+      const result = await uploadProductImageSmart(file, { onProgress: setUploadProgress })
+      setUploadResult(result)
+      if (result.kind === 'media') {
+        // Prefer the server-processed card variant for the preview once
+        // it's ready — more accurate than the local blob URL (shows the
+        // actual crop/orientation/strip result).
+        const cardUrl = result.asset?.variants?.find((v) => v.variant === 'card')?.url
+        if (cardUrl) setImagePreview(cardUrl)
+      }
+    } catch (err) {
+      setUploadError(translateMediaError(err))
+      setUploadProgress(null)
+    }
   }
 
   function removeImage() {
-    setImageFile(null)
-    setImagePreview(null)
-    setForm(prev => ({ ...prev, image_url: '' }))
+    // Only clears the pending local selection/preview — never deletes an
+    // already-saved image on the server (this modal has no delete-image
+    // affordance; that matches its pre-Phase-2 behavior). If the user had
+    // just uploaded a new file via the media pipeline and then removes it
+    // before saving, that asset is simply never attached to anything —
+    // internal/media's quarantine-purge job reclaims genuinely orphaned
+    // uploads on its own retention schedule, so no extra cleanup is needed
+    // here.
+    resetUpload()
+    setImagePreview(isEdit ? (getProductImageVariant(product, 'detail') || null) : null)
+    setForm(prev => ({ ...prev, image_url: isEdit ? (getProductImage(product) ?? '') : '' }))
   }
 
   const mutation = useMutation({
@@ -77,16 +117,24 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
       if (form.purchase_price !== '') payload.purchase_price = Number(form.purchase_price)
       if (form.sale_price !== '')     payload.sale_price     = Number(form.sale_price)
 
+      // A newly uploaded image via the media pipeline is attached
+      // atomically as part of create/update itself (the backend handles
+      // rollback/quarantine on failure — see internal/products/service.go).
+      if (uploadResult?.kind === 'media') {
+        payload.primary_image_media_asset_id = uploadResult.asset.id
+      }
+
       const saved = isEdit
         ? await updateProduct(getId(product), payload)
         : await createProduct(payload)
 
       const productId = getId(saved) ?? getId(product)
 
-      // Upload new image file to /uploads and store the returned URL (not base64)
-      if (productId && imageFile) {
-        const { url } = await uploadImageFile(imageFile)
-        await addProductImage(productId, { image_url: url, is_primary: true, sort_order: 0 })
+      // Legacy fallback path (media pipeline disabled on the server):
+      // attach via the pre-Phase-2 image_url endpoint, unchanged from
+      // before this phase.
+      if (productId && uploadResult?.kind === 'legacy') {
+        await addProductImage(productId, { image_url: uploadResult.url, is_primary: true, sort_order: 0 })
       }
 
       return saved
@@ -103,7 +151,8 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
   }
 
   const errMsg = mutation.error?.response?.data?.error?.message ?? mutation.error?.message
-  const canSubmit = form.name.trim() && (!isEdit || form.sku.trim())
+  const isUploading = uploadProgress !== null && uploadProgress < 100 && !uploadError && !uploadResult
+  const canSubmit = form.name.trim() && (!isEdit || form.sku.trim()) && !isUploading
 
   return (
     <Modal
@@ -139,6 +188,17 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
         {imagePreview ? (
           <div className="relative w-32 h-32 rounded-2xl overflow-hidden border border-slate-200 group">
             <img src={imagePreview} alt="preview" className="w-full h-full object-cover" />
+            {isUploading && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/50">
+                <div className="h-1.5 w-20 overflow-hidden rounded-full bg-white/30">
+                  <div
+                    className="h-full rounded-full bg-white transition-[width] duration-150"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <span className="text-[11px] font-medium text-white">{uploadProgress}%</span>
+              </div>
+            )}
             <button
               onClick={removeImage}
               className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
@@ -156,7 +216,10 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
             <span className="text-[11px] font-medium">Загрузить</span>
           </button>
         )}
-        {imagePreview && (
+        {uploadError && (
+          <p className="mt-2 text-[12px] font-medium text-rose-600">{uploadError}</p>
+        )}
+        {imagePreview && !isUploading && (
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
