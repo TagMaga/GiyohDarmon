@@ -92,15 +92,7 @@ func (s *Service) Ready(ctx context.Context) ReadinessStatus {
 		allOK = false
 	}
 
-	// 3. Default product exists (by seed SKU).
-	productOK := s.countCheck(ctx, "products",
-		"sku = 'TEST-001' AND deleted_at IS NULL", 1)
-	checks["default_product"] = productOK
-	if !productOK {
-		allOK = false
-	}
-
-	// 4. All five commission types have at least one active global config.
+	// 3. All five commission types have at least one active global config.
 	commOK := true
 	for _, ct := range compensation.AllCommissionTypes {
 		ok := s.countCheck(ctx, "commission_configs",
@@ -113,7 +105,7 @@ func (s *Service) Ready(ctx context.Context) ReadinessStatus {
 	}
 	checks["commission_configs"] = commOK
 
-	// 5. Delivery settings singleton row exists.
+	// 4. Delivery settings singleton row exists.
 	deliverySettingsOK := s.countCheck(ctx, "delivery_settings", "id = 1", 1)
 	checks["delivery_settings"] = deliverySettingsOK
 	if !deliverySettingsOK {
