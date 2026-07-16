@@ -17,6 +17,10 @@ jobs:
     env:
       FRONTEND_DIR: megamall-crm/web-admin
       BACKEND_DIR: megamall-crm
+      # internal/media (image pipeline) uses bimg/libvips via CGO — every
+      # Go step in this job needs the C toolchain + libvips headers, not
+      # just the build step, since `go vet`/`go test` also compile.
+      CGO_ENABLED: 1
 
     steps:
       - name: Check out the PR revision
@@ -43,6 +47,11 @@ jobs:
           go-version-file: megamall-crm/go.mod
           cache-dependency-path: megamall-crm/go.sum
 
+      - name: Install libvips (internal/media image pipeline, CGO)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libvips-dev
+
       - name: Compile all backend packages
         working-directory: ${{ env.BACKEND_DIR }}
         run: go build ./...
@@ -54,3 +63,15 @@ jobs:
       - name: Run users module tests
         working-directory: ${{ env.BACKEND_DIR }}
         run: go test ./internal/users/...
+
+      - name: Run media pipeline unit tests (no DB required)
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test ./internal/media/... -run 'TestValidate|TestSignedURL|TestNewSignedURLQuery|TestSafeStorageKey|TestNewStorageKey|TestVariantStorageKey|TestLooksLike|TestBaseContentType|TestBuildExifJPEG|TestProcess|TestWriteAtomic|TestRegisterRoutes|TestAuthorize' -timeout 5m
+
+      - name: Run media config tests (MEDIA_PIPELINE_ENABLED production-safety contract)
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test ./config/... -v -run TestLoad_Media
+
+      - name: Run request-logger redaction tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test ./pkg/middleware/... -run 'TestRedactSensitiveQuery|TestRequestLogger'

@@ -12,6 +12,7 @@ type Config struct {
 	Database DatabaseConfig
 	JWT      JWTConfig
 	Redis    RedisConfig
+	Media    MediaConfig
 }
 
 type ServerConfig struct {
@@ -59,6 +60,64 @@ type RedisConfig struct {
 	URL string `envconfig:"REDIS_URL" default:"redis://localhost:6379"`
 }
 
+// MediaConfig governs the centralized upload/image pipeline (internal/media).
+// Every limit here is deliberately configurable — production defaults are
+// chosen to be safe on a memory-constrained host (see the libvips benchmark
+// in megamall-audits/libvips-install-20260716/BENCHMARK_RESULTS.md), not
+// maximally permissive.
+type MediaConfig struct {
+	// Enabled is the master switch for the entire pipeline. Defaults to
+	// false so a production deploy of this code is a no-op until someone
+	// deliberately turns it on: cmd/server/main.go skips constructing the
+	// repository/service/handler, registering any /api/v1/media or
+	// /media/public|private route, and starting the quarantine-purge
+	// goroutine entirely when this is false — see the "Gated behind
+	// MEDIA_PIPELINE_ENABLED" comment there. The legacy /uploads endpoint
+	// and every existing route are completely unaffected either way.
+	Enabled bool `envconfig:"MEDIA_PIPELINE_ENABLED" default:"false"`
+	// MaxUploadBytes is the hard ceiling for any single upload, enforced at
+	// the HTTP body-read layer before any per-category limit is checked.
+	MaxUploadBytes int64 `envconfig:"MEDIA_MAX_UPLOAD_BYTES" default:"20971520"` // 20 MiB
+	// MaxImageBytes/MaxDocumentBytes are the per-category ceilings applied
+	// after MaxUploadBytes (must be <= it). Product/avatar/proof images use
+	// MaxImageBytes; user_document (which may be a PDF) uses MaxDocumentBytes.
+	MaxImageBytes    int64 `envconfig:"MEDIA_MAX_IMAGE_BYTES" default:"15728640"`    // 15 MiB
+	MaxDocumentBytes int64 `envconfig:"MEDIA_MAX_DOCUMENT_BYTES" default:"20971520"` // 20 MiB
+	// MaxPixels bounds width*height for any image before it is ever handed
+	// to libvips — the actual decompression-bomb defense. 40MP comfortably
+	// covers any real camera/phone photo (a 12MP phone photo, a 24MP DSLR
+	// photo) while rejecting the pathological declared-but-implausible
+	// dimensions a crafted file can claim in its header alone.
+	MaxPixels int64 `envconfig:"MEDIA_MAX_PIXELS" default:"40000000"`
+	// MaxDimension bounds any single side, independent of the total-pixel
+	// cap (catches e.g. a 1x2000000000 degenerate image that would pass a
+	// pure area check).
+	MaxDimension int `envconfig:"MEDIA_MAX_DIMENSION" default:"12000"`
+	// SigningSecret is the HMAC key for private-media signed URLs. Distinct
+	// from the JWT signing keys to avoid any cross-protocol key reuse. Not
+	// marked `required:"true"` here — a production deploy with the pipeline
+	// disabled (the default) must start cleanly without this ever being
+	// set. Load() below enforces it's non-empty only when Enabled is true.
+	SigningSecret string `envconfig:"MEDIA_SIGNING_SECRET"`
+	// SignedURLTTL is how long a signed private-media URL remains valid.
+	SignedURLTTL time.Duration `envconfig:"MEDIA_SIGNED_URL_TTL" default:"15m"`
+	// QuarantineRetention is how long a deleted asset's physical file is
+	// kept in quarantine before the purge job removes it permanently.
+	QuarantineRetention time.Duration `envconfig:"MEDIA_QUARANTINE_RETENTION" default:"720h"` // 30 days
+	// ProcessingConcurrency bounds how many image-processing jobs may run
+	// at once, process-wide — see the concurrency=2 benchmark result.
+	// Deliberately conservative pending a dedicated load test at higher
+	// concurrency (see BENCHMARK_RESULTS.md's noted limitation).
+	ProcessingConcurrency int `envconfig:"MEDIA_PROCESSING_CONCURRENCY" default:"2"`
+	// ProcessingTimeout bounds a single image's processing wall time.
+	ProcessingTimeout time.Duration `envconfig:"MEDIA_PROCESSING_TIMEOUT" default:"20s"`
+	// UploadDir is the root directory uploaded/processed files are written
+	// under, matching the existing (currently hardcoded) "./uploads" the
+	// rest of the app uses — kept configurable here so tests can point it
+	// at a temp directory instead of the live uploads/ tree.
+	UploadDir string `envconfig:"MEDIA_UPLOAD_DIR" default:"./uploads"`
+}
+
 // Load reads all config from environment variables.
 func Load() (*Config, error) {
 	var cfg Config
@@ -74,6 +133,12 @@ func Load() (*Config, error) {
 	}
 	if err := envconfig.Process("", &cfg.Redis); err != nil {
 		return nil, fmt.Errorf("redis config: %w", err)
+	}
+	if err := envconfig.Process("", &cfg.Media); err != nil {
+		return nil, fmt.Errorf("media config: %w", err)
+	}
+	if cfg.Media.Enabled && cfg.Media.SigningSecret == "" {
+		return nil, fmt.Errorf("media config: MEDIA_SIGNING_SECRET is required when MEDIA_PIPELINE_ENABLED=true")
 	}
 
 	return &cfg, nil
