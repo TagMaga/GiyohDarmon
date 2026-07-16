@@ -142,6 +142,12 @@ func TestService_Create_UnknownCategoryRejected(t *testing.T) {
 	}
 }
 
+// TestService_Authorize exercises the universal baseline (uploader/owner/
+// it_specialist always allowed) using an asset with no Category set — an
+// empty/unrecognized category falls back to categoryAccessPolicies' zero
+// value, which grants no AdditionalRoles and no SubjectSelfAccess, i.e.
+// exactly this baseline. Category-specific policies (product images,
+// avatars, order attachments, etc.) are covered in rbac_test.go.
 func TestService_Authorize(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc := NewService(NewRepository(db), testServiceCfg(t))

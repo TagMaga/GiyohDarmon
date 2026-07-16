@@ -145,12 +145,23 @@ func TestHandler_UploadThenGet_Success(t *testing.T) {
 	}
 }
 
+// Cross-user IDOR tests use CategoryUserDocument (strictly owner-only, no
+// role or self-view grants access — see rbac.go) rather than
+// CategoryPrepaymentProof: the RBAC audit in rbac.go deliberately broadens
+// prepayment_proof access to any of {sales_team_lead, manager, seller,
+// dispatcher} (mirroring internal/orders' own prepaymentRoles), so a
+// same-role "seller vs. seller" cross-user request against that category is
+// no longer an unauthorized access attempt — see
+// TestHandler_PrepaymentProof_SameRolePeerCanAccess below for that
+// intentional behavior's own positive test. CategoryUserDocument has no
+// such broadening (see rbac.go's audited, strictly owner-only policy for
+// it), making it the correct category for a "must always reject" test.
 func TestHandler_CrossUserIDOR_GetReturns404NotForbidden(t *testing.T) {
 	r, _, db := buildMediaTestRouter(t)
 	owner := testutil.CreateUser(t, db, users.RoleSeller)
 	attacker := testutil.CreateUser(t, db, users.RoleSeller)
 
-	rec := uploadAs(t, r, tokenFor(owner.ID, "seller"), CategoryPrepaymentProof, "p.png", fixture(t, "transparent.png"))
+	rec := uploadAs(t, r, tokenFor(owner.ID, "seller"), CategoryUserDocument, "p.png", fixture(t, "transparent.png"))
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("upload status = %d, body=%s", rec.Code, rec.Body.String())
 	}
@@ -174,7 +185,7 @@ func TestHandler_CrossUserIDOR_DeleteReturns404(t *testing.T) {
 	owner := testutil.CreateUser(t, db, users.RoleSeller)
 	attacker := testutil.CreateUser(t, db, users.RoleSeller)
 
-	rec := uploadAs(t, r, tokenFor(owner.ID, "seller"), CategoryPrepaymentProof, "p.png", fixture(t, "transparent.png"))
+	rec := uploadAs(t, r, tokenFor(owner.ID, "seller"), CategoryUserDocument, "p.png", fixture(t, "transparent.png"))
 	asset := decodeAsset(t, rec)
 
 	delReq := httptest.NewRequest(http.MethodDelete, "/api/v1/media/"+asset.ID.String(), nil)
@@ -183,6 +194,40 @@ func TestHandler_CrossUserIDOR_DeleteReturns404(t *testing.T) {
 	r.ServeHTTP(delRec, delReq)
 	if delRec.Code != http.StatusNotFound {
 		t.Fatalf("cross-user DELETE status = %d, want 404", delRec.Code)
+	}
+}
+
+// TestHandler_PrepaymentProof_SameRolePeerCanAccess documents and proves
+// the intentional (not a bug) RBAC broadening from rbac.go: any of
+// {sales_team_lead, manager, seller, dispatcher} may view a prepayment
+// proof they didn't upload, mirroring internal/orders' own prepaymentRoles
+// — orders.go itself grants any of those roles access to any order's
+// prepayments, so restricting the proof *image* more tightly than the
+// order it belongs to would be inconsistent, not more secure.
+func TestHandler_PrepaymentProof_SameRolePeerCanAccess(t *testing.T) {
+	r, _, db := buildMediaTestRouter(t)
+	uploader := testutil.CreateUser(t, db, users.RoleSeller)
+	peer := testutil.CreateUser(t, db, users.RoleSeller)
+
+	rec := uploadAs(t, r, tokenFor(uploader.ID, "seller"), CategoryPrepaymentProof, "p.png", fixture(t, "transparent.png"))
+	asset := decodeAsset(t, rec)
+
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/media/"+asset.ID.String(), nil)
+	getReq.Header.Set("Authorization", "Bearer "+tokenFor(peer.ID, "seller"))
+	getRec := httptest.NewRecorder()
+	r.ServeHTTP(getRec, getReq)
+	if getRec.Code != http.StatusOK {
+		t.Fatalf("a peer seller should be able to view a prepayment proof they didn't upload, got %d: %s", getRec.Code, getRec.Body.String())
+	}
+
+	// A role with no order-management access at all must still be rejected.
+	courier := testutil.CreateUser(t, db, users.RoleCourier)
+	courierReq := httptest.NewRequest(http.MethodGet, "/api/v1/media/"+asset.ID.String(), nil)
+	courierReq.Header.Set("Authorization", "Bearer "+tokenFor(courier.ID, "courier"))
+	courierRec := httptest.NewRecorder()
+	r.ServeHTTP(courierRec, courierReq)
+	if courierRec.Code != http.StatusNotFound {
+		t.Errorf("a courier should NOT be able to view a prepayment proof, got %d", courierRec.Code)
 	}
 }
 

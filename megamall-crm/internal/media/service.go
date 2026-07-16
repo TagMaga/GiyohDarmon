@@ -173,14 +173,24 @@ func (s *Service) processImage(ctx context.Context, asset *Asset, dir, key strin
 	return nil
 }
 
-// Authorize is the baseline ownership check: the uploader may always act on
-// their own asset; any owner-equivalent role may act on anything. Domain
-// modules that attach media to a business object with its own RBAC (an
-// order, a courier's cash handover) should perform their own authorization
-// before calling Service directly rather than relying solely on this — this
-// is the "authorization-through-owning-object" extension point described in
-// the Phase 1 spec; only the generic HTTP endpoints in handler.go use this
-// baseline today. See deliverables report, "remaining questions."
+// Authorize checks, in order: (1) an owner-equivalent role may always act
+// on anything; (2) the uploader may always act on their own asset; (3) the
+// asset's "subject" (owner_entity_id, when owner_entity_type == "users")
+// may act on it if the category grants SubjectSelfAccess; (4) the caller's
+// role may act on it if it's in the category's AdditionalRoles. See
+// rbac.go for the full per-category policy table and the audit that
+// produced it.
+//
+// This mirrors each category's owning domain module's *role-level* RBAC
+// only — it does not call into internal/orders/products/users/courier, so
+// it cannot verify true per-object ownership (e.g. "is this seller
+// assigned to THIS specific order"). Domain modules that need that
+// stronger guarantee should perform their own authorization before calling
+// Service directly, rather than relying solely on this — this is the
+// "authorization-through-owning-object" extension point described in the
+// Phase 1 spec. See rbac.go's package doc comment and the Phase 1 report's
+// "remaining questions" for the full reasoning and what real integration
+// would require.
 func (s *Service) Authorize(callerID uuid.UUID, callerRole string, asset *Asset) error {
 	if callerRole == "owner" || callerRole == "it_specialist" {
 		return nil
@@ -188,6 +198,21 @@ func (s *Service) Authorize(callerID uuid.UUID, callerRole string, asset *Asset)
 	if asset.UploadedByUserID == callerID {
 		return nil
 	}
+
+	policy := categoryAccessPolicies[asset.Category]
+
+	if policy.SubjectSelfAccess &&
+		asset.OwnerEntityType != nil && *asset.OwnerEntityType == "users" &&
+		asset.OwnerEntityID != nil && *asset.OwnerEntityID == callerID {
+		return nil
+	}
+
+	for _, r := range policy.AdditionalRoles {
+		if r == callerRole {
+			return nil
+		}
+	}
+
 	return ErrForbidden
 }
 

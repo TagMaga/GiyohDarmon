@@ -7,6 +7,24 @@ import (
 	"github.com/megamall/crm/pkg/middleware"
 )
 
+// RegisterRoutes is the single entry point cmd/server/main.go calls to wire
+// up the entire media pipeline HTTP surface, gated by enabled (the
+// MEDIA_PIPELINE_ENABLED flag — see config.MediaConfig.Enabled). When
+// enabled is false this is a pure no-op: neither RegisterManagementRoutes
+// nor RegisterDeliveryRoutes is called, so gin has no knowledge of any
+// /api/v1/media or /media/public|private path at all — a request to any of
+// them falls through to gin's default NoRoute 404, identical to any other
+// path that was never registered. h may be nil when enabled is false (the
+// caller isn't required to construct a Handler at all in that case); it is
+// never dereferenced unless enabled is true.
+func RegisterRoutes(router gin.IRouter, v1 *gin.RouterGroup, h *Handler, store middleware.RateLimitStore, enabled bool) {
+	if !enabled {
+		return
+	}
+	h.RegisterManagementRoutes(v1.Group("/media"), store)
+	RegisterDeliveryRoutes(router, h)
+}
+
 // RegisterManagementRoutes mounts the authenticated upload/get/delete/
 // signed-url endpoints onto rg (expected to be v1.Group("/media")). Every
 // authenticated role may upload/manage its own media; Authorize (see

@@ -66,4 +66,12 @@ jobs:
 
       - name: Run media pipeline unit tests (no DB required)
         working-directory: ${{ env.BACKEND_DIR }}
-        run: go test ./internal/media/... -run 'TestValidate|TestSignedURL|TestNewSignedURLQuery|TestSafeStorageKey|TestNewStorageKey|TestVariantStorageKey|TestLooksLike|TestBaseContentType|TestBuildExifJPEG|TestProcess|TestWriteAtomic' -timeout 5m
+        run: go test ./internal/media/... -run 'TestValidate|TestSignedURL|TestNewSignedURLQuery|TestSafeStorageKey|TestNewStorageKey|TestVariantStorageKey|TestLooksLike|TestBaseContentType|TestBuildExifJPEG|TestProcess|TestWriteAtomic|TestRegisterRoutes|TestAuthorize' -timeout 5m
+
+      - name: Run media config tests (MEDIA_PIPELINE_ENABLED production-safety contract)
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test ./config/... -v -run TestLoad_Media
+
+      - name: Run request-logger redaction tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test ./pkg/middleware/... -run 'TestRedactSensitiveQuery|TestRequestLogger'
