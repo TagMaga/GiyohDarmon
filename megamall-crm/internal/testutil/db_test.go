@@ -1,0 +1,152 @@
+package testutil
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"testing"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// These tests exercise setupDisposableDB directly (not through a package's
+// TestMain) so they can provision, inspect, and tear down independently —
+// verifying the actual safety properties Phase 0 is for, not just that the
+// happy path compiles.
+
+func TestSetupDisposableDB_RequiresAdminDSN(t *testing.T) {
+	t.Setenv("TEST_ADMIN_DSN", "")
+
+	_, err := setupDisposableDB()
+	if err == nil {
+		t.Fatal("expected an error when TEST_ADMIN_DSN is unset, got nil")
+	}
+}
+
+func TestSetupDisposableDB_UniquePerCall(t *testing.T) {
+	requireAdminDSN(t)
+
+	cleanup1, err := setupDisposableDB()
+	if err != nil {
+		t.Fatalf("first setupDisposableDB: %v", err)
+	}
+	db1 := DB(t)
+	var name1 string
+	if err := db1.Raw("SELECT current_database()").Scan(&name1).Error; err != nil {
+		cleanup1()
+		t.Fatalf("query current_database (1): %v", err)
+	}
+
+	cleanup2, err := setupDisposableDB()
+	if err != nil {
+		cleanup1()
+		t.Fatalf("second setupDisposableDB: %v", err)
+	}
+	db2 := DB(t)
+	var name2 string
+	if err := db2.Raw("SELECT current_database()").Scan(&name2).Error; err != nil {
+		cleanup1()
+		cleanup2()
+		t.Fatalf("query current_database (2): %v", err)
+	}
+
+	cleanup2()
+	cleanup1()
+
+	if name1 == name2 {
+		t.Fatalf("expected two calls to setupDisposableDB to provision different databases, both got %q", name1)
+	}
+	if name1 == "postgres" || name2 == "postgres" || name1 == "" || name2 == "" {
+		t.Fatalf("disposable database names look wrong: %q, %q", name1, name2)
+	}
+}
+
+func TestSetupDisposableDB_RoleCannotEscalate(t *testing.T) {
+	requireAdminDSN(t)
+
+	cleanup, err := setupDisposableDB()
+	if err != nil {
+		t.Fatalf("setupDisposableDB: %v", err)
+	}
+	defer cleanup()
+
+	db := DB(t)
+	var isSuper, canCreateDB, canCreateRole bool
+	err = db.Raw(`
+		SELECT rolsuper, rolcreatedb, rolcreaterole
+		FROM pg_roles
+		WHERE rolname = current_user
+	`).Row().Scan(&isSuper, &canCreateDB, &canCreateRole)
+	if err != nil {
+		t.Fatalf("query pg_roles for current_user: %v", err)
+	}
+	if isSuper || canCreateDB || canCreateRole {
+		t.Fatalf("disposable role has escalated privileges: super=%v createdb=%v createrole=%v", isSuper, canCreateDB, canCreateRole)
+	}
+}
+
+func TestSetupDisposableDB_CleanupDropsDatabaseAndRole(t *testing.T) {
+	requireAdminDSN(t)
+
+	cleanup, err := setupDisposableDB()
+	if err != nil {
+		t.Fatalf("setupDisposableDB: %v", err)
+	}
+	db := DB(t)
+	var dbName, roleName string
+	if err := db.Raw("SELECT current_database(), current_user").Row().Scan(&dbName, &roleName); err != nil {
+		cleanup()
+		t.Fatalf("query current_database/current_user: %v", err)
+	}
+
+	cleanup()
+
+	adminDSN, err := adminDSNForTest(t)
+	if err != nil {
+		t.Fatalf("re-derive admin DSN: %v", err)
+	}
+	ctx := context.Background()
+	adminCfg, err := pgx.ParseConfig(adminDSN)
+	if err != nil {
+		t.Fatalf("parse admin DSN: %v", err)
+	}
+	conn, err := pgx.ConnectConfig(ctx, adminCfg)
+	if err != nil {
+		t.Fatalf("reconnect as admin: %v", err)
+	}
+	defer conn.Close(ctx)
+
+	var dbExists bool
+	if err := conn.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", dbName).Scan(&dbExists); err != nil {
+		t.Fatalf("check pg_database: %v", err)
+	}
+	if dbExists {
+		t.Errorf("database %q still exists after cleanup", dbName)
+	}
+
+	var roleExists bool
+	if err := conn.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = $1)", roleName).Scan(&roleExists); err != nil {
+		t.Fatalf("check pg_roles: %v", err)
+	}
+	if roleExists {
+		t.Errorf("role %q still exists after cleanup", roleName)
+	}
+}
+
+func requireAdminDSN(t *testing.T) {
+	t.Helper()
+	if _, err := adminDSNForTest(t); err != nil {
+		t.Skipf("TEST_ADMIN_DSN not usable, skipping: %v", err)
+	}
+}
+
+// adminDSNForTest reads TEST_ADMIN_DSN directly so tests can produce a clear
+// skip reason when it's absent, rather than failing outright.
+func adminDSNForTest(t *testing.T) (string, error) {
+	t.Helper()
+	dsn := os.Getenv("TEST_ADMIN_DSN")
+	if dsn == "" {
+		return "", fmt.Errorf("TEST_ADMIN_DSN is not set")
+	}
+	return dsn, nil
+}

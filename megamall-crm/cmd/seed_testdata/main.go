@@ -9,6 +9,11 @@ package main
 // courier_payout freezing all come out of the actual business logic, exactly
 // as they would from real usage. Idempotent for users/teams/products/customers
 // (check-before-insert); re-running adds another batch of orders on top.
+//
+// This is a scratch/dev tool only — never run it against production. It
+// refuses to start if DB_DSN looks production-shaped (see pkg/dbsafety);
+// unlike cmd/seed, this tool has no legitimate production use case at all,
+// so there is no override.
 
 import (
 	"context"
@@ -32,6 +37,7 @@ import (
 	"github.com/megamall/crm/internal/teams"
 	"github.com/megamall/crm/internal/users"
 	"github.com/megamall/crm/pkg/database"
+	"github.com/megamall/crm/pkg/dbsafety"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -53,6 +59,9 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("config: %v", err)
+	}
+	if err := dbsafety.RefuseProduction(cfg.Database.DSN); err != nil {
+		log.Fatalf("refusing to run against what looks like production: %v", err)
 	}
 	db, err := database.Connect(cfg.Database)
 	if err != nil {

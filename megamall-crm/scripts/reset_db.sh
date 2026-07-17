@@ -23,6 +23,16 @@ DB_PORT="${DB_PORT:-5432}"
 DB_USER="${DB_USER:-postgres}"
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-./migrations}"
 
+# ── Guard: refuse anything production-shaped ──────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/dbsafety.sh
+source "$SCRIPT_DIR/lib/dbsafety.sh"
+refuse_if_production_env
+refuse_if_production_value "DB_DSN" "$DB_DSN"
+refuse_if_production_value "DB_NAME" "$DB_NAME"
+refuse_if_production_value "DB_HOST" "$DB_HOST"
+refuse_if_production_value "DB_USER" "$DB_USER"
+
 # ── Guard: confirmation prompt ────────────────────────────────────────────────
 echo ""
 echo "⚠️  WARNING: This will DESTROY the database '${DB_NAME}' on ${DB_HOST}:${DB_PORT}"
