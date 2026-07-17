@@ -16,6 +16,7 @@ package products_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -193,6 +194,74 @@ func TestCreateProduct_WithMediaImage_Success(t *testing.T) {
 	}
 	if len(reloaded.Images) != 1 || reloaded.Images[0].MediaAssetID == nil {
 		t.Fatalf("image did not persist correctly: %+v", reloaded.Images)
+	}
+}
+
+// TestCreateProduct_ExistingImageWithLegacyMasterVariant_StillServesCorrectly
+// guards backward compatibility for assets processed *before* the
+// size-aware master policy shipped (internal/media's ProcessProductImage):
+// any already-persisted asset whose variant_metadata still includes a
+// "webp_master" entry (the old, unconditional-generation behavior) must
+// attach to a product and serve exactly as before — the fix only changes
+// what gets generated going forward, never how already-processed assets are
+// read and attached. This exercises the real attach path (mediabridge's
+// VariantsOf decode + name-lookup), not just internal/media's own decode
+// unit test.
+func TestCreateProduct_ExistingImageWithLegacyMasterVariant_StillServesCorrectly(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc, mediaSvc := setupWithMedia(t, db)
+	uploader := testutil.CreateUser(t, db, users.RoleOwner)
+
+	// 1200x900 is under detailWidth, so the real pipeline (post-fix) never
+	// writes a "webp_master" key for it — see
+	// TestProcessProductImage_MasterOmittedWhenItWouldDuplicateDetailDimensions.
+	asset := uploadProductImage(t, mediaSvc, uploader.ID, fixture(t, "transparent.png"))
+
+	reFetched, err := mediaSvc.GetByID(context.Background(), asset.ID)
+	if err != nil || reFetched == nil {
+		t.Fatalf("re-fetch uploaded asset: %v", err)
+	}
+	realVariants, verr := mediaSvc.VariantsOf(reFetched)
+	if verr != nil {
+		t.Fatalf("decode real variants: %v", verr)
+	}
+	if _, hasMaster := realVariants["webp_master"]; hasMaster {
+		t.Fatal("test setup invalid: fixture unexpectedly already has a webp_master variant")
+	}
+	// Simulate legacy data by adding a webp_master entry alongside the real
+	// thumbnail/card/detail keys — exactly what an asset processed by the
+	// old, unconditional code would have stored.
+	realVariants["webp_master"] = media.Variant{StorageKey: "legacy-master-placeholder.webp", Width: 1200, Height: 900, Bytes: 999999}
+	legacyJSON, mErr := json.Marshal(realVariants)
+	if mErr != nil {
+		t.Fatalf("marshal augmented variants: %v", mErr)
+	}
+	if err := db.Exec("UPDATE media_assets SET variant_metadata = ? WHERE id = ?", string(legacyJSON), asset.ID).Error; err != nil {
+		t.Fatalf("simulate legacy variant metadata: %v", err)
+	}
+
+	p, err := svc.CreateProduct(context.Background(), uploader.ID, products.CreateProductRequest{
+		Name:                     "Legacy Master Product",
+		PrimaryImageMediaAssetID: &asset.ID,
+	})
+	if err != nil {
+		t.Fatalf("CreateProduct with legacy-master asset: %v", err)
+	}
+	if len(p.Images) != 1 {
+		t.Fatalf("expected 1 image, got %d", len(p.Images))
+	}
+	img := p.Images[0]
+	if img.ThumbnailURL == nil || img.CardURL == nil || img.DetailURL == nil {
+		t.Fatalf("expected all three real variant URLs, got thumb=%v card=%v detail=%v", img.ThumbnailURL, img.CardURL, img.DetailURL)
+	}
+	// The injected legacy master's placeholder storage key must never leak
+	// into any response field — attach only ever looks up thumbnail/card/
+	// detail by name (see mediabridge.Adapters), so its presence in the
+	// decoded map must be harmless.
+	for _, u := range []*string{img.ThumbnailURL, img.CardURL, img.DetailURL, &img.ImageURL} {
+		if u != nil && *u == mediaSvc.PublicURL("legacy-master-placeholder.webp") {
+			t.Errorf("response leaked the injected legacy master placeholder: %s", *u)
+		}
 	}
 }
 

@@ -16,6 +16,16 @@ import (
 // can roll out without needing a destructive rewrite of existing files.
 const PipelineVersion = "v1"
 
+// Named widths for the fixed product-image variants — pulled out of
+// ProductVariantSpecs so detailWidth can also gate whether a "master"
+// variant is worth generating at all (see the master-generation comment in
+// ProcessProductImage).
+const (
+	thumbnailWidth = 320
+	cardWidth      = 768
+	detailWidth    = 1440
+)
+
 // ProductVariantSpecs are the fixed sizes generated for every public
 // product image. Widths are targets; aspect ratio is always preserved and
 // a source narrower than a given width is never upscaled — its own
@@ -26,13 +36,19 @@ var ProductVariantSpecs = []struct {
 	Name  string
 	Width int
 }{
-	{"thumbnail", 320},
-	{"card", 768},
-	{"detail", 1440},
+	{"thumbnail", thumbnailWidth},
+	{"card", cardWidth},
+	{"detail", detailWidth},
 }
 
 const webpQuality = 82
 const masterWebpQuality = 90
+
+// masterWebpFallbackQuality is tried once, only if masterWebpQuality
+// produced a file no smaller than the original — a single controlled step
+// down, not a blanket quality reduction (most images never reach this
+// path; see the size-vs-original comparison in ProcessProductImage).
+const masterWebpFallbackQuality = 75
 
 // isSideways reports whether an EXIF orientation value implies a 90/270
 // degree rotation, which swaps the visual width and height relative to the
@@ -60,11 +76,15 @@ func processWithTimeout(ctx context.Context, timeout time.Duration, fn func() er
 	}
 }
 
-// ProcessProductImage generates the fixed thumbnail/card/detail variants
-// plus a full-resolution WebP master for a public product photo, writing
-// each atomically (write-to-temp-then-rename, so a reader never observes a
-// partially-written file) under uploadDir. Returns the variant metadata to
-// persist on the Asset row and to return to the frontend.
+// ProcessProductImage generates the fixed thumbnail/card/detail variants,
+// plus a full-resolution WebP "master" *when it's actually worth keeping*
+// (see the size-aware guards below — a master that would just duplicate the
+// detail variant's dimensions, or that never beats the original's size, is
+// never persisted), for a public product photo, writing each atomically
+// (write-to-temp-then-rename, so a reader never observes a partially-
+// written file) under uploadDir. Returns the variant metadata to persist on
+// the Asset row and to return to the frontend; the returned []byte is the
+// kept master's bytes, or nil if no master was generated/kept.
 func ProcessProductImage(ctx context.Context, timeout time.Duration, uploadDir, sourceKey string, buf []byte) (map[string]Variant, []byte, error) {
 	variants := make(map[string]Variant, len(ProductVariantSpecs)+1)
 
@@ -128,20 +148,71 @@ func ProcessProductImage(ctx context.Context, timeout time.Duration, uploadDir, 
 		variants[spec.Name] = Variant{StorageKey: key, Width: vMeta.Size.Width, Height: vMeta.Size.Height, Bytes: len(out)}
 	}
 
-	var master []byte
-	err = processWithTimeout(ctx, timeout, func() error {
-		var perr error
-		master, perr = bimg.NewImage(buf).Process(bimg.Options{
-			Type:          bimg.WEBP,
-			Quality:       masterWebpQuality,
-			StripMetadata: true,
-			NoAutoRotate:  false,
+	// The "master" variant is a full-resolution WebP re-encode — its only
+	// reason to exist is to be a smaller-than-original, format-normalized
+	// stand-in for the original file. Two size-aware guards keep that
+	// promise instead of assuming it:
+	//
+	//  1. Duplicate-of-detail skip: when the source is no wider than
+	//     detailWidth, an unclamped master would land at *exactly* the same
+	//     pixel dimensions as the "detail" variant already generated above
+	//     — a second full-size file that adds nothing but disk space and
+	//     processing time. Skipped entirely (no encode attempted) rather
+	//     than generated and discarded, since most product photos are
+	//     already ≤1440px wide and this is the common case, not an edge
+	//     case. The original file (preserved via WriteOriginal, exposed as
+	//     MediaAssetInfo.OriginalURL) remains the full-resolution reference.
+	//  2. Never-larger-than-original guard: for sources wider than
+	//     detailWidth, master genuinely differs from every fixed variant, so
+	//     it's worth attempting — but a real-world photo already saved at a
+	//     moderate JPEG quality can re-encode *larger* as WebP at a high,
+	//     fixed quality (observed in production: a 900x1600, 181,707-byte
+	//     JPEG produced a 197,316-byte WebP master — see the 2026-07-17
+	//     canary report). One fallback attempt at a lower quality is tried;
+	//     if that still isn't smaller than the original, no master is
+	//     persisted at all rather than keeping a file that made things
+	//     worse. This is a size comparison against the real original, not a
+	//     blanket quality cut — the vast majority of images never take the
+	//     fallback path, let alone the omit path (see BENCHMARK_RESULTS and
+	//     the master-vs-original test coverage in processing_test.go).
+	if effSrcWidth <= detailWidth {
+		return variants, nil, nil
+	}
+
+	genMaster := func(quality int) ([]byte, error) {
+		var out []byte
+		err := processWithTimeout(ctx, timeout, func() error {
+			var perr error
+			out, perr = bimg.NewImage(buf).Process(bimg.Options{
+				Type:          bimg.WEBP,
+				Quality:       quality,
+				StripMetadata: true,
+				NoAutoRotate:  false,
+			})
+			return perr
 		})
-		return perr
-	})
+		return out, err
+	}
+
+	master, err := genMaster(masterWebpQuality)
 	if err != nil {
 		return nil, nil, fmt.Errorf("process webp master: %w", err)
 	}
+	if len(master) >= len(buf) {
+		fallback, ferr := genMaster(masterWebpFallbackQuality)
+		if ferr != nil {
+			return nil, nil, fmt.Errorf("process webp master fallback: %w", ferr)
+		}
+		master = selectMaster(master, fallback, len(buf))
+	}
+	if master == nil {
+		// Neither the primary nor the fallback attempt beat the original's
+		// size — no master file is written, nothing is added to variants.
+		// The original itself, already durably written by WriteOriginal
+		// before processing began, remains the full-resolution reference.
+		return variants, nil, nil
+	}
+
 	masterMeta, merr := bimg.NewImage(master).Metadata()
 	if merr != nil {
 		return nil, nil, fmt.Errorf("read master metadata: %w", merr)
@@ -156,6 +227,22 @@ func ProcessProductImage(ctx context.Context, timeout time.Duration, uploadDir, 
 	variants["webp_master"] = Variant{StorageKey: masterKey, Width: masterMeta.Size.Width, Height: masterMeta.Size.Height, Bytes: len(master)}
 
 	return variants, master, nil
+}
+
+// selectMaster picks which candidate WebP master (if any) is worth keeping:
+// the primary (quality-90) attempt if it already beats the original's size,
+// else the fallback (lower-quality) attempt if *it* beats the original,
+// else nil — meaning no master should be persisted at all. Pulled out as a
+// pure function (no I/O, no image processing) so the size-decision policy
+// itself is directly unit-testable without depending on real codec output.
+func selectMaster(primary, fallback []byte, originalLen int) []byte {
+	if len(primary) < originalLen {
+		return primary
+	}
+	if fallback != nil && len(fallback) < originalLen {
+		return fallback
+	}
+	return nil
 }
 
 // ProcessPrivateProofPreview generates a single high-quality WebP preview

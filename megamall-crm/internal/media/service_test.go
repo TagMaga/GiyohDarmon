@@ -126,6 +126,49 @@ func TestService_Create_PDFPreservedNotRasterized(t *testing.T) {
 	}
 }
 
+// TestVariantsOf_DecodesLegacyMasterKeyWithoutError guards backward
+// compatibility for product images processed *before* the size-aware
+// master policy shipped: any already-persisted asset whose stored
+// variant_metadata JSON includes a "webp_master" key (the old, unconditional
+// behavior) must still decode and resolve exactly as before — this change
+// only affects what gets *generated* going forward, never how existing rows
+// are *read*. See internal/products' mediabridge, which already never reads
+// "webp_master" by name — this test guards the shared decode path itself.
+func TestVariantsOf_DecodesLegacyMasterKeyWithoutError(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc := NewService(NewRepository(db), testServiceCfg(t))
+
+	legacyJSON := []byte(`{
+		"thumbnail": {"storage_key": "abc.v1.thumbnail.webp", "width": 320, "height": 240, "bytes": 1000},
+		"card":      {"storage_key": "abc.v1.card.webp",      "width": 768, "height": 576, "bytes": 5000},
+		"detail":    {"storage_key": "abc.v1.detail.webp",    "width": 1440, "height": 1080, "bytes": 20000},
+		"webp_master": {"storage_key": "abc.v1.master.webp",  "width": 1440, "height": 1080, "bytes": 21000}
+	}`)
+	asset := &Asset{VariantMetadataJSON: legacyJSON}
+
+	variants, err := svc.VariantsOf(asset)
+	if err != nil {
+		t.Fatalf("VariantsOf: %v", err)
+	}
+	if len(variants) != 4 {
+		t.Fatalf("got %d variants, want 4 (legacy data includes webp_master)", len(variants))
+	}
+	master, ok := variants["webp_master"]
+	if !ok {
+		t.Fatal("expected legacy webp_master entry to still decode")
+	}
+	if master.StorageKey != "abc.v1.master.webp" || master.Bytes != 21000 {
+		t.Errorf("legacy master decoded incorrectly: %+v", master)
+	}
+	// The three fixed variants a real product-image consumer actually
+	// reads by name must also still resolve correctly alongside it.
+	for _, name := range []string{"thumbnail", "card", "detail"} {
+		if _, ok := variants[name]; !ok {
+			t.Errorf("missing %q alongside legacy webp_master", name)
+		}
+	}
+}
+
 func TestService_Create_UnknownCategoryRejected(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	u := testutil.CreateUser(t, db, users.RoleOwner)
