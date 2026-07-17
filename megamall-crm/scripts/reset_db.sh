@@ -32,6 +32,7 @@ refuse_if_production_value "DB_DSN" "$DB_DSN"
 refuse_if_production_value "DB_NAME" "$DB_NAME"
 refuse_if_production_value "DB_HOST" "$DB_HOST"
 refuse_if_production_value "DB_USER" "$DB_USER"
+refuse_if_non_local_host "DB_HOST" "$DB_HOST"
 
 # ── Guard: confirmation prompt ────────────────────────────────────────────────
 echo ""

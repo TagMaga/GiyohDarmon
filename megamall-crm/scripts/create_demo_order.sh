@@ -29,6 +29,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/dbsafety.sh"
 refuse_if_production_env
 refuse_if_production_value "BASE_URL" "$BASE_URL"
+refuse_if_non_local_host "BASE_URL" "$BASE_URL"
 
 # ── Dependency check ──────────────────────────────────────────────────────────
 command -v jq   >/dev/null 2>&1 || { echo "ERROR: jq is required. Install: brew install jq"; exit 1; }

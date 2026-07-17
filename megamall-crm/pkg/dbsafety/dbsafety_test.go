@@ -108,15 +108,51 @@ func TestAssertNotProduction_AllowedHostsOverride(t *testing.T) {
 	}
 }
 
-func TestRefuseProduction_AllowsNonLoopbackDevHost(t *testing.T) {
+func TestRefuseProduction_RejectsNonLoopbackHostWithoutConfirmation(t *testing.T) {
 	clearProductionEnvMarkers(t)
+	t.Setenv(envConfirmRemoteHost, "")
+
+	// A denylist alone can't catch every production host (a bare IP or an
+	// unfamiliar hostname won't match "prod"/"production"/etc.), so any
+	// non-loopback host must be explicitly confirmed — see
+	// requireRemoteHostConfirmation's doc comment on RefuseProduction.
+	dsn := "host=dev-postgres.internal.example port=5432 user=devuser password=x dbname=megamall_dev sslmode=require"
+	if err := RefuseProduction(dsn); err == nil {
+		t.Fatal("expected a non-loopback host to be refused without an explicit DBSAFETY_CONFIRM_REMOTE_HOST match")
+	}
+}
+
+func TestRefuseProduction_AllowsNonLoopbackDevHostWithConfirmation(t *testing.T) {
+	clearProductionEnvMarkers(t)
+	t.Setenv(envConfirmRemoteHost, "dev-postgres.internal.example")
 
 	// A real dev/staging host by name, unlike AssertNotProduction, must be
-	// allowed here — RefuseProduction is for human-run scratch tools that
-	// need this flexibility, guarded by the denylist alone.
+	// allowed here once explicitly confirmed — RefuseProduction is for
+	// human-run scratch tools that need this flexibility, guarded by the
+	// denylist plus an explicit per-host confirmation.
 	dsn := "host=dev-postgres.internal.example port=5432 user=devuser password=x dbname=megamall_dev sslmode=require"
 	if err := RefuseProduction(dsn); err != nil {
-		t.Fatalf("expected a non-production-shaped dev host to be allowed, got: %v", err)
+		t.Fatalf("expected a confirmed, non-production-shaped dev host to be allowed, got: %v", err)
+	}
+}
+
+func TestRefuseProduction_ConfirmationMustMatchExactHost(t *testing.T) {
+	clearProductionEnvMarkers(t)
+	t.Setenv(envConfirmRemoteHost, "some-other-host.example")
+
+	dsn := "host=dev-postgres.internal.example port=5432 user=devuser password=x dbname=megamall_dev sslmode=require"
+	if err := RefuseProduction(dsn); err == nil {
+		t.Fatal("expected a confirmation for a different host to not satisfy this DSN's host")
+	}
+}
+
+func TestRefuseProduction_LoopbackNeedsNoConfirmation(t *testing.T) {
+	clearProductionEnvMarkers(t)
+	t.Setenv(envConfirmRemoteHost, "")
+
+	dsn := "host=localhost port=5432 user=devuser password=x dbname=megamall_dev sslmode=disable"
+	if err := RefuseProduction(dsn); err != nil {
+		t.Fatalf("expected loopback to need no confirmation, got: %v", err)
 	}
 }
 

@@ -118,9 +118,35 @@ func AssertNotProduction(dsn string) error {
 // staging host reachable by name or IP — something the strict, CI-only
 // AssertNotProduction would always refuse. It still fails closed on an
 // unparseable DSN and on anything matching a production-shaped pattern.
+//
+// A denylist alone can't catch every production host — a bare IP or a
+// differently-named endpoint simply won't match any of deniedSubstrings.
+// So for any host that isn't loopback, RefuseProduction additionally
+// requires the caller to set DBSAFETY_CONFIRM_REMOTE_HOST to that exact
+// host, forcing a deliberate, per-run confirmation rather than letting an
+// unrecognized remote host (potentially production) pass through silently
+// by default.
 func RefuseProduction(dsn string) error {
-	_, err := checkCommon(dsn)
-	return err
+	cfg, err := checkCommon(dsn)
+	if err != nil {
+		return err
+	}
+	return requireRemoteHostConfirmation(cfg.Host)
+}
+
+const envConfirmRemoteHost = "DBSAFETY_CONFIRM_REMOTE_HOST"
+
+func requireRemoteHostConfirmation(host string) error {
+	lower := strings.ToLower(host)
+	if lower == "localhost" || lower == "127.0.0.1" || lower == "::1" || lower == "" {
+		return nil
+	}
+	confirm := strings.ToLower(strings.TrimSpace(os.Getenv(envConfirmRemoteHost)))
+	if confirm != lower {
+		return fmt.Errorf("dbsafety: refusing DSN — host %q is not local; set %s=%q to confirm this is an "+
+			"intentional, non-production target", host, envConfirmRemoteHost, lower)
+	}
+	return nil
 }
 
 func checkCommon(dsn string) (*pgconn.Config, error) {
