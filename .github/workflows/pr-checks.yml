@@ -13,7 +13,7 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       FRONTEND_DIR: megamall-crm/web-admin
       BACKEND_DIR: megamall-crm
@@ -21,6 +21,28 @@ jobs:
       # Go step in this job needs the C toolchain + libvips headers, not
       # just the build step, since `go vet`/`go test` also compile.
       CGO_ENABLED: 1
+      # Admin connection for the disposable-database test harness
+      # (pkg/dbsafety, internal/testutil) — points ONLY at the ephemeral
+      # `postgres` service container below, never at anything shared or
+      # long-lived. Every DB-backed test creates and drops its own unique
+      # database + role through this connection; see pkg/dbsafety's doc
+      # comment for why this is a hard requirement, not a convenience.
+      TEST_ADMIN_DSN: "host=localhost port=5432 user=ci_disposable_admin password=ci_disposable_admin dbname=postgres sslmode=disable"
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_disposable_admin
+          POSTGRES_PASSWORD: ci_disposable_admin
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_disposable_admin"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Check out the PR revision
@@ -77,10 +99,20 @@ jobs:
         run: go test ./pkg/middleware/... -run 'TestRedactSensitiveQuery|TestRequestLogger'
 
       # internal/products' dto_test.go is DB-independent (pure request
-      # validation); media_integration_test.go/handler_media_test.go
-      # (Phase 2: product images) need a real Postgres via DB_DSN, same as
-      # internal/media's own DB-backed tests, so only this filtered subset
-      # runs in CI.
+      # validation); this filtered subset gives a fast signal before the
+      # full DB-backed run below.
       - name: Run products no-DB tests
         working-directory: ${{ env.BACKEND_DIR }}
         run: go test ./internal/products/... -run 'TestCreateProductRequest|TestUpdateProductRequest'
+
+      # Every package with DB-backed tests (internal/media,
+      # internal/products' media integration tests, and the rest listed in
+      # internal/testutil's doc comment) provisions its own disposable
+      # database + role against the postgres service container above via
+      # TEST_ADMIN_DSN, through pkg/dbsafety + internal/testutil — never
+      # against anything shared. This is the first time these tests run in
+      # CI at all; previously they were entirely filtered out above for
+      # lack of a database to run against.
+      - name: Run full test suite (disposable DB via TEST_ADMIN_DSN)
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test ./... -timeout 10m

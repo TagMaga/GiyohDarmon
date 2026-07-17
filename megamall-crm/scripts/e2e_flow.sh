@@ -22,6 +22,14 @@ set -euo pipefail
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 API="${BASE_URL}/api/v1"
 
+# ── Guard: refuse anything production-shaped ──────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/dbsafety.sh
+source "$SCRIPT_DIR/lib/dbsafety.sh"
+refuse_if_production_env
+refuse_if_production_value "BASE_URL" "$BASE_URL"
+refuse_if_non_local_host "BASE_URL" "$BASE_URL"
+
 # Floating-point tolerance for amount comparisons (0.01 = 1 cent).
 TOLERANCE="0.01"
 
