@@ -11,17 +11,17 @@ package testutil
 //	db := testutil.NewTestDB(t)   // opens a tx; rolls back on t.Cleanup
 //	user := testutil.CreateUser(t, db, "seller")
 //
-// Main provisions one disposable PostgreSQL database and one disposable,
-// non-superuser role for the lifetime of that test binary, then drops both
-// when the binary exits. The connection comes exclusively from
-// TEST_ADMIN_DSN via pkg/dbsafety — never from DB_DSN, which is also what a
-// production deploy uses. See pkg/dbsafety's doc comment: this split exists
-// because a prior scratch test pointed a connection string at the live
-// production role and mutated its password directly, causing an outage.
+// Main just runs m.Run(), then drops the disposable database + role if any
+// test actually used one during that run — see DB's doc comment for why
+// provisioning is lazy (triggered by the first test that calls DB/NewTestDB)
+// rather than eager. The connection comes exclusively from TEST_ADMIN_DSN
+// via pkg/dbsafety — never from DB_DSN, which is also what a production
+// deploy uses. See pkg/dbsafety's doc comment: this split exists because a
+// prior scratch test pointed a connection string at the live production
+// role and mutated its password directly, causing an outage.
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,73 +39,58 @@ import (
 )
 
 var (
-	globalDB *gorm.DB
-	globalMu sync.RWMutex
+	globalDB      *gorm.DB
+	globalErr     error
+	globalCleanup func()
+	globalOnce    sync.Once
+	globalStateMu sync.Mutex
 )
 
-// Main provisions a single disposable database + disposable role for the
-// lifetime of one `go test` process (one package's test binary), runs
-// m.Run(), then unconditionally drops both — even on panic/failure, via
-// defer. Every package with DB-backed tests must call this from its own
-// TestMain (see package doc comment above). A package that never calls Main
-// gets a clear failure from DB/NewTestDB rather than silently reusing
-// another package's connection or falling back to anything shared.
+// Main runs m.Run(), then unconditionally drops the disposable database +
+// role if DB/NewTestDB provisioned one during the run — even on
+// panic/failure, via defer. Every package with DB-backed tests must call
+// this from its own TestMain:
 //
-// TestMain always executes even under `go test -run '^$'` — the "compile
-// everything, run nothing" invocation deploy.yml's "Compile all backend
-// packages" step uses to catch test-file compile errors before shipping,
-// without needing a database at all. -run is only consulted by m.Run()
-// internally, not before TestMain runs, so without the check below this
-// would try to provision a disposable database (and fail on a missing
-// TEST_ADMIN_DSN) purely to compile-check a binary that will run zero
-// tests. See compileOnly's doc comment.
+//	func TestMain(m *testing.M) { os.Exit(testutil.Main(m)) }
+//
+// Provisioning is deliberately lazy (see DB), so calling Main costs nothing
+// extra for a test binary whose selected tests never touch the database —
+// e.g. `go test -run '^$'` (compile-check only) or a -run pattern that
+// names only DB-independent tests, both of which deploy.yml's pipeline
+// actually does. TestMain itself always executes regardless of -run (a Go
+// runtime fact, not a choice made here) — what varies is only whether any
+// individual test body goes on to call DB/NewTestDB.
 func Main(m *testing.M) int {
-	if compileOnly() {
-		return m.Run()
-	}
+	code := m.Run()
 
-	cleanup, err := setupDisposableDB()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "testutil: %v\n", err)
-		return 1
+	globalStateMu.Lock()
+	cleanup := globalCleanup
+	globalCleanup = nil
+	globalDB = nil
+	globalStateMu.Unlock()
+
+	if cleanup != nil {
+		cleanup()
 	}
-	defer cleanup()
-	return m.Run()
+	return code
 }
 
-// compileOnly reports whether this invocation was `go test -run '^$'` (or
-// an equivalent pattern that provably matches no test name) — the standard
-// idiom for "compile every _test.go file and report success/failure, but
-// run nothing." The testing package registers its flags (including
-// test.run) in an init(), so they exist by the time TestMain runs, but
-// nothing has called flag.Parse() yet at that point — (*testing.M).Run()
-// only does so internally, and only once TestMain calls it. Parsing here
-// first is safe and idempotent: flag.Parse() records that it ran, so
-// m.Run()'s own "if !flag.Parsed()" guard just skips re-parsing.
-func compileOnly() bool {
-	if !flag.Parsed() {
-		flag.Parse()
-	}
-	f := flag.Lookup("test.run")
-	return f != nil && f.Value.String() == "^$"
-}
-
-func setupDisposableDB() (cleanup func(), err error) {
+func provisionDisposableDB() (db *gorm.DB, cleanup func(), err error) {
 	ctx := context.Background()
 
 	adminDSN, err := dbsafety.AdminDSN()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	adminCfg, err := pgx.ParseConfig(adminDSN)
 	if err != nil {
-		return nil, fmt.Errorf("testutil: parse %s: %w", dbsafety.EnvAdminDSN, err)
+		return nil, nil, fmt.Errorf("testutil: parse %s: %w", dbsafety.EnvAdminDSN, err)
 	}
 
 	adminConn, err := pgx.ConnectConfig(ctx, adminCfg)
 	if err != nil {
-		return nil, fmt.Errorf("testutil: connect to disposable-DB admin instance: %w", err)
+		return nil, nil, fmt.Errorf("testutil: connect to disposable-DB admin instance: %w", err)
 	}
 
 	dbToken, err1 := dbsafety.RandomToken(6)
@@ -113,7 +98,7 @@ func setupDisposableDB() (cleanup func(), err error) {
 	password, err3 := dbsafety.RandomToken(24)
 	if err := firstNonNil(err1, err2, err3); err != nil {
 		adminConn.Close(ctx)
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Pure "prefix + lowercase hex" — never derived from any external
@@ -124,7 +109,7 @@ func setupDisposableDB() (cleanup func(), err error) {
 
 	if verifyErr := dbsafety.AssertNotProduction(fmt.Sprintf("host=%s port=%d dbname=%s user=%s", adminCfg.Host, adminCfg.Port, dbName, roleName)); verifyErr != nil {
 		adminConn.Close(ctx)
-		return nil, fmt.Errorf("testutil: refusing to provision disposable database: %w", verifyErr)
+		return nil, nil, fmt.Errorf("testutil: refusing to provision disposable database: %w", verifyErr)
 	}
 
 	quotedRole := pgx.Identifier{roleName}.Sanitize()
@@ -149,17 +134,17 @@ func setupDisposableDB() (cleanup func(), err error) {
 		quotedRole, password,
 	)); execErr != nil {
 		teardown()
-		return nil, fmt.Errorf("testutil: create disposable role: %w", execErr)
+		return nil, nil, fmt.Errorf("testutil: create disposable role: %w", execErr)
 	}
 
 	if _, execErr := adminConn.Exec(ctx, fmt.Sprintf("CREATE DATABASE %s OWNER %s", quotedDB, quotedRole)); execErr != nil {
 		teardown()
-		return nil, fmt.Errorf("testutil: create disposable database: %w", execErr)
+		return nil, nil, fmt.Errorf("testutil: create disposable database: %w", execErr)
 	}
 
 	if _, execErr := adminConn.Exec(ctx, "REVOKE ALL ON DATABASE "+quotedDB+" FROM PUBLIC"); execErr != nil {
 		teardown()
-		return nil, fmt.Errorf("testutil: restrict disposable database to its owner: %w", execErr)
+		return nil, nil, fmt.Errorf("testutil: restrict disposable database to its owner: %w", execErr)
 	}
 
 	// CREATE EXTENSION and (on some Postgres versions) ownership of the
@@ -168,7 +153,7 @@ func setupDisposableDB() (cleanup func(), err error) {
 	// then hand off to the disposable role for the actual migrations.
 	if execErr := prepareSchema(ctx, adminCfg, dbName, quotedRole); execErr != nil {
 		teardown()
-		return nil, execErr
+		return nil, nil, execErr
 	}
 
 	disposableCfg := adminCfg.Copy()
@@ -178,7 +163,7 @@ func setupDisposableDB() (cleanup func(), err error) {
 
 	if verifyErr := dbsafety.AssertNotProduction(disposableCfg.ConnString()); verifyErr != nil {
 		teardown()
-		return nil, fmt.Errorf("testutil: refusing disposable connection: %w", verifyErr)
+		return nil, nil, fmt.Errorf("testutil: refusing disposable connection: %w", verifyErr)
 	}
 
 	sqlDB := stdlib.OpenDB(*disposableCfg)
@@ -187,38 +172,31 @@ func setupDisposableDB() (cleanup func(), err error) {
 	if dirErr != nil {
 		sqlDB.Close()
 		teardown()
-		return nil, dirErr
+		return nil, nil, dirErr
 	}
 
 	goose.SetLogger(goose.NopLogger())
 	if dialectErr := goose.SetDialect("postgres"); dialectErr != nil {
 		sqlDB.Close()
 		teardown()
-		return nil, fmt.Errorf("testutil: set goose dialect: %w", dialectErr)
+		return nil, nil, fmt.Errorf("testutil: set goose dialect: %w", dialectErr)
 	}
 	if upErr := goose.Up(sqlDB, dir); upErr != nil {
 		sqlDB.Close()
 		teardown()
-		return nil, fmt.Errorf("testutil: run migrations on disposable database: %w", upErr)
+		return nil, nil, fmt.Errorf("testutil: run migrations on disposable database: %w", upErr)
 	}
 
-	db, openErr := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
+	gdb, openErr := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if openErr != nil {
 		sqlDB.Close()
 		teardown()
-		return nil, fmt.Errorf("testutil: open gorm over disposable database: %w", openErr)
+		return nil, nil, fmt.Errorf("testutil: open gorm over disposable database: %w", openErr)
 	}
 
-	globalMu.Lock()
-	globalDB = db
-	globalMu.Unlock()
-
-	return func() {
-		globalMu.Lock()
-		globalDB = nil
-		globalMu.Unlock()
+	return gdb, func() {
 		sqlDB.Close()
 		teardown()
 	}, nil
@@ -272,17 +250,35 @@ func firstNonNil(errs ...error) error {
 	return nil
 }
 
-// DB returns the disposable *gorm.DB provisioned by Main for this test
-// binary. Fails the test immediately if Main was never called for this
-// package.
+// DB returns a disposable *gorm.DB, provisioning it on the first call from
+// any test in this binary and reusing it for the rest of the run — Main
+// (via TestMain) drops it afterward. Provisioning is lazy rather than
+// happening unconditionally in Main/TestMain because TestMain always
+// executes regardless of -run, and several real CI invocations select only
+// tests that never touch the database at all: `go test -run '^$'`
+// (deploy.yml's compile-only check) and `-run 'TestValidate|...'`-style
+// patterns naming a curated DB-independent subset (deploy.yml's "no DB
+// required" steps). Eagerly provisioning in Main would require
+// TEST_ADMIN_DSN even for those runs, even though nothing in them would
+// ever use it — which is exactly what broke the first two production
+// deploy attempts after this package was introduced. Lazy provisioning
+// means only a test that actually calls DB/NewTestDB ever needs
+// TEST_ADMIN_DSN to be set.
 func DB(t *testing.T) *gorm.DB {
 	t.Helper()
-	globalMu.RLock()
-	db := globalDB
-	globalMu.RUnlock()
-	if db == nil {
-		t.Fatal("testutil: no disposable database provisioned for this package — add:\n\n" +
-			"\tfunc TestMain(m *testing.M) { os.Exit(testutil.Main(m)) }\n")
+	globalOnce.Do(func() {
+		db, cleanup, err := provisionDisposableDB()
+		globalStateMu.Lock()
+		globalDB, globalCleanup, globalErr = db, cleanup, err
+		globalStateMu.Unlock()
+	})
+
+	globalStateMu.Lock()
+	db, err := globalDB, globalErr
+	globalStateMu.Unlock()
+
+	if err != nil {
+		t.Fatalf("testutil: %v", err)
 	}
 	return db
 }

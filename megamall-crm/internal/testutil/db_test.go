@@ -12,40 +12,38 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// These tests exercise setupDisposableDB directly (not through a package's
-// TestMain) so they can provision, inspect, and tear down independently —
-// verifying the actual safety properties Phase 0 is for, not just that the
-// happy path compiles.
+// These tests exercise provisionDisposableDB directly (not through a
+// package's TestMain/DB lazy-init path) so they can provision, inspect, and
+// tear down independently — verifying the actual safety properties Phase 0
+// is for, not just that the happy path compiles.
 
-func TestSetupDisposableDB_RequiresAdminDSN(t *testing.T) {
+func TestProvisionDisposableDB_RequiresAdminDSN(t *testing.T) {
 	t.Setenv("TEST_ADMIN_DSN", "")
 
-	_, err := setupDisposableDB()
+	_, _, err := provisionDisposableDB()
 	if err == nil {
 		t.Fatal("expected an error when TEST_ADMIN_DSN is unset, got nil")
 	}
 }
 
-func TestSetupDisposableDB_UniquePerCall(t *testing.T) {
+func TestProvisionDisposableDB_UniquePerCall(t *testing.T) {
 	requireAdminDSN(t)
 
-	cleanup1, err := setupDisposableDB()
+	db1, cleanup1, err := provisionDisposableDB()
 	if err != nil {
-		t.Fatalf("first setupDisposableDB: %v", err)
+		t.Fatalf("first provisionDisposableDB: %v", err)
 	}
-	db1 := DB(t)
 	var name1 string
 	if err := db1.Raw("SELECT current_database()").Scan(&name1).Error; err != nil {
 		cleanup1()
 		t.Fatalf("query current_database (1): %v", err)
 	}
 
-	cleanup2, err := setupDisposableDB()
+	db2, cleanup2, err := provisionDisposableDB()
 	if err != nil {
 		cleanup1()
-		t.Fatalf("second setupDisposableDB: %v", err)
+		t.Fatalf("second provisionDisposableDB: %v", err)
 	}
-	db2 := DB(t)
 	var name2 string
 	if err := db2.Raw("SELECT current_database()").Scan(&name2).Error; err != nil {
 		cleanup1()
@@ -57,23 +55,22 @@ func TestSetupDisposableDB_UniquePerCall(t *testing.T) {
 	cleanup1()
 
 	if name1 == name2 {
-		t.Fatalf("expected two calls to setupDisposableDB to provision different databases, both got %q", name1)
+		t.Fatalf("expected two calls to provisionDisposableDB to provision different databases, both got %q", name1)
 	}
 	if name1 == "postgres" || name2 == "postgres" || name1 == "" || name2 == "" {
 		t.Fatalf("disposable database names look wrong: %q, %q", name1, name2)
 	}
 }
 
-func TestSetupDisposableDB_RoleCannotEscalate(t *testing.T) {
+func TestProvisionDisposableDB_RoleCannotEscalate(t *testing.T) {
 	requireAdminDSN(t)
 
-	cleanup, err := setupDisposableDB()
+	db, cleanup, err := provisionDisposableDB()
 	if err != nil {
-		t.Fatalf("setupDisposableDB: %v", err)
+		t.Fatalf("provisionDisposableDB: %v", err)
 	}
 	defer cleanup()
 
-	db := DB(t)
 	var isSuper, canCreateDB, canCreateRole bool
 	err = db.Raw(`
 		SELECT rolsuper, rolcreatedb, rolcreaterole
@@ -88,14 +85,13 @@ func TestSetupDisposableDB_RoleCannotEscalate(t *testing.T) {
 	}
 }
 
-func TestSetupDisposableDB_CleanupDropsDatabaseAndRole(t *testing.T) {
+func TestProvisionDisposableDB_CleanupDropsDatabaseAndRole(t *testing.T) {
 	requireAdminDSN(t)
 
-	cleanup, err := setupDisposableDB()
+	db, cleanup, err := provisionDisposableDB()
 	if err != nil {
-		t.Fatalf("setupDisposableDB: %v", err)
+		t.Fatalf("provisionDisposableDB: %v", err)
 	}
-	db := DB(t)
 	var dbName, roleName string
 	if err := db.Raw("SELECT current_database(), current_user").Row().Scan(&dbName, &roleName); err != nil {
 		cleanup()
@@ -141,14 +137,11 @@ func TestSetupDisposableDB_CleanupDropsDatabaseAndRole(t *testing.T) {
 // packages" step runs `go test -run '^$' ./...` with no TEST_ADMIN_DSN and
 // no database at all — it exists purely to catch _test.go compile errors
 // before shipping, not to run anything. TestMain executes unconditionally
-// regardless of -run (that's a Go runtime fact, not a choice this package
-// makes), so without compileOnly's guard this would fail on a missing
-// TEST_ADMIN_DSN despite selecting zero tests — which is exactly what broke
-// the first production deploy attempt after this package's own guard was
-// introduced. This spawns a real `go test -run '^$'` subprocess (the only
-// way to observe compileOnly's actual behavior, since it reads the live
-// process's own flags) against internal/media, a real package with a
-// TestMain wired to testutil.Main.
+// regardless of -run (a Go runtime fact), so provisioning must be lazy
+// (triggered only when a test actually calls DB/NewTestDB — see DB's doc
+// comment) or this would fail on a missing TEST_ADMIN_DSN despite selecting
+// zero tests. This spawns a real `go test -run '^$'` subprocess against
+// internal/media, a real package with a TestMain wired to testutil.Main.
 func TestCompileOnly_NeverRequiresAdminDSN(t *testing.T) {
 	if testing.Short() {
 		t.Skip("spawns a go test subprocess; skipped in -short")
@@ -162,6 +155,32 @@ func TestCompileOnly_NeverRequiresAdminDSN(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("`go test -run '^$' ./internal/media/...` with no TEST_ADMIN_DSN must succeed (compile-only, no tests selected), got: %v\n%s", err, out)
+	}
+}
+
+// TestNamedDBIndependentRun_NeverRequiresAdminDSN is a regression test for
+// the second, subtler failure mode: deploy.yml also runs a *named* -run
+// pattern selecting only a curated DB-independent test subset (its "no DB
+// required" steps) — not the '^$' compile-only sentinel. Provisioning must
+// stay lazy enough that a run selecting zero DB-touching tests never needs
+// TEST_ADMIN_DSN either, even when -run is a real, non-empty pattern. This
+// reproduces deploy.yml's "Run media pipeline unit tests" step exactly.
+func TestNamedDBIndependentRun_NeverRequiresAdminDSN(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns a go test subprocess; skipped in -short")
+	}
+
+	repoRoot := repoRootForTest(t)
+	const runPattern = "TestValidate|TestSignedURL|TestNewSignedURLQuery|TestSafeStorageKey|TestNewStorageKey|" +
+		"TestVariantStorageKey|TestLooksLike|TestBaseContentType|TestBuildExifJPEG|TestProcess|TestWriteAtomic|" +
+		"TestRegisterRoutes|TestAuthorize"
+
+	cmd := exec.Command("go", "test", "./internal/media/...", "-run", runPattern, "-timeout", "5m")
+	cmd.Dir = repoRoot
+	cmd.Env = append(os.Environ(), "TEST_ADMIN_DSN=", "CGO_ENABLED=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("deploy.yml's DB-independent media test subset must succeed with no TEST_ADMIN_DSN, got: %v\n%s", err, out)
 	}
 }
 
