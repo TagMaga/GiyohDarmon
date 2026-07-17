@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -131,6 +134,48 @@ func TestSetupDisposableDB_CleanupDropsDatabaseAndRole(t *testing.T) {
 	if roleExists {
 		t.Errorf("role %q still exists after cleanup", roleName)
 	}
+}
+
+// TestCompileOnly_NeverRequiresAdminDSN is a regression test for the exact
+// incident this guards against: deploy.yml's "Compile all backend
+// packages" step runs `go test -run '^$' ./...` with no TEST_ADMIN_DSN and
+// no database at all — it exists purely to catch _test.go compile errors
+// before shipping, not to run anything. TestMain executes unconditionally
+// regardless of -run (that's a Go runtime fact, not a choice this package
+// makes), so without compileOnly's guard this would fail on a missing
+// TEST_ADMIN_DSN despite selecting zero tests — which is exactly what broke
+// the first production deploy attempt after this package's own guard was
+// introduced. This spawns a real `go test -run '^$'` subprocess (the only
+// way to observe compileOnly's actual behavior, since it reads the live
+// process's own flags) against internal/media, a real package with a
+// TestMain wired to testutil.Main.
+func TestCompileOnly_NeverRequiresAdminDSN(t *testing.T) {
+	if testing.Short() {
+		t.Skip("spawns a go test subprocess; skipped in -short")
+	}
+
+	repoRoot := repoRootForTest(t)
+
+	cmd := exec.Command("go", "test", "-run", "^$", "./internal/media/...")
+	cmd.Dir = repoRoot
+	cmd.Env = append(os.Environ(), "TEST_ADMIN_DSN=", "CGO_ENABLED=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("`go test -run '^$' ./internal/media/...` with no TEST_ADMIN_DSN must succeed (compile-only, no tests selected), got: %v\n%s", err, out)
+	}
+}
+
+// repoRootForTest locates the megamall-crm module root the same way
+// migrationsDir does — anchored to this source file's own path, stable
+// regardless of the test binary's working directory.
+func repoRootForTest(t *testing.T) string {
+	t.Helper()
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller failed")
+	}
+	// this file is internal/testutil/db_test.go — module root is two levels up.
+	return filepath.Join(filepath.Dir(thisFile), "..", "..")
 }
 
 func requireAdminDSN(t *testing.T) {

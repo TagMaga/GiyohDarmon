@@ -21,6 +21,7 @@ package testutil
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,7 +50,20 @@ var (
 // TestMain (see package doc comment above). A package that never calls Main
 // gets a clear failure from DB/NewTestDB rather than silently reusing
 // another package's connection or falling back to anything shared.
+//
+// TestMain always executes even under `go test -run '^$'` — the "compile
+// everything, run nothing" invocation deploy.yml's "Compile all backend
+// packages" step uses to catch test-file compile errors before shipping,
+// without needing a database at all. -run is only consulted by m.Run()
+// internally, not before TestMain runs, so without the check below this
+// would try to provision a disposable database (and fail on a missing
+// TEST_ADMIN_DSN) purely to compile-check a binary that will run zero
+// tests. See compileOnly's doc comment.
 func Main(m *testing.M) int {
+	if compileOnly() {
+		return m.Run()
+	}
+
 	cleanup, err := setupDisposableDB()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "testutil: %v\n", err)
@@ -57,6 +71,23 @@ func Main(m *testing.M) int {
 	}
 	defer cleanup()
 	return m.Run()
+}
+
+// compileOnly reports whether this invocation was `go test -run '^$'` (or
+// an equivalent pattern that provably matches no test name) — the standard
+// idiom for "compile every _test.go file and report success/failure, but
+// run nothing." The testing package registers its flags (including
+// test.run) in an init(), so they exist by the time TestMain runs, but
+// nothing has called flag.Parse() yet at that point — (*testing.M).Run()
+// only does so internally, and only once TestMain calls it. Parsing here
+// first is safe and idempotent: flag.Parse() records that it ran, so
+// m.Run()'s own "if !flag.Parsed()" guard just skips re-parsing.
+func compileOnly() bool {
+	if !flag.Parsed() {
+		flag.Parse()
+	}
+	f := flag.Lookup("test.run")
+	return f != nil && f.Value.String() == "^$"
 }
 
 func setupDisposableDB() (cleanup func(), err error) {
