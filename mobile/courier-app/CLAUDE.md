@@ -27,6 +27,30 @@ eas login
 eas build --platform android --profile preview   # APK для теста
 eas build --platform android --profile production # AAB для Play Store
 ```
+A full build is required whenever native code, permissions, or the Expo SDK
+version change — OTA updates below cannot ship those.
+
+## OTA updates (EAS Update)
+JS/UI-only fixes (no native code / Expo SDK change) ship instantly via OTA —
+no store review, no reinstall. `preview` and `production` builds are on
+separate channels (`eas.json`'s `build.<profile>.channel`); `runtimeVersion`
+uses the `fingerprint` policy, so an update is only offered to installs whose
+native code it's actually compatible with — no manual version bumping needed.
+
+One-time setup (run once, after `eas login`):
+```bash
+eas channel:create preview
+eas channel:create production
+```
+
+Publishing a fix:
+```bash
+npm run update:preview      # push to internal/preview testers first
+# verify on a preview-channel build, then:
+npm run update:production   # push to production once confirmed
+```
+Couriers on a build from the matching channel get the update on next app
+launch — no new APK/store submission needed.
 
 ## Env
 Скопируй `.env.example` → `.env` и замени IP на адрес сервера в локальной сети.
