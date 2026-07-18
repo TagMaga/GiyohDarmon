@@ -46,15 +46,18 @@ type MediaAssetInfo struct {
 }
 
 // AttachAvatarFn claims a previously-uploaded, unattached media asset
-// (category avatar) as userID's avatar. Returns (wrapped, check with
-// errors.Is) ErrMediaAssetNotFound / ErrMediaCategoryMismatch /
-// ErrMediaAlreadyAttached for the caller to map via mediaAttachError.
-type AttachAvatarFn func(ctx context.Context, assetID, userID uuid.UUID) (*MediaAssetInfo, error)
+// (category avatar) as userID's avatar. actorID must be the asset's own
+// uploader (see media.Service.AttachToOwner) — the caller making the
+// current request (self, or an owner acting on userID's behalf), not
+// necessarily userID itself. Returns (wrapped, check with errors.Is)
+// ErrMediaAssetNotFound / ErrMediaCategoryMismatch / ErrMediaAlreadyAttached
+// for the caller to map via mediaAttachError.
+type AttachAvatarFn func(ctx context.Context, assetID, userID, actorID uuid.UUID) (*MediaAssetInfo, error)
 
 // AttachUserDocumentFn claims a previously-uploaded, unattached media asset
 // (category user_document) as userID's document. Same sentinel-error
-// contract as AttachAvatarFn.
-type AttachUserDocumentFn func(ctx context.Context, assetID, userID uuid.UUID) (*MediaAssetInfo, error)
+// contract and actorID semantics as AttachAvatarFn.
+type AttachUserDocumentFn func(ctx context.Context, assetID, userID, actorID uuid.UUID) (*MediaAssetInfo, error)
 
 // ReleaseMediaFn quarantines a previously-attached (or attach-then-
 // abandoned) media asset — the compensating action for a failed
@@ -317,7 +320,11 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateUserReques
 	}
 	var newAvatarAssetID *uuid.UUID
 	if req.AvatarMediaAssetID != nil {
-		info, attachErr := s.attachAvatar(ctx, *req.AvatarMediaAssetID, u.ID)
+		actorID := id
+		if len(actorIDs) > 0 {
+			actorID = actorIDs[0]
+		}
+		info, attachErr := s.attachAvatar(ctx, *req.AvatarMediaAssetID, u.ID, actorID)
 		if attachErr != nil {
 			return nil, mediaAttachError(attachErr)
 		}
@@ -534,7 +541,7 @@ func (s *Service) PatchMe(ctx context.Context, id uuid.UUID, req PatchMeRequest)
 	previousAvatarAssetID := u.AvatarMediaAssetID
 	var newAvatarAssetID *uuid.UUID
 	if req.AvatarMediaAssetID != nil {
-		info, attachErr := s.attachAvatar(ctx, *req.AvatarMediaAssetID, u.ID)
+		info, attachErr := s.attachAvatar(ctx, *req.AvatarMediaAssetID, u.ID, id)
 		if attachErr != nil {
 			return nil, mediaAttachError(attachErr)
 		}
@@ -677,7 +684,7 @@ func (s *Service) CreateDocument(ctx context.Context, userID uuid.UUID, uploaded
 		doc.ContentType = req.ContentType
 		doc.SizeBytes = req.SizeBytes
 	} else {
-		info, attachErr := s.attachUserDocument(ctx, *req.MediaAssetID, userID)
+		info, attachErr := s.attachUserDocument(ctx, *req.MediaAssetID, userID, uploadedBy)
 		if attachErr != nil {
 			return nil, mediaAttachError(attachErr)
 		}

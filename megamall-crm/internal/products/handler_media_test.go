@@ -16,9 +16,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/megamall/crm/internal/products"
 	"github.com/megamall/crm/internal/testutil"
 	"github.com/megamall/crm/internal/users"
@@ -31,14 +33,29 @@ func init() {
 }
 
 // buildProductsTestRouter wires products.RegisterRoutes with a fake
-// validator that trusts the role passed as the Bearer token value —
-// mirrors internal/orders/rbac_test.go's established pattern.
+// validator that trusts the Bearer token value as either a bare role
+// ("seller") or "role|userID" ("owner|<uuid>") — mirrors internal/orders/
+// rbac_test.go's established pattern, extended with an optional UserID
+// since media.Service.AttachToOwner now requires the caller's ID to match
+// the asset's own uploader (see the Phase 1 security review): a test that
+// expects the request to succeed all the way to a real attach must send
+// the same UserID as whoever uploaded the asset, not just the right role.
 func buildProductsTestRouter(svc *products.Service) *gin.Engine {
 	middleware.SetTokenValidator(func(_ context.Context, token string) (*middleware.ContextClaims, error) {
 		if token == "" {
 			return nil, apperrors.Unauthorized("no token")
 		}
-		return &middleware.ContextClaims{Role: token}, nil
+		role := token
+		var userID uuid.UUID
+		if idx := strings.IndexByte(token, '|'); idx >= 0 {
+			role = token[:idx]
+			parsed, err := uuid.Parse(token[idx+1:])
+			if err != nil {
+				return nil, apperrors.Unauthorized("invalid test token user id")
+			}
+			userID = parsed
+		}
+		return &middleware.ContextClaims{Role: role, UserID: userID}, nil
 	})
 
 	r := gin.New()
@@ -57,6 +74,13 @@ func postAsRole(r *gin.Engine, path, role string, body any) *httptest.ResponseRe
 	rec := httptest.NewRecorder()
 	r.ServeHTTP(rec, req)
 	return rec
+}
+
+// postAsUser is postAsRole plus a specific UserID — needed whenever the
+// request is expected to reach a real media attach, since the caller's ID
+// must match the asset's uploader.
+func postAsUser(r *gin.Engine, path, role string, userID uuid.UUID, body any) *httptest.ResponseRecorder {
+	return postAsRole(r, path, role+"|"+userID.String(), body)
 }
 
 // TestProductsHandler_CreateWithImage_OwnerAllowed_SellerForbidden proves
@@ -82,7 +106,7 @@ func TestProductsHandler_CreateWithImage_OwnerAllowed_SellerForbidden(t *testing
 		t.Errorf("seller: status = %d, want 403 — write-role gate must reject this exactly as before", sellerRec.Code)
 	}
 
-	ownerRec := postAsRole(r, "/api/v1/products", "owner", body)
+	ownerRec := postAsUser(r, "/api/v1/products", "owner", uploader.ID, body)
 	if ownerRec.Code != http.StatusCreated {
 		t.Fatalf("owner: status = %d, want 201, body=%s", ownerRec.Code, ownerRec.Body.String())
 	}
@@ -108,7 +132,7 @@ func TestProductsHandler_CreateWithImage_WarehouseManagerAllowed(t *testing.T) {
 	uploader := testutil.CreateUser(t, db, users.RoleWarehouseManager)
 	asset := uploadProductImage(t, mediaSvc, uploader.ID, fixture(t, "transparent.png"))
 
-	rec := postAsRole(r, "/api/v1/products", "warehouse_manager", map[string]any{
+	rec := postAsUser(r, "/api/v1/products", "warehouse_manager", uploader.ID, map[string]any{
 		"name":                         "Warehouse Widget",
 		"primary_image_media_asset_id": asset.ID.String(),
 	})

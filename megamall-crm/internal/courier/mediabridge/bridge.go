@@ -29,8 +29,8 @@ const cashHandoverOwnerType = "cash_handovers"
 // pipeline disabled simply don't call this and never call
 // SetMediaAdapters, leaving courier.Service's adapters nil.
 func Adapters(mediaSvc *media.Service) (courier.AttachCashHandoverProofFn, courier.ListCashHandoverProofsFn, courier.ReleaseMediaFn, courier.SignedMediaURLFn) {
-	attach := func(ctx context.Context, assetID, handoverID uuid.UUID) (*courier.MediaAssetInfo, error) {
-		asset, err := mediaSvc.AttachToOwner(ctx, assetID, media.CategoryCashHandoverProof, cashHandoverOwnerType, handoverID)
+	attach := func(ctx context.Context, assetID, handoverID, actorID uuid.UUID) (*courier.MediaAssetInfo, error) {
+		asset, err := mediaSvc.AttachToOwner(ctx, assetID, media.CategoryCashHandoverProof, cashHandoverOwnerType, handoverID, actorID)
 		if err != nil {
 			switch {
 			case errors.Is(err, media.ErrAssetNotFound):

@@ -78,7 +78,10 @@ type MediaAssetInfo struct {
 // variant URLs. Returns (wrapped, check with errors.Is)
 // ErrMediaAssetNotFound / ErrMediaCategoryMismatch / ErrMediaAlreadyAttached
 // for the caller to map to the right HTTP response — see mediaAttachError.
-type AttachProductImageFn func(ctx context.Context, assetID, productID uuid.UUID) (*MediaAssetInfo, error)
+// actorID must be the asset's own uploader (see media.Service.AttachToOwner's
+// doc comment) — the caller performing the current create/update/
+// AddProductImage request, not necessarily anything else.
+type AttachProductImageFn func(ctx context.Context, assetID, productID, actorID uuid.UUID) (*MediaAssetInfo, error)
 
 // ReleaseMediaFn quarantines a previously-attached (or attach-then-
 // abandoned) media asset — the compensating action for a failed create, a
@@ -340,7 +343,7 @@ func (s *Service) CreateProduct(ctx context.Context, actorID uuid.UUID, req Crea
 	}
 
 	if req.PrimaryImageMediaAssetID != nil {
-		if err := s.attachPrimaryImageOrRollback(ctx, p, *req.PrimaryImageMediaAssetID); err != nil {
+		if err := s.attachPrimaryImageOrRollback(ctx, p, *req.PrimaryImageMediaAssetID, actorID); err != nil {
 			return nil, err
 		}
 	}
@@ -366,8 +369,8 @@ func (s *Service) CreateProduct(ctx context.Context, actorID uuid.UUID, req Crea
 // on next read. The media asset itself, if the second step (row insert)
 // fails after a successful attach, is released (quarantined) too — so
 // neither side of the operation survives a partial failure.
-func (s *Service) attachPrimaryImageOrRollback(ctx context.Context, p *Product, assetID uuid.UUID) error {
-	info, err := s.attachProductImage(ctx, assetID, p.ID)
+func (s *Service) attachPrimaryImageOrRollback(ctx context.Context, p *Product, assetID, actorID uuid.UUID) error {
+	info, err := s.attachProductImage(ctx, assetID, p.ID, actorID)
 	if err != nil {
 		if rbErr := s.repo.HardDeleteProduct(ctx, p.ID); rbErr != nil {
 			log.Printf("[products] rollback failed for product %s after image attach failure: %v", p.ID, rbErr)
@@ -494,7 +497,7 @@ func (s *Service) UpdateProduct(ctx context.Context, actorID, id uuid.UUID, req 
 	}
 
 	if req.PrimaryImageMediaAssetID != nil {
-		if err := s.replacePrimaryImage(ctx, p, *req.PrimaryImageMediaAssetID); err != nil {
+		if err := s.replacePrimaryImage(ctx, p, *req.PrimaryImageMediaAssetID, actorID); err != nil {
 			// Every other field on the product was already saved
 			// successfully above — an image-replace failure is reported
 			// but doesn't roll back those unrelated field changes; the
@@ -520,8 +523,8 @@ func (s *Service) UpdateProduct(ctx context.Context, actorID, id uuid.UUID, req 
 // Attach happens first and must succeed before anything about the old
 // image is touched, so a failed replace never leaves the product without
 // any primary image.
-func (s *Service) replacePrimaryImage(ctx context.Context, p *Product, newAssetID uuid.UUID) error {
-	info, err := s.attachProductImage(ctx, newAssetID, p.ID)
+func (s *Service) replacePrimaryImage(ctx context.Context, p *Product, newAssetID, actorID uuid.UUID) error {
+	info, err := s.attachProductImage(ctx, newAssetID, p.ID, actorID)
 	if err != nil {
 		return mediaAttachError(err)
 	}
@@ -634,7 +637,7 @@ func (s *Service) AddProductImage(ctx context.Context, actorID, productID uuid.U
 		if err := s.requireMedia(); err != nil {
 			return nil, err
 		}
-		info, err := s.attachProductImage(ctx, *req.MediaAssetID, productID)
+		info, err := s.attachProductImage(ctx, *req.MediaAssetID, productID, actorID)
 		if err != nil {
 			return nil, mediaAttachError(err)
 		}

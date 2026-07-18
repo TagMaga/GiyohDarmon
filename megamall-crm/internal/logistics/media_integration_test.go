@@ -136,7 +136,7 @@ func TestListHandovers_ResolvesMediaAssetPipelineProof(t *testing.T) {
 	if appErr != nil {
 		t.Fatalf("upload proof fixture: %v", appErr)
 	}
-	if _, err := mediaSvc.AttachToOwner(context.Background(), asset.ID, media.CategoryCashHandoverProof, "cash_handovers", row.ID); err != nil {
+	if _, err := mediaSvc.AttachToOwner(context.Background(), asset.ID, media.CategoryCashHandoverProof, "cash_handovers", row.ID, courierUser.ID); err != nil {
 		t.Fatalf("attach proof to handover: %v", err)
 	}
 

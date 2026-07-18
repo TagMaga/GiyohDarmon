@@ -61,9 +61,9 @@ func setupOrderServiceWithMedia(t *testing.T, db *gorm.DB) (*Service, *media.Ser
 	svc, _, _ := buildTestOrderService(t, db)
 	mediaSvc := media.NewService(media.NewRepository(db), ordersTestMediaCfg(t))
 
-	attachFor := func(category media.Category) func(ctx context.Context, assetID, ownerID uuid.UUID) (*MediaAssetInfo, error) {
-		return func(ctx context.Context, assetID, ownerID uuid.UUID) (*MediaAssetInfo, error) {
-			asset, err := mediaSvc.AttachToOwner(ctx, assetID, category, "orders", ownerID)
+	attachFor := func(category media.Category) func(ctx context.Context, assetID, ownerID, actorID uuid.UUID) (*MediaAssetInfo, error) {
+		return func(ctx context.Context, assetID, ownerID, actorID uuid.UUID) (*MediaAssetInfo, error) {
+			asset, err := mediaSvc.AttachToOwner(ctx, assetID, category, "orders", ownerID, actorID)
 			if err != nil {
 				switch {
 				case errors.Is(err, media.ErrAssetNotFound):

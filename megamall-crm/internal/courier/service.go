@@ -45,7 +45,9 @@ type MediaAssetInfo struct {
 // Returns (wrapped, check with errors.Is) ErrMediaAssetNotFound /
 // ErrMediaCategoryMismatch / ErrMediaAlreadyAttached for the caller to map
 // via mediaAttachError.
-type AttachCashHandoverProofFn func(ctx context.Context, assetID, handoverID uuid.UUID) (*MediaAssetInfo, error)
+// actorID must be the asset's own uploader (see
+// media.Service.AttachToOwner) — the courier submitting the handover.
+type AttachCashHandoverProofFn func(ctx context.Context, assetID, handoverID, actorID uuid.UUID) (*MediaAssetInfo, error)
 
 // ListCashHandoverProofsFn returns every media asset currently attached to
 // handoverID — the only way to enumerate a handover's proofs, since there
@@ -417,7 +419,7 @@ func (s *Service) SubmitHandover(ctx context.Context, courierID uuid.UUID, req S
 			return nil, err
 		}
 		for _, assetID := range req.MediaAssetIDs {
-			if _, err := s.attachCashHandoverProof(ctx, assetID, handoverID); err != nil {
+			if _, err := s.attachCashHandoverProof(ctx, assetID, handoverID, courierID); err != nil {
 				for _, attached := range attachedAssetIDs {
 					s.releaseAndLog(ctx, attached)
 				}

@@ -79,8 +79,8 @@ func setupCourierServiceWithMedia(t *testing.T, db *gorm.DB) (*Service, *media.S
 	svc := NewService(NewRepository(db), ordersSvc, activityLogger, db)
 	mediaSvc := media.NewService(media.NewRepository(db), courierTestMediaCfg(t))
 
-	attach := func(ctx context.Context, assetID, handoverID uuid.UUID) (*MediaAssetInfo, error) {
-		asset, err := mediaSvc.AttachToOwner(ctx, assetID, media.CategoryCashHandoverProof, "cash_handovers", handoverID)
+	attach := func(ctx context.Context, assetID, handoverID, actorID uuid.UUID) (*MediaAssetInfo, error) {
+		asset, err := mediaSvc.AttachToOwner(ctx, assetID, media.CategoryCashHandoverProof, "cash_handovers", handoverID, actorID)
 		if err != nil {
 			switch {
 			case errors.Is(err, media.ErrAssetNotFound):

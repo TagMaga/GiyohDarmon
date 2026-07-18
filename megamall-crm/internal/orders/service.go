@@ -56,16 +56,18 @@ type MediaAssetInfo struct {
 }
 
 // AttachOrderAttachmentFn claims a previously-uploaded, unattached media
-// asset (category order_attachment) as orderID's attachment. Returns
-// (wrapped, check with errors.Is) ErrMediaAssetNotFound /
+// asset (category order_attachment) as orderID's attachment. actorID must
+// be the asset's own uploader (see media.Service.AttachToOwner) — the
+// caller creating/updating the order, not necessarily anything else.
+// Returns (wrapped, check with errors.Is) ErrMediaAssetNotFound /
 // ErrMediaCategoryMismatch / ErrMediaAlreadyAttached for the caller to map
 // via mediaAttachError.
-type AttachOrderAttachmentFn func(ctx context.Context, assetID, orderID uuid.UUID) (*MediaAssetInfo, error)
+type AttachOrderAttachmentFn func(ctx context.Context, assetID, orderID, actorID uuid.UUID) (*MediaAssetInfo, error)
 
 // AttachPrepaymentProofFn claims a previously-uploaded, unattached media
 // asset (category prepayment_proof) as orderID's prepayment proof. Same
-// sentinel-error contract as AttachOrderAttachmentFn.
-type AttachPrepaymentProofFn func(ctx context.Context, assetID, orderID uuid.UUID) (*MediaAssetInfo, error)
+// sentinel-error contract and actorID semantics as AttachOrderAttachmentFn.
+type AttachPrepaymentProofFn func(ctx context.Context, assetID, orderID, actorID uuid.UUID) (*MediaAssetInfo, error)
 
 // ReleaseMediaFn quarantines a previously-attached (or attach-then-
 // abandoned) media asset — the compensating action for a failed
@@ -229,7 +231,7 @@ func (s *Service) prepareOrderAttachment(ctx context.Context, orderID, actorID u
 	if err := s.requireMedia(); err != nil {
 		return nil, err
 	}
-	info, attachErr := s.attachOrderAttachment(ctx, *mediaAssetID, orderID)
+	info, attachErr := s.attachOrderAttachment(ctx, *mediaAssetID, orderID, actorID)
 	if attachErr != nil {
 		return nil, mediaAttachError(attachErr)
 	}
@@ -244,7 +246,7 @@ func (s *Service) prepareOrderAttachment(ctx context.Context, orderID, actorID u
 // url/mediaAssetID, both unset is fine" contract, but returns the fields
 // needed to populate an *OrderPrepayment rather than a whole struct, since
 // AddPrepayment builds the rest of that row from other request fields.
-func (s *Service) preparePrepaymentProof(ctx context.Context, orderID uuid.UUID, url *string, mediaAssetID *uuid.UUID) (proofURL *string, resolvedAssetID *uuid.UUID, width, height *int, err error) {
+func (s *Service) preparePrepaymentProof(ctx context.Context, orderID, actorID uuid.UUID, url *string, mediaAssetID *uuid.UUID) (proofURL *string, resolvedAssetID *uuid.UUID, width, height *int, err error) {
 	hasURL := url != nil && strings.TrimSpace(*url) != ""
 	hasAsset := mediaAssetID != nil
 	if hasURL && hasAsset {
@@ -261,7 +263,7 @@ func (s *Service) preparePrepaymentProof(ctx context.Context, orderID uuid.UUID,
 	if reqErr := s.requireMedia(); reqErr != nil {
 		return nil, nil, nil, nil, reqErr
 	}
-	info, attachErr := s.attachPrepaymentProof(ctx, *mediaAssetID, orderID)
+	info, attachErr := s.attachPrepaymentProof(ctx, *mediaAssetID, orderID, actorID)
 	if attachErr != nil {
 		return nil, nil, nil, nil, mediaAttachError(attachErr)
 	}
@@ -1478,7 +1480,7 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, req AddPrepaymentRequest) (*OrderPrepayment, error) {
 	// Attach BEFORE the transaction — same reasoning as Create/Update's
 	// pre-attach blocks.
-	proofURL, mediaAssetID, width, height, prepErr := s.preparePrepaymentProof(ctx, orderID, req.ProofURL, req.MediaAssetID)
+	proofURL, mediaAssetID, width, height, prepErr := s.preparePrepaymentProof(ctx, orderID, actorID, req.ProofURL, req.MediaAssetID)
 	if prepErr != nil {
 		return nil, prepErr
 	}

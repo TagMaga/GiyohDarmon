@@ -22,11 +22,11 @@ import (
 // pipeline disabled simply don't call this and never call
 // SetMediaAdapters, leaving orders.Service's adapters nil.
 func Adapters(mediaSvc *media.Service) (orders.AttachOrderAttachmentFn, orders.AttachPrepaymentProofFn, orders.ReleaseMediaFn, orders.SignedMediaURLFn) {
-	attachOrderAttachment := func(ctx context.Context, assetID, orderID uuid.UUID) (*orders.MediaAssetInfo, error) {
-		return attach(ctx, mediaSvc, assetID, media.CategoryOrderAttachment, "orders", orderID)
+	attachOrderAttachment := func(ctx context.Context, assetID, orderID, actorID uuid.UUID) (*orders.MediaAssetInfo, error) {
+		return attach(ctx, mediaSvc, assetID, media.CategoryOrderAttachment, "orders", orderID, actorID)
 	}
-	attachPrepaymentProof := func(ctx context.Context, assetID, orderID uuid.UUID) (*orders.MediaAssetInfo, error) {
-		return attach(ctx, mediaSvc, assetID, media.CategoryPrepaymentProof, "orders", orderID)
+	attachPrepaymentProof := func(ctx context.Context, assetID, orderID, actorID uuid.UUID) (*orders.MediaAssetInfo, error) {
+		return attach(ctx, mediaSvc, assetID, media.CategoryPrepaymentProof, "orders", orderID, actorID)
 	}
 
 	signedMediaURL := func(ctx context.Context, assetID uuid.UUID, variant string) string {
@@ -44,8 +44,8 @@ func Adapters(mediaSvc *media.Service) (orders.AttachOrderAttachmentFn, orders.A
 	return attachOrderAttachment, attachPrepaymentProof, mediaSvc.ReleaseByID, signedMediaURL
 }
 
-func attach(ctx context.Context, mediaSvc *media.Service, assetID uuid.UUID, category media.Category, ownerEntityType string, ownerEntityID uuid.UUID) (*orders.MediaAssetInfo, error) {
-	asset, err := mediaSvc.AttachToOwner(ctx, assetID, category, ownerEntityType, ownerEntityID)
+func attach(ctx context.Context, mediaSvc *media.Service, assetID uuid.UUID, category media.Category, ownerEntityType string, ownerEntityID, actorID uuid.UUID) (*orders.MediaAssetInfo, error) {
+	asset, err := mediaSvc.AttachToOwner(ctx, assetID, category, ownerEntityType, ownerEntityID, actorID)
 	if err != nil {
 		switch {
 		case errors.Is(err, media.ErrAssetNotFound):

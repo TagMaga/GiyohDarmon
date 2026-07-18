@@ -22,11 +22,11 @@ import (
 // disabled simply don't call this and pass nil, nil, nil, nil to
 // users.NewService instead.
 func Adapters(mediaSvc *media.Service) (users.AttachAvatarFn, users.AttachUserDocumentFn, users.ReleaseMediaFn, users.SignedMediaURLFn) {
-	attachAvatar := func(ctx context.Context, assetID, userID uuid.UUID) (*users.MediaAssetInfo, error) {
-		return attach(ctx, mediaSvc, assetID, media.CategoryAvatar, "users", userID)
+	attachAvatar := func(ctx context.Context, assetID, userID, actorID uuid.UUID) (*users.MediaAssetInfo, error) {
+		return attach(ctx, mediaSvc, assetID, media.CategoryAvatar, "users", userID, actorID)
 	}
-	attachUserDocument := func(ctx context.Context, assetID, userID uuid.UUID) (*users.MediaAssetInfo, error) {
-		return attach(ctx, mediaSvc, assetID, media.CategoryUserDocument, "users", userID)
+	attachUserDocument := func(ctx context.Context, assetID, userID, actorID uuid.UUID) (*users.MediaAssetInfo, error) {
+		return attach(ctx, mediaSvc, assetID, media.CategoryUserDocument, "users", userID, actorID)
 	}
 
 	signedMediaURL := func(ctx context.Context, assetID uuid.UUID, variant string) string {
@@ -44,8 +44,8 @@ func Adapters(mediaSvc *media.Service) (users.AttachAvatarFn, users.AttachUserDo
 	return attachAvatar, attachUserDocument, mediaSvc.ReleaseByID, signedMediaURL
 }
 
-func attach(ctx context.Context, mediaSvc *media.Service, assetID uuid.UUID, category media.Category, ownerEntityType string, ownerEntityID uuid.UUID) (*users.MediaAssetInfo, error) {
-	asset, err := mediaSvc.AttachToOwner(ctx, assetID, category, ownerEntityType, ownerEntityID)
+func attach(ctx context.Context, mediaSvc *media.Service, assetID uuid.UUID, category media.Category, ownerEntityType string, ownerEntityID, actorID uuid.UUID) (*users.MediaAssetInfo, error) {
+	asset, err := mediaSvc.AttachToOwner(ctx, assetID, category, ownerEntityType, ownerEntityID, actorID)
 	if err != nil {
 		switch {
 		case errors.Is(err, media.ErrAssetNotFound):
