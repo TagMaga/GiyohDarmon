@@ -1,4 +1,5 @@
 import client from '../../shared/api/client'
+import { uploadToMedia } from '../../shared/api/mediaUpload'
 
 /**
  * Unwrap an Axios response into the actual payload array/object.
@@ -111,6 +112,22 @@ export async function uploadMyAvatar(file) {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return unwrap(res)
+}
+
+// uploadMyAvatarSmart tries the centralized media pipeline first
+// (category=avatar), then attaches it via PATCH /users/me — falling back
+// to the legacy uploadMyAvatar (already-attached in one call) when the
+// pipeline route 404s (MEDIA_PIPELINE_ENABLED=false server-side). Returns
+// the updated UserResponse either way, so callers can treat it exactly
+// like the old uploadMyAvatar.
+export async function uploadMyAvatarSmart(file) {
+  try {
+    const asset = await uploadToMedia(file, 'avatar')
+    return patchMe({ avatar_media_asset_id: asset.id })
+  } catch (err) {
+    if (err?.response?.status !== 404) throw err
+    return uploadMyAvatar(file)
+  }
 }
 
 /** PATCH /users/:id/password — self-service password change */

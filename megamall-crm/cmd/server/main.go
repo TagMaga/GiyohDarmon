@@ -30,6 +30,7 @@ import (
 	"github.com/megamall/crm/internal/hierarchy"
 	"github.com/megamall/crm/internal/inventory"
 	"github.com/megamall/crm/internal/logistics"
+	logisticsmediabridge "github.com/megamall/crm/internal/logistics/mediabridge"
 	logistics_settings "github.com/megamall/crm/internal/logistics_settings"
 	"github.com/megamall/crm/internal/media"
 	"github.com/megamall/crm/internal/orders"
@@ -310,6 +311,10 @@ func main() {
 	// ── Phase 17: Owner Logistics ─────────────────────────────────────────────
 	logisticsRepo := logistics.NewRepository(db, loc)
 	logisticsHandler := logistics.NewHandler(logisticsRepo, loc)
+	if cfg.Media.Enabled {
+		listCashHandoverProofsFn, signedLogisticsMediaURLFn := logisticsmediabridge.Adapters(mediaSvc)
+		logisticsHandler.SetMediaAdapters(listCashHandoverProofsFn, signedLogisticsMediaURLFn)
+	}
 
 	// ── Rate-limit store (in-memory; swap for Redis store in production) ─────
 	rateLimitStore := middleware.NewMemoryStore()

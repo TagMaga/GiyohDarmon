@@ -1,7 +1,9 @@
 package logistics
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -12,9 +14,36 @@ import (
 	"github.com/megamall/crm/pkg/validator"
 )
 
+// MediaAssetInfo mirrors internal/courier.MediaAssetInfo — a plain, local
+// struct rather than importing internal/media's own types directly (same
+// import-cycle reasoning as every other domain's mediabridge). Read-only
+// here: internal/logistics only displays cash-handover proofs (via the
+// owner dashboard), it never attaches/uploads them — that happens through
+// internal/courier's own SubmitHandover.
+type MediaAssetInfo struct {
+	ID     uuid.UUID
+	Width  *int
+	Height *int
+}
+
+// ListCashHandoverProofsFn returns every media asset attached to
+// handoverID — see internal/courier.ListCashHandoverProofsFn's identical
+// doc comment.
+type ListCashHandoverProofsFn func(ctx context.Context, handoverID uuid.UUID) ([]MediaAssetInfo, error)
+
+// SignedMediaURLFn mints a fresh signed URL for a private media asset —
+// see internal/courier.SignedMediaURLFn's identical doc comment.
+type SignedMediaURLFn func(ctx context.Context, assetID uuid.UUID, variant string) string
+
 type Handler struct {
 	repo *Repository
 	loc  *time.Location
+
+	// listCashHandoverProofs/signedMediaURL are nil when
+	// MEDIA_PIPELINE_ENABLED=false — set via SetMediaAdapters after
+	// construction (mirrors internal/courier.Service.SetMediaAdapters).
+	listCashHandoverProofs ListCashHandoverProofsFn
+	signedMediaURL         SignedMediaURLFn
 }
 
 func NewHandler(repo *Repository, loc *time.Location) *Handler {
@@ -22,6 +51,44 @@ func NewHandler(repo *Repository, loc *time.Location) *Handler {
 		loc = time.UTC
 	}
 	return &Handler{repo: repo, loc: loc}
+}
+
+// SetMediaAdapters injects the media-pipeline read adapters after
+// construction — called from main.go once *media.Service exists (inside
+// the "if cfg.Media.Enabled" block). Both adapters stay nil when the
+// pipeline is disabled, in which case listHandovers simply omits
+// MediaAssets from every row (legacy proof_url/attachments_json are
+// unaffected either way).
+func (h *Handler) SetMediaAdapters(list ListCashHandoverProofsFn, signedURL SignedMediaURLFn) {
+	h.listCashHandoverProofs = list
+	h.signedMediaURL = signedURL
+}
+
+// resolveHandoverMediaAssets lists handoverID's attached media-pipeline
+// proof assets and mints a fresh signed URL for each — never persisted,
+// resolved on every read. Returns nil (not an error) when the pipeline is
+// disabled or a lookup fails, so callers still have the legacy fields.
+func (h *Handler) resolveHandoverMediaAssets(ctx context.Context, handoverID uuid.UUID) []HandoverMediaAsset {
+	if h.listCashHandoverProofs == nil {
+		return nil
+	}
+	infos, err := h.listCashHandoverProofs(ctx, handoverID)
+	if err != nil {
+		log.Printf("[logistics] failed to list cash handover proofs for %s: %v", handoverID, err)
+		return nil
+	}
+	assets := make([]HandoverMediaAsset, 0, len(infos))
+	for _, info := range infos {
+		if h.signedMediaURL == nil {
+			continue
+		}
+		url := h.signedMediaURL(ctx, info.ID, "preview")
+		if url == "" {
+			continue
+		}
+		assets = append(assets, HandoverMediaAsset{ID: info.ID, URL: url, Width: info.Width, Height: info.Height})
+	}
+	return assets
 }
 
 // ─── Dashboard ───────────────────────────────────────────────────────────────
@@ -143,6 +210,9 @@ func (h *Handler) listHandovers(c *gin.Context) {
 	if err != nil {
 		response.HandleError(c, err)
 		return
+	}
+	for i := range rows {
+		rows[i].MediaAssets = h.resolveHandoverMediaAssets(c.Request.Context(), rows[i].ID)
 	}
 	response.OKWithMeta(c, rows, pagination.BuildMeta(p, total))
 }

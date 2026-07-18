@@ -132,6 +132,23 @@ type HandoverListRow struct {
 	AdminNote         *string    `json:"admin_note"`
 	ConfirmedAt       *time.Time `json:"confirmed_at"`
 	CreatedAt         time.Time  `json:"created_at"`
+	// MediaAssets is resolved fresh (signed URLs, never persisted) by
+	// Handler.listHandovers via the adapters set through SetMediaAdapters —
+	// mirrors internal/courier.Service.ToHandoverResponse's
+	// HandoverResponse.MediaAssets exactly, for the same underlying
+	// cash_handovers rows viewed here from the owner's logistics dashboard
+	// instead of the courier/dispatcher endpoints. Left nil (omitted) when
+	// the media pipeline is disabled or the adapters haven't been set.
+	MediaAssets []HandoverMediaAsset `json:"media_assets,omitempty"`
+}
+
+// HandoverMediaAsset is one resolved cash-handover proof image — same
+// shape as internal/courier.HandoverMediaAsset.
+type HandoverMediaAsset struct {
+	ID     uuid.UUID `json:"id"`
+	URL    string    `json:"url"`
+	Width  *int      `json:"width,omitempty"`
+	Height *int      `json:"height,omitempty"`
 }
 
 // Amount bounds (max=1000000) are a fat-finger/overflow guard on

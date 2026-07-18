@@ -4,6 +4,7 @@ import { useSellerMe, useSellerCompensation, useSellerTeamRank, useMyTeam } from
 import useSellerOrders from '../hooks/useSellerOrders'
 import useAuthStore from '../../../shared/store/authStore'
 import { M, MobileShell, Card, StatTile, InitialsAvatar, SectionLabel } from '../components/mobileUi'
+import { withCacheBust } from '../../../shared/api/mediaUpload'
 
 function monthsOnline(iso) {
   if (!iso) return null
@@ -46,7 +47,7 @@ export default function SellerProfilePage() {
 
   const fullName = me?.full_name ?? ''
   const initials = fullName.split(' ').map(n => n[0] ?? '').join('').slice(0, 2).toUpperCase() || 'SE'
-  const avatarUrl = me?.avatar_url ? `${me.avatar_url}?t=${me.updated_at ?? ''}` : null
+  const avatarUrl = withCacheBust(me?.avatar_url, me?.updated_at)
   const commissionPct = compensation?.commission_rate != null ? +(compensation.commission_rate * 100).toFixed(1) : null
   const rank = rankData?.rank ?? null
   const totalMembers = rankData?.total_members ?? null

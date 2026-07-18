@@ -43,8 +43,12 @@ const STATUS_CFG = {
   disputed:  { label: 'Спор',      badge: 'violet'  },
 }
 
-// Parse attachments_json (string) → array of URL strings
-function parseAttachments(proofUrl, attachmentsJson) {
+// Parse proof_url + attachments_json (legacy) + media_assets (centralized
+// media pipeline — internal/courier.Service.ToHandoverResponse resolves
+// these fresh, signed, on every read; see internal/courier/dto.go's
+// HandoverResponse.MediaAssets doc comment) into one flat array of URL
+// strings for display.
+function parseAttachments(proofUrl, attachmentsJson, mediaAssets) {
   const out = []
   if (proofUrl) out.push(proofUrl)
   if (attachmentsJson) {
@@ -54,6 +58,9 @@ function parseAttachments(proofUrl, attachmentsJson) {
         arr.forEach(u => { if (u && !out.includes(u)) out.push(u) })
       }
     } catch { /* ignore malformed */ }
+  }
+  if (Array.isArray(mediaAssets)) {
+    mediaAssets.forEach(a => { if (a?.url && !out.includes(a.url)) out.push(a.url) })
   }
   return out
 }
@@ -82,8 +89,8 @@ function DiffCell({ expected, actual }) {
 }
 
 // Receipt thumbnail
-function ReceiptThumb({ proofUrl, attachmentsJson, onClick }) {
-  const urls = parseAttachments(proofUrl, attachmentsJson)
+function ReceiptThumb({ proofUrl, attachmentsJson, mediaAssets, onClick }) {
+  const urls = parseAttachments(proofUrl, attachmentsJson, mediaAssets)
   if (urls.length === 0) {
     return <span className="text-slate-300 text-xs">—</span>
   }
@@ -129,7 +136,7 @@ function VerifyModal({ row, open, onClose, onConfirm, onReject, onDelete, updati
 
   if (!row) return null
 
-  const urls      = parseAttachments(row.proof_url, row.attachments_json)
+  const urls      = parseAttachments(row.proof_url, row.attachments_json, row.media_assets)
   const sc        = STATUS_CFG[row.status] ?? STATUS_CFG.pending
   const actualAmt = displayActual(row)
   const diff      = actualAmt != null ? actualAmt - row.total_to_return : null
@@ -533,6 +540,7 @@ export default function CashHandoversPage({ courierId } = {}) {
                           <ReceiptThumb
                             proofUrl={row.proof_url}
                             attachmentsJson={row.attachments_json}
+                            mediaAssets={row.media_assets}
                             onClick={() => setVerifyRow(row)}
                           />
                         </td>
@@ -571,7 +579,7 @@ export default function CashHandoversPage({ courierId } = {}) {
               {items.map(row => {
                 const sc = STATUS_CFG[row.status] ?? STATUS_CFG.pending
                 const isPending = row.status === 'pending' || row.status === 'disputed'
-                const urls = parseAttachments(row.proof_url, row.attachments_json)
+                const urls = parseAttachments(row.proof_url, row.attachments_json, row.media_assets)
                 return (
                   <div
                     key={row.id}
@@ -593,7 +601,7 @@ export default function CashHandoversPage({ courierId } = {}) {
                     </div>
                     <div className="flex items-center justify-between">
                       {urls.length > 0 && (
-                        <ReceiptThumb proofUrl={row.proof_url} attachmentsJson={row.attachments_json} />
+                        <ReceiptThumb proofUrl={row.proof_url} attachmentsJson={row.attachments_json} mediaAssets={row.media_assets} />
                       )}
                       {isPending && (
                         <div className="flex gap-2 ml-auto">

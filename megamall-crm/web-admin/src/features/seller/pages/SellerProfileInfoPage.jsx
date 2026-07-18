@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Alert from '../../../shared/components/Alert'
-import { useSellerMe, usePatchMe } from '../hooks/useSellerMe'
+import { useSellerMe, usePatchMe, useUploadMyAvatar } from '../hooks/useSellerMe'
 import { useToast } from '../../../shared/components/ToastProvider'
-import { Check } from 'lucide-react'
+import { translateMediaError } from '../../../shared/api/mediaErrors'
+import { withCacheBust } from '../../../shared/api/mediaUpload'
+import { Check, Upload } from 'lucide-react'
 import { M, Card } from '../components/mobileUi'
 
 function initials(name = '') {
@@ -12,8 +14,24 @@ function initials(name = '') {
 export default function SellerProfileInfoPage() {
   const { data: me, isLoading } = useSellerMe()
   const patch = usePatchMe()
+  const avatarUpload = useUploadMyAvatar()
   const toast = useToast()
   const [fullName, setFullName] = useState('')
+  // Two separate refs: mobile and desktop layouts are both always mounted
+  // (shown/hidden via Tailwind's lg: breakpoint classes, never
+  // conditionally rendered), so a single shared ref would only ever point
+  // at whichever block's <input> rendered last in the JSX.
+  const fileRef = useRef()
+  const fileRefDesktop = useRef()
+
+  function handleAvatarChange(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    avatarUpload.mutate(file, {
+      onError: (err) => toast.error(translateMediaError(err)),
+    })
+  }
 
   useEffect(() => {
     if (me?.full_name != null) setFullName(me.full_name)
@@ -34,7 +52,7 @@ export default function SellerProfileInfoPage() {
     patch.mutate(payload, { onSuccess: () => toast.success('Изменения сохранены') })
   }
 
-  const avatarUrl = me?.avatar_url ? `${me.avatar_url}?t=${me.updated_at ?? ''}` : null
+  const avatarUrl = withCacheBust(me?.avatar_url, me?.updated_at)
   const roleLabel = me?.role === 'manager' ? 'Менеджер' : me?.role === 'sales_team_lead' ? 'Тимлид' : 'Продавец'
   const cityLabel = me?.city_name ?? me?.city ?? me?.address ?? 'Душанбе'
 
@@ -51,11 +69,22 @@ export default function SellerProfileInfoPage() {
         {errMsg && <Alert variant="error">{errMsg}</Alert>}
 
         <Card className="flex flex-col items-center text-center" style={{ borderRadius: 20, padding: '24px 18px' }}>
-          <div
-            className="flex items-center justify-center overflow-hidden"
-            style={{ width: 84, height: 84, borderRadius: '50%', background: '#E7E5FB', color: M.indigoDeep, fontWeight: 800, fontSize: 28 }}
-          >
-            {avatarUrl ? <img src={avatarUrl} alt={fullName || 'Профиль'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials(fullName)}
+          <div className="relative group/av">
+            <div
+              className="flex items-center justify-center overflow-hidden cursor-pointer"
+              style={{ width: 84, height: 84, borderRadius: '50%', background: '#E7E5FB', color: M.indigoDeep, fontWeight: 800, fontSize: 28 }}
+              onClick={() => fileRef.current?.click()}
+            >
+              {avatarUrl ? <img src={avatarUrl} alt={fullName || 'Профиль'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials(fullName)}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/av:opacity-100 transition-opacity flex items-center justify-center" style={{ borderRadius: '50%' }}>
+                {avatarUpload.isPending ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Upload size={18} className="text-white" />
+                )}
+              </div>
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           </div>
         </Card>
 
@@ -135,13 +164,22 @@ export default function SellerProfileInfoPage() {
       <div className="grid gap-5" style={{ gridTemplateColumns: '300px 1fr' }}>
         {/* avatar column */}
         <Card style={{ borderRadius: 20, padding: '32px 20px', height: 'fit-content' }} className="flex flex-col items-center text-center">
-          <div className="relative">
+          <div className="relative group/av">
             <div
-              className="flex items-center justify-center overflow-hidden"
+              className="flex items-center justify-center overflow-hidden cursor-pointer"
               style={{ width: 96, height: 96, borderRadius: '50%', background: '#E7E5FB', color: M.indigoDeep, fontWeight: 800, fontSize: 32 }}
+              onClick={() => fileRefDesktop.current?.click()}
             >
               {avatarUrl ? <img src={avatarUrl} alt={fullName || 'Профиль'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : initials(fullName)}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/av:opacity-100 transition-opacity flex items-center justify-center" style={{ borderRadius: '50%' }}>
+                {avatarUpload.isPending ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Upload size={20} className="text-white" />
+                )}
+              </div>
             </div>
+            <input ref={fileRefDesktop} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           </div>
         </Card>
 

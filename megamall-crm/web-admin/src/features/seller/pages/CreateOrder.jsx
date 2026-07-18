@@ -5,7 +5,8 @@ import { ShoppingCart, Search, X, Package, AlertCircle } from 'lucide-react'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
 import { createOrder, createCustomer } from '../api'
-import client from '../../../shared/api/client'
+import { smartUpload } from '../../../shared/api/mediaUpload'
+import { uploadFileLegacy } from '../../../shared/api/legacyUpload'
 import useProfile from '../../../shared/hooks/useProfile'
 import useCustomers from '../hooks/useCustomers'
 import useProducts from '../hooks/useProducts'
@@ -176,11 +177,13 @@ export default function CreateOrder() {
   const [success, setSuccess] = useState(null)
   const [submitError, setSubmitError] = useState(null)
   const [proofFile, setProofFile] = useState(null)
-  const uploadedProofUrl = useRef(null)
+  // { kind: 'media', asset } | { kind: 'legacy', url } | null — cached so a
+  // retried submit doesn't re-upload the same file.
+  const uploadedProofResult = useRef(null)
 
   const handleProofFileChange = useCallback((file) => {
     setProofFile(file)
-    uploadedProofUrl.current = null  // clear cache when file changes
+    uploadedProofResult.current = null  // clear cache when file changes
   }, [])
 
   const { data: customersRaw = [] } = useCustomers()
@@ -293,18 +296,23 @@ export default function CreateOrder() {
         cid = newCust.id
       }
 
-      // Upload proof file if attached — reuse cached URL on retry
+      // Upload proof file if attached — reuse cached result on retry.
+      // Category 'order_attachment' matches CreateOrderRequest's
+      // payment_proof_media_asset_id, which internal/orders attaches via
+      // AttachOrderAttachmentFn (category order_attachment) — NOT
+      // prepayment_proof, which is a separate flow (POST
+      // /orders/:id/prepayments, used after order creation).
       let proofUrl = undefined
+      let proofMediaAssetId = undefined
       if (proofFile && form.payMode === 'prepayment') {
-        if (!uploadedProofUrl.current) {
-          const fd = new FormData()
-          fd.append('file', proofFile)
-          const uploadRes = await client.post('/uploads', fd, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          })
-          uploadedProofUrl.current = uploadRes.data?.data?.url ?? uploadRes.data?.url
+        if (!uploadedProofResult.current) {
+          uploadedProofResult.current = await smartUpload(proofFile, 'order_attachment', uploadFileLegacy)
         }
-        proofUrl = uploadedProofUrl.current
+        if (uploadedProofResult.current.kind === 'media') {
+          proofMediaAssetId = uploadedProofResult.current.asset.id
+        } else {
+          proofUrl = uploadedProofResult.current.url
+        }
       }
 
       const noteParts = []
@@ -331,6 +339,7 @@ export default function CreateOrder() {
         prepayment_receiver: prepayRequired && form.prepayReceiver ? form.prepayReceiver : undefined,
         prepayment_comment:  prepayRequired && form.comment.trim() ? form.comment.trim() : undefined,
         payment_proof_url:   proofUrl ?? undefined,
+        payment_proof_media_asset_id: proofMediaAssetId ?? undefined,
       })
 
       return { order }
@@ -338,7 +347,7 @@ export default function CreateOrder() {
     onSuccess: ({ order }) => {
       clearDraft()
       setProofFile(null)
-      uploadedProofUrl.current = null
+      uploadedProofResult.current = null
       qc.invalidateQueries({ queryKey: KEYS.seller.orders })
       setSuccess({
         order,
@@ -378,7 +387,7 @@ export default function CreateOrder() {
     setSuccess(null)
     setForm(EMPTY_FORM)
     setProofFile(null)
-    uploadedProofUrl.current = null
+    uploadedProofResult.current = null
     clearDraft()
   }
 
@@ -398,7 +407,7 @@ export default function CreateOrder() {
     setForm(EMPTY_FORM)
     setProofFile(null)
     setSubmitError(null)
-    uploadedProofUrl.current = null
+    uploadedProofResult.current = null
     clearDraft()
     navigate('/seller')
   }

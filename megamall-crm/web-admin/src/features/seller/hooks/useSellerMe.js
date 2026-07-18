@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { KEYS } from '../../../shared/queryKeys'
-import { fetchMe, patchMe, uploadMyAvatar, fetchMyCompensation, fetchMyTeamRank, fetchMyTeam, changePassword } from '../api'
+import { fetchMe, patchMe, uploadMyAvatarSmart, fetchMyCompensation, fetchMyTeamRank, fetchMyTeam, changePassword } from '../api'
 
 export function useSellerMe() {
   return useQuery({
@@ -27,7 +27,7 @@ export function useChangePassword(userId) {
 export function useUploadMyAvatar() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: uploadMyAvatar,
+    mutationFn: uploadMyAvatarSmart,
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.seller.me }),
   })
 }
