@@ -175,36 +175,16 @@ export async function updateCourierPayout(courierId, payload) {
 
 // ── Avatar upload ─────────────────────────────────────────────────────────────
 
-export async function uploadUserAvatar(userId, file) {
-  const form = new FormData()
-  form.append('avatar', file)
-  const res = await client.post(`/users/${userId}/avatar`, form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
-  return unwrap(res)
-}
-
-// uploadUserAvatarSmart tries the centralized media pipeline first
-// (category=avatar) and returns the resulting media_asset_id for the
-// caller to pass into updateEmployee's avatar_media_asset_id — falling
-// back to the legacy uploadUserAvatar (which attaches directly, in one
-// call, without a separate updateEmployee) when the pipeline route 404s
-// (MEDIA_PIPELINE_ENABLED=false server-side).
-//
-// Returns:
-//   { kind: 'media', asset: <AssetResponse> }
-//   { kind: 'legacy', updated: <UserResponse> }  — already attached, no
-//     further updateEmployee call needed
-export async function uploadUserAvatarSmart(userId, file, { onProgress } = {}) {
-  try {
-    const asset = await uploadToMedia(file, 'avatar', { onProgress })
-    return { kind: 'media', asset }
-  } catch (err) {
-    if (err?.response?.status !== 404) throw err
-    const updated = await uploadUserAvatar(userId, file)
-    onProgress?.(100)
-    return { kind: 'legacy', updated }
-  }
+// uploadUserAvatarSecure uploads through the centralized media pipeline only
+// (category=avatar, PRIVATE) and returns the resulting asset for the caller
+// to pass into updateEmployee's avatar_media_asset_id. Avatars must never
+// fall back to the legacy, unauthenticated POST /users/:id/avatar endpoint —
+// see shared/api/mediaUpload.js's smartUpload doc comment for why. If the
+// pipeline is unavailable, this throws and the caller renders the error via
+// translateMediaError; it never silently downgrades to public storage.
+export async function uploadUserAvatarSecure(file, { onProgress } = {}) {
+  const asset = await uploadToMedia(file, 'avatar', { onProgress })
+  return { kind: 'media', asset }
 }
 
 export async function uploadFile(file) {

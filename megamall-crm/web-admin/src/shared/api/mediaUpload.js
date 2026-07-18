@@ -30,9 +30,17 @@ export async function uploadToMedia(file, category, { onProgress, timeout = 60_0
 // signal that MEDIA_PIPELINE_ENABLED=false server-side; see
 // internal/media/routes.go). A real validation/processing error from an
 // *enabled* pipeline (400/413/500/etc.) is thrown as-is, not swallowed —
-// callers should render it via translateMediaError. Mirrors
-// features/warehouse/api.js's uploadProductImageSmart, generalized to any
-// category.
+// callers should render it via translateMediaError.
+//
+// PUBLIC categories only (currently just product_image, via
+// features/warehouse/api.js's uploadProductImageSmart) — the legacy
+// /uploads endpoint it falls back to is unauthenticated and publicly
+// readable. PRIVATE categories (avatar, order_attachment,
+// prepayment_proof, cash_handover_proof, user_document) must call
+// uploadToMedia directly and let a failure propagate — see each domain's
+// api.js (e.g. seller/api.js's uploadMyAvatarSecure) for the pattern, and
+// scripts/verify-private-media-no-legacy-fallback.sh for the regression
+// guard that enforces this only warehouse/api.js imports this function.
 //
 // Returns either:
 //   { kind: 'media', asset: <AssetResponse> }

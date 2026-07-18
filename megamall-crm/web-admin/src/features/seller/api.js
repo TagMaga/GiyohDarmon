@@ -104,30 +104,16 @@ export async function patchMe(payload) {
   return unwrap(res)
 }
 
-/** POST /users/me/avatar */
-export async function uploadMyAvatar(file) {
-  const form = new FormData()
-  form.append('avatar', file)
-  const res = await client.post('/users/me/avatar', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
-  return unwrap(res)
-}
-
-// uploadMyAvatarSmart tries the centralized media pipeline first
-// (category=avatar), then attaches it via PATCH /users/me — falling back
-// to the legacy uploadMyAvatar (already-attached in one call) when the
-// pipeline route 404s (MEDIA_PIPELINE_ENABLED=false server-side). Returns
-// the updated UserResponse either way, so callers can treat it exactly
-// like the old uploadMyAvatar.
-export async function uploadMyAvatarSmart(file) {
-  try {
-    const asset = await uploadToMedia(file, 'avatar')
-    return patchMe({ avatar_media_asset_id: asset.id })
-  } catch (err) {
-    if (err?.response?.status !== 404) throw err
-    return uploadMyAvatar(file)
-  }
+// uploadMyAvatarSecure uploads through the centralized media pipeline only
+// (category=avatar, PRIVATE) and attaches it via PATCH /users/me. Avatars
+// must never fall back to the legacy, unauthenticated POST /users/me/avatar
+// endpoint — see shared/api/mediaUpload.js's smartUpload doc comment for
+// why. If the pipeline is unavailable, this throws and the caller renders
+// the error via translateMediaError; it never silently downgrades to
+// public storage.
+export async function uploadMyAvatarSecure(file) {
+  const asset = await uploadToMedia(file, 'avatar')
+  return patchMe({ avatar_media_asset_id: asset.id })
 }
 
 /** PATCH /users/:id/password — self-service password change */

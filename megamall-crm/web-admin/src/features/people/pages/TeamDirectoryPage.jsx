@@ -29,15 +29,15 @@ import {
   fetchEmployeeCompensation, fetchEmployeeCompensationHistory,
   fetchEmployeeConfigs, fetchEmployeeConfigHistory, fetchTeamConfigs,
   fetchGlobalRates, createConfig, disableConfig,
-  updateEmployee, uploadUserAvatarSmart,
+  updateEmployee, uploadUserAvatarSecure,
   fetchUserDocuments, createUserDocument, deleteUserDocument,
   updateUserDocumentStatus, fetchUserHistory, fetchAllUserHistory,
 } from '../api'
 import {
   fetchCourierTariffs, createCourierTariff, deleteCourierTariff,
 } from '../../dispatcher/api'
-import { withCacheBust, smartUpload } from '../../../shared/api/mediaUpload'
-import { uploadFileLegacy } from '../../../shared/api/legacyUpload'
+import { withCacheBust, uploadToMedia } from '../../../shared/api/mediaUpload'
+import { translateMediaError } from '../../../shared/api/mediaErrors'
 import { ALL_ROLES, ROLE_LABEL, COMMISSION_TYPE_LABEL, STATUS_CFG, STATUS_OPTIONS, fmtDate, fmtMoney, fmtPct, isConfigActive } from '../utils/peopleHelpers'
 import EditEmployeeModal   from '../components/EditEmployeeModal'
 import Modal               from '../../../shared/components/Modal'
@@ -540,6 +540,7 @@ function GroupStat({ icon, color, value, label }) {
 
 function DetailPanel({ person, teamId, teamColor, teamName, teams, employees, onBack, onUpdated }) {
   const qc        = useQueryClient()
+  const toast     = useToast()
   const fileRef   = useRef()
   const color     = teamColor ?? '#6366f1'
 
@@ -601,12 +602,7 @@ function DetailPanel({ person, teamId, teamColor, teamName, teams, employees, on
 
   const avatarMut = useMutation({
     mutationFn: async (file) => {
-      const result = await uploadUserAvatarSmart(person.id, file)
-      // Legacy path already attached the avatar in one call (see
-      // uploadUserAvatarSmart's doc comment); the media-pipeline path
-      // still needs a separate PATCH to actually attach the freshly
-      // uploaded (but as-yet-unattached) asset to this user.
-      if (result.kind === 'legacy') return result.updated
+      const result = await uploadUserAvatarSecure(file)
       return updateEmployee(person.id, { avatar_media_asset_id: result.asset.id })
     },
     onSuccess: (updated) => {
@@ -615,6 +611,7 @@ function DetailPanel({ person, teamId, teamColor, teamName, teams, employees, on
       qc.invalidateQueries({ queryKey: ['users-history'] })
       onUpdated?.()
     },
+    onError: (err) => toast.error(translateMediaError(err)),
   })
 
   function handleAvatarChange(e) {
@@ -897,41 +894,26 @@ function DocumentsField({ personId }) {
       const files = Array.from(selectedFiles ?? [])
       for (const file of files) {
         const expiresAtIso = expiresAt ? `${expiresAt}T00:00:00Z` : undefined
+        // HR/passport documents are a PRIVATE category — they must never be
+        // newly uploaded through the legacy, unauthenticated /uploads
+        // endpoint (see shared/api/mediaUpload.js's smartUpload doc
+        // comment, and the 2026-07-16 P0 incident referenced there).
+        //
         // internal/media only accepts image/jpeg|png|webp and
         // application/pdf (see internal/media/validate.go's sniffedType
-        // table) — anything else (e.g. .doc/.docx, still accepted by this
-        // field's file input) would hard-fail the pipeline with a 400, not
-        // the 404 smartUpload treats as "pipeline disabled", so those go
-        // straight to the legacy path without attempting it at all.
+        // table). Anything else (e.g. .doc/.docx, still accepted by this
+        // field's file input) is rejected up front, client-side, with a
+        // clear error — it is never sent anywhere, public or private.
         const MEDIA_PIPELINE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-        if (MEDIA_PIPELINE_TYPES.includes(file.type)) {
-          const result = await smartUpload(file, 'user_document', uploadFileLegacy)
-          if (result.kind === 'media') {
-            await createUserDocument(personId, {
-              media_asset_id: result.asset.id,
-              document_type: documentType,
-              expires_at: expiresAtIso,
-            })
-            continue
-          }
-          await createUserDocument(personId, {
-            file_url: result.url,
-            original_filename: file.name,
-            content_type: file.type || undefined,
-            size_bytes: file.size,
-            document_type: documentType,
-            expires_at: expiresAtIso,
-          })
-          continue
+        if (!MEDIA_PIPELINE_TYPES.includes(file.type)) {
+          throw new Error(
+            `«${file.name}»: неподдерживаемый тип файла. Разрешены только JPG, PNG, WEBP и PDF.`
+          )
         }
 
-        const uploaded = await uploadFileLegacy(file)
-        if (!uploaded?.url) throw new Error('Не удалось получить ссылку на файл')
+        const asset = await uploadToMedia(file, 'user_document')
         await createUserDocument(personId, {
-          file_url: uploaded.url,
-          original_filename: file.name,
-          content_type: file.type || undefined,
-          size_bytes: file.size,
+          media_asset_id: asset.id,
           document_type: documentType,
           expires_at: expiresAtIso,
         })
@@ -1019,7 +1001,7 @@ function DocumentsField({ personId }) {
       </button>
       {uploadMut.error && (
         <p className="mt-2 text-[12px] font-medium text-rose-600">
-          {uploadMut.error.response?.data?.error?.message ?? uploadMut.error.message}
+          {uploadMut.error.response ? translateMediaError(uploadMut.error) : uploadMut.error.message}
         </p>
       )}
       <div className="mt-3 space-y-2">

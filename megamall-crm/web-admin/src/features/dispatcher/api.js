@@ -1,6 +1,5 @@
 import client from '../../shared/api/client'
-import { smartUpload } from '../../shared/api/mediaUpload'
-import { uploadFileLegacy } from '../../shared/api/legacyUpload'
+import { uploadToMedia } from '../../shared/api/mediaUpload'
 
 /** Unwrap standard envelope { success, data } */
 const unwrap = (res) => res.data.data
@@ -287,16 +286,15 @@ export async function fetchOrderPrepayments(id) {
 
 /**
  * Uploads a file through the centralized media pipeline (category
- * order_attachment) and attaches it to orderId via POST
- * /orders/:id/attachments — falls back to the legacy generic /uploads
- * endpoint + file_url when the pipeline isn't enabled server-side.
+ * order_attachment, PRIVATE) and attaches it to orderId via POST
+ * /orders/:id/attachments. Order attachments must never fall back to the
+ * legacy, unauthenticated /uploads endpoint — see shared/api/mediaUpload.js's
+ * smartUpload doc comment for why. If the pipeline is unavailable, this
+ * throws and the caller renders the error via translateMediaError.
  */
 export async function addOrderAttachment(orderId, file, type) {
-  const result = await smartUpload(file, 'order_attachment', uploadFileLegacy)
-  const payload = result.kind === 'media'
-    ? { type, media_asset_id: result.asset.id }
-    : { type, file_url: result.url }
-  const res = await client.post(`/orders/${orderId}/attachments`, payload)
+  const asset = await uploadToMedia(file, 'order_attachment')
+  const res = await client.post(`/orders/${orderId}/attachments`, { type, media_asset_id: asset.id })
   return unwrap(res)
 }
 
