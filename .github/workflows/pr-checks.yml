@@ -48,6 +48,9 @@ jobs:
       - name: Check out the PR revision
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      - name: Verify CI test-isolation contract (deploy.yml must never need a database)
+        run: bash scripts/verify-deploy-test-isolation.sh
+
       - name: Set up Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
@@ -104,6 +107,21 @@ jobs:
       - name: Run products no-DB tests
         working-directory: ${{ env.BACKEND_DIR }}
         run: go test ./internal/products/... -run 'TestCreateProductRequest|TestUpdateProductRequest'
+
+      # Proves deploy.yml's "Run courier no-DB tests" / "Run users no-DB
+      # tests" steps are genuinely database-independent, not just passing
+      # because TEST_ADMIN_DSN happens to be set here too: same -run
+      # filters, same packages, with TEST_ADMIN_DSN explicitly cleared for
+      # this one step even though the postgres service container above is
+      # still running. See scripts/verify-deploy-test-isolation.sh for the
+      # accompanying static check that deploy.yml never sets this var.
+      - name: Verify courier/users no-DB test filters need no database
+        working-directory: ${{ env.BACKEND_DIR }}
+        env:
+          TEST_ADMIN_DSN: ""
+        run: |
+          go test ./internal/courier -run 'TestSubmitHandoverRequest' -v
+          go test ./internal/users -run 'TestUpdateUserRBAC|TestUsers_' -v
 
       # Every package with DB-backed tests (internal/media,
       # internal/products' media integration tests, and the rest listed in
