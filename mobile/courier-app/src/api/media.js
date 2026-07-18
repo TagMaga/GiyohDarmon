@@ -11,32 +11,17 @@ export async function uploadToMedia(file, category) {
   return res.data?.data ?? res.data // AssetResponse: { id, processing_status, variants: [...] }
 }
 
-// uploadFileLegacy uploads through the generic pre-Phase-1 POST /uploads
-// endpoint — used as smartUpload's fallback when the pipeline is disabled.
-export async function uploadFileLegacy(file) {
-  const form = new FormData()
-  form.append('file', file)
-  const res = await client.post('/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } })
-  const data = res.data?.data ?? res.data
-  return { url: data?.url }
-}
-
-// smartUpload tries the media pipeline first and transparently falls back
-// to uploadFileLegacy when the route doesn't exist (HTTP 404 — the exact
-// signal that MEDIA_PIPELINE_ENABLED=false server-side; see
-// internal/media/routes.go). A real validation/processing error from an
-// *enabled* pipeline (400/413/500/etc.) is thrown as-is, not swallowed.
-//
-// Returns either:
-//   { kind: 'media', asset: <AssetResponse> }
-//   { kind: 'legacy', url: string }
-export async function smartUpload(file, category) {
-  try {
-    const asset = await uploadToMedia(file, category)
-    return { kind: 'media', asset }
-  } catch (err) {
-    if (err?.response?.status !== 404) throw err
-    const { url } = await uploadFileLegacy(file)
-    return { kind: 'legacy', url }
-  }
+// securePrivateUpload uploads through the centralized media pipeline only.
+// Cash-handover proofs are a PRIVATE category — this must never fall back
+// to the legacy, unauthenticated POST /uploads endpoint (that endpoint
+// saves publicly-readable files with no auth on the read side; see
+// web-admin's shared/api/mediaUpload.js doc comment and the 2026-07-16 P0
+// incident it references: a private file already leaked through that
+// exact class of unauthenticated legacy storage once). If the pipeline is
+// unavailable (HTTP 404 — MEDIA_PIPELINE_ENABLED=false server-side) or
+// rejects the file, this throws and the caller must show a clear error and
+// stop, never silently upload elsewhere.
+export async function securePrivateUpload(file, category) {
+  const asset = await uploadToMedia(file, category)
+  return { kind: 'media', asset }
 }

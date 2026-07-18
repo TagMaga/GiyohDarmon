@@ -5,8 +5,8 @@ import { ShoppingCart, Search, X, Package, AlertCircle } from 'lucide-react'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
 import { createOrder, createCustomer } from '../api'
-import { smartUpload } from '../../../shared/api/mediaUpload'
-import { uploadFileLegacy } from '../../../shared/api/legacyUpload'
+import { uploadToMedia } from '../../../shared/api/mediaUpload'
+import { translateMediaError } from '../../../shared/api/mediaErrors'
 import useProfile from '../../../shared/hooks/useProfile'
 import useCustomers from '../hooks/useCustomers'
 import useProducts from '../hooks/useProducts'
@@ -302,17 +302,18 @@ export default function CreateOrder() {
       // AttachOrderAttachmentFn (category order_attachment) — NOT
       // prepayment_proof, which is a separate flow (POST
       // /orders/:id/prepayments, used after order creation).
-      let proofUrl = undefined
+      //
+      // This is a PRIVATE category — it must never fall back to the
+      // legacy, unauthenticated /uploads endpoint (see
+      // shared/api/mediaUpload.js's smartUpload doc comment). If the
+      // pipeline is unavailable, uploadToMedia throws and onError below
+      // renders a clear message via translateMediaError.
       let proofMediaAssetId = undefined
       if (proofFile && form.payMode === 'prepayment') {
         if (!uploadedProofResult.current) {
-          uploadedProofResult.current = await smartUpload(proofFile, 'order_attachment', uploadFileLegacy)
+          uploadedProofResult.current = await uploadToMedia(proofFile, 'order_attachment')
         }
-        if (uploadedProofResult.current.kind === 'media') {
-          proofMediaAssetId = uploadedProofResult.current.asset.id
-        } else {
-          proofUrl = uploadedProofResult.current.url
-        }
+        proofMediaAssetId = uploadedProofResult.current.id
       }
 
       const noteParts = []
@@ -338,7 +339,6 @@ export default function CreateOrder() {
         prepayment_amount:   prepayRequired ? prepayAmt : 0,
         prepayment_receiver: prepayRequired && form.prepayReceiver ? form.prepayReceiver : undefined,
         prepayment_comment:  prepayRequired && form.comment.trim() ? form.comment.trim() : undefined,
-        payment_proof_url:   proofUrl ?? undefined,
         payment_proof_media_asset_id: proofMediaAssetId ?? undefined,
       })
 
@@ -367,6 +367,13 @@ export default function CreateOrder() {
       })
     },
     onError: (err) => {
+      if (err?.response?.status === 404 && !err?.config?.url?.includes('/orders')) {
+        // The proof-upload step (uploadToMedia, not createOrder) is the
+        // only 404 source here — give the specific "pipeline unavailable"
+        // message instead of the generic order-creation fallback below.
+        setSubmitError(translateMediaError(err))
+        return
+      }
       let msg = err?.response?.data?.error?.message ?? err?.response?.data?.error ?? err?.message ?? 'Ошибка создания заказа'
       if (typeof msg === 'string') {
         msg = msg.replace(

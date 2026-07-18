@@ -7,7 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { getCashSummary, submitHandover, getHandoverHistory, getMyOrders } from '../../src/api/orders'
-import { smartUpload } from '../../src/api/media'
+import { securePrivateUpload } from '../../src/api/media'
 import { API_URL } from '../../src/api/client'
 import { FadeSlideIn, PressScale, CountUp, Skeleton, animateLayout } from '../../src/components/motion'
 import { GlassBackdrop, GlassFill, Sheen, useGlass } from '../../src/components/glass'
@@ -120,29 +120,28 @@ export default function CashScreen() {
         setSubmitting(true)
         try {
           // Each attachment uploads through the centralized media pipeline
-          // (category=cash_handover_proof) first, falling back per-file to
-          // the legacy /uploads endpoint if the pipeline is disabled
-          // server-side (smartUpload's 404 fallback — see src/api/media.js).
-          // In practice a deployment is either pipeline-enabled or not, so
-          // results are never actually mixed, but handling both keeps
-          // submitHandover's payload shape exactly backward compatible
-          // either way.
+          // only (category=cash_handover_proof, PRIVATE). This must never
+          // fall back to the legacy /uploads endpoint — see
+          // securePrivateUpload's doc comment in src/api/media.js. If the
+          // pipeline is unavailable or rejects a file, the upload throws
+          // and the catch below shows a clear error; nothing is sent
+          // anywhere else.
           const results = await Promise.all(
-            attachments.map(a => smartUpload({ uri: a.uri, type: a.type, name: a.name }, 'cash_handover_proof'))
+            attachments.map(a => securePrivateUpload({ uri: a.uri, type: a.type, name: a.name }, 'cash_handover_proof'))
           )
-          const mediaAssetIds = results.filter(r => r.kind === 'media').map(r => r.asset.id)
-          const legacyUrls    = results.filter(r => r.kind === 'legacy').map(r => r.url).filter(Boolean)
+          const mediaAssetIds = results.map(r => r.asset.id)
           await submitHandover({
-            proof_url: legacyUrls[0] || undefined,
-            attachments_json: legacyUrls.length > 1 ? JSON.stringify(legacyUrls) : undefined,
-            media_asset_ids: mediaAssetIds.length > 0 ? mediaAssetIds : undefined,
+            media_asset_ids: mediaAssetIds,
             actual_amount: amt,
             notes: notes || undefined,
           })
           Alert.alert('Отправлено!', 'Запрос на передачу наличных отправлен на проверку')
           setAttachments([]); setActualAmount(''); setNotes(''); setShowHandover(false); fetchData()
         } catch (e) {
-          Alert.alert('Ошибка', e?.response?.data?.error?.message || 'Попробуйте ещё раз')
+          const msg = e?.response?.status === 404
+            ? 'Загрузка защищённых файлов временно недоступна. Обратитесь к администратору.'
+            : (e?.response?.data?.error?.message || 'Попробуйте ещё раз')
+          Alert.alert('Ошибка', msg)
         } finally { setSubmitting(false) }
       }},
     ])
