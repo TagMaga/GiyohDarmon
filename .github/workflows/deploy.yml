@@ -59,6 +59,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libvips-dev
 
+      - name: Verify CI test-isolation contract (deploy.yml must never need a database)
+        run: bash scripts/verify-deploy-test-isolation.sh
+
       - name: Compile all backend packages
         working-directory: ${{ env.BACKEND_DIR }}
         run: go test -run '^$' ./...
@@ -68,14 +71,33 @@ jobs:
         run: |
           go test \
             ./internal/compensation \
-            ./internal/courier \
             ./internal/finance \
             ./internal/inventory \
             ./internal/payouts \
             ./internal/seed \
             ./internal/uploads \
-            ./internal/users \
             ./pkg/middleware
+
+      # internal/courier's dto_test.go is DB-independent (pure request
+      # validation), but media_integration_test.go (cash-handover proofs,
+      # Phase 1 media pipeline) needs a real Postgres via TEST_ADMIN_DSN,
+      # same as internal/products' and internal/users' equivalents below —
+      # so, like those, it isn't run in this workflow; only the -run filter
+      # below is.
+      - name: Run courier no-DB tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test ./internal/courier -run 'TestSubmitHandoverRequest'
+
+      # internal/users' rbac_test.go and service_test.go are DB-independent
+      # (rbac_test.go is a pure unit test; service_test.go's own newTestDB
+      # helper skips gracefully when DB_DSN is unset, which it always is
+      # here). media_integration_test.go (Phase 1 media pipeline: avatars,
+      # HR/passport documents) needs TEST_ADMIN_DSN's disposable Postgres,
+      # so — like internal/products' and internal/courier's equivalents —
+      # it isn't run in this workflow; only the -run filter below is.
+      - name: Run users no-DB tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test ./internal/users -run 'TestUpdateUserRBAC|TestUsers_'
 
       - name: Run media pipeline unit tests (no DB required)
         working-directory: ${{ env.BACKEND_DIR }}
