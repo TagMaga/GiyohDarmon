@@ -24,9 +24,8 @@ export default function RootLayout() {
   useEffect(() => {
     rehydrate()
       .then(() => {
-        if (!useAuthStore.getState().isAuthenticated) {
-          router.replace('/(auth)/login')
-        }
+        const authed = useAuthStore.getState().isAuthenticated
+        router.replace(authed ? '/(tabs)/dashboard' : '/(auth)/login')
       })
       .catch(() => router.replace('/(auth)/login'))
   }, [])
