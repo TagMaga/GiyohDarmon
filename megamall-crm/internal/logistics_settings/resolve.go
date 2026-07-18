@@ -83,16 +83,30 @@ func ResolveAssignmentPayout(db *gorm.DB, courierID uuid.UUID, cityID *uuid.UUID
 		return 0, apperrors.BadRequest("курьер отключён диспетчером")
 	}
 
-	// Guard 2: courier must have a payout profile with is_active=true.
+	// Guard 2: courier must have payout economics configured — either a flat
+	// courier_profiles row (owner-set payout_normal/payout_fast) or at least
+	// one range-based courier_tariff_rules row (dispatcher's Тарифы modal on
+	// the courier list). Both feed ResolveCourierPayout above, so either one
+	// is a legitimate "tariff is configured" state. A profile's is_active
+	// flag is the explicit deactivation switch when one exists; couriers
+	// configured via tariff rules only have no separate toggle, so their
+	// rules' presence alone counts as active.
 	exists, active, err := CourierProfileStatus(db, courierID)
 	if err != nil {
 		return 0, apperrors.Internal(err)
 	}
-	if !exists {
-		return 0, apperrors.BadRequest("у курьера не настроен тариф выплат — настройте его в разделе HR")
-	}
-	if !active {
-		return 0, apperrors.BadRequest("курьер неактивен")
+	if exists {
+		if !active {
+			return 0, apperrors.BadRequest("курьер неактивен")
+		}
+	} else {
+		hasRules, err := courierHasTariffRules(db, courierID)
+		if err != nil {
+			return 0, apperrors.Internal(err)
+		}
+		if !hasRules {
+			return 0, apperrors.BadRequest("у курьера не настроен тариф выплат — настройте его в разделе HR")
+		}
 	}
 	if cityID != nil {
 		serves, err := CourierServesCity(db, courierID, *cityID)
@@ -106,6 +120,19 @@ func ResolveAssignmentPayout(db *gorm.DB, courierID uuid.UUID, cityID *uuid.UUID
 	// At assignment time we do not yet know the order amount, so we pass 0.
 	// The tariff resolver falls through to the flat profile rate when amount is 0.
 	return ResolveCourierPayout(db, courierID, method, 0)
+}
+
+// courierHasTariffRules reports whether a courier has any range-based tariff
+// rule configured (for either delivery type).
+func courierHasTariffRules(db *gorm.DB, courierID uuid.UUID) (bool, error) {
+	var count int64
+	err := db.Model(&courier_tariffs.CourierTariffRule{}).
+		Where("courier_id = ?", courierID).
+		Count(&count).Error
+	if err != nil {
+		return false, fmt.Errorf("check courier tariff rules: %w", err)
+	}
+	return count > 0, nil
 }
 
 // CourierServesCity reports whether a courier is assigned to a given city.
