@@ -49,6 +49,13 @@ type SubmitHandoverRequest struct {
 	// max=1000000 is a fat-finger/overflow guard on cash-in-hand, not a real
 	// business ceiling.
 	ActualAmount *float64 `json:"actual_amount" validate:"omitempty,min=0,max=1000000"`
+	// MediaAssetIDs are media-pipeline-backed proof images (category
+	// cash_handover_proof), uploaded via POST /media beforehand — coexists
+	// with the legacy ProofURL/AttachmentsJSON fields above rather than
+	// replacing them, per the "preserve all legacy fields" requirement.
+	// Capped at MaxCashHandoverProofs (enforced again in SubmitHandover,
+	// since validator's max on a slice checks length, not element validity).
+	MediaAssetIDs []uuid.UUID `json:"media_asset_ids" validate:"omitempty,max=5"`
 }
 
 type ConfirmHandoverRequest struct {
@@ -182,6 +189,20 @@ type HandoverResponse struct {
 	ConfirmedAt       *time.Time          `json:"confirmed_at"`
 	CreatedAt         time.Time           `json:"created_at"`
 	Orders            []HandoverOrderLine `json:"orders,omitempty"`
+	// MediaAssets is resolved fresh at request time by
+	// Service.ToHandoverResponse — never persisted as signed URLs. Empty
+	// when the media pipeline is disabled or this handover has no
+	// pipeline-backed proofs; HandoverToResponse alone always leaves this
+	// nil, since it has no way to look assets up without a *media.Service.
+	MediaAssets []HandoverMediaAsset `json:"media_assets,omitempty"`
+}
+
+// HandoverMediaAsset is one resolved cash-handover proof image.
+type HandoverMediaAsset struct {
+	ID     uuid.UUID `json:"id"`
+	URL    string    `json:"url"`
+	Width  *int      `json:"width,omitempty"`
+	Height *int      `json:"height,omitempty"`
 }
 
 type HandoverOrderLine struct {

@@ -12,6 +12,7 @@ import Alert             from '../../../shared/components/Alert'
 import Modal             from '../../../shared/components/Modal'
 import { CardSkeleton }  from '../../../shared/components/Skeleton'
 import { useToast }      from '../../../shared/components/ToastProvider'
+import { withCacheBust } from '../../../shared/api/mediaUpload'
 
 import useTeams          from '../hooks/useTeams'
 import useTeamMembers    from '../hooks/useTeamMembers'
@@ -75,7 +76,7 @@ function initials(name = '') {
 
 function avatarSrc(person) {
   if (!person?.avatar_url) return null
-  return `${person.avatar_url}?t=${person.updated_at ?? ''}`
+  return withCacheBust(person.avatar_url, person.updated_at)
 }
 
 function Avatar({ person, size = 44, gradient = 'linear-gradient(135deg,#4f46e5,#818cf8)' }) {

@@ -292,7 +292,7 @@ func (h *Handler) submitHandover(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
-	response.Created(c, HandoverToResponse(handover))
+	response.Created(c, h.svc.ToHandoverResponse(c.Request.Context(), handover))
 }
 
 func (h *Handler) myHandovers(c *gin.Context) {
@@ -305,7 +305,7 @@ func (h *Handler) myHandovers(c *gin.Context) {
 	}
 	out := make([]HandoverResponse, 0, len(handovers))
 	for i := range handovers {
-		out = append(out, HandoverToResponse(&handovers[i]))
+		out = append(out, h.svc.ToHandoverResponse(c.Request.Context(), &handovers[i]))
 	}
 	response.OKWithMeta(c, out, pagination.BuildMeta(p, total))
 }

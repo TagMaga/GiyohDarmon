@@ -131,6 +131,23 @@ func (r *Repository) UpdateOwner(ctx context.Context, id uuid.UUID, ownerEntityT
 	return result.RowsAffected > 0, nil
 }
 
+// ListByOwner returns every non-deleted asset attached to (ownerEntityType,
+// ownerEntityID), oldest first — used for owners that can hold more than
+// one asset (e.g. cash-handover proofs), where there is no per-owner FK
+// column and the media_assets row's own owner_entity_type/owner_entity_id
+// is the only link back to the owner.
+func (r *Repository) ListByOwner(ctx context.Context, ownerEntityType string, ownerEntityID uuid.UUID) ([]Asset, error) {
+	var rows []Asset
+	err := r.db.WithContext(ctx).
+		Where("owner_entity_type = ? AND owner_entity_id = ? AND deleted_at IS NULL", ownerEntityType, ownerEntityID).
+		Order("created_at").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("list media assets by owner: %w", err)
+	}
+	return rows, nil
+}
+
 // ListOrphanedByOwner returns non-deleted assets whose owning record no
 // longer exists — used by the "old comments/orders do not leave
 // permanently public orphan files" reconciliation job. ownerTable/ownerIDs

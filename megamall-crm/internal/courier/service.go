@@ -13,7 +13,9 @@ package courier
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,11 +26,71 @@ import (
 	"gorm.io/gorm"
 )
 
+// MediaAssetInfo is what an external media-pipeline integration reports
+// about a cash-handover proof asset — deliberately a plain, local struct
+// rather than importing internal/media's own types directly, mirroring
+// internal/orders.MediaAssetInfo's import-cycle reasoning. Unlike orders'
+// single-asset-per-slot version, this carries an ID: a handover can hold up
+// to 5 proof assets with no FK column of its own (see CashHandover's doc
+// comment), so the asset's own ID is the only handle callers have on each
+// one.
+type MediaAssetInfo struct {
+	ID     uuid.UUID
+	Width  *int
+	Height *int
+}
+
+// AttachCashHandoverProofFn claims a previously-uploaded, unattached media
+// asset (category cash_handover_proof) as one of handoverID's proof images.
+// Returns (wrapped, check with errors.Is) ErrMediaAssetNotFound /
+// ErrMediaCategoryMismatch / ErrMediaAlreadyAttached for the caller to map
+// via mediaAttachError.
+// actorID must be the asset's own uploader (see
+// media.Service.AttachToOwner) — the courier submitting the handover.
+type AttachCashHandoverProofFn func(ctx context.Context, assetID, handoverID, actorID uuid.UUID) (*MediaAssetInfo, error)
+
+// ListCashHandoverProofsFn returns every media asset currently attached to
+// handoverID — the only way to enumerate a handover's proofs, since there
+// is no media_asset_id column on cash_handovers; the asset rows' own
+// owner_entity_type/owner_entity_id is the link.
+type ListCashHandoverProofsFn func(ctx context.Context, handoverID uuid.UUID) ([]MediaAssetInfo, error)
+
+// ReleaseMediaFn quarantines a previously-attached (or attach-then-
+// abandoned) media asset — the compensating action for a failed
+// SubmitHandover, wired to internal/media.Service.ReleaseByID in main.go.
+type ReleaseMediaFn func(ctx context.Context, assetID uuid.UUID) error
+
+// SignedMediaURLFn mints a fresh, short-lived signed URL for a private
+// media asset's given variant. Never cached or persisted. Returns "" if the
+// asset can no longer be resolved (e.g. quarantined).
+type SignedMediaURLFn func(ctx context.Context, assetID uuid.UUID, variant string) string
+
+// Sentinel errors an AttachCashHandoverProofFn implementation should wrap so
+// mediaAttachError can map them to the right client-facing response.
+var (
+	ErrMediaAssetNotFound    = errors.New("media asset not found")
+	ErrMediaCategoryMismatch = errors.New("media asset category mismatch")
+	ErrMediaAlreadyAttached  = errors.New("media asset is already attached")
+)
+
+// MaxCashHandoverProofs is the maximum number of media-pipeline proof
+// images a single handover may carry, enforced in SubmitHandover.
+const MaxCashHandoverProofs = 5
+
 type Service struct {
 	repo      *Repository
 	ordersSvc *orders.Service
 	logger    *activity.Logger
 	db        *gorm.DB
+
+	// attachCashHandoverProof/listCashHandoverProofs/releaseMedia/
+	// signedMediaURL are nil when MEDIA_PIPELINE_ENABLED=false — see
+	// requireMedia. Set via SetMediaAdapters after construction (mirrors
+	// internal/orders.Service.SetMediaAdapters).
+	attachCashHandoverProof AttachCashHandoverProofFn
+	listCashHandoverProofs  ListCashHandoverProofsFn
+	releaseMedia            ReleaseMediaFn
+	signedMediaURL          SignedMediaURLFn
 }
 
 func NewService(
@@ -43,6 +105,88 @@ func NewService(
 		logger:    logger,
 		db:        db,
 	}
+}
+
+// SetMediaAdapters injects the media-pipeline adapters after construction —
+// called from main.go once *media.Service exists (inside the "if
+// cfg.Media.Enabled" block). All four adapters stay nil when the pipeline
+// is disabled — see requireMedia.
+func (s *Service) SetMediaAdapters(attach AttachCashHandoverProofFn, list ListCashHandoverProofsFn, release ReleaseMediaFn, signedURL SignedMediaURLFn) {
+	s.attachCashHandoverProof = attach
+	s.listCashHandoverProofs = list
+	s.releaseMedia = release
+	s.signedMediaURL = signedURL
+}
+
+// requireMedia returns a clear, user-facing error when the caller supplied
+// a media-pipeline-backed field but the pipeline is disabled.
+func (s *Service) requireMedia() error {
+	if s.attachCashHandoverProof == nil {
+		return apperrors.BadRequest("the media pipeline is not enabled")
+	}
+	return nil
+}
+
+// mediaAttachError maps AttachCashHandoverProofFn's sentinel errors to the
+// appropriate client-facing AppError.
+func mediaAttachError(err error) error {
+	switch {
+	case errors.Is(err, ErrMediaAssetNotFound):
+		return apperrors.BadRequest("referenced upload was not found or has already been used")
+	case errors.Is(err, ErrMediaCategoryMismatch):
+		return apperrors.BadRequest("referenced upload is not the expected media category")
+	case errors.Is(err, ErrMediaAlreadyAttached):
+		return apperrors.Conflict("referenced upload is already attached")
+	default:
+		return err
+	}
+}
+
+// releaseAndLog quarantines a media asset as a compensating action,
+// logging (never failing the caller's own operation on) an error.
+func (s *Service) releaseAndLog(ctx context.Context, assetID uuid.UUID) {
+	if err := s.releaseMedia(ctx, assetID); err != nil {
+		log.Printf("[courier] failed to release media asset %s during rollback: %v", assetID, err)
+	}
+}
+
+// resolveCashHandoverProofs lists handoverID's attached media-pipeline proof
+// assets and mints a fresh signed URL for each — never persisted, resolved
+// on every read. Returns nil (not an error) when the pipeline is disabled,
+// the handover has no pipeline-backed proofs, or a lookup fails — callers
+// still have the legacy ProofURL/AttachmentsJSON fields either way.
+func (s *Service) resolveCashHandoverProofs(ctx context.Context, handoverID uuid.UUID) []HandoverMediaAsset {
+	if s.listCashHandoverProofs == nil {
+		return nil
+	}
+	infos, err := s.listCashHandoverProofs(ctx, handoverID)
+	if err != nil {
+		log.Printf("[courier] failed to list cash handover proofs for %s: %v", handoverID, err)
+		return nil
+	}
+	assets := make([]HandoverMediaAsset, 0, len(infos))
+	for _, info := range infos {
+		if s.signedMediaURL == nil {
+			continue
+		}
+		url := s.signedMediaURL(ctx, info.ID, "preview")
+		if url == "" {
+			continue
+		}
+		assets = append(assets, HandoverMediaAsset{ID: info.ID, URL: url, Width: info.Width, Height: info.Height})
+	}
+	return assets
+}
+
+// ToHandoverResponse builds h's client-facing response, including a
+// freshly-resolved MediaAssets list — the one entry point handlers
+// (internal/courier and internal/dispatch, which delegates to this service)
+// should use instead of calling HandoverToResponse directly, so pipeline-
+// backed proofs are never missing from the response.
+func (s *Service) ToHandoverResponse(ctx context.Context, h *CashHandover) HandoverResponse {
+	resp := HandoverToResponse(h)
+	resp.MediaAssets = s.resolveCashHandoverProofs(ctx, h.ID)
+	return resp
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
@@ -257,6 +401,34 @@ func (s *Service) UpdateStatus(ctx context.Context, courierID uuid.UUID, req Upd
 //  3. Sum totals.
 //  4. Create CashHandover + CashHandoverOrder rows in one transaction.
 func (s *Service) SubmitHandover(ctx context.Context, courierID uuid.UUID, req SubmitHandoverRequest) (*CashHandover, error) {
+	if len(req.MediaAssetIDs) > MaxCashHandoverProofs {
+		return nil, apperrors.BadRequest(fmt.Sprintf("at most %d cash-handover proof images may be attached", MaxCashHandoverProofs))
+	}
+
+	// ── Proof assets: attached BEFORE the transaction ──────────────────────
+	// A media-pipeline attach is a separate service call with its own DB
+	// write, so it can't participate in this transaction — see
+	// internal/orders.Service.Create's identical pre-attach comment.
+	// handoverID is generated here (rather than inside the transaction, as
+	// before) so it can be used as the owner_entity_id for these
+	// pre-attaches.
+	handoverID := uuid.New()
+	var attachedAssetIDs []uuid.UUID
+	if len(req.MediaAssetIDs) > 0 {
+		if err := s.requireMedia(); err != nil {
+			return nil, err
+		}
+		for _, assetID := range req.MediaAssetIDs {
+			if _, err := s.attachCashHandoverProof(ctx, assetID, handoverID, courierID); err != nil {
+				for _, attached := range attachedAssetIDs {
+					s.releaseAndLog(ctx, attached)
+				}
+				return nil, mediaAttachError(err)
+			}
+			attachedAssetIDs = append(attachedAssetIDs, assetID)
+		}
+	}
+
 	var created *CashHandover
 
 	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -275,7 +447,8 @@ func (s *Service) SubmitHandover(ctx context.Context, courierID uuid.UUID, req S
 			return apperrors.BadRequest("no eligible delivered orders found for handover")
 		}
 
-		handoverID := uuid.New()
+		// handoverID was generated before this transaction started (see the
+		// pre-attach comment above), not here.
 		var totalCollected, totalFees, totalReturn float64
 		lines := make([]CashHandoverOrder, 0, len(eligible))
 
@@ -355,6 +528,11 @@ func (s *Service) SubmitHandover(ctx context.Context, courierID uuid.UUID, req S
 	})
 
 	if txErr != nil {
+		// The handover never persisted — release any media assets
+		// pre-attached above so they don't linger claimed-but-orphaned.
+		for _, attached := range attachedAssetIDs {
+			s.releaseAndLog(ctx, attached)
+		}
 		return nil, txErr
 	}
 	return created, nil

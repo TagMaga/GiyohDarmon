@@ -21,6 +21,7 @@ import (
 	"github.com/megamall/crm/internal/budget"
 	"github.com/megamall/crm/internal/compensation"
 	"github.com/megamall/crm/internal/courier"
+	couriermediabridge "github.com/megamall/crm/internal/courier/mediabridge"
 	"github.com/megamall/crm/internal/customers"
 	delivery_settings "github.com/megamall/crm/internal/delivery_settings"
 	"github.com/megamall/crm/internal/dispatch"
@@ -29,15 +30,18 @@ import (
 	"github.com/megamall/crm/internal/hierarchy"
 	"github.com/megamall/crm/internal/inventory"
 	"github.com/megamall/crm/internal/logistics"
+	logisticsmediabridge "github.com/megamall/crm/internal/logistics/mediabridge"
 	logistics_settings "github.com/megamall/crm/internal/logistics_settings"
 	"github.com/megamall/crm/internal/media"
 	"github.com/megamall/crm/internal/orders"
+	ordersmediabridge "github.com/megamall/crm/internal/orders/mediabridge"
 	"github.com/megamall/crm/internal/payouts"
 	"github.com/megamall/crm/internal/products"
 	"github.com/megamall/crm/internal/products/mediabridge"
 	"github.com/megamall/crm/internal/teams"
 	"github.com/megamall/crm/internal/uploads"
 	"github.com/megamall/crm/internal/users"
+	usersmediabridge "github.com/megamall/crm/internal/users/mediabridge"
 	"github.com/megamall/crm/pkg/database"
 	"github.com/megamall/crm/pkg/middleware"
 )
@@ -205,13 +209,17 @@ func main() {
 	// first and behaves exactly as before when they're absent — see
 	// products/service.go's requireMedia.
 	var mediaHandler *media.Handler
+	var mediaSvc *media.Service
 	var attachProductImageFn products.AttachProductImageFn
 	var releaseMediaFn products.ReleaseMediaFn
 	if cfg.Media.Enabled {
 		mediaRepo := media.NewRepository(db)
-		mediaSvc := media.NewService(mediaRepo, cfg.Media)
+		mediaSvc = media.NewService(mediaRepo, cfg.Media)
 		mediaHandler = media.NewHandler(mediaSvc)
 		attachProductImageFn, releaseMediaFn = mediabridge.Adapters(mediaSvc)
+
+		attachAvatarFn, attachUserDocumentFn, releaseUserMediaFn, signedUserMediaURLFn := usersmediabridge.Adapters(mediaSvc)
+		userSvc.SetMediaAdapters(attachAvatarFn, attachUserDocumentFn, releaseUserMediaFn, signedUserMediaURLFn)
 
 		// Quarantine purge: physically removes files whose retention window
 		// has elapsed (internal/media.Service.PurgeExpiredQuarantine). DB
@@ -277,11 +285,19 @@ func main() {
 			return &orders.SellerLookupResult{IsActive: u.IsActive, Role: string(u.Role)}, nil
 		},
 	)
+	if cfg.Media.Enabled {
+		attachOrderAttachmentFn, attachPrepaymentProofFn, releaseOrderMediaFn, signedOrderMediaURLFn := ordersmediabridge.Adapters(mediaSvc)
+		orderSvc.SetMediaAdapters(attachOrderAttachmentFn, attachPrepaymentProofFn, releaseOrderMediaFn, signedOrderMediaURLFn)
+	}
 	orderHandler := orders.NewHandler(orderSvc)
 
 	// ── Phase 5: Dispatch + Courier ───────────────────────────────────────────
 	courierRepo := courier.NewRepository(db)
 	courierSvc := courier.NewService(courierRepo, orderSvc, activityLogger, db)
+	if cfg.Media.Enabled {
+		attachCashHandoverProofFn, listCashHandoverProofsFn, releaseCourierMediaFn, signedCourierMediaURLFn := couriermediabridge.Adapters(mediaSvc)
+		courierSvc.SetMediaAdapters(attachCashHandoverProofFn, listCashHandoverProofsFn, releaseCourierMediaFn, signedCourierMediaURLFn)
+	}
 	courierHandler := courier.NewHandler(courierSvc)
 
 	dispatchRepo := dispatch.NewRepository(db)
@@ -295,6 +311,10 @@ func main() {
 	// ── Phase 17: Owner Logistics ─────────────────────────────────────────────
 	logisticsRepo := logistics.NewRepository(db, loc)
 	logisticsHandler := logistics.NewHandler(logisticsRepo, loc)
+	if cfg.Media.Enabled {
+		listCashHandoverProofsFn, signedLogisticsMediaURLFn := logisticsmediabridge.Adapters(mediaSvc)
+		logisticsHandler.SetMediaAdapters(listCashHandoverProofsFn, signedLogisticsMediaURLFn)
+	}
 
 	// ── Rate-limit store (in-memory; swap for Redis store in production) ─────
 	rateLimitStore := middleware.NewMemoryStore()

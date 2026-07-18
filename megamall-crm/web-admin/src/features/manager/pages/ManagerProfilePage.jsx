@@ -6,6 +6,7 @@ import useMyManagerTeam from '../hooks/useMyManagerTeam'
 import useTeamMembers from '../../people/hooks/useTeamMembers'
 import useAuthStore from '../../../shared/store/authStore'
 import { M, MobileShell, Card, SectionLabel } from '../../seller/components/mobileUi'
+import { withCacheBust } from '../../../shared/api/mediaUpload'
 
 function monthsOnline(iso) {
   if (!iso) return null
@@ -29,7 +30,7 @@ export default function ManagerProfilePage() {
 
   const fullName = me?.full_name ?? ''
   const initials = fullName.split(' ').map(n => n[0] ?? '').join('').slice(0, 2).toUpperCase() || 'MG'
-  const avatarUrl = me?.avatar_url ? `${me.avatar_url}?t=${me.updated_at ?? ''}` : null
+  const avatarUrl = withCacheBust(me?.avatar_url, me?.updated_at)
   const commissionPct = compensation?.commission_rate != null ? +(compensation.commission_rate * 100).toFixed(1) : null
   const tenure = monthsOnline(me?.hire_date ?? me?.created_at)
   const teamSize = members.length

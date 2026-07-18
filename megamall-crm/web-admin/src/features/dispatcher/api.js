@@ -1,4 +1,6 @@
 import client from '../../shared/api/client'
+import { smartUpload } from '../../shared/api/mediaUpload'
+import { uploadFileLegacy } from '../../shared/api/legacyUpload'
 
 /** Unwrap standard envelope { success, data } */
 const unwrap = (res) => res.data.data
@@ -125,6 +127,12 @@ export async function fetchHandovers() {
     actual_returned:     h.ActualReturned    ?? h.actual_returned,
     status:              h.Status            ?? h.status             ?? 'pending',
     comment:             h.Comment           ?? h.comment,
+    proof_url:           h.ProofURL          ?? h.proof_url,
+    attachments_json:    h.AttachmentsJSON   ?? h.attachments_json,
+    // media_assets — resolved fresh, signed URLs — is only ever present in
+    // the current (snake_case, ToHandoverResponse-mapped) response shape;
+    // no PascalCase fallback needed.
+    media_assets:        h.media_assets ?? [],
     created_at:          h.CreatedAt         ?? h.created_at,
     confirmed_at:        h.ConfirmedAt       ?? h.confirmed_at,
     orders: (h.Orders ?? h.orders ?? []).map(o => ({
@@ -275,6 +283,21 @@ export async function fetchOrderTimeline(id) {
 export async function fetchOrderPrepayments(id) {
   const res = await client.get(`/orders/${id}/prepayments`)
   return unwrap(res) ?? []
+}
+
+/**
+ * Uploads a file through the centralized media pipeline (category
+ * order_attachment) and attaches it to orderId via POST
+ * /orders/:id/attachments — falls back to the legacy generic /uploads
+ * endpoint + file_url when the pipeline isn't enabled server-side.
+ */
+export async function addOrderAttachment(orderId, file, type) {
+  const result = await smartUpload(file, 'order_attachment', uploadFileLegacy)
+  const payload = result.kind === 'media'
+    ? { type, media_asset_id: result.asset.id }
+    : { type, file_url: result.url }
+  const res = await client.post(`/orders/${orderId}/attachments`, payload)
+  return unwrap(res)
 }
 
 // ── Office order creation (dispatcher) ───────────────────────────────────────

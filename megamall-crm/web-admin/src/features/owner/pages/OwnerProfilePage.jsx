@@ -3,6 +3,7 @@ import { Info, ChevronRight, LogOut } from 'lucide-react'
 import { useSellerMe } from '../../seller/hooks/useSellerMe'
 import useAuthStore from '../../../shared/store/authStore'
 import { M, MobileShell, Card, SectionLabel } from '../../seller/components/mobileUi'
+import { withCacheBust } from '../../../shared/api/mediaUpload'
 
 function monthsOnline(iso) {
   if (!iso) return null
@@ -22,7 +23,7 @@ export default function OwnerProfilePage() {
 
   const fullName = me?.full_name ?? ''
   const initials = fullName.split(' ').map(n => n[0] ?? '').join('').slice(0, 2).toUpperCase() || 'ВЛ'
-  const avatarUrl = me?.avatar_url ? `${me.avatar_url}?t=${me.updated_at ?? ''}` : null
+  const avatarUrl = withCacheBust(me?.avatar_url, me?.updated_at)
   const tenure = monthsOnline(me?.hire_date ?? me?.created_at)
 
   return (

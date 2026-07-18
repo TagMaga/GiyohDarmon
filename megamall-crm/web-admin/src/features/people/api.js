@@ -3,6 +3,7 @@
  * Covers: users, teams, hierarchy, compensation configs, tariffs, orders (performance)
  */
 import client from '../../shared/api/client'
+import { uploadToMedia } from '../../shared/api/mediaUpload'
 
 const unwrap = (res) => {
   const body = res.data
@@ -181,6 +182,29 @@ export async function uploadUserAvatar(userId, file) {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return unwrap(res)
+}
+
+// uploadUserAvatarSmart tries the centralized media pipeline first
+// (category=avatar) and returns the resulting media_asset_id for the
+// caller to pass into updateEmployee's avatar_media_asset_id — falling
+// back to the legacy uploadUserAvatar (which attaches directly, in one
+// call, without a separate updateEmployee) when the pipeline route 404s
+// (MEDIA_PIPELINE_ENABLED=false server-side).
+//
+// Returns:
+//   { kind: 'media', asset: <AssetResponse> }
+//   { kind: 'legacy', updated: <UserResponse> }  — already attached, no
+//     further updateEmployee call needed
+export async function uploadUserAvatarSmart(userId, file, { onProgress } = {}) {
+  try {
+    const asset = await uploadToMedia(file, 'avatar', { onProgress })
+    return { kind: 'media', asset }
+  } catch (err) {
+    if (err?.response?.status !== 404) throw err
+    const updated = await uploadUserAvatar(userId, file)
+    onProgress?.(100)
+    return { kind: 'legacy', updated }
+  }
 }
 
 export async function uploadFile(file) {

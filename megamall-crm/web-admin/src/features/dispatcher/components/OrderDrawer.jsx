@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   X, Phone, MapPin, User, Truck, Package, Clock,
   Banknote, CheckCircle, XCircle, AlertCircle, ZoomIn,
-  ChevronDown, ChevronUp, Users, MessageSquare, Send, Loader2,
+  ChevronDown, ChevronUp, Users, MessageSquare, Send, Loader2, Paperclip,
 } from 'lucide-react'
 import { KEYS } from '../../../shared/queryKeys'
 import { STATUS_HEX, fmt, fmtDate } from '../statusConfig'
 import { resolveCustomer, resolveAddress, resolveCity } from '../utils/resolveCustomer'
 import { resolveCourier, resolveCourierDisplay, formatOrderLabel, getCourierId } from '../utils/orderHelpers'
-import { fetchOrderDetail, fetchOrderTimeline, fetchOrderPrepayments, fetchComments, addComment } from '../api'
+import { fetchOrderDetail, fetchOrderTimeline, fetchOrderPrepayments, fetchComments, addComment, addOrderAttachment } from '../api'
+import { translateMediaError } from '../../../shared/api/mediaErrors'
+import { useToast } from '../../../shared/components/ToastProvider'
 
 /* ── Design tokens (warm light — matches dispatcher board) ───────────── */
 const BG      = '#FFFFFF'
@@ -68,6 +70,21 @@ const ACTIONS = {
 
 export default function OrderDrawer({ order, open, onClose, onAction, customerMap = {}, courierMap = {}, isConfirming = false, isVerifyingPrepayment = false }) {
   const orderId = order?.id ?? order?.order_id
+  const qc = useQueryClient()
+  const toast = useToast()
+  const attachmentFileRef = useRef()
+
+  const addAttachmentMut = useMutation({
+    mutationFn: (file) => addOrderAttachment(orderId, file, 'other'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(orderId) }),
+    onError: (err) => toast.error(translateMediaError(err)),
+  })
+
+  function handleAttachmentFileChange(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (file) addAttachmentMut.mutate(file)
+  }
 
   const { data: fullOrder, isLoading: loadingOrder } = useQuery({
     queryKey: KEYS.dispatcher.orderDetail(orderId),
@@ -381,12 +398,31 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
             )}
 
             {/* Attachments */}
-            {attachments.length > 0 && (
+            {!o.status || (o.status !== 'cancelled' && o.status !== 'returned') ? (
               <div className="mx-4 mb-3">
-                <div className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: TEXT3 }}>Файлы · {attachments.length}</div>
+                <div className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: TEXT3 }}>
+                  Файлы {attachments.length > 0 ? `· ${attachments.length}` : ''}
+                </div>
                 <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => attachmentFileRef.current?.click()}
+                    disabled={addAttachmentMut.isPending}
+                    className="flex flex-col items-center justify-center gap-1 rounded-xl aspect-square transition-opacity"
+                    style={{ background: CARD, border: `1px dashed ${BORDER}`, opacity: addAttachmentMut.isPending ? 0.5 : 1 }}
+                  >
+                    {addAttachmentMut.isPending
+                      ? <Loader2 size={16} className="animate-spin" style={{ color: TEXT3 }} />
+                      : <Paperclip size={16} style={{ color: TEXT3 }} />}
+                    <span className="text-[9px]" style={{ color: TEXT3 }}>Прикрепить</span>
+                  </button>
+                  <input ref={attachmentFileRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleAttachmentFileChange} />
                   {attachments.map((att) => {
-                    const isImage = /\.(jpg|jpeg|png|webp|gif)$/i.test(att.file_url ?? '')
+                    // (\?|$) — not just $ — since a media-pipeline signed
+                    // URL has a query string after the extension
+                    // (/media/private/<key>.webp?sig=...&expires=...),
+                    // unlike a legacy /uploads/<file> URL.
+                    const isImage = /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(att.file_url ?? '')
                     return (
                       <a
                         key={att.id}
@@ -422,7 +458,7 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
                   })}
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* ── Issue reason ─────────────────────────────────────────── */}

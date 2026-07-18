@@ -29,8 +29,8 @@ import (
 // disabled simply don't call this and pass nil, nil to products.NewService
 // instead — see main.go's "Gated behind MEDIA_PIPELINE_ENABLED" comment.
 func Adapters(mediaSvc *media.Service) (products.AttachProductImageFn, products.ReleaseMediaFn) {
-	attach := func(ctx context.Context, assetID, productID uuid.UUID) (*products.MediaAssetInfo, error) {
-		asset, err := mediaSvc.AttachToOwner(ctx, assetID, media.CategoryProductImage, "products", productID)
+	attach := func(ctx context.Context, assetID, productID, actorID uuid.UUID) (*products.MediaAssetInfo, error) {
+		asset, err := mediaSvc.AttachToOwner(ctx, assetID, media.CategoryProductImage, "products", productID, actorID)
 		if err != nil {
 			switch {
 			case errors.Is(err, media.ErrAssetNotFound):

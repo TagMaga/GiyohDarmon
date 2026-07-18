@@ -29,13 +29,15 @@ import {
   fetchEmployeeCompensation, fetchEmployeeCompensationHistory,
   fetchEmployeeConfigs, fetchEmployeeConfigHistory, fetchTeamConfigs,
   fetchGlobalRates, createConfig, disableConfig,
-  updateEmployee, uploadUserAvatar,
-  uploadFile, fetchUserDocuments, createUserDocument, deleteUserDocument,
+  updateEmployee, uploadUserAvatarSmart,
+  fetchUserDocuments, createUserDocument, deleteUserDocument,
   updateUserDocumentStatus, fetchUserHistory, fetchAllUserHistory,
 } from '../api'
 import {
   fetchCourierTariffs, createCourierTariff, deleteCourierTariff,
 } from '../../dispatcher/api'
+import { withCacheBust, smartUpload } from '../../../shared/api/mediaUpload'
+import { uploadFileLegacy } from '../../../shared/api/legacyUpload'
 import { ALL_ROLES, ROLE_LABEL, COMMISSION_TYPE_LABEL, STATUS_CFG, STATUS_OPTIONS, fmtDate, fmtMoney, fmtPct, isConfigActive } from '../utils/peopleHelpers'
 import EditEmployeeModal   from '../components/EditEmployeeModal'
 import Modal               from '../../../shared/components/Modal'
@@ -88,7 +90,7 @@ function calcAge(dobIso) {
 
 function avatarSrc(person) {
   if (!person?.avatar_url) return null
-  return `${person.avatar_url}?t=${person.updated_at ?? ''}`
+  return withCacheBust(person.avatar_url, person.updated_at)
 }
 
 // Resolve commission label for the "salary" stat card
@@ -598,7 +600,15 @@ function DetailPanel({ person, teamId, teamColor, teamName, teams, employees, on
   })
 
   const avatarMut = useMutation({
-    mutationFn: (file) => uploadUserAvatar(person.id, file),
+    mutationFn: async (file) => {
+      const result = await uploadUserAvatarSmart(person.id, file)
+      // Legacy path already attached the avatar in one call (see
+      // uploadUserAvatarSmart's doc comment); the media-pipeline path
+      // still needs a separate PATCH to actually attach the freshly
+      // uploaded (but as-yet-unattached) asset to this user.
+      if (result.kind === 'legacy') return result.updated
+      return updateEmployee(person.id, { avatar_media_asset_id: result.asset.id })
+    },
     onSuccess: (updated) => {
       patchCache(updated)
       qc.invalidateQueries({ queryKey: ['user-history', person.id] })
@@ -886,16 +896,44 @@ function DocumentsField({ personId }) {
     mutationFn: async (selectedFiles) => {
       const files = Array.from(selectedFiles ?? [])
       for (const file of files) {
-        const uploaded = await uploadFile(file)
-        const fileUrl = uploaded?.url ?? uploaded?.data?.url
-        if (!fileUrl) throw new Error('Не удалось получить ссылку на файл')
+        const expiresAtIso = expiresAt ? `${expiresAt}T00:00:00Z` : undefined
+        // internal/media only accepts image/jpeg|png|webp and
+        // application/pdf (see internal/media/validate.go's sniffedType
+        // table) — anything else (e.g. .doc/.docx, still accepted by this
+        // field's file input) would hard-fail the pipeline with a 400, not
+        // the 404 smartUpload treats as "pipeline disabled", so those go
+        // straight to the legacy path without attempting it at all.
+        const MEDIA_PIPELINE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+        if (MEDIA_PIPELINE_TYPES.includes(file.type)) {
+          const result = await smartUpload(file, 'user_document', uploadFileLegacy)
+          if (result.kind === 'media') {
+            await createUserDocument(personId, {
+              media_asset_id: result.asset.id,
+              document_type: documentType,
+              expires_at: expiresAtIso,
+            })
+            continue
+          }
+          await createUserDocument(personId, {
+            file_url: result.url,
+            original_filename: file.name,
+            content_type: file.type || undefined,
+            size_bytes: file.size,
+            document_type: documentType,
+            expires_at: expiresAtIso,
+          })
+          continue
+        }
+
+        const uploaded = await uploadFileLegacy(file)
+        if (!uploaded?.url) throw new Error('Не удалось получить ссылку на файл')
         await createUserDocument(personId, {
-          file_url: fileUrl,
+          file_url: uploaded.url,
           original_filename: file.name,
           content_type: file.type || undefined,
           size_bytes: file.size,
           document_type: documentType,
-          expires_at: expiresAt ? `${expiresAt}T00:00:00Z` : undefined,
+          expires_at: expiresAtIso,
         })
       }
     },

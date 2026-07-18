@@ -49,6 +49,12 @@ type CreateOrderRequest struct {
 	// Attachment URLs — client uploads file first via /upload, then passes URL here.
 	PaymentProofURL *string `json:"payment_proof_url"`
 	CustomerChatURL *string `json:"customer_chat_url"`
+	// Attachment media-pipeline equivalents — client uploads via POST /media
+	// (category order_attachment) first, then passes the resulting asset ID
+	// here instead. Exactly one of the URL/MediaAssetID pair may be set per
+	// slot. See Service.prepareOrderAttachment.
+	PaymentProofMediaAssetID *uuid.UUID `json:"payment_proof_media_asset_id"`
+	CustomerChatMediaAssetID *uuid.UUID `json:"customer_chat_media_asset_id"`
 }
 
 // ─── Order Stats (dashboard order-health) ───────────────────────────────────────
@@ -80,6 +86,9 @@ type UpdateOrderRequest struct {
 	PrepaymentComment  *string            `json:"prepayment_comment"`
 	PaymentProofURL    *string            `json:"payment_proof_url"`
 	CustomerChatURL    *string            `json:"customer_chat_url"`
+	// See CreateOrderRequest's identical fields' doc comment.
+	PaymentProofMediaAssetID *uuid.UUID `json:"payment_proof_media_asset_id"`
+	CustomerChatMediaAssetID *uuid.UUID `json:"customer_chat_media_asset_id"`
 }
 
 // ─── Order Comments ────────────────────────────────────────────────────────────
@@ -117,43 +126,86 @@ type RejectPrepaymentRequest struct {
 	Reason string `json:"reason" validate:"required"`
 }
 
+// AddAttachmentRequest accepts either a legacy FileURL (uploaded via the
+// generic /uploads endpoint) or a media-pipeline MediaAssetID (category
+// order_attachment) — exactly one of the two. See Service.AddAttachment.
+type AddAttachmentRequest struct {
+	Type         string     `json:"type" validate:"required"`
+	FileURL      string     `json:"file_url" validate:"omitempty"`
+	MediaAssetID *uuid.UUID `json:"media_asset_id" validate:"omitempty"`
+}
+
 type AttachmentResponse struct {
-	ID         uuid.UUID `json:"id"`
-	OrderID    uuid.UUID `json:"order_id"`
-	Type       string    `json:"type"`
-	FileURL    string    `json:"file_url"`
-	UploadedBy uuid.UUID `json:"uploaded_by"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID      uuid.UUID `json:"id"`
+	OrderID uuid.UUID `json:"order_id"`
+	Type    string    `json:"type"`
+	// FileURL is either the legacy stored value, or (when MediaAssetID is
+	// set) a freshly-minted signed URL resolved at request time — see
+	// Service.resolveAttachmentURL. Never persisted as a signed URL.
+	FileURL      string     `json:"file_url"`
+	UploadedBy   uuid.UUID  `json:"uploaded_by"`
+	MediaAssetID *uuid.UUID `json:"media_asset_id,omitempty"`
+	Width        *int       `json:"width,omitempty"`
+	Height       *int       `json:"height,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+}
+
+func ToAttachmentResponse(a *OrderAttachment) AttachmentResponse {
+	return AttachmentResponse{
+		ID:           a.ID,
+		OrderID:      a.OrderID,
+		Type:         a.Type,
+		FileURL:      a.FileURL,
+		UploadedBy:   a.UploadedBy,
+		MediaAssetID: a.MediaAssetID,
+		Width:        a.Width,
+		Height:       a.Height,
+		CreatedAt:    a.CreatedAt,
+	}
 }
 
 // ─── Prepayment ───────────────────────────────────────────────────────────────
 
+// AddPrepaymentRequest accepts either a legacy ProofURL or a media-pipeline
+// MediaAssetID (category prepayment_proof) — at most one of the two (both
+// may be omitted; a prepayment doesn't strictly require a proof). See
+// Service.AddPrepayment.
 type AddPrepaymentRequest struct {
-	Amount   float64 `json:"amount"    validate:"required,min=0.01"`
-	ProofURL *string `json:"proof_url"`
+	Amount       float64    `json:"amount"    validate:"required,min=0.01"`
+	ProofURL     *string    `json:"proof_url"`
+	MediaAssetID *uuid.UUID `json:"media_asset_id" validate:"omitempty"`
 }
 
 type PrepaymentResponse struct {
-	ID         uuid.UUID  `json:"id"`
-	OrderID    uuid.UUID  `json:"order_id"`
-	Amount     float64    `json:"amount"`
-	ProofURL   *string    `json:"proof_url"`
-	VerifiedBy *uuid.UUID `json:"verified_by"`
-	VerifiedAt *time.Time `json:"verified_at"`
-	CreatedBy  uuid.UUID  `json:"created_by"`
-	CreatedAt  time.Time  `json:"created_at"`
+	ID      uuid.UUID `json:"id"`
+	OrderID uuid.UUID `json:"order_id"`
+	Amount  float64   `json:"amount"`
+	// ProofURL is either the legacy stored value, or (when MediaAssetID is
+	// set) a freshly-minted signed URL resolved at request time — see
+	// Service.resolveAttachmentURL. Never persisted as a signed URL.
+	ProofURL     *string    `json:"proof_url"`
+	VerifiedBy   *uuid.UUID `json:"verified_by"`
+	VerifiedAt   *time.Time `json:"verified_at"`
+	CreatedBy    uuid.UUID  `json:"created_by"`
+	MediaAssetID *uuid.UUID `json:"media_asset_id,omitempty"`
+	Width        *int       `json:"width,omitempty"`
+	Height       *int       `json:"height,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 func ToPrepaymentResponse(p *OrderPrepayment) PrepaymentResponse {
 	return PrepaymentResponse{
-		ID:         p.ID,
-		OrderID:    p.OrderID,
-		Amount:     p.Amount,
-		ProofURL:   p.ProofURL,
-		VerifiedBy: p.VerifiedBy,
-		VerifiedAt: p.VerifiedAt,
-		CreatedBy:  p.CreatedBy,
-		CreatedAt:  p.CreatedAt,
+		ID:           p.ID,
+		OrderID:      p.OrderID,
+		Amount:       p.Amount,
+		ProofURL:     p.ProofURL,
+		VerifiedBy:   p.VerifiedBy,
+		VerifiedAt:   p.VerifiedAt,
+		CreatedBy:    p.CreatedBy,
+		MediaAssetID: p.MediaAssetID,
+		Width:        p.Width,
+		Height:       p.Height,
+		CreatedAt:    p.CreatedAt,
 	}
 }
 
@@ -371,15 +423,8 @@ func ToOrderResponse(o *Order) OrderResponse {
 		})
 	}
 	attachments := make([]AttachmentResponse, 0, len(o.Attachments))
-	for _, a := range o.Attachments {
-		attachments = append(attachments, AttachmentResponse{
-			ID:         a.ID,
-			OrderID:    a.OrderID,
-			Type:       a.Type,
-			FileURL:    a.FileURL,
-			UploadedBy: a.UploadedBy,
-			CreatedAt:  a.CreatedAt,
-		})
+	for i := range o.Attachments {
+		attachments = append(attachments, ToAttachmentResponse(&o.Attachments[i]))
 	}
 	totalOrderAmount := o.TotalAmount + o.DeliveryFee
 	amountToCollect := totalOrderAmount - o.PrepaymentAmount
