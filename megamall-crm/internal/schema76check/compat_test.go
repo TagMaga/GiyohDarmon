@@ -1,3 +1,14 @@
+//go:build schema76check
+
+// Gated behind an explicit build tag: TestSchema76Compat_* are DESIGNED to
+// fail against schema 76 (that failure is the proof this gate exists to
+// produce — see the doc comment below), so this package must never run as
+// part of the normal `go test ./...` suite (which pr-checks.yml's CI
+// runs) — it would fail permanently, forever, by design, which is not a
+// real CI regression. Run explicitly and only when re-verifying this
+// specific hazard:
+//
+//	TEST_ADMIN_DSN=... go test -tags schema76check ./internal/schema76check/... -v
 package schema76check
 
 // compat_test.go — Phase 1 merge-readiness gate, requested explicitly
