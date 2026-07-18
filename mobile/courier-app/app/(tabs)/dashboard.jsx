@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, Alert } from 'react-native'
 import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import { getMyOrders, getCashSummary, getClaimableOrders, updateOrderStatus } from '../../src/api/orders'
 import useAuthStore from '../../src/store/authStore'
 import { OrderDetailSheet, C } from '../../src/components/OrderDetailSheet'
@@ -38,7 +39,10 @@ export default function DashboardScreen() {
     } finally { setLoading(false); setRefreshing(false) }
   }
 
-  useEffect(() => { fetchAll() }, [])
+  // useFocusEffect so the KPIs/active-orders refresh whenever this tab
+  // regains focus (e.g. after claiming or delivering an order elsewhere),
+  // not just once on first mount — see deliveries.jsx for the same fix.
+  useFocusEffect(useCallback(() => { fetchAll() }, []))
 
   const handleStart = async (order) => {
     setActionLoading(true)
