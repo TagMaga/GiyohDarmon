@@ -13,7 +13,9 @@ package orders
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -43,6 +45,50 @@ type SellerLookupResult struct {
 // Returns (nil, nil) if no such user exists.
 type SellerLookupFn func(ctx context.Context, id uuid.UUID) (*SellerLookupResult, error)
 
+// MediaAssetInfo is what an external media-pipeline integration reports
+// about a freshly-attached media asset (order attachment or prepayment
+// proof). Deliberately a plain, local struct rather than importing
+// internal/media's own types directly — see internal/products/service.go's
+// MediaAssetInfo doc comment for the import-cycle reasoning this mirrors.
+type MediaAssetInfo struct {
+	Width  *int
+	Height *int
+}
+
+// AttachOrderAttachmentFn claims a previously-uploaded, unattached media
+// asset (category order_attachment) as orderID's attachment. Returns
+// (wrapped, check with errors.Is) ErrMediaAssetNotFound /
+// ErrMediaCategoryMismatch / ErrMediaAlreadyAttached for the caller to map
+// via mediaAttachError.
+type AttachOrderAttachmentFn func(ctx context.Context, assetID, orderID uuid.UUID) (*MediaAssetInfo, error)
+
+// AttachPrepaymentProofFn claims a previously-uploaded, unattached media
+// asset (category prepayment_proof) as orderID's prepayment proof. Same
+// sentinel-error contract as AttachOrderAttachmentFn.
+type AttachPrepaymentProofFn func(ctx context.Context, assetID, orderID uuid.UUID) (*MediaAssetInfo, error)
+
+// ReleaseMediaFn quarantines a previously-attached (or attach-then-
+// abandoned) media asset — the compensating action for a failed
+// create/update, wired to internal/media.Service.ReleaseByID in main.go.
+type ReleaseMediaFn func(ctx context.Context, assetID uuid.UUID) error
+
+// SignedMediaURLFn mints a fresh, short-lived signed URL for a private
+// media asset's given variant ("preview" for images, "" for the original).
+// Never cached or persisted — resolved on every call, since signed URLs
+// expire after MediaConfig.SignedURLTTL. Returns "" if the asset can no
+// longer be resolved (e.g. quarantined): callers fall back to the legacy
+// URL column in that case rather than failing the whole request.
+type SignedMediaURLFn func(ctx context.Context, assetID uuid.UUID, variant string) string
+
+// Sentinel errors an AttachOrderAttachmentFn/AttachPrepaymentProofFn
+// implementation should wrap so mediaAttachError can map them to the right
+// client-facing response.
+var (
+	ErrMediaAssetNotFound    = errors.New("media asset not found")
+	ErrMediaCategoryMismatch = errors.New("media asset category mismatch")
+	ErrMediaAlreadyAttached  = errors.New("media asset is already attached")
+)
+
 // Service encapsulates all order business logic.
 type Service struct {
 	repo         *Repository
@@ -53,6 +99,16 @@ type Service struct {
 	logger       *activity.Logger
 	db           *gorm.DB
 	sellerLookup SellerLookupFn
+
+	// attachOrderAttachment/attachPrepaymentProof/releaseMedia/
+	// signedMediaURL are nil when MEDIA_PIPELINE_ENABLED=false — see
+	// requireMedia. Set via SetMediaAdapters after construction (mirrors
+	// internal/users.Service.SetMediaAdapters — see its doc comment for why
+	// a post-construction setter is used instead of constructor params).
+	attachOrderAttachment AttachOrderAttachmentFn
+	attachPrepaymentProof AttachPrepaymentProofFn
+	releaseMedia          ReleaseMediaFn
+	signedMediaURL        SignedMediaURLFn
 }
 
 // NewService wires up the order service and its dependencies.
@@ -76,6 +132,140 @@ func NewService(
 		db:           db,
 		sellerLookup: sellerLookup,
 	}
+}
+
+// SetMediaAdapters injects the media-pipeline adapters after construction —
+// called from main.go once *media.Service exists (inside the "if
+// cfg.Media.Enabled" block). All four adapters stay nil when the pipeline
+// is disabled — see requireMedia.
+func (s *Service) SetMediaAdapters(attachOrderAttachment AttachOrderAttachmentFn, attachPrepaymentProof AttachPrepaymentProofFn, releaseMedia ReleaseMediaFn, signedMediaURL SignedMediaURLFn) {
+	s.attachOrderAttachment = attachOrderAttachment
+	s.attachPrepaymentProof = attachPrepaymentProof
+	s.releaseMedia = releaseMedia
+	s.signedMediaURL = signedMediaURL
+}
+
+// requireMedia returns a clear, user-facing error when the caller supplied
+// a media-pipeline-backed field but the pipeline is disabled.
+func (s *Service) requireMedia() error {
+	if s.attachOrderAttachment == nil {
+		return apperrors.BadRequest("the media pipeline is not enabled")
+	}
+	return nil
+}
+
+// mediaAttachError maps Attach*Fn's sentinel errors to the appropriate
+// client-facing AppError.
+func mediaAttachError(err error) error {
+	switch {
+	case errors.Is(err, ErrMediaAssetNotFound):
+		return apperrors.BadRequest("referenced upload was not found or has already been used")
+	case errors.Is(err, ErrMediaCategoryMismatch):
+		return apperrors.BadRequest("referenced upload is not the expected media category")
+	case errors.Is(err, ErrMediaAlreadyAttached):
+		return apperrors.Conflict("referenced upload is already attached")
+	default:
+		return err
+	}
+}
+
+// releaseAndLog quarantines a media asset as a compensating action,
+// logging (never failing the caller's own operation on) an error — mirrors
+// internal/products/service.go's releaseAndLog exactly.
+func (s *Service) releaseAndLog(ctx context.Context, assetID uuid.UUID) {
+	if err := s.releaseMedia(ctx, assetID); err != nil {
+		log.Printf("[orders] failed to release media asset %s during rollback: %v", assetID, err)
+	}
+}
+
+// resolveAttachmentURL mints a fresh signed URL for a's FileURL when it's
+// pipeline-backed, overwriting the in-memory copy before it's serialized —
+// never persisted back to the DB. Falls back to the stored legacy FileURL
+// if the pipeline is disabled or the asset can no longer be resolved.
+func (s *Service) resolveAttachmentURL(ctx context.Context, a *OrderAttachment) {
+	if a.MediaAssetID == nil || s.signedMediaURL == nil {
+		return
+	}
+	if url := s.signedMediaURL(ctx, *a.MediaAssetID, "preview"); url != "" {
+		a.FileURL = url
+	}
+}
+
+// resolvePrepaymentURL is resolveAttachmentURL's counterpart for
+// OrderPrepayment.
+func (s *Service) resolvePrepaymentURL(ctx context.Context, p *OrderPrepayment) {
+	if p.MediaAssetID == nil || s.signedMediaURL == nil {
+		return
+	}
+	if url := s.signedMediaURL(ctx, *p.MediaAssetID, "preview"); url != "" {
+		p.ProofURL = &url
+	}
+}
+
+// prepareOrderAttachment resolves one attachment slot (e.g. payment-proof
+// or customer-chat) from a (legacy URL, media asset ID) pair into a
+// ready-to-insert *OrderAttachment — exactly one of url/mediaAssetID may be
+// set; both unset means the slot is untouched (returns nil, nil). When
+// mediaAssetID is set, this attaches the asset (category order_attachment)
+// immediately — the caller is responsible for releasing it via
+// releaseAndLog if the surrounding operation subsequently fails, since
+// attach happens outside (before) any enclosing DB transaction.
+func (s *Service) prepareOrderAttachment(ctx context.Context, orderID, actorID uuid.UUID, fileType string, url *string, mediaAssetID *uuid.UUID) (*OrderAttachment, error) {
+	hasURL := url != nil && strings.TrimSpace(*url) != ""
+	hasAsset := mediaAssetID != nil
+	if hasURL && hasAsset {
+		return nil, apperrors.BadRequest(fmt.Sprintf("exactly one of a legacy URL or media_asset_id may be set for %s", fileType))
+	}
+	if !hasURL && !hasAsset {
+		return nil, nil
+	}
+
+	att := &OrderAttachment{ID: uuid.New(), OrderID: orderID, Type: fileType, UploadedBy: actorID}
+	if hasURL {
+		att.FileURL = strings.TrimSpace(*url)
+		return att, nil
+	}
+
+	if err := s.requireMedia(); err != nil {
+		return nil, err
+	}
+	info, attachErr := s.attachOrderAttachment(ctx, *mediaAssetID, orderID)
+	if attachErr != nil {
+		return nil, mediaAttachError(attachErr)
+	}
+	att.MediaAssetID = mediaAssetID
+	att.Width = info.Width
+	att.Height = info.Height
+	return att, nil
+}
+
+// preparePrepaymentProof is prepareOrderAttachment's counterpart for a
+// prepayment's proof (category prepayment_proof) — same "exactly one of
+// url/mediaAssetID, both unset is fine" contract, but returns the fields
+// needed to populate an *OrderPrepayment rather than a whole struct, since
+// AddPrepayment builds the rest of that row from other request fields.
+func (s *Service) preparePrepaymentProof(ctx context.Context, orderID uuid.UUID, url *string, mediaAssetID *uuid.UUID) (proofURL *string, resolvedAssetID *uuid.UUID, width, height *int, err error) {
+	hasURL := url != nil && strings.TrimSpace(*url) != ""
+	hasAsset := mediaAssetID != nil
+	if hasURL && hasAsset {
+		return nil, nil, nil, nil, apperrors.BadRequest("exactly one of proof_url or media_asset_id may be set")
+	}
+	if hasURL {
+		trimmed := strings.TrimSpace(*url)
+		return &trimmed, nil, nil, nil, nil
+	}
+	if !hasAsset {
+		return nil, nil, nil, nil, nil
+	}
+
+	if reqErr := s.requireMedia(); reqErr != nil {
+		return nil, nil, nil, nil, reqErr
+	}
+	info, attachErr := s.attachPrepaymentProof(ctx, *mediaAssetID, orderID)
+	if attachErr != nil {
+		return nil, nil, nil, nil, mediaAttachError(attachErr)
+	}
+	return nil, mediaAssetID, info.Width, info.Height, nil
 }
 
 // ─── Hierarchy resolution ──────────────────────────────────────────────────────
@@ -259,6 +449,41 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		return nil, err
 	}
 
+	// ── Attachments: resolved/attached BEFORE the transaction ──────────────
+	// A media-pipeline attach is a separate service call with its own DB
+	// write (internal/media's own claim-the-asset UPDATE), so it can't
+	// participate in this transaction — it's a "safely compensated"
+	// operation instead (attach first, release on any later failure),
+	// mirroring internal/products' attachPrimaryImageOrRollback. orderID is
+	// generated here (rather than inside the transaction, as before) so it
+	// can be used as the owner_entity_id for these pre-attaches.
+	orderID := uuid.New()
+	var pendingAttachments []*OrderAttachment
+	if req.PrepaymentRequired {
+		slots := []struct {
+			fileType     string
+			url          *string
+			mediaAssetID *uuid.UUID
+		}{
+			{"payment_proof", req.PaymentProofURL, req.PaymentProofMediaAssetID},
+			{"customer_chat", req.CustomerChatURL, req.CustomerChatMediaAssetID},
+		}
+		for _, slot := range slots {
+			att, prepErr := s.prepareOrderAttachment(ctx, orderID, actorID, slot.fileType, slot.url, slot.mediaAssetID)
+			if prepErr != nil {
+				for _, prepared := range pendingAttachments {
+					if prepared.MediaAssetID != nil {
+						s.releaseAndLog(ctx, *prepared.MediaAssetID)
+					}
+				}
+				return nil, prepErr
+			}
+			if att != nil {
+				pendingAttachments = append(pendingAttachments, att)
+			}
+		}
+	}
+
 	var created *Order
 
 	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -327,7 +552,8 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		}
 
 		// ── Build order ───────────────────────────────────────────────────────
-		orderID := uuid.New()
+		// orderID was generated before this transaction started (see the
+		// pre-attach comment above), not here.
 
 		// Prepayment flow: no prepayment → auto-confirm; with prepayment → stay new, await dispatcher.
 		initialStatus := StatusConfirmed
@@ -424,28 +650,14 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		}
 
 		// ── Attachment rows for prepayment proof ─────────────────────────────
-		if req.PrepaymentRequired {
-			proofURLs := []struct {
-				url      *string
-				fileType string
-			}{
-				{req.PaymentProofURL, "payment_proof"},
-				{req.CustomerChatURL, "customer_chat"},
-			}
-			for _, p := range proofURLs {
-				if p.url == nil || *p.url == "" {
-					continue
-				}
-				att := &OrderAttachment{
-					ID:         uuid.New(),
-					OrderID:    orderID,
-					Type:       p.fileType,
-					FileURL:    *p.url,
-					UploadedBy: actorID,
-				}
-				if err := tx.WithContext(ctx).Create(att).Error; err != nil {
-					return fmt.Errorf("create attachment: %w", err)
-				}
+		// Already resolved/attached (legacy URL or media pipeline) before
+		// this transaction started — see the pre-attach comment near the
+		// top of Create. If any insert below fails, the enclosing
+		// Transaction call rolls back and the caller releases any attached
+		// media assets (see txErr handling after Transaction returns).
+		for _, att := range pendingAttachments {
+			if err := tx.WithContext(ctx).Create(att).Error; err != nil {
+				return fmt.Errorf("create attachment: %w", err)
 			}
 		}
 
@@ -481,11 +693,22 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		if err != nil {
 			return err
 		}
+		for i := range loaded.Attachments {
+			s.resolveAttachmentURL(ctx, &loaded.Attachments[i])
+		}
 		created = loaded
 		return nil
 	})
 
 	if txErr != nil {
+		// The order (and its attachment rows) never persisted — release
+		// any media assets pre-attached above so they don't linger
+		// claimed-but-orphaned.
+		for _, att := range pendingAttachments {
+			if att.MediaAssetID != nil {
+				s.releaseAndLog(ctx, *att.MediaAssetID)
+			}
+		}
 		return nil, txErr
 	}
 	return created, nil
@@ -568,6 +791,9 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*Order, error) {
 	if o == nil {
 		return nil, apperrors.NotFound("order")
 	}
+	for i := range o.Attachments {
+		s.resolveAttachmentURL(ctx, &o.Attachments[i])
+	}
 	return o, nil
 }
 
@@ -606,6 +832,33 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 	// Empty items slice = error; order must always have at least one item.
 	if req.Items != nil && len(req.Items) == 0 {
 		return nil, apperrors.BadRequest("items list must not be empty when provided")
+	}
+
+	// ── Attachments: resolved/attached BEFORE the transaction ──────────────
+	// See Create's identical pre-attach comment for why this can't happen
+	// inside the transaction below.
+	slots := []struct {
+		fileType     string
+		url          *string
+		mediaAssetID *uuid.UUID
+	}{
+		{"payment_proof", req.PaymentProofURL, req.PaymentProofMediaAssetID},
+		{"customer_chat", req.CustomerChatURL, req.CustomerChatMediaAssetID},
+	}
+	var pendingAttachments []*OrderAttachment
+	for _, slot := range slots {
+		att, prepErr := s.prepareOrderAttachment(ctx, orderID, actorID, slot.fileType, slot.url, slot.mediaAssetID)
+		if prepErr != nil {
+			for _, prepared := range pendingAttachments {
+				if prepared.MediaAssetID != nil {
+					s.releaseAndLog(ctx, *prepared.MediaAssetID)
+				}
+			}
+			return nil, prepErr
+		}
+		if att != nil {
+			pendingAttachments = append(pendingAttachments, att)
+		}
 	}
 
 	var updated *Order
@@ -772,25 +1025,10 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 			o.PrepaymentComment = req.PrepaymentComment
 		}
 
-		// ── Attachment URLs ───────────────────────────────────────────────────
-		attachmentURLs := []struct {
-			url      *string
-			fileType string
-		}{
-			{req.PaymentProofURL, "payment_proof"},
-			{req.CustomerChatURL, "customer_chat"},
-		}
-		for _, p := range attachmentURLs {
-			if p.url == nil || *p.url == "" {
-				continue
-			}
-			att := &OrderAttachment{
-				ID:         uuid.New(),
-				OrderID:    o.ID,
-				Type:       p.fileType,
-				FileURL:    *p.url,
-				UploadedBy: actorID,
-			}
+		// ── Attachment rows ────────────────────────────────────────────────────
+		// Already resolved/attached (legacy URL or media pipeline) before
+		// this transaction started — see the pre-attach block above Update.
+		for _, att := range pendingAttachments {
 			if err := tx.WithContext(ctx).Create(att).Error; err != nil {
 				return fmt.Errorf("create attachment: %w", err)
 			}
@@ -893,10 +1131,18 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 			EntityType: "order",
 			EntityID:   &orderID,
 		})
+		for i := range o.Attachments {
+			s.resolveAttachmentURL(ctx, &o.Attachments[i])
+		}
 		updated = o
 		return nil
 	})
 	if txErr != nil {
+		for _, att := range pendingAttachments {
+			if att.MediaAssetID != nil {
+				s.releaseAndLog(ctx, *att.MediaAssetID)
+			}
+		}
 		return nil, txErr
 	}
 	return updated, nil
@@ -1212,6 +1458,9 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 			return err
 		}
 
+		for i := range o.Attachments {
+			s.resolveAttachmentURL(ctx, &o.Attachments[i])
+		}
 		updated = o
 		return nil
 	})
@@ -1227,6 +1476,13 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 // AddPrepayment records a partial payment and updates orders.prepayment_amount.
 // Total prepayments cannot exceed total_order_amount (products + client delivery).
 func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, req AddPrepaymentRequest) (*OrderPrepayment, error) {
+	// Attach BEFORE the transaction — same reasoning as Create/Update's
+	// pre-attach blocks.
+	proofURL, mediaAssetID, width, height, prepErr := s.preparePrepaymentProof(ctx, orderID, req.ProofURL, req.MediaAssetID)
+	if prepErr != nil {
+		return nil, prepErr
+	}
+
 	var created *OrderPrepayment
 
 	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -1255,11 +1511,14 @@ func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID 
 		}
 
 		p := &OrderPrepayment{
-			ID:        uuid.New(),
-			OrderID:   orderID,
-			Amount:    req.Amount,
-			ProofURL:  req.ProofURL,
-			CreatedBy: actorID,
+			ID:           uuid.New(),
+			OrderID:      orderID,
+			Amount:       req.Amount,
+			ProofURL:     proofURL,
+			CreatedBy:    actorID,
+			MediaAssetID: mediaAssetID,
+			Width:        width,
+			Height:       height,
 		}
 		if err := s.repo.CreatePrepayment(ctx, tx, p); err != nil {
 			return err
@@ -1281,8 +1540,12 @@ func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID 
 	})
 
 	if txErr != nil {
+		if mediaAssetID != nil {
+			s.releaseAndLog(ctx, *mediaAssetID)
+		}
 		return nil, txErr
 	}
+	s.resolvePrepaymentURL(ctx, created)
 	return created, nil
 }
 
@@ -1290,7 +1553,14 @@ func (s *Service) ListPrepayments(ctx context.Context, orderID uuid.UUID) ([]Ord
 	if _, err := s.GetByID(ctx, orderID); err != nil {
 		return nil, err
 	}
-	return s.repo.ListPrepayments(ctx, orderID)
+	prepayments, err := s.repo.ListPrepayments(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range prepayments {
+		s.resolvePrepaymentURL(ctx, &prepayments[i])
+	}
+	return prepayments, nil
 }
 
 // ─── Prepayment verification ───────────────────────────────────────────────────
@@ -1421,23 +1691,39 @@ func (s *Service) ListAttachments(ctx context.Context, orderID uuid.UUID) ([]Ord
 	if err := s.db.WithContext(ctx).Where("order_id = ?", orderID).Order("created_at").Find(&attachments).Error; err != nil {
 		return nil, fmt.Errorf("list attachments: %w", err)
 	}
+	for i := range attachments {
+		s.resolveAttachmentURL(ctx, &attachments[i])
+	}
 	return attachments, nil
 }
 
-func (s *Service) AddAttachment(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, fileType, fileURL string) (*OrderAttachment, error) {
+// AddAttachment accepts either a legacy FileURL or a media-pipeline
+// MediaAssetID (category order_attachment) — exactly one of the two, via
+// req. See prepareOrderAttachment.
+func (s *Service) AddAttachment(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, req AddAttachmentRequest) (*OrderAttachment, error) {
 	if _, err := s.GetByID(ctx, orderID); err != nil {
 		return nil, err
 	}
-	att := &OrderAttachment{
-		ID:         uuid.New(),
-		OrderID:    orderID,
-		Type:       fileType,
-		FileURL:    fileURL,
-		UploadedBy: actorID,
+
+	var url *string
+	if strings.TrimSpace(req.FileURL) != "" {
+		url = &req.FileURL
 	}
+	att, err := s.prepareOrderAttachment(ctx, orderID, actorID, req.Type, url, req.MediaAssetID)
+	if err != nil {
+		return nil, err
+	}
+	if att == nil {
+		return nil, apperrors.BadRequest("exactly one of file_url or media_asset_id is required")
+	}
+
 	if err := s.db.WithContext(ctx).Create(att).Error; err != nil {
+		if att.MediaAssetID != nil {
+			s.releaseAndLog(ctx, *att.MediaAssetID)
+		}
 		return nil, fmt.Errorf("create attachment: %w", err)
 	}
+	s.resolveAttachmentURL(ctx, att)
 	return att, nil
 }
 

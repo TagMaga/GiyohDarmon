@@ -370,7 +370,11 @@ func (h *Handler) listHandovers(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
-	response.OKWithMeta(c, handovers, pagination.BuildMeta(p, total))
+	out := make([]courier.HandoverResponse, 0, len(handovers))
+	for i := range handovers {
+		out = append(out, h.courierSvc.ToHandoverResponse(c.Request.Context(), &handovers[i]))
+	}
+	response.OKWithMeta(c, out, pagination.BuildMeta(p, total))
 }
 
 func (h *Handler) confirmHandover(c *gin.Context) {
@@ -397,7 +401,7 @@ func (h *Handler) confirmHandover(c *gin.Context) {
 		response.HandleError(c, svcErr)
 		return
 	}
-	response.OK(c, courier.HandoverToResponse(handover))
+	response.OK(c, h.courierSvc.ToHandoverResponse(c.Request.Context(), handover))
 }
 
 func (h *Handler) rejectHandover(c *gin.Context) {
@@ -423,7 +427,7 @@ func (h *Handler) rejectHandover(c *gin.Context) {
 		response.HandleError(c, svcErr)
 		return
 	}
-	response.OK(c, courier.HandoverToResponse(handover))
+	response.OK(c, h.courierSvc.ToHandoverResponse(c.Request.Context(), handover))
 }
 
 func (h *Handler) confirmCashTransaction(c *gin.Context) {
@@ -438,7 +442,7 @@ func (h *Handler) confirmCashTransaction(c *gin.Context) {
 		response.HandleError(c, svcErr)
 		return
 	}
-	response.OK(c, courier.HandoverToResponse(handover))
+	response.OK(c, h.courierSvc.ToHandoverResponse(c.Request.Context(), handover))
 }
 
 func (h *Handler) rejectCashTransaction(c *gin.Context) {
@@ -464,7 +468,7 @@ func (h *Handler) rejectCashTransaction(c *gin.Context) {
 		response.HandleError(c, svcErr)
 		return
 	}
-	response.OK(c, courier.HandoverToResponse(handover))
+	response.OK(c, h.courierSvc.ToHandoverResponse(c.Request.Context(), handover))
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

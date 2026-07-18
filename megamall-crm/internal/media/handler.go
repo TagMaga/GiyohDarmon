@@ -91,7 +91,7 @@ func (h *Handler) Get(c *gin.Context) {
 		response.Error(c, apperrors.NotFound("media asset"))
 		return
 	}
-	if err := h.svc.Authorize(claims.UserID, claims.Role, asset); err != nil {
+	if err := h.svc.AuthorizeView(claims.UserID, claims.Role, asset); err != nil {
 		// A caller who is not authorized gets the same 404 as a truly
 		// missing asset — never a distinguishing 403 — so probing IDs
 		// can't be used to enumerate which ones exist. See signing.go's
@@ -147,7 +147,7 @@ func (h *Handler) MintSignedURL(c *gin.Context) {
 		response.Error(c, apperrors.NotFound("media asset"))
 		return
 	}
-	if err := h.svc.Authorize(claims.UserID, claims.Role, asset); err != nil {
+	if err := h.svc.AuthorizeView(claims.UserID, claims.Role, asset); err != nil {
 		response.Error(c, apperrors.NotFound("media asset"))
 		return
 	}

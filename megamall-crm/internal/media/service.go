@@ -181,6 +181,10 @@ func (s *Service) processImage(ctx context.Context, asset *Asset, dir, key strin
 // rbac.go for the full per-category policy table and the audit that
 // produced it.
 //
+// This is the *manage* check (delete, replace) — deliberately tighter than
+// AuthorizeView. See AuthorizeView's doc comment for why the two differ and
+// which handler operations use which.
+//
 // This mirrors each category's owning domain module's *role-level* RBAC
 // only — it does not call into internal/orders/products/users/courier, so
 // it cannot verify true per-object ownership (e.g. "is this seller
@@ -208,6 +212,33 @@ func (s *Service) Authorize(callerID uuid.UUID, callerRole string, asset *Asset)
 	}
 
 	for _, r := range policy.AdditionalRoles {
+		if r == callerRole {
+			return nil
+		}
+	}
+
+	return ErrForbidden
+}
+
+// AuthorizeView is the read-only counterpart to Authorize: it additionally
+// allows any role listed in the category's ViewOnlyRoles, on top of
+// everything Authorize already allows. Handler.Get and Handler.MintSignedURL
+// (both read-only — neither mutates or deletes the asset) use this; only
+// Handler.Delete uses the tighter Authorize. This split exists because some
+// categories need broad viewability without granting broad delete/replace
+// rights — e.g. CategoryAvatar: any authenticated business role may view a
+// colleague's avatar (matching today's avatar_url being rendered broadly
+// across team/order UIs with no access check), but only the subject
+// themselves, an owner, or the uploader may delete or replace it.
+func (s *Service) AuthorizeView(callerID uuid.UUID, callerRole string, asset *Asset) error {
+	if err := s.Authorize(callerID, callerRole, asset); err == nil {
+		return nil
+	} else if !errors.Is(err, ErrForbidden) {
+		return err
+	}
+
+	policy := categoryAccessPolicies[asset.Category]
+	for _, r := range policy.ViewOnlyRoles {
 		if r == callerRole {
 			return nil
 		}
@@ -312,6 +343,15 @@ func (s *Service) AttachToOwner(ctx context.Context, assetID uuid.UUID, expectCa
 	asset.OwnerEntityType = &ownerEntityType
 	asset.OwnerEntityID = &ownerEntityID
 	return asset, nil
+}
+
+// ListByOwner returns every non-deleted asset attached to (ownerEntityType,
+// ownerEntityID), oldest first — for owners that can hold more than one
+// asset (e.g. cash-handover proofs), where there is no per-owner FK column
+// and this owner_entity_type/owner_entity_id pair on the asset row itself
+// is the only link back to the owner. See Repository.ListByOwner.
+func (s *Service) ListByOwner(ctx context.Context, ownerEntityType string, ownerEntityID uuid.UUID) ([]Asset, error) {
+	return s.repo.ListByOwner(ctx, ownerEntityType, ownerEntityID)
 }
 
 // ReleaseByID quarantines an asset by ID — the compensating action for

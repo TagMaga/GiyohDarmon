@@ -303,15 +303,7 @@ func (h *Handler) ListAttachments(c *gin.Context) {
 	}
 	out := make([]AttachmentResponse, 0, len(atts))
 	for i := range atts {
-		a := &atts[i]
-		out = append(out, AttachmentResponse{
-			ID:         a.ID,
-			OrderID:    a.OrderID,
-			Type:       a.Type,
-			FileURL:    a.FileURL,
-			UploadedBy: a.UploadedBy,
-			CreatedAt:  a.CreatedAt,
-		})
+		out = append(out, ToAttachmentResponse(&atts[i]))
 	}
 	response.OK(c, out)
 }
@@ -323,31 +315,21 @@ func (h *Handler) AddAttachment(c *gin.Context) {
 		return
 	}
 	claims := middleware.ClaimsFromContext(c)
-	var body struct {
-		Type    string `json:"type"     binding:"required"`
-		FileURL string `json:"file_url" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&body); err != nil {
+	var req AddAttachmentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, apperrors.BadRequest(err.Error()))
 		return
 	}
-	if appErr := validator.Validate(body); appErr != nil {
+	if appErr := validator.Validate(req); appErr != nil {
 		response.Error(c, appErr)
 		return
 	}
-	att, err := h.svc.AddAttachment(c.Request.Context(), claims.UserID, id, body.Type, body.FileURL)
+	att, err := h.svc.AddAttachment(c.Request.Context(), claims.UserID, id, req)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
-	response.Created(c, AttachmentResponse{
-		ID:         att.ID,
-		OrderID:    att.OrderID,
-		Type:       att.Type,
-		FileURL:    att.FileURL,
-		UploadedBy: att.UploadedBy,
-		CreatedAt:  att.CreatedAt,
-	})
+	response.Created(c, ToAttachmentResponse(att))
 }
 
 // GetSnapshot handles GET /orders/:id/snapshot — Phase 6.

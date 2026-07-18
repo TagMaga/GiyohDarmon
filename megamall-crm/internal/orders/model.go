@@ -12,7 +12,7 @@ import (
 type OrderType string
 
 const (
-	OrderTypeSeller        OrderType = "seller_order"
+	OrderTypeSeller           OrderType = "seller_order"
 	OrderTypeManagerPersonal  OrderType = "manager_personal_order"
 	OrderTypeTeamLeadPersonal OrderType = "team_lead_personal_order"
 	// OrderTypeHouse is an owner-created order with no seller/team
@@ -32,16 +32,16 @@ func (t OrderType) IsValid() bool {
 type OrderStatus string
 
 const (
-	StatusNew               OrderStatus = "new"
-	StatusConfirmed         OrderStatus = "confirmed"
-	StatusPrepaymentPending OrderStatus = "prepayment_pending"
+	StatusNew                OrderStatus = "new"
+	StatusConfirmed          OrderStatus = "confirmed"
+	StatusPrepaymentPending  OrderStatus = "prepayment_pending"
 	StatusPrepaymentReceived OrderStatus = "prepayment_received"
-	StatusAssigned          OrderStatus = "assigned"
-	StatusInDelivery        OrderStatus = "in_delivery"
-	StatusDelivered         OrderStatus = "delivered"
-	StatusReturned          OrderStatus = "returned"
-	StatusCancelled         OrderStatus = "cancelled"
-	StatusIssue             OrderStatus = "issue"
+	StatusAssigned           OrderStatus = "assigned"
+	StatusInDelivery         OrderStatus = "in_delivery"
+	StatusDelivered          OrderStatus = "delivered"
+	StatusReturned           OrderStatus = "returned"
+	StatusCancelled          OrderStatus = "cancelled"
+	StatusIssue              OrderStatus = "issue"
 )
 
 func (s OrderStatus) IsValid() bool {
@@ -63,8 +63,9 @@ func (s OrderStatus) IsTerminal() bool {
 // This map is the single source of truth for the status engine.
 //
 // Correction 7 applied:
-//   new → confirmed:  dispatcher / owner ONLY
-//   new → cancelled:  creator / dispatcher / owner (enforced in service)
+//
+//	new → confirmed:  dispatcher / owner ONLY
+//	new → cancelled:  creator / dispatcher / owner (enforced in service)
 var allowedTransitions = map[OrderStatus][]OrderStatus{
 	StatusNew: {
 		StatusConfirmed,
@@ -153,7 +154,7 @@ func (SellerInfo) TableName() string { return "users" }
 
 // Order is the central domain entity for Phase 4.
 type Order struct {
-	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ID uuid.UUID `gorm:"type:uuid;primaryKey"`
 	// default:(-) tells GORM to omit this column on INSERT so the DB sequence fires.
 	OrderNumber string `gorm:"column:order_number;not null;uniqueIndex;default:(-)"`
 
@@ -189,27 +190,27 @@ type Order struct {
 	//   net_revenue       = total_amount - delivery_fee  (base for all commissions)
 	//   total_order_amount = total_amount + delivery_fee (what client actually pays)
 	//   amount_to_collect  = total_order_amount - prepayment_amount
-	Subtotal          float64 `gorm:"type:numeric(12,2);not null;default:0"`
-	DeliveryFee       float64 `gorm:"type:numeric(12,2);not null;default:0;column:delivery_fee"`
-	TotalAmount       float64 `gorm:"type:numeric(12,2);not null;default:0;column:total_amount"`
-	NetRevenue        float64 `gorm:"type:numeric(12,2);not null;default:0;column:net_revenue"`
-	PrepaymentAmount  float64 `gorm:"type:numeric(12,2);not null;default:0;column:prepayment_amount"`
+	Subtotal         float64 `gorm:"type:numeric(12,2);not null;default:0"`
+	DeliveryFee      float64 `gorm:"type:numeric(12,2);not null;default:0;column:delivery_fee"`
+	TotalAmount      float64 `gorm:"type:numeric(12,2);not null;default:0;column:total_amount"`
+	NetRevenue       float64 `gorm:"type:numeric(12,2);not null;default:0;column:net_revenue"`
+	PrepaymentAmount float64 `gorm:"type:numeric(12,2);not null;default:0;column:prepayment_amount"`
 
 	// Prepayment verification flow (Migration 00040)
 	PrepaymentRequired        bool       `gorm:"not null;default:false;column:prepayment_required"`
-	PrepaymentType            *string    `gorm:"column:prepayment_type"`            // "partial" | "full"
+	PrepaymentType            *string    `gorm:"column:prepayment_type"`                         // "partial" | "full"
 	PrepaymentStatus          string     `gorm:"not null;default:none;column:prepayment_status"` // none|pending_verification|verified|rejected
-	PrepaymentReceiver        *string    `gorm:"column:prepayment_receiver"`        // dispatcher_card|company_card|cash|other
+	PrepaymentReceiver        *string    `gorm:"column:prepayment_receiver"`                     // dispatcher_card|company_card|cash|other
 	PrepaymentComment         *string    `gorm:"column:prepayment_comment"`
 	PrepaymentVerifiedBy      *uuid.UUID `gorm:"type:uuid;column:prepayment_verified_by"`
 	PrepaymentVerifiedAt      *time.Time `gorm:"column:prepayment_verified_at"`
 	PrepaymentRejectionReason *string    `gorm:"column:prepayment_rejection_reason"`
 
-	Notes           *string `gorm:"type:text"`
-	DeliveryAddress *string `gorm:"type:text;column:delivery_address"`
+	Notes           *string    `gorm:"type:text"`
+	DeliveryAddress *string    `gorm:"type:text;column:delivery_address"`
 	CreatedAt       time.Time  `gorm:"autoCreateTime"`
-	UpdatedAt time.Time  `gorm:"autoUpdateTime"`
-	DeletedAt *time.Time `gorm:"index"`
+	UpdatedAt       time.Time  `gorm:"autoUpdateTime"`
+	DeletedAt       *time.Time `gorm:"index"`
 
 	// Phase 5: courier assignment cache.
 	// SOURCE OF TRUTH is order_assignments WHERE is_active=true.
@@ -232,14 +233,22 @@ const (
 	PrepaymentStatusRejected            = "rejected"
 )
 
-// OrderAttachment stores proof files for prepayment verification.
+// OrderAttachment stores proof files for prepayment verification. FileURL
+// is either a legacy value (uploaded via the generic /uploads endpoint) or,
+// when MediaAssetID is set, resolved to a freshly-minted signed URL at
+// serialization time (see migration 00078, internal/orders/mediabridge) —
+// never a persisted signed URL. Width/Height are dimensions, not URLs, so
+// they're safe to denormalize permanently.
 type OrderAttachment struct {
-	ID         uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrderID    uuid.UUID `gorm:"type:uuid;not null;column:order_id"`
-	Type       string    `gorm:"not null"` // "payment_proof" | "customer_chat" | "other"
-	FileURL    string    `gorm:"not null;column:file_url"`
-	UploadedBy uuid.UUID `gorm:"type:uuid;not null;column:uploaded_by"`
-	CreatedAt  time.Time `gorm:"autoCreateTime"`
+	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	OrderID      uuid.UUID  `gorm:"type:uuid;not null;column:order_id"`
+	Type         string     `gorm:"not null"` // "payment_proof" | "customer_chat" | "other"
+	FileURL      string     `gorm:"not null;column:file_url"`
+	UploadedBy   uuid.UUID  `gorm:"type:uuid;not null;column:uploaded_by"`
+	MediaAssetID *uuid.UUID `gorm:"column:media_asset_id;type:uuid"`
+	Width        *int       `gorm:"column:width"`
+	Height       *int       `gorm:"column:height"`
+	CreatedAt    time.Time  `gorm:"autoCreateTime"`
 }
 
 func (OrderAttachment) TableName() string { return "order_attachments" }
@@ -248,12 +257,12 @@ func (Order) TableName() string { return "orders" }
 
 // OrderItem stores a price snapshot per product line — never read from products table again.
 type OrderItem struct {
-	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	OrderID     uuid.UUID `gorm:"type:uuid;not null;column:order_id"`
-	ProductID   uuid.UUID `gorm:"type:uuid;not null;column:product_id"`
-	Quantity    int       `gorm:"not null"`
-	UnitPrice   float64   `gorm:"type:numeric(12,2);not null;column:unit_price"`
-	TotalPrice  float64   `gorm:"type:numeric(12,2);not null;column:total_price"`
+	ID         uuid.UUID `gorm:"type:uuid;primaryKey"`
+	OrderID    uuid.UUID `gorm:"type:uuid;not null;column:order_id"`
+	ProductID  uuid.UUID `gorm:"type:uuid;not null;column:product_id"`
+	Quantity   int       `gorm:"not null"`
+	UnitPrice  float64   `gorm:"type:numeric(12,2);not null;column:unit_price"`
+	TotalPrice float64   `gorm:"type:numeric(12,2);not null;column:total_price"`
 	// ProductName and ProductImageURL are populated at query time — not stored.
 	ProductName     string  `gorm:"column:product_name;<-:false"`
 	ProductImageURL *string `gorm:"column:product_image_url;<-:false"`
@@ -271,21 +280,27 @@ type OrderTimeline struct {
 	CreatedBy  uuid.UUID `gorm:"type:uuid;not null;column:created_by"`
 	CreatedAt  time.Time `gorm:"autoCreateTime"`
 	// ActorName is populated at query time via LEFT JOIN users — not stored.
-	ActorName  string    `gorm:"column:actor_name;<-:false"`
+	ActorName string `gorm:"column:actor_name;<-:false"`
 }
 
 func (OrderTimeline) TableName() string { return "order_timeline" }
 
 // OrderPrepayment records a partial payment with optional verification.
+// ProofURL is either a legacy value or, when MediaAssetID is set, resolved
+// to a freshly-minted signed URL at serialization time (see migration
+// 00079, internal/orders/mediabridge) — never a persisted signed URL.
 type OrderPrepayment struct {
-	ID         uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OrderID    uuid.UUID  `gorm:"type:uuid;not null;column:order_id"`
-	Amount     float64    `gorm:"type:numeric(12,2);not null"`
-	ProofURL   *string    `gorm:"column:proof_url"`
-	VerifiedBy *uuid.UUID `gorm:"type:uuid;column:verified_by"`
-	VerifiedAt *time.Time `gorm:"column:verified_at"`
-	CreatedBy  uuid.UUID  `gorm:"type:uuid;not null;column:created_by"`
-	CreatedAt  time.Time  `gorm:"autoCreateTime"`
+	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	OrderID      uuid.UUID  `gorm:"type:uuid;not null;column:order_id"`
+	Amount       float64    `gorm:"type:numeric(12,2);not null"`
+	ProofURL     *string    `gorm:"column:proof_url"`
+	VerifiedBy   *uuid.UUID `gorm:"type:uuid;column:verified_by"`
+	VerifiedAt   *time.Time `gorm:"column:verified_at"`
+	CreatedBy    uuid.UUID  `gorm:"type:uuid;not null;column:created_by"`
+	MediaAssetID *uuid.UUID `gorm:"column:media_asset_id;type:uuid"`
+	Width        *int       `gorm:"column:width"`
+	Height       *int       `gorm:"column:height"`
+	CreatedAt    time.Time  `gorm:"autoCreateTime"`
 }
 
 func (OrderPrepayment) TableName() string { return "order_prepayments" }

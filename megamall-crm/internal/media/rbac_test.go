@@ -117,6 +117,64 @@ func TestAuthorize_Avatar_NoSubjectSelfAccessWithoutUsersOwnerEntity(t *testing.
 	}
 }
 
+// TestAuthorizeView_Avatar_AnyBusinessRoleCanView is the positive half of
+// the view/manage split introduced for avatars: any authenticated business
+// role may VIEW a colleague's avatar (matching avatar_url's pre-pipeline,
+// no-access-check rendering across team/order UIs), via AuthorizeView only.
+func TestAuthorizeView_Avatar_AnyBusinessRoleCanView(t *testing.T) {
+	svc := NewService(nil, testServiceCfg(t))
+	uploader := uuid.New()
+	stranger := uuid.New()
+	asset := assetFor(CategoryAvatar, uploader, nil, nil)
+
+	for _, role := range []string{"sales_team_lead", "manager", "seller", "dispatcher", "warehouse_manager", "courier"} {
+		if err := svc.AuthorizeView(stranger, role, asset); err != nil {
+			t.Errorf("role %q should be able to VIEW any avatar, got %v", role, err)
+		}
+	}
+}
+
+// TestAuthorize_Avatar_ViewOnlyRolesCannotManage is the negative half: the
+// same broad viewability must NOT extend to delete/replace — Authorize
+// (used by Handler.Delete) must reject every ViewOnlyRole for a stranger's
+// avatar. Only the uploader, the subject (SubjectSelfAccess), or an
+// owner/it_specialist may manage it.
+func TestAuthorize_Avatar_ViewOnlyRolesCannotManage(t *testing.T) {
+	svc := NewService(nil, testServiceCfg(t))
+	uploader := uuid.New()
+	stranger := uuid.New()
+	asset := assetFor(CategoryAvatar, uploader, nil, nil)
+
+	for _, role := range []string{"sales_team_lead", "manager", "seller", "dispatcher", "warehouse_manager", "courier"} {
+		if err := svc.Authorize(stranger, role, asset); err != ErrForbidden {
+			t.Errorf("role %q must NOT be able to MANAGE (delete/replace) another user's avatar, got %v", role, err)
+		}
+	}
+}
+
+// TestAuthorizeView_NonAvatarCategories_UnaffectedByViewOnlyRoles proves the
+// view/manage split is a no-op for every category that has no ViewOnlyRoles
+// configured: AuthorizeView must behave identically to Authorize there.
+func TestAuthorizeView_NonAvatarCategories_UnaffectedByViewOnlyRoles(t *testing.T) {
+	svc := NewService(nil, testServiceCfg(t))
+	uploader := uuid.New()
+	stranger := uuid.New()
+
+	for _, cat := range []Category{
+		CategoryProductImage, CategoryOrderAttachment,
+		CategoryPrepaymentProof, CategoryUserDocument, CategoryCashHandoverProof,
+	} {
+		asset := assetFor(cat, uploader, nil, nil)
+		for _, role := range []string{"sales_team_lead", "manager", "seller", "dispatcher", "warehouse_manager", "courier"} {
+			wantErr := svc.Authorize(stranger, role, asset)
+			gotErr := svc.AuthorizeView(stranger, role, asset)
+			if (wantErr == nil) != (gotErr == nil) {
+				t.Errorf("category %s role %q: Authorize=%v but AuthorizeView=%v, expected them to agree (no ViewOnlyRoles configured)", cat, role, wantErr, gotErr)
+			}
+		}
+	}
+}
+
 func TestAuthorize_OrderAttachment_MatchesOrdersRoleSet(t *testing.T) {
 	svc := NewService(nil, testServiceCfg(t))
 	uploader := uuid.New()

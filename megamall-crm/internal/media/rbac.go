@@ -39,13 +39,19 @@ package media
 // owner-equivalent role (always allowed unconditionally, see
 // Service.Authorize) — may view/manage assets in a given category.
 type CategoryAccessPolicy struct {
-	// AdditionalRoles may access any asset in this category, beyond the
-	// uploader and owner/it_specialist.
+	// AdditionalRoles may both view AND manage (delete/replace) any asset in
+	// this category, beyond the uploader and owner/it_specialist. Checked by
+	// both Service.Authorize and Service.AuthorizeView.
 	AdditionalRoles []string
+	// ViewOnlyRoles may view (Get/MintSignedURL) but NOT manage (Delete) any
+	// asset in this category — checked only by Service.AuthorizeView. Use
+	// this for a category that should be broadly readable without granting
+	// broad delete/replace rights.
+	ViewOnlyRoles []string
 	// SubjectSelfAccess, when true, additionally allows the user identified
 	// by owner_entity_id (only when owner_entity_type == "users") to access
 	// their own asset even when someone else (e.g. an owner acting on their
-	// behalf) was the uploader.
+	// behalf) was the uploader. Applies to both Authorize and AuthorizeView.
 	SubjectSelfAccess bool
 }
 
@@ -62,14 +68,26 @@ var categoryAccessPolicies = map[Category]CategoryAccessPolicy{
 	// viewing the file itself.
 	CategoryProductImage: {AdditionalRoles: []string{"warehouse_manager"}},
 
-	// Mirrors internal/users/handler.go: "POST /users/me/avatar" (any
-	// authenticated user, their own) and "POST /users/:id/avatar"
-	// (owner-only, on another user's behalf). SubjectSelfAccess covers a
-	// user viewing/replacing their own avatar even when an owner uploaded
-	// it for them — in that case UploadedByUserID is the owner's ID, not
-	// the subject's, so the uploader check alone would wrongly exclude
-	// the person the avatar actually belongs to.
-	CategoryAvatar: {SubjectSelfAccess: true},
+	// Manage (delete/replace) mirrors internal/users/handler.go exactly:
+	// "POST /users/me/avatar" (any authenticated user, their own) and
+	// "POST /users/:id/avatar" (owner-only, on another user's behalf) — so
+	// AdditionalRoles stays empty; only the uploader, the subject
+	// (SubjectSelfAccess), or an owner/it_specialist may delete/replace.
+	//
+	// View is deliberately broader: avatar_url is rendered across team
+	// directories, order history, dropdown menus, etc. with no access
+	// check today (avatars were served fully unauthenticated pre-pipeline).
+	// Per the Phase 1 decision, avatars move to private/signed storage
+	// without breaking that existing broad visibility, so every
+	// authenticated business role is a ViewOnlyRole here — this does NOT
+	// grant delete/replace, only Service.AuthorizeView (Get/MintSignedURL),
+	// never Service.Authorize (Delete).
+	CategoryAvatar: {
+		SubjectSelfAccess: true,
+		ViewOnlyRoles: []string{
+			"sales_team_lead", "manager", "seller", "dispatcher", "warehouse_manager", "courier",
+		},
+	},
 
 	// Mirrors internal/orders/routes.go's attachmentWriteRoles, which is
 	// identical to orderRoles as of 2026-07-16: {"owner",
