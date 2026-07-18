@@ -61,6 +61,20 @@ eas login
 eas build --platform android --profile preview     # APK for testing
 eas build --platform android --profile production  # AAB for Play Store
 ```
+Full builds are only needed when native code, permissions, or the Expo SDK
+version change.
+
+### OTA updates (EAS Update)
+
+JS/UI-only fixes ship without a new build or store review, via
+`preview`/`production` channels (`eas.json`'s `build.<profile>.channel`) and
+a `fingerprint`-policy `runtimeVersion`, which only offers an update to
+installs it's actually compatible with:
+
+```bash
+npm run update:preview      # test on a preview-channel build first
+npm run update:production   # then push to production
+```
 
 Env: copy `.env.example` → `.env`, set `EXPO_PUBLIC_API_URL=http://<lan-ip>:8080`. In dev this is actually rarely needed — see base-URL resolution below.
 

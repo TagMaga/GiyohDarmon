@@ -34,11 +34,18 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-asset"
+      "expo-asset",
+      "expo-updates"
     ],
     "scheme": "megamall-courier",
     "experiments": {
       "typedRoutes": true
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/5f020a78-04d3-47c7-9991-3047d864855c"
     },
     "extra": {
       "router": {},
