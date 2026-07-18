@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { View, Text, ScrollView, StyleSheet, RefreshControl, Alert, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import { getClaimableOrders, claimOrder } from '../../src/api/orders'
 import useAuthStore from '../../src/store/authStore'
 import { resolveCreator } from '../../src/lib/creator'
@@ -35,7 +36,10 @@ export default function ClaimableScreen() {
     } finally { setLoading(false); setRefreshing(false) }
   }
 
-  useEffect(() => { fetchOrders() }, [])
+  // useFocusEffect so a claim made from another session/device, or an order
+  // that expired while this tab was backgrounded, is reflected on return —
+  // see deliveries.jsx for the same fix and the reason it's needed.
+  useFocusEffect(useCallback(() => { fetchOrders() }, []))
 
   // Direct claim — no confirmation popup, no success popup
   const handleClaim = async (order) => {

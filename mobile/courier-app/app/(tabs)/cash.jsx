@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert,
   ActivityIndicator, TextInput, RefreshControl, Image, Modal,
   Pressable, FlatList,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import * as ImagePicker from 'expo-image-picker'
 import { getCashSummary, submitHandover, getHandoverHistory, getMyOrders } from '../../src/api/orders'
 import { securePrivateUpload } from '../../src/api/media'
@@ -82,7 +83,10 @@ export default function CashScreen() {
     finally { setLoading(false); setRefreshing(false) }
   }
 
-  useEffect(() => { fetchData() }, [])
+  // useFocusEffect so the cash summary/history reflects a handover just
+  // submitted or an order just delivered elsewhere — see deliveries.jsx for
+  // the same fix and the reason it's needed.
+  useFocusEffect(useCallback(() => { fetchData() }, []))
 
   // Tapping the upload zone opens the gallery directly (no camera/gallery action
   // sheet). The native gallery picker presents reliably over the open handover

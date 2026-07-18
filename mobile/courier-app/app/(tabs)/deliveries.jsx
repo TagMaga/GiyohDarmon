@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl, Alert } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import { getMyOrders, updateOrderStatus } from '../../src/api/orders'
 import { OrderDetailSheet, C } from '../../src/components/OrderDetailSheet'
 import { OrderCard } from '../../src/components/OrderCard'
@@ -34,7 +35,11 @@ export default function DeliveriesScreen() {
     } finally { setLoading(false); setRefreshing(false) }
   }
 
-  useEffect(() => { fetchOrders() }, [])
+  // useFocusEffect (not useEffect) so returning to this tab after claiming an
+  // order, changing a status, etc. always shows current data — expo-router's
+  // Tabs keep every tab screen mounted, so a mount-only effect only ever ran
+  // once and left the list stale until a manual pull-to-refresh.
+  useFocusEffect(useCallback(() => { fetchOrders() }, []))
 
   const isUrgent = (o) => {
     const m = String(o?.delivery_method ?? o?.DeliveryMethod ?? o?.deliveryMethod ?? '').toLowerCase()
