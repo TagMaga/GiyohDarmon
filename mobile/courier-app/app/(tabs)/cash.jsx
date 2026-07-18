@@ -7,7 +7,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { getCashSummary, submitHandover, getHandoverHistory, getMyOrders } from '../../src/api/orders'
-import client, { API_URL } from '../../src/api/client'
+import { smartUpload } from '../../src/api/media'
+import { API_URL } from '../../src/api/client'
 import { FadeSlideIn, PressScale, CountUp, Skeleton, animateLayout } from '../../src/components/motion'
 import { GlassBackdrop, GlassFill, Sheen, useGlass } from '../../src/components/glass'
 import dayjs from 'dayjs'
@@ -118,16 +119,23 @@ export default function CashScreen() {
       { text: 'Отправить', onPress: async () => {
         setSubmitting(true)
         try {
-          const urls = await Promise.all(attachments.map(async (a) => {
-            const form = new FormData()
-            form.append('file', { uri: a.uri, type: a.type, name: a.name })
-            const res = await client.post('/uploads', form, { headers: { 'Content-Type': 'multipart/form-data' } })
-            return res.data.data?.url || res.data.url || ''
-          }))
-          const validUrls = urls.filter(Boolean)
+          // Each attachment uploads through the centralized media pipeline
+          // (category=cash_handover_proof) first, falling back per-file to
+          // the legacy /uploads endpoint if the pipeline is disabled
+          // server-side (smartUpload's 404 fallback — see src/api/media.js).
+          // In practice a deployment is either pipeline-enabled or not, so
+          // results are never actually mixed, but handling both keeps
+          // submitHandover's payload shape exactly backward compatible
+          // either way.
+          const results = await Promise.all(
+            attachments.map(a => smartUpload({ uri: a.uri, type: a.type, name: a.name }, 'cash_handover_proof'))
+          )
+          const mediaAssetIds = results.filter(r => r.kind === 'media').map(r => r.asset.id)
+          const legacyUrls    = results.filter(r => r.kind === 'legacy').map(r => r.url).filter(Boolean)
           await submitHandover({
-            proof_url: validUrls[0] || undefined,
-            attachments_json: validUrls.length > 1 ? JSON.stringify(validUrls) : undefined,
+            proof_url: legacyUrls[0] || undefined,
+            attachments_json: legacyUrls.length > 1 ? JSON.stringify(legacyUrls) : undefined,
+            media_asset_ids: mediaAssetIds.length > 0 ? mediaAssetIds : undefined,
             actual_amount: amt,
             notes: notes || undefined,
           })
@@ -143,6 +151,11 @@ export default function CashScreen() {
   // Earnings = courier's fixed delivery fee per delivered order (independent of
   // handover status). Built from the courier's delivered orders.
   const fullUrl = (u) => (!u ? null : u.startsWith('http') ? u : `${API_URL}${u}`)
+  // Prefer the legacy proof_url when present, else the first
+  // centralized-media-pipeline proof (media_assets[].url — resolved fresh,
+  // signed, by the backend on every read; see
+  // internal/courier.Service.ToHandoverResponse).
+  const handoverProofUrl = (h) => fullUrl(h.proof_url || h.media_assets?.[0]?.url)
   const earnings = delivered.map(o => ({
     id: o.order_id ?? o.id,
     number: o.order_number ?? o.OrderNumber ?? '—',
@@ -325,7 +338,7 @@ export default function CashScreen() {
                     const statusColor = isConfirmed ? C.green : isRejected ? C.red : C.orange
                     const sLabel = isConfirmed ? 'Подтверждено' : isPending ? 'Ожидает проверки' : isRejected ? 'Отклонено' : h.status
                     const amount = h.actual_returned ?? h.total_to_return ?? 0
-                    const proof = fullUrl(h.proof_url)
+                    const proof = handoverProofUrl(h)
                     return (
                       <View key={h.id || i} style={[s.cashItem, { borderBottomColor: T.hairline }, i === filteredHistory.length - 1 && { borderBottomWidth: 0 }]}>
                         {proof
