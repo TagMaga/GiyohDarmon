@@ -86,7 +86,8 @@ func (h *Handler) resolveHandoverMediaAssets(ctx context.Context, handoverID uui
 		if url == "" {
 			continue
 		}
-		assets = append(assets, HandoverMediaAsset{ID: info.ID, URL: url, Width: info.Width, Height: info.Height})
+		thumbURL := h.signedMediaURL(ctx, info.ID, "thumb")
+		assets = append(assets, HandoverMediaAsset{ID: info.ID, URL: url, ThumbURL: thumbURL, Width: info.Width, Height: info.Height})
 	}
 	return assets
 }

@@ -245,18 +245,37 @@ func selectMaster(primary, fallback []byte, originalLen int) []byte {
 	return nil
 }
 
-// ProcessPrivateProofPreview generates a single high-quality WebP preview
-// for a private proof/receipt/screenshot (prepayment proof, cash-handover
-// proof) — deliberately *not* aggressively compressed, so text/sums/dates/
-// transaction IDs stay legible, per the requirement. The original is
-// always preserved untouched as audit evidence; this preview is an
-// additional derived file, never a replacement.
-func ProcessPrivateProofPreview(ctx context.Context, timeout time.Duration, uploadDir, sourceKey string, buf []byte) (Variant, error) {
-	img := bimg.NewImage(buf)
-	var out []byte
-	err := processWithTimeout(ctx, timeout, func() error {
+// proofThumbWidth is the target width for the small "thumb" variant of a
+// private proof — sized for list-view thumbnails (courier handover history,
+// the owner's cash-handovers table), never for reading the proof itself.
+const proofThumbWidth = 320
+
+// ProcessPrivateProofPreview generates two WebP variants for a private
+// proof/receipt/screenshot (prepayment proof, cash-handover proof):
+//   - "preview": full-resolution, deliberately *not* aggressively compressed,
+//     so text/sums/dates/transaction IDs stay legible when actually opened.
+//   - "thumb": a small (proofThumbWidth-wide) variant for list/table
+//     thumbnails, which have no need for full resolution or quality-95
+//     bytes just to paint a 40x40 dot — see the 2026-07 report of the
+//     owner's cash-handovers table front-loading dozens of MB of full-size
+//     "preview" images to render row thumbnails.
+//
+// The original is always preserved untouched as audit evidence; both of
+// these are additional derived files, never a replacement.
+func ProcessPrivateProofPreview(ctx context.Context, timeout time.Duration, uploadDir, sourceKey string, buf []byte) (map[string]Variant, error) {
+	srcMeta, err := bimg.NewImage(buf).Metadata()
+	if err != nil {
+		return nil, fmt.Errorf("read source metadata: %w", err)
+	}
+	effSrcWidth := srcMeta.Size.Width
+	if isSideways(srcMeta.Orientation) {
+		effSrcWidth = srcMeta.Size.Height
+	}
+
+	var preview []byte
+	err = processWithTimeout(ctx, timeout, func() error {
 		var perr error
-		out, perr = img.Process(bimg.Options{
+		preview, perr = bimg.NewImage(buf).Process(bimg.Options{
 			// No resize — proofs are usually already screen/phone
 			// resolution; downsizing risks making numbers illegible.
 			Type:          bimg.WEBP,
@@ -267,17 +286,50 @@ func ProcessPrivateProofPreview(ctx context.Context, timeout time.Duration, uplo
 		return perr
 	})
 	if err != nil {
-		return Variant{}, fmt.Errorf("process proof preview: %w", err)
+		return nil, fmt.Errorf("process proof preview: %w", err)
 	}
-	meta, err := bimg.NewImage(out).Metadata()
+	previewMeta, err := bimg.NewImage(preview).Metadata()
 	if err != nil {
-		return Variant{}, fmt.Errorf("read preview metadata: %w", err)
+		return nil, fmt.Errorf("read preview metadata: %w", err)
 	}
-	key := VariantStorageKey(sourceKey, "preview", PipelineVersion)
-	if err := writeAtomic(uploadDir, key, out); err != nil {
-		return Variant{}, fmt.Errorf("write preview: %w", err)
+	previewKey := VariantStorageKey(sourceKey, "preview", PipelineVersion)
+	if err := writeAtomic(uploadDir, previewKey, preview); err != nil {
+		return nil, fmt.Errorf("write preview: %w", err)
 	}
-	return Variant{StorageKey: key, Width: meta.Size.Width, Height: meta.Size.Height, Bytes: len(out)}, nil
+
+	thumbWidth := proofThumbWidth
+	if effSrcWidth < thumbWidth {
+		thumbWidth = effSrcWidth // never upscale (see ProcessProductImage's clamp for why Enlarge:false alone isn't enough)
+	}
+	var thumb []byte
+	err = processWithTimeout(ctx, timeout, func() error {
+		var perr error
+		thumb, perr = bimg.NewImage(buf).Process(bimg.Options{
+			Width:         thumbWidth,
+			Type:          bimg.WEBP,
+			Quality:       webpQuality,
+			StripMetadata: true,
+			Enlarge:       false,
+			NoAutoRotate:  false,
+		})
+		return perr
+	})
+	if err != nil {
+		return nil, fmt.Errorf("process proof thumb: %w", err)
+	}
+	thumbMeta, err := bimg.NewImage(thumb).Metadata()
+	if err != nil {
+		return nil, fmt.Errorf("read thumb metadata: %w", err)
+	}
+	thumbKey := VariantStorageKey(sourceKey, "thumb", PipelineVersion)
+	if err := writeAtomic(uploadDir, thumbKey, thumb); err != nil {
+		return nil, fmt.Errorf("write thumb: %w", err)
+	}
+
+	return map[string]Variant{
+		"preview": {StorageKey: previewKey, Width: previewMeta.Size.Width, Height: previewMeta.Size.Height, Bytes: len(preview)},
+		"thumb":   {StorageKey: thumbKey, Width: thumbMeta.Size.Width, Height: thumbMeta.Size.Height, Bytes: len(thumb)},
+	}, nil
 }
 
 // writeAtomic writes data to <dir>/<key> via a temp file in the same

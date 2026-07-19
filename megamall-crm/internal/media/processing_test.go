@@ -482,15 +482,62 @@ func TestProcessPrivateProofPreview_NoResizeHighQuality(t *testing.T) {
 	png := fixture(t, "transparent.png") // 1200x900
 	dir := t.TempDir()
 
-	v, err := ProcessPrivateProofPreview(context.Background(), 20*time.Second, dir, "proof1.png", png)
+	variants, err := ProcessPrivateProofPreview(context.Background(), 20*time.Second, dir, "proof1.png", png)
 	if err != nil {
 		t.Fatalf("ProcessPrivateProofPreview: %v", err)
+	}
+	v, ok := variants["preview"]
+	if !ok {
+		t.Fatal("expected a \"preview\" variant")
 	}
 	if v.Width != 1200 || v.Height != 900 {
 		t.Errorf("preview size = %dx%d, want the untouched 1200x900 (proofs are not resized)", v.Width, v.Height)
 	}
 	if _, err := os.Stat(filepath.Join(dir, v.StorageKey)); err != nil {
 		t.Errorf("preview file not found on disk: %v", err)
+	}
+}
+
+func TestProcessPrivateProofPreview_GeneratesSmallThumb(t *testing.T) {
+	png := fixture(t, "transparent.png") // 1200x900
+	dir := t.TempDir()
+
+	variants, err := ProcessPrivateProofPreview(context.Background(), 20*time.Second, dir, "proof2.png", png)
+	if err != nil {
+		t.Fatalf("ProcessPrivateProofPreview: %v", err)
+	}
+	thumb, ok := variants["thumb"]
+	if !ok {
+		t.Fatal("expected a \"thumb\" variant")
+	}
+	if thumb.Width != proofThumbWidth {
+		t.Errorf("thumb width = %d, want %d", thumb.Width, proofThumbWidth)
+	}
+	if thumb.Height != 240 { // 900 * (320/1200), aspect preserved
+		t.Errorf("thumb height = %d, want 240 (aspect preserved)", thumb.Height)
+	}
+	if _, err := os.Stat(filepath.Join(dir, thumb.StorageKey)); err != nil {
+		t.Errorf("thumb file not found on disk: %v", err)
+	}
+	if thumb.Bytes >= variants["preview"].Bytes {
+		t.Errorf("thumb (%d bytes) should be smaller than preview (%d bytes)", thumb.Bytes, variants["preview"].Bytes)
+	}
+}
+
+func TestProcessPrivateProofPreview_NeverUpscalesThumb(t *testing.T) {
+	// A source narrower than proofThumbWidth must not be upscaled — the
+	// thumb's width ceiling is the source's own (rotation-corrected) width,
+	// same guarantee ProcessProductImage gives its fixed variants.
+	tiny := buildPhotoLikeJPEG(t, 100, 80, 90)
+	dir := t.TempDir()
+
+	variants, err := ProcessPrivateProofPreview(context.Background(), 20*time.Second, dir, "proof3.jpg", tiny)
+	if err != nil {
+		t.Fatalf("ProcessPrivateProofPreview: %v", err)
+	}
+	thumb := variants["thumb"]
+	if thumb.Width != 100 || thumb.Height != 80 {
+		t.Errorf("thumb = %dx%d, want unmodified source size 100x80 (no upscale)", thumb.Width, thumb.Height)
 	}
 }
 

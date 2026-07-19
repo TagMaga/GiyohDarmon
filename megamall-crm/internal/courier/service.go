@@ -173,7 +173,8 @@ func (s *Service) resolveCashHandoverProofs(ctx context.Context, handoverID uuid
 		if url == "" {
 			continue
 		}
-		assets = append(assets, HandoverMediaAsset{ID: info.ID, URL: url, Width: info.Width, Height: info.Height})
+		thumbURL := s.signedMediaURL(ctx, info.ID, "thumb")
+		assets = append(assets, HandoverMediaAsset{ID: info.ID, URL: url, ThumbURL: thumbURL, Width: info.Width, Height: info.Height})
 	}
 	return assets
 }

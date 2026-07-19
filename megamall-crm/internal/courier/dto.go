@@ -197,12 +197,16 @@ type HandoverResponse struct {
 	MediaAssets []HandoverMediaAsset `json:"media_assets,omitempty"`
 }
 
-// HandoverMediaAsset is one resolved cash-handover proof image.
+// HandoverMediaAsset is one resolved cash-handover proof image. URL is the
+// full-resolution "preview" variant (open this to actually read the proof);
+// ThumbURL is a small variant meant for list/table thumbnails — never
+// resolve URL just to paint a 40x40 dot, see resolveCashHandoverProofs.
 type HandoverMediaAsset struct {
-	ID     uuid.UUID `json:"id"`
-	URL    string    `json:"url"`
-	Width  *int      `json:"width,omitempty"`
-	Height *int      `json:"height,omitempty"`
+	ID       uuid.UUID `json:"id"`
+	URL      string    `json:"url"`
+	ThumbURL string    `json:"thumb_url,omitempty"`
+	Width    *int      `json:"width,omitempty"`
+	Height   *int      `json:"height,omitempty"`
 }
 
 type HandoverOrderLine struct {
