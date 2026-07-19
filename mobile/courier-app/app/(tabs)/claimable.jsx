@@ -106,7 +106,10 @@ export default function ClaimableScreen() {
 
                   {/* Address / customer */}
                   <View style={s.infoBlock}>
-                    <Text style={[s.clientName, { color: T.ink }]} numberOfLines={1}>{order.customer?.full_name || '—'}</Text>
+                    {order.customer?.full_name
+                      ? <Text style={[s.clientName, { color: T.ink }]} numberOfLines={1}>{order.customer.full_name}</Text>
+                      : <Text style={[s.clientNameFallback, { color: T.muted }]}>Клиент не указан</Text>
+                    }
                     {order.customer?.address
                       ? <Text style={[s.address, { color: T.muted }]} numberOfLines={2}>📍 {order.customer.address}{order.customer?.city ? `, ${order.customer.city}` : ''}</Text>
                       : null
@@ -193,6 +196,7 @@ const s = StyleSheet.create({
   newBadgeText: { color: '#1d9a45', fontWeight: '700', fontSize: 11 },
   infoBlock:    { gap: 4 },
   clientName:   { fontSize: 17, fontWeight: '700', color: C.ink, letterSpacing: -0.3 },
+  clientNameFallback: { fontSize: 15, fontStyle: 'italic', fontWeight: '500' },
   address:      { fontSize: 13, color: C.muted, fontWeight: '600', lineHeight: 18 },
   amountRow:    { gap: 2 },
   amountLabel:  { fontSize: 10, fontWeight: '600', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.4 },

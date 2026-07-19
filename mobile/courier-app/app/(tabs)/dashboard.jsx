@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, A
 import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
-import { getMyOrders, getCashSummary, getClaimableOrders, updateOrderStatus } from '../../src/api/orders'
+import { getMyOrders, getCashSummary, getClaimableOrders, updateOrderStatus, updateCourierStatus } from '../../src/api/orders'
 import useAuthStore from '../../src/store/authStore'
 import { OrderDetailSheet, C } from '../../src/components/OrderDetailSheet'
 import { OrderCard } from '../../src/components/OrderCard'
@@ -54,6 +54,18 @@ export default function DashboardScreen() {
     } finally { setActionLoading(false) }
   }
 
+  // Appends a real entry to the courier's presence log (courier_status_logs)
+  // instead of just flipping local UI state — previously this toggle looked
+  // actionable but never told the backend anything.
+  const handleToggleOnline = () => {
+    const next = !isOnline
+    animateLayout()
+    setIsOnline(next)
+    updateCourierStatus(next ? 'online' : 'offline').catch((e) => {
+      console.warn('[dashboard] failed to log courier status:', e?.message)
+    })
+  }
+
   const handleDelivered = async (order, data = {}) => {
     setActionLoading(true)
     try {
@@ -95,7 +107,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.onlineBtn, !isOnline && { backgroundColor: T.chip, borderColor: T.chipEdge }]}
-            onPress={() => { animateLayout(); setIsOnline(v => !v) }}
+            onPress={handleToggleOnline}
           >
             <PulseDot color={isOnline ? C.green : '#8a93a3'} size={8} active={isOnline} />
             <Text style={[s.onlineText, !isOnline && { color: T.muted }]}>{isOnline ? 'На линии' : 'Не на линии'}</Text>
@@ -137,16 +149,19 @@ export default function DashboardScreen() {
           <View style={s.kpis}>
             <PressScale style={[s.kpi, { backgroundColor: T.card, borderColor: T.cardEdge }]} scaleTo={0.94} onPress={() => router.push('/(tabs)/deliveries')}>
               <Sheen radius={22} />
+              <Text style={s.kpiChevron}>›</Text>
               <CountUp value={done} style={[s.kpiNum, { color: C.green }]} />
               <Text style={[s.kpiLabel, { color: T.muted }]}>доставлено</Text>
             </PressScale>
             <PressScale style={[s.kpi, { backgroundColor: T.card, borderColor: T.cardEdge }]} scaleTo={0.94} onPress={() => router.push('/(tabs)/deliveries')}>
               <Sheen radius={22} />
+              <Text style={s.kpiChevron}>›</Text>
               <CountUp value={active} style={[s.kpiNum, { color: C.blue }]} />
               <Text style={[s.kpiLabel, { color: T.muted }]}>активный</Text>
             </PressScale>
             <PressScale style={[s.kpi, { backgroundColor: T.card, borderColor: T.cardEdge }]} scaleTo={0.94} onPress={() => router.push('/(tabs)/claimable')}>
               <Sheen radius={22} />
+              <Text style={s.kpiChevron}>›</Text>
               <CountUp value={availCount} style={[s.kpiNum, { color: C.orange }]} />
               <Text style={[s.kpiLabel, { color: T.muted }]}>доступно</Text>
             </PressScale>
@@ -192,10 +207,10 @@ export default function DashboardScreen() {
                 </View>
                 <View style={[s.card, s.statusCard, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
                   <Sheen radius={28} />
-                  <View style={s.iconBox}><Text style={{ fontSize: 26 }}>🔥</Text></View>
+                  <View style={s.iconBox}><Text style={{ fontSize: 26 }}>📈</Text></View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.statusTitle, { color: T.ink }]}>{done} доставок сегодня</Text>
-                    <Text style={[s.statusSub, { color: T.muted }]}>Рейтинг 4.9 · {fmt(salary)} TJS заработано</Text>
+                    <Text style={[s.statusTitle, { color: T.ink }]}>Рейтинг 4.9 за неделю</Text>
+                    <Text style={[s.statusSub, { color: T.muted }]}>{fmt(salary)} TJS заработано сегодня</Text>
                   </View>
                 </View>
               </FadeSlideIn>
@@ -237,6 +252,7 @@ const s = StyleSheet.create({
   heroParagraph: { marginTop: 12, fontSize: 15, color: 'rgba(255,255,255,0.82)', fontWeight: '700' },
   kpis:    { flexDirection: 'row', gap: 10, marginBottom: 24 },
   kpi:     { flex: 1, backgroundColor: '#ffffff', borderRadius: 22, paddingVertical: 16, paddingHorizontal: 8, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)', shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 14, elevation: 2 },
+  kpiChevron: { position: 'absolute', top: 8, right: 10, fontSize: 13, fontWeight: '700', color: 'rgba(10,132,255,0.55)' },
   kpiNum:  { fontSize: 28, fontWeight: '700', lineHeight: 34 },
   kpiLabel: { fontSize: 12, color: C.muted, fontWeight: '600', marginTop: 4 },
   sectionHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13, paddingHorizontal: 4 },

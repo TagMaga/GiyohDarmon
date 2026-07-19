@@ -29,3 +29,7 @@ export const addOrderComment = (id, comment) => client.post(`/orders/${id}/comme
 export const getCashSummary = () => client.get('/courier/cash/summary')
 export const submitHandover = (data) => client.post('/courier/cash/handover', data)
 export const getHandoverHistory = () => client.get('/courier/cash/handovers')
+
+// Appends an entry to the courier's append-only presence log
+// (courier_status_logs) — 'online' | 'offline' | 'busy'.
+export const updateCourierStatus = (status) => client.post('/courier/status', { status })
