@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -548,6 +549,20 @@ func parseCashTransactionFilter(c *gin.Context) (CashTransactionFilter, error) {
 		default:
 			return filter, apperrors.BadRequest("invalid status")
 		}
+	}
+	if raw := c.Query("amount_min"); raw != "" {
+		v, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return filter, apperrors.BadRequest("invalid amount_min")
+		}
+		filter.AmountMin = &v
+	}
+	if raw := c.Query("amount_max"); raw != "" {
+		v, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			return filter, apperrors.BadRequest("invalid amount_max")
+		}
+		filter.AmountMax = &v
 	}
 	return filter, nil
 }
