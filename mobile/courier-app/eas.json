@@ -12,7 +12,8 @@
       "channel": "preview"
     },
     "production": {
-      "android": { "buildType": "app-bundle" },
+      "distribution": "internal",
+      "android": { "buildType": "apk" },
       "env": { "EXPO_PUBLIC_API_URL": "https://134.122.81.40" },
       "channel": "production"
     }

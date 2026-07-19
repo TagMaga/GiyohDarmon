@@ -59,7 +59,7 @@ npx expo start --android  # Android emulator
 npm install -g eas-cli
 eas login
 eas build --platform android --profile preview     # APK for testing
-eas build --platform android --profile production  # AAB for Play Store
+eas build --platform android --profile production  # APK, internal distribution — sideloaded directly to courier devices, no Play Store
 ```
 Full builds are only needed when native code, permissions, or the Expo SDK
 version change.
