@@ -31,10 +31,11 @@ export function OrderCard({ order, onOpen, onStart, actionLoading }) {
 
   return (
     <PressScale
-      style={[oc.card, { backgroundColor: T.card, borderColor: T.cardEdge }, isUrgent(order) && oc.cardUrgent]}
+      style={[oc.cardShadow, isUrgent(order) && oc.cardShadowUrgent]}
       onPress={onOpen}
       scaleTo={0.98}
     >
+      <View style={[oc.card, { backgroundColor: T.card, borderColor: T.cardEdge }, isUrgent(order) && oc.cardBorderUrgent]}>
       <Sheen radius={24} />
       {/* Top: order number + status badge */}
       <View style={oc.topRow}>
@@ -93,21 +94,36 @@ export function OrderCard({ order, onOpen, onStart, actionLoading }) {
           </TouchableOpacity>
         )}
       </View>
+      </View>
     </PressScale>
   )
 }
 
 const oc = StyleSheet.create({
-  card: {
-    backgroundColor: C.card, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)',
-    padding: 16, gap: 12,
+  // Shadow lives on its own node, separate from the rounded/translucent
+  // content view below. On Android, elevation's drop shadow is cast as a
+  // rectangle behind the view's rounded silhouette; combined with a
+  // semi-transparent fill on the SAME node, the corners don't clip cleanly
+  // and the backdrop shows through in a ring around the card. Giving the
+  // shadow its own (backgroundless) node with matching borderRadius keeps
+  // the cast shadow shaped correctly, while the inner node's
+  // overflow:'hidden' guarantees the translucent fill is clipped exactly
+  // to the rounded rect with no bleed-through.
+  cardShadow: {
+    borderRadius: 24,
     shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05, shadowRadius: 14, elevation: 2,
   },
-  cardUrgent: {
-    borderColor: C.orange, borderWidth: 2,
+  cardShadowUrgent: {
     shadowColor: C.orange, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.28, shadowRadius: 16, elevation: 6,
+  },
+  card: {
+    backgroundColor: C.card, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)',
+    padding: 16, gap: 12, overflow: 'hidden',
+  },
+  cardBorderUrgent: {
+    borderColor: C.orange, borderWidth: 2,
   },
   topRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   orderNum:  { fontSize: 15, fontWeight: '700', color: C.ink, letterSpacing: -0.2 },
