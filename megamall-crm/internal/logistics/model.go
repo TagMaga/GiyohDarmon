@@ -147,10 +147,11 @@ type HandoverListRow struct {
 // HandoverMediaAsset is one resolved cash-handover proof image — same
 // shape as internal/courier.HandoverMediaAsset.
 type HandoverMediaAsset struct {
-	ID     uuid.UUID `json:"id"`
-	URL    string    `json:"url"`
-	Width  *int      `json:"width,omitempty"`
-	Height *int      `json:"height,omitempty"`
+	ID       uuid.UUID `json:"id"`
+	URL      string    `json:"url"`
+	ThumbURL string    `json:"thumb_url,omitempty"`
+	Width    *int      `json:"width,omitempty"`
+	Height   *int      `json:"height,omitempty"`
 }
 
 // Amount bounds (max=1000000) are a fat-finger/overflow guard on

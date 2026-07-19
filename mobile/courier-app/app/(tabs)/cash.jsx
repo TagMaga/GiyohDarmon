@@ -7,6 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import * as ImagePicker from 'expo-image-picker'
+import * as ImageManipulator from 'expo-image-manipulator'
 import { getCashSummary, submitHandover, getHandoverHistory, getMyOrders } from '../../src/api/orders'
 import { securePrivateUpload } from '../../src/api/media'
 import { API_URL } from '../../src/api/client'
@@ -23,6 +24,36 @@ const C = {
 
 const MAX_ATTACHMENTS = 5
 const fmt = (n) => Number(n || 0).toLocaleString()
+
+// Cap for a receipt photo's longer side before upload. The picker's own
+// `quality` option only re-encodes JPEGs — it does nothing to an
+// already-compressed source (e.g. a phone screenshot saved as PNG/WebP), so
+// without this a full-resolution screenshot went up untouched, sometimes
+// multiple MB, then had to be downloaded again in full just to render a
+// small thumbnail in the owner's CRM (see the 2026-07 slow-receipt report).
+const MAX_RECEIPT_DIMENSION = 1600
+
+// Resizes a picked asset down to MAX_RECEIPT_DIMENSION if it's larger;
+// never upscales. Falls back to the original asset untouched if
+// manipulation fails for any reason — a slightly larger upload beats a
+// crashed handover submission.
+async function resizeForUpload(asset) {
+  if (!asset.width || asset.width <= MAX_RECEIPT_DIMENSION) return asset
+  try {
+    const out = await ImageManipulator.manipulateAsync(
+      asset.uri,
+      [{ resize: { width: MAX_RECEIPT_DIMENSION } }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+    )
+    return {
+      ...asset, uri: out.uri, width: out.width, height: out.height,
+      mimeType: 'image/jpeg',
+      fileName: (asset.fileName || 'receipt').replace(/\.\w+$/, '') + '.jpg',
+    }
+  } catch {
+    return asset
+  }
+}
 
 function AttachmentItem({ item, onRemove, onPreview }) {
   const isImage = item.type?.startsWith('image')
@@ -97,7 +128,9 @@ export default function CashScreen() {
     if (status !== 'granted') { Alert.alert('Нет доступа', 'Разрешите доступ к галерее в настройках'); return }
     const remaining = MAX_ATTACHMENTS - attachments.length
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: remaining, quality: 0.8 })
-    if (!result.canceled && result.assets?.length) addAssets(result.assets)
+    if (result.canceled || !result.assets?.length) return
+    const resized = await Promise.all(result.assets.map(resizeForUpload))
+    addAssets(resized)
   }
 
   const addAssets = useCallback((assets) => {

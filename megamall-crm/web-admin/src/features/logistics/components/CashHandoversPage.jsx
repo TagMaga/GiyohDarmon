@@ -65,6 +65,29 @@ function parseAttachments(proofUrl, attachmentsJson, mediaAssets) {
   return out
 }
 
+// Same shape/order as parseAttachments, but prefers each media asset's small
+// thumb_url over its full-resolution url — legacy proof_url/attachments_json
+// entries have no thumb variant, so they fall back to themselves. Table-row
+// thumbnails should always use this, never the full url: a "Передачи кассы"
+// page with 50 rows was front-loading 50 full-resolution receipt images just
+// to paint 40x40 dots (see the 2026-07 slow-load report).
+function parseThumbAttachments(proofUrl, attachmentsJson, mediaAssets) {
+  const out = []
+  if (proofUrl) out.push(proofUrl)
+  if (attachmentsJson) {
+    try {
+      const arr = JSON.parse(attachmentsJson)
+      if (Array.isArray(arr)) {
+        arr.forEach(u => { if (u) out.push(u) })
+      }
+    } catch { /* ignore malformed */ }
+  }
+  if (Array.isArray(mediaAssets)) {
+    mediaAssets.forEach(a => { if (a?.url) out.push(a.thumb_url || a.url) })
+  }
+  return out
+}
+
 function isImageUrl(url) {
   return /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(url)
 }
@@ -95,6 +118,7 @@ function ReceiptThumb({ proofUrl, attachmentsJson, mediaAssets, onClick }) {
     return <span className="text-slate-300 text-xs">—</span>
   }
   const first = urls[0]
+  const firstThumb = parseThumbAttachments(proofUrl, attachmentsJson, mediaAssets)[0] ?? first
   if (isImageUrl(first)) {
     return (
       <button
@@ -102,7 +126,7 @@ function ReceiptThumb({ proofUrl, attachmentsJson, mediaAssets, onClick }) {
         className="group relative w-10 h-10 rounded-lg overflow-hidden border border-slate-200 hover:border-indigo-400 transition-all flex-shrink-0"
         title="Просмотр квитанции"
       >
-        <img src={first} alt="квитанция" className="w-full h-full object-cover" />
+        <img src={firstThumb} alt="квитанция" loading="lazy" className="w-full h-full object-cover" />
         {urls.length > 1 && (
           <span className="absolute bottom-0 right-0 bg-black/60 text-white text-[9px] px-1 rounded-tl">
             +{urls.length - 1}

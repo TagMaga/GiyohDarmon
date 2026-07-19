@@ -157,7 +157,7 @@ func (s *Service) processImage(ctx context.Context, asset *Asset, dir, key strin
 		if err != nil {
 			return err
 		}
-		variants = map[string]Variant{"preview": v}
+		variants = v
 	}
 
 	variantJSON, err := json.Marshal(variants)
