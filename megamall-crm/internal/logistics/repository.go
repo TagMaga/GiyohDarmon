@@ -446,7 +446,7 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 			  AND o.id NOT IN (
 				  SELECT cho.order_id FROM cash_handover_orders cho
 				  JOIN cash_handovers ch ON ch.id = cho.handover_id
-				  WHERE ch.status IN ('pending','confirmed')
+				  WHERE ch.status = 'confirmed'
 			  )
 			GROUP BY o.courier_id
 		),
