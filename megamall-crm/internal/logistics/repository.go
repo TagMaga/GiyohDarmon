@@ -440,7 +440,7 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 		debt_cte AS (
 			SELECT
 				o.courier_id,
-				COALESCE(SUM(GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0))), 0) AS cash_debt
+				COALESCE(SUM(GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0) - COALESCE(o.courier_payout,0))), 0) AS cash_debt
 			FROM orders o
 			WHERE o.courier_id IS NOT NULL AND o.status = 'delivered' AND o.deleted_at IS NULL
 			  AND o.id NOT IN (
