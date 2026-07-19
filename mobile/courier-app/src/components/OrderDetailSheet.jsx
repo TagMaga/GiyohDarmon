@@ -11,7 +11,7 @@ import { GlassFill, Sheen } from './glass'
 import { updateOrderStatus, reportAddressChanged, deferOrder, getOrderComments, addOrderComment } from '../api/orders'
 import useAuthStore from '../store/authStore'
 import { resolveCreator } from '../lib/creator'
-import Avatar from './Avatar'
+import Avatar, { resolveMediaUrl } from './Avatar'
 
 const { height: SCREEN_H } = Dimensions.get('window')
 export const SHEET_H = SCREEN_H * 0.90
@@ -488,7 +488,7 @@ export function OrderDetailSheet({
                   style={[d.productRow, i === order.items.length - 1 && { borderBottomWidth: 0 }]}
                 >
                   {item.product_image_url
-                    ? <Image source={{ uri: item.product_image_url }} style={d.productThumb} />
+                    ? <Image source={{ uri: resolveMediaUrl(item.product_image_url) }} style={d.productThumb} />
                     : <View style={d.productThumbPlaceholder}>
                         <Text style={d.productThumbInitial}>
                           {(item.product_name || item.name || '?')[0].toUpperCase()}

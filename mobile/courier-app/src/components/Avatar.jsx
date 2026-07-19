@@ -1,7 +1,7 @@
 import { View, Text, Image, StyleSheet } from 'react-native'
 import { API_URL } from '../api/client'
 
-export function resolveAvatarUrl(url) {
+export function resolveMediaUrl(url) {
   if (!url) return null
   return url.startsWith('http') ? url : `${API_URL}${url}`
 }
@@ -17,7 +17,7 @@ export function getInitialsFromName(name) {
  * initials derived from `name` (or `fallback` text) on a colored circle.
  */
 export default function Avatar({ uri, name, fallback, size = 44, radius, color = '#6366f1', textColor = '#fff' }) {
-  const resolved = resolveAvatarUrl(uri)
+  const resolved = resolveMediaUrl(uri)
   const initials = fallback ?? getInitialsFromName(name)
   const circle = { width: size, height: size, borderRadius: radius ?? size / 2 }
 
