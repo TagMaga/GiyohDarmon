@@ -47,7 +47,10 @@ export function OrderCard({ order, onOpen, onStart, actionLoading }) {
 
       {/* Customer name + address */}
       <View style={oc.infoRow}>
-        <Text style={[oc.clientName, { color: T.ink }]} numberOfLines={1}>{order.customer?.full_name || '—'}</Text>
+        {order.customer?.full_name
+          ? <Text style={[oc.clientName, { color: T.ink }]} numberOfLines={1}>{order.customer.full_name}</Text>
+          : <Text style={[oc.clientNameFallback, { color: T.muted }]}>Клиент не указан</Text>
+        }
         {order.customer?.address
           ? <Text style={[oc.address, { color: T.muted }]} numberOfLines={1}>📍 {order.customer.address}{order.customer?.city ? `, ${order.customer.city}` : ''}</Text>
           : null
@@ -131,6 +134,7 @@ const oc = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '700' },
   infoRow:   { gap: 4 },
   clientName: { fontSize: 17, fontWeight: '700', color: C.ink, letterSpacing: -0.3 },
+  clientNameFallback: { fontSize: 15, fontStyle: 'italic', fontWeight: '500' },
   address:   { fontSize: 13, color: C.muted, fontWeight: '600', lineHeight: 18 },
   amountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   amountBox: { gap: 1 },
@@ -141,7 +145,10 @@ const oc = StyleSheet.create({
   actions:   { flexDirection: 'row', gap: 8 },
   btn:       { flex: 1, borderRadius: 999, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   btnCall:   { backgroundColor: 'rgba(10,132,255,0.12)', borderWidth: 1, borderColor: 'rgba(10,132,255,0.22)' },
-  btnCallText: { fontSize: 13, fontWeight: '700', color: C.blue },
+  // Darkened from C.blue (#0a84ff) — the plain accent measured 3.1:1 against
+  // its own 12%-tint pill background, below WCAG AA's 4.5:1 minimum for
+  // this text size. #065aaa against the same background is ~5.9:1.
+  btnCallText: { fontSize: 13, fontWeight: '700', color: '#065aaa' },
   btnPrimary:  { backgroundColor: C.blue },
   btnPrimaryText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   btnOpen:   { backgroundColor: 'rgba(255,255,255,0.45)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)' },

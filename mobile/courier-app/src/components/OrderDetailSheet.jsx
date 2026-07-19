@@ -437,7 +437,10 @@ export function OrderDetailSheet({
                 </Text>
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={d.clientName}>{order.customer?.full_name || '—'}</Text>
+                {order.customer?.full_name
+                  ? <Text style={d.clientName}>{order.customer.full_name}</Text>
+                  : <Text style={d.clientNameFallback}>Клиент не указан</Text>
+                }
                 {order.customer?.phone
                   ? <Text style={d.clientPhone}>{order.customer.phone}</Text>
                   : null}
@@ -747,6 +750,7 @@ const d = StyleSheet.create({
   avatar:       { width: 50, height: 50, borderRadius: 17, backgroundColor: '#eef3ff', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line },
   avatarInitial: { fontSize: 20, fontWeight: '700', color: C.violet },
   clientName:   { fontSize: 18, fontWeight: '700', color: C.ink, letterSpacing: -0.3 },
+  clientNameFallback: { fontSize: 16, fontStyle: 'italic', fontWeight: '500', color: C.muted },
   clientPhone:  { fontSize: 13, color: C.muted, fontWeight: '600', marginTop: 2 },
   infoRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 10 },
   infoText:     { flex: 1, fontSize: 13, color: C.ink, fontWeight: '600', lineHeight: 19 },
