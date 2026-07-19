@@ -8,7 +8,7 @@ import { API_URL } from '../../src/api/client'
 import { GlassBackdrop, useGlass } from '../../src/components/glass'
 
 const C = {
-  bg: '#0b101e', surface: 'rgba(30,36,58,0.55)', surface2: 'rgba(255,255,255,0.06)',
+  bg: '#0b101e', surface: '#1c2438', surface2: '#242e46',
   border: 'rgba(255,255,255,0.12)', border2: 'rgba(255,255,255,0.20)',
   text: '#f0f2f8', text2: '#9aa2b8', text3: '#68718a',
   accent: '#0a84ff', green: '#34c759', red: '#ff453a',

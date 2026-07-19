@@ -20,10 +20,9 @@ const DRAG_CLOSE_VELOCITY = 1
 const HANDLE_COLLAPSED_RATIO = 0.34
 const HANDLE_MAX_COLLAPSE = 260
 
-// Apple Liquid Glass palette: iOS system accents, translucent card surfaces.
-// Sheets get their surface from GlassFill; C.bg is the opaque screen base.
+// iOS system accents, solid opaque card surfaces.
 export const C = {
-  bg: '#eef2fa', card: 'rgba(255,255,255,0.66)', ink: '#0a1528', muted: '#5f6e88', line: 'rgba(120,144,180,0.30)',
+  bg: '#eef2fa', card: '#ffffff', ink: '#0a1528', muted: '#5f6e88', line: 'rgba(120,144,180,0.30)',
   blue: '#0a84ff', violet: '#5e5ce6', green: '#34c759', orange: '#ff9500', red: '#ff3b30',
   tag: 'rgba(10,132,255,0.10)',
 }
@@ -171,12 +170,12 @@ export function BottomSheet({ visible, onClose, children, height = SHEET_H }) {
   return (
     <Modal visible transparent animationType="none" statusBarTranslucent onRequestClose={closeWithAnimation}>
       <Animated.View style={[bs.backdrop, { opacity: dimOpacity }]}>
-        {/* Frost the screen behind the sheet instead of a heavy dim */}
-        <GlassFill intensity={16} overlay="rgba(9,17,32,0.30)" androidFallback="rgba(9,17,32,0.42)" />
+        {/* Dim the screen behind the sheet — a scrim, so it stays translucent */}
+        <GlassFill fill="rgba(9,17,32,0.42)" />
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeWithAnimation} />
       </Animated.View>
       <Animated.View style={[bs.sheet, { height, paddingBottom: insets.bottom, transform: [{ translateY: animatedTranslateY }] }]}>
-        <GlassFill intensity={64} overlay="rgba(242,246,252,0.40)" androidFallback="rgba(240,244,252,0.94)" />
+        <GlassFill fill="#f0f4fc" />
         <Sheen radius={28} opacity={0.35} />
         <PanGestureHandler
           activeOffsetY={[-8, 8]}
@@ -769,7 +768,7 @@ const d = StyleSheet.create({
   commentsLoading:     { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
   commentsLoadingText: { fontSize: 12, color: C.muted, fontWeight: '700' },
   emptyComments:       { fontSize: 13, color: C.muted, fontWeight: '700', textAlign: 'center', paddingVertical: 12 },
-  commentThreadItem:   { backgroundColor: 'rgba(255,255,255,0.45)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.60)', borderRadius: 14, padding: 12, marginBottom: 8 },
+  commentThreadItem:   { backgroundColor: '#eef1f6', borderWidth: 1, borderColor: 'rgba(255,255,255,0.60)', borderRadius: 14, padding: 12, marginBottom: 8 },
   commentThreadHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
   commentAuthor:       { flex: 1, fontSize: 12, color: C.ink, fontWeight: '700' },
   commentRoleBadge:    { backgroundColor: '#eef3ff', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
@@ -778,7 +777,7 @@ const d = StyleSheet.create({
   showMoreText:        { fontSize: 12, color: C.violet, fontWeight: '600', marginTop: 4 },
   commentTime:         { fontSize: 10, color: C.muted, fontWeight: '700', marginTop: 6 },
   commentInputRow:     { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 4 },
-  commentInput:        { flex: 1, minHeight: 42, maxHeight: 86, borderWidth: 1, borderColor: C.line, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: 'rgba(255,255,255,0.45)', color: C.ink, fontSize: 13, fontWeight: '700' },
+  commentInput:        { flex: 1, minHeight: 42, maxHeight: 86, borderWidth: 1, borderColor: C.line, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#eef1f6', color: C.ink, fontSize: 13, fontWeight: '700' },
   commentSendBtn:      { width: 42, height: 42, borderRadius: 14, backgroundColor: C.violet, alignItems: 'center', justifyContent: 'center' },
 
   // Person row (creator merged)
@@ -819,7 +818,7 @@ const d = StyleSheet.create({
   actionBar:      { gap: 10, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.line },
   primaryBtn:     { borderRadius: 18, paddingVertical: 16, alignItems: 'center' },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  secondaryBtn:   { borderRadius: 999, paddingVertical: 13, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.45)', borderWidth: 1, borderColor: C.line },
+  secondaryBtn:   { borderRadius: 999, paddingVertical: 13, alignItems: 'center', backgroundColor: '#eef1f6', borderWidth: 1, borderColor: C.line },
   secondaryBtnText: { fontSize: 15, fontWeight: '600', color: C.ink },
   btnDisabled:    { opacity: 0.45 },
 })
@@ -828,7 +827,7 @@ const ps = StyleSheet.create({
   stepTitle: { fontSize: 20, fontWeight: '700', color: C.ink, marginBottom: 8 },
   stepSub:   { fontSize: 14, color: C.muted, marginBottom: 20, lineHeight: 20 },
   optRow:    { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.line },
-  optIcon:   { width: 44, height: 44, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.45)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line },
+  optIcon:   { width: 44, height: 44, borderRadius: 14, backgroundColor: '#eef1f6', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line },
   optLabel:  { fontSize: 15, fontWeight: '600', color: C.ink, marginBottom: 2 },
   optDesc:   { fontSize: 12, color: C.muted, fontWeight: '600' },
   chevron:   { fontSize: 22, color: C.muted },
