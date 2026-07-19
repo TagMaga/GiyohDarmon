@@ -1,7 +1,6 @@
 import { Tabs } from 'expo-router'
 import { useEffect, useRef } from 'react'
-import { Animated, StyleSheet } from 'react-native'
-import { BlurView } from 'expo-blur'
+import { Animated, StyleSheet, View } from 'react-native'
 import { Home, Package, MapPin, Wallet, User } from 'lucide-react-native'
 import { useGlass } from '../../src/components/glass'
 
@@ -67,7 +66,7 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: BLUE,
         tabBarInactiveTintColor: inactive,
-        // Floating liquid-glass pill: real blur over the content scrolling under it
+        // Floating solid pill tab bar
         tabBarStyle: {
           position: 'absolute',
           left: 16,
@@ -82,16 +81,13 @@ export default function TabsLayout() {
           paddingTop: 8,
         },
         tabBarBackground: () => (
-          <BlurView
-            intensity={42}
-            tint={dark ? 'dark' : 'light'}
-            experimentalBlurMethod="dimezisBlurView"
+          <View
             style={[
               StyleSheet.absoluteFillObject,
               {
                 borderRadius: 34,
                 overflow: 'hidden',
-                backgroundColor: dark ? 'rgba(18,26,44,0.55)' : 'rgba(255,255,255,0.48)',
+                backgroundColor: dark ? '#1c2438' : '#ffffff',
                 borderWidth: 1,
                 borderColor: dark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.65)',
               },

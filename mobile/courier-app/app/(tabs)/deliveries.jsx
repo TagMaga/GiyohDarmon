@@ -172,7 +172,7 @@ const s = StyleSheet.create({
   onlineText:  { fontSize: 14, fontWeight: '700', color: '#1d9a45' },
   filterScroll: { flexGrow: 0, flexShrink: 0, width: '100%' },
   filterRow:   { paddingHorizontal: 18, paddingVertical: 10, columnGap: 8, flexDirection: 'row', alignItems: 'center' },
-  chip:        { minHeight: 40, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', backgroundColor: 'rgba(255,255,255,0.45)', flexGrow: 0, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
+  chip:        { minHeight: 40, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', backgroundColor: '#eef1f6', flexGrow: 0, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
   chipActive:  { backgroundColor: C.blue, borderColor: C.blue },
   chipText:    { fontSize: 14, lineHeight: 18, fontWeight: '700', color: C.ink, flexGrow: 0, flexShrink: 0 },
   chipTextActive: { color: '#fff' },

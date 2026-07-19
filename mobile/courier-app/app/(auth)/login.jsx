@@ -12,7 +12,7 @@ import { FadeSlideIn, PressScale } from '../../src/components/motion'
 import { GlassBackdrop } from '../../src/components/glass'
 
 const C = {
-  bg: '#0b101e', bg2: 'rgba(255,255,255,0.08)', surface: 'rgba(28,34,56,0.55)',
+  bg: '#0b101e', bg2: '#1b2338', surface: '#1c2438',
   border: 'rgba(255,255,255,0.12)', border2: 'rgba(255,255,255,0.20)',
   text: '#f0f2f8', text2: '#9aa2b8',
   accent: '#0a84ff', glow: 'rgba(10,132,255,0.3)',

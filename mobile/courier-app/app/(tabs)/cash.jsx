@@ -17,7 +17,7 @@ import 'dayjs/locale/ru'
 dayjs.locale('ru')
 
 const C = {
-  bg: '#eef2fa', card: 'rgba(255,255,255,0.66)', ink: '#0a1528', muted: '#5f6e88', line: 'rgba(120,144,180,0.30)',
+  bg: '#eef2fa', card: '#ffffff', ink: '#0a1528', muted: '#5f6e88', line: 'rgba(120,144,180,0.30)',
   blue: '#0a84ff', violet: '#5e5ce6', green: '#34c759', orange: '#ff9500', red: '#ff3b30',
 }
 
@@ -396,7 +396,7 @@ export default function CashScreen() {
       <Modal visible={showHandover} animationType="slide" transparent statusBarTranslucent>
         <Pressable style={s.overlay} onPress={() => { if (!submitting) { setShowHandover(false); setAttachments([]); setActualAmount(''); setNotes('') } }}>
           <Pressable style={s.sheet} onPress={e => e.stopPropagation()}>
-            <GlassFill intensity={64} overlay="rgba(242,246,252,0.40)" androidFallback="rgba(240,244,252,0.94)" />
+            <GlassFill fill="#f0f4fc" />
             <Sheen radius={32} opacity={0.35} />
             <View style={s.sheetHandle} />
             <ScrollView contentContainerStyle={s.sheetContent} showsVerticalScrollIndicator={false}>
@@ -495,10 +495,10 @@ const s = StyleSheet.create({
   headTitle: { fontSize: 28, fontWeight: '700', color: C.ink, letterSpacing: -0.8 },
   headSub: { fontSize: 13, color: C.muted, fontWeight: '600', marginTop: 6 },
   // Cash hero
-  cashHero: { marginHorizontal: 18, backgroundColor: 'rgba(255,255,255,0.60)', borderWidth: 1, borderColor: 'rgba(255,149,0,0.30)', borderRadius: 32, padding: 24, marginBottom: 16, shadowColor: C.orange, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.08, shadowRadius: 34, elevation: 3, overflow: 'hidden' },
+  cashHero: { marginHorizontal: 18, backgroundColor: '#ffffff', borderWidth: 1, borderColor: 'rgba(255,149,0,0.30)', borderRadius: 32, padding: 24, marginBottom: 16, shadowColor: C.orange, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.08, shadowRadius: 34, elevation: 3, overflow: 'hidden' },
   cashLabel: { fontSize: 13, color: '#c47c00', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   cashSum: { fontSize: 52, fontWeight: '700', letterSpacing: -2, color: C.orange, marginTop: 14, marginBottom: 16, lineHeight: 58 },
-  formula: { backgroundColor: 'rgba(255,255,255,0.50)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', borderRadius: 22, padding: 15, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
+  formula: { backgroundColor: '#eef1f6', borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', borderRadius: 22, padding: 15, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
   formulaVal: { fontSize: 18, fontWeight: '700', color: C.ink },
   formulaMuted: { fontSize: 18, fontWeight: '700', color: C.muted },
   formulaGreen: { fontSize: 18, fontWeight: '700', color: C.green },
@@ -512,14 +512,14 @@ const s = StyleSheet.create({
   submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 17 },
   // KPI cards (tab switcher)
   kpiRow:        { flexDirection: 'row', marginHorizontal: 18, gap: 12, marginBottom: 16 },
-  kpiCard:       { flex: 1, backgroundColor: 'rgba(255,255,255,0.50)', borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.62)', padding: 16 },
-  kpiCardActive: { backgroundColor: 'rgba(255,255,255,0.72)', borderColor: C.blue, shadowColor: C.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: 3 },
+  kpiCard:       { flex: 1, backgroundColor: '#eef1f6', borderRadius: 20, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.62)', padding: 16 },
+  kpiCardActive: { backgroundColor: '#ffffff', borderColor: C.blue, shadowColor: C.blue, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.14, shadowRadius: 12, elevation: 3 },
   kpiLabel:      { fontSize: 12, color: C.muted, fontWeight: '600', marginBottom: 6 },
   kpiValue:      { fontSize: 28, fontWeight: '700', color: C.ink, letterSpacing: -1 },
   kpiUnit:       { fontSize: 12, color: C.muted, fontWeight: '700', marginTop: 2 },
   // Filter chips
   filterRow:          { flexDirection: 'row', marginHorizontal: 18, gap: 10, marginBottom: 14 },
-  filterChip:         { backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)' },
+  filterChip:         { backgroundColor: '#eef1f6', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)' },
   filterChipActive:   { backgroundColor: 'rgba(10,132,255,0.14)', borderColor: C.blue },
   filterChipText:     { fontSize: 13, fontWeight: '600', color: C.muted },
   filterChipTextActive: { color: C.blue },
@@ -535,20 +535,20 @@ const s = StyleSheet.create({
   sheetHandle: { width: 74, height: 6, borderRadius: 99, backgroundColor: '#d9deea', alignSelf: 'center', marginTop: 14 },
   sheetContent: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40, gap: 16 },
   sheetTitle: { fontSize: 28, fontWeight: '700', color: C.ink },
-  sheetRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.50)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', borderRadius: 22, paddingHorizontal: 18, paddingVertical: 15 },
+  sheetRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#eef1f6', borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)', borderRadius: 22, paddingHorizontal: 18, paddingVertical: 15 },
   sheetRowLabel: { color: C.muted, fontWeight: '600', fontSize: 14 },
   sheetRowVal: { fontSize: 22, fontWeight: '700', color: C.orange },
   field: {},
   fieldLabel: { fontSize: 14, color: C.muted, fontWeight: '700', marginBottom: 10 },
-  amountInput: { borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.62)', backgroundColor: 'rgba(255,255,255,0.50)', borderRadius: 22, paddingVertical: 18, fontSize: 28, fontWeight: '700', textAlign: 'center', color: C.ink },
+  amountInput: { borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.62)', backgroundColor: '#eef1f6', borderRadius: 22, paddingVertical: 18, fontSize: 28, fontWeight: '700', textAlign: 'center', color: C.ink },
   diffRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1 },
   diffLabel: { fontSize: 13, fontWeight: '700', color: C.muted },
   diffVal: { fontSize: 15, fontWeight: '700' },
-  uploadArea: { borderWidth: 1.5, borderColor: 'rgba(120,144,180,0.40)', borderStyle: 'dashed', borderRadius: 22, paddingVertical: 24, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.40)' },
+  uploadArea: { borderWidth: 1.5, borderColor: 'rgba(120,144,180,0.40)', borderStyle: 'dashed', borderRadius: 22, paddingVertical: 24, alignItems: 'center', backgroundColor: '#eef1f6' },
   uploadPlus: { fontSize: 34, fontWeight: '700', color: C.ink, marginBottom: 8 },
   uploadText: { fontSize: 16, fontWeight: '700', color: C.muted },
   uploadSub: { fontSize: 12, color: C.muted, marginTop: 4 },
-  textarea: { borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.62)', backgroundColor: 'rgba(255,255,255,0.50)', borderRadius: 22, padding: 18, fontSize: 15, fontWeight: '700', color: C.ink, minHeight: 88, textAlignVertical: 'top' },
+  textarea: { borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.62)', backgroundColor: '#eef1f6', borderRadius: 22, padding: 18, fontSize: 15, fontWeight: '700', color: C.ink, minHeight: 88, textAlignVertical: 'top' },
   submitBigBtn: { backgroundColor: C.blue, borderRadius: 999, paddingVertical: 18, alignItems: 'center', shadowColor: C.blue, shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.25, shadowRadius: 28, elevation: 4 },
   submitBigBtnText: { color: '#fff', fontWeight: '700', fontSize: 17 },
   // Earnings

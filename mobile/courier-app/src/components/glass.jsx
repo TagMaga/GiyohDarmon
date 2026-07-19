@@ -1,20 +1,19 @@
 /**
- * Apple Liquid Glass design system.
+ * Solid surface design system (formerly "Liquid Glass").
  *
  * Layers (back to front):
- *   1. GlassBackdrop — colorful radial washes so glass has something to refract
- *   2. Surfaces — translucent fills with bright hairline edges (GlassCard / tokens)
- *   3. Sheen — specular top highlight, the "reflection" signature of liquid glass
- *   4. Real blur (expo-blur) — reserved for chrome: tab bar, sheets, menus
+ *   1. GlassBackdrop — colorful radial washes behind everything
+ *   2. Surfaces — solid opaque fills with bright hairline edges (GlassCard / tokens)
+ *   3. Sheen — specular top highlight accent, kept as a subtle finishing touch
+ *   4. Chrome (tab bar, sheets, menus) — solid opaque fills, no blur
  *
  * Appearance adapts to the system light/dark setting via GlassThemeProvider;
- * the in-app toggle (account menu) overrides it. Content cards use pseudo-glass
- * (translucent fill over smooth washes ≈ blur, at zero GPU cost); real BlurView
- * stays on chrome, which is also how Apple applies materials.
+ * the in-app toggle (account menu) overrides it. Cards, chips and chrome are
+ * all fully opaque now — the backdrop's colorful washes show only in the gaps
+ * between surfaces, never through them.
  */
 import { createContext, useContext, useMemo, useState } from 'react'
-import { Platform, View, StyleSheet, useColorScheme, useWindowDimensions } from 'react-native'
-import { BlurView } from 'expo-blur'
+import { View, StyleSheet, useColorScheme, useWindowDimensions } from 'react-native'
 import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg'
 
 // ── Tokens ──────────────────────────────────────────────────────────────────
@@ -27,9 +26,9 @@ export const LIGHT = {
   base:     '#eef2fa',
   ink:      '#0a1528',
   muted:    '#5f6e88',
-  card:     'rgba(255,255,255,0.58)',
+  card:     '#ffffff',
   cardEdge: 'rgba(255,255,255,0.68)',
-  chip:     'rgba(255,255,255,0.45)',
+  chip:     '#eef1f6',
   chipEdge: 'rgba(255,255,255,0.62)',
   hairline: 'rgba(120,144,180,0.30)',
   sheen:    0.5,
@@ -41,9 +40,9 @@ export const DARK = {
   base:     '#0b101e',
   ink:      '#f2f5fc',
   muted:    '#9aa6bd',
-  card:     'rgba(38,48,76,0.52)',
+  card:     '#1c2438',
   cardEdge: 'rgba(255,255,255,0.14)',
-  chip:     'rgba(255,255,255,0.08)',
+  chip:     '#242e46',
   chipEdge: 'rgba(255,255,255,0.14)',
   hairline: 'rgba(255,255,255,0.10)',
   sheen:    0.14,
@@ -71,28 +70,19 @@ export function useGlass() {
   return useContext(ThemeCtx)
 }
 
-// ── Frosted fill (real blur) for sheets / modals / chrome ───────────────────
+// ── Opaque fill for sheets / modals / chrome ────────────────────────────────
 
 /**
- * Absolute-fill frosted glass layer for sheets, modals and panels.
- * iOS: real UIVisualEffectView blur + a soft tint overlay so text stays readable.
- * Android: translucent solid fallback — expo-blur inside a <Modal> is unreliable
- * there, and a high-opacity tint still reads as glass over the dim.
- * The parent must set borderRadius + overflow:'hidden' to clip the blur.
+ * Absolute-fill solid backing for sheets, modals and panels — same flat
+ * `fill` color on both platforms, no blur. Pass a translucent color for a
+ * modal dimming scrim, or an opaque one for an actual surface (e.g. a
+ * bottom sheet's own background). The parent must set borderRadius +
+ * overflow:'hidden' to clip it to the sheet's rounded corners.
  */
-export function GlassFill({ tint = 'light', intensity = 55, overlay, androidFallback }) {
+export function GlassFill({ tint = 'light', fill }) {
   const isDark = tint === 'dark'
-  const wash = overlay ?? (isDark ? 'rgba(15,26,46,0.55)' : 'rgba(242,246,252,0.45)')
-  const solid = androidFallback ?? (isDark ? 'rgba(16,28,48,0.94)' : 'rgba(240,244,252,0.93)')
-  if (Platform.OS === 'ios') {
-    return (
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <BlurView tint={isDark ? 'dark' : 'light'} intensity={intensity} style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: wash }]} />
-      </View>
-    )
-  }
-  return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: solid }]} />
+  const color = fill ?? (isDark ? '#101c30' : '#f0f4fc')
+  return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: color }]} />
 }
 
 // ── Specular highlight ───────────────────────────────────────────────────────
