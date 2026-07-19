@@ -29,7 +29,15 @@ export function animateLayout() {
   })
 }
 
-/** Fade + rise entrance. Use `delay={index * 60}` for staggered lists. */
+/**
+ * Rise-in entrance. Use `delay={index * 60}` for staggered lists.
+ *
+ * Slide only, no opacity fade: every surface this wraps (cards, KPI
+ * bubbles) is now fully opaque by design, and animating opacity from 0
+ * meant it passed through a partially-transparent state on every mount —
+ * which, sitting over the colorful backdrop, looked exactly like the old
+ * translucent "liquid glass" style flashing in before settling solid.
+ */
 export function FadeSlideIn({ children, delay = 0, from = 14, style }) {
   const progress = useRef(new Animated.Value(0)).current
   useEffect(() => {
@@ -40,7 +48,6 @@ export function FadeSlideIn({ children, delay = 0, from = 14, style }) {
   return (
     <Animated.View
       style={[style, {
-        opacity: progress,
         transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [from, 0] }) }],
       }]}
     >
