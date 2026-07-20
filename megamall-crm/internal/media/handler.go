@@ -3,10 +3,12 @@ package media
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -218,7 +220,9 @@ func (h *Handler) PublicDelivery(c *gin.Context) {
 		c.Status(http.StatusNotFound)
 		return
 	}
-	h.serveFile(c, h.svc.visibilityDir(VisibilityPublic), key, true)
+	// Content/version-based filenames (VariantStorageKey) make this safe:
+	// the same key never refers to different bytes over time.
+	h.serveFile(c, h.svc.visibilityDir(VisibilityPublic), key, "public, max-age=31536000, immutable")
 }
 
 // PrivateDelivery serves a file from the private namespace only if the
@@ -247,10 +251,21 @@ func (h *Handler) PrivateDelivery(c *gin.Context) {
 		return
 	}
 
-	h.serveFile(c, h.svc.visibilityDir(VisibilityPrivate), key, false)
+	// "private" (never a shared/CDN cache — only the requester's own
+	// device, unlike PublicDelivery's "public") for exactly the token's
+	// remaining lifetime. Service.signedURLExpiry buckets that token's
+	// expiry so repeated mints for the same asset within a few minutes
+	// produce a byte-identical URL — letting the device's own HTTP cache
+	// serve a previously-downloaded image instead of redownloading it
+	// every time the courier app re-fetches its handover list.
+	remaining := expiry - time.Now().Unix()
+	if remaining < 0 {
+		remaining = 0
+	}
+	h.serveFile(c, h.svc.visibilityDir(VisibilityPrivate), key, fmt.Sprintf("private, max-age=%d", remaining))
 }
 
-func (h *Handler) serveFile(c *gin.Context, dir, key string, cacheable bool) {
+func (h *Handler) serveFile(c *gin.Context, dir, key, cacheControl string) {
 	f, err := os.Open(filepath.Join(dir, key))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -269,15 +284,7 @@ func (h *Handler) serveFile(c *gin.Context, dir, key string, cacheable bool) {
 	}
 
 	c.Header("X-Content-Type-Options", "nosniff")
-	if cacheable {
-		// Content/version-based filenames (VariantStorageKey) make this
-		// safe: the same key never refers to different bytes over time.
-		c.Header("Cache-Control", "public, max-age=31536000, immutable")
-	} else {
-		// Never cache a private response — a shared/browser cache could
-		// leak it to a later, unauthorized visitor of the same URL.
-		c.Header("Cache-Control", "private, no-store")
-	}
+	c.Header("Cache-Control", cacheControl)
 	http.ServeContent(c.Writer, c.Request, key, info.ModTime(), f)
 }
 

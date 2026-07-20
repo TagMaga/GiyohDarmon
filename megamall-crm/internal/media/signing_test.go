@@ -77,14 +77,14 @@ func TestSignedURL_MissingFieldsRejected(t *testing.T) {
 }
 
 func TestNewSignedURLQuery_ContainsExpectedFields(t *testing.T) {
-	q := NewSignedURLQuery(testSecret, "key1.webp", "card", 5*time.Minute)
+	q := NewSignedURLQuery(testSecret, "key1.webp", "card", time.Now().Add(5*time.Minute))
 	if !strings.Contains(q, "exp=") || !strings.Contains(q, "sig=") || !strings.Contains(q, "v=card") {
 		t.Fatalf("query string missing expected fields: %q", q)
 	}
 }
 
 func TestNewSignedURLQuery_OmitsEmptyVariant(t *testing.T) {
-	q := NewSignedURLQuery(testSecret, "key1.webp", "", 5*time.Minute)
+	q := NewSignedURLQuery(testSecret, "key1.webp", "", time.Now().Add(5*time.Minute))
 	if strings.Contains(q, "&v=") {
 		t.Fatalf("empty variant should not appear in the query string: %q", q)
 	}

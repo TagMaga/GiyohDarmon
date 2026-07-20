@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -308,15 +309,28 @@ func TestHandler_PrivateDelivery_RequiresValidSignature(t *testing.T) {
 		t.Fatalf("expected a /media/private/ URL, got %q", privateURL)
 	}
 
-	// 1. Valid signature (as minted) → 200, no-store.
+	// 1. Valid signature (as minted) → 200, cacheable only by the
+	// requester's own device ("private", never a shared/CDN cache) for
+	// approximately the signed URL's remaining TTL (15m in this test's
+	// config — see testServiceCfg's SignedURLTTL) — not "no-store": a
+	// courier reopening the app should be able to reuse an
+	// already-downloaded photo instead of redownloading it every time.
 	okReq := httptest.NewRequest(http.MethodGet, privateURL, nil)
 	okRec := httptest.NewRecorder()
 	r.ServeHTTP(okRec, okReq)
 	if okRec.Code != http.StatusOK {
 		t.Fatalf("valid signature status = %d, body=%s", okRec.Code, okRec.Body.String())
 	}
-	if cc := okRec.Header().Get("Cache-Control"); !strings.Contains(cc, "no-store") {
-		t.Errorf("private Cache-Control = %q, want no-store", cc)
+	cc := okRec.Header().Get("Cache-Control")
+	if !strings.HasPrefix(cc, "private, max-age=") {
+		t.Fatalf("private Cache-Control = %q, want prefix %q", cc, "private, max-age=")
+	}
+	var maxAge int
+	if _, err := fmt.Sscanf(cc, "private, max-age=%d", &maxAge); err != nil {
+		t.Fatalf("could not parse max-age from %q: %v", cc, err)
+	}
+	if maxAge <= 0 || maxAge > 15*60 {
+		t.Errorf("max-age = %d, want in (0, 900]", maxAge)
 	}
 
 	// 2. Missing signature entirely → 404.
@@ -341,7 +355,7 @@ func TestHandler_PrivateDelivery_RequiresValidSignature(t *testing.T) {
 	}
 
 	// 4. Expired signature → 404.
-	expiredQuery := NewSignedURLQuery(testSecret, key, "original", -time.Minute)
+	expiredQuery := NewSignedURLQuery(testSecret, key, "original", time.Now().Add(-time.Minute))
 	expiredReq := httptest.NewRequest(http.MethodGet, "/media/private/"+key+"?"+expiredQuery, nil)
 	expiredRec := httptest.NewRecorder()
 	r.ServeHTTP(expiredRec, expiredReq)

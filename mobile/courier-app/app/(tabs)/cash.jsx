@@ -12,6 +12,7 @@ import { getCashSummary, submitHandover, getHandoverHistory, getMyOrders } from 
 import { securePrivateUpload } from '../../src/api/media'
 import { API_URL } from '../../src/api/client'
 import { FadeSlideIn, PressScale, CountUp, Skeleton, animateLayout } from '../../src/components/motion'
+import CachedImage from '../../src/components/CachedImage'
 import { GlassBackdrop, GlassFill, Sheen, useGlass } from '../../src/components/glass'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
@@ -103,6 +104,7 @@ export default function CashScreen() {
   const [actualAmount, setActualAmount] = useState('')
   const [notes, setNotes]           = useState('')
   const [previewUri, setPreviewUri] = useState(null)
+  const [previewCacheKey, setPreviewCacheKey] = useState(null)
   const [delivered, setDelivered]   = useState([])
 
   const fetchData = async () => {
@@ -211,6 +213,12 @@ export default function CashScreen() {
   // signed, by the backend on every read; see
   // internal/courier.Service.ToHandoverResponse).
   const handoverProofUrl = (h) => fullUrl(h.proof_url || h.media_assets?.[0]?.url)
+  // The media-pipeline URL above carries a fresh signature on every fetch,
+  // so it can't itself be a cache key — the asset's own id is stable across
+  // fetches and app restarts, which is what CachedImage needs. Legacy
+  // proof_url has no backing media asset (and is already a stable URL), so
+  // there's nothing to key a local cache off of.
+  const handoverProofCacheKey = (h) => (h.proof_url ? null : h.media_assets?.[0]?.id ?? null)
   const earnings = delivered.map(o => ({
     id: o.order_id ?? o.id,
     number: o.order_number ?? o.OrderNumber ?? '—',
@@ -394,11 +402,12 @@ export default function CashScreen() {
                     const sLabel = isConfirmed ? 'Подтверждено' : isPending ? 'Ожидает проверки' : isRejected ? 'Отклонено' : h.status
                     const amount = h.actual_returned ?? h.total_to_return ?? 0
                     const proof = handoverProofUrl(h)
+                    const proofCacheKey = handoverProofCacheKey(h)
                     return (
                       <View key={h.id || i} style={[s.cashItem, { borderBottomColor: T.hairline }, i === filteredHistory.length - 1 && { borderBottomWidth: 0 }]}>
                         {proof
-                          ? <TouchableOpacity activeOpacity={0.85} onPress={() => setPreviewUri(proof)}>
-                              <Image source={{ uri: proof }} style={s.receipt} />
+                          ? <TouchableOpacity activeOpacity={0.85} onPress={() => { setPreviewUri(proof); setPreviewCacheKey(proofCacheKey) }}>
+                              <CachedImage uri={proof} cacheKey={proofCacheKey} style={s.receipt} />
                             </TouchableOpacity>
                           : <View style={[s.receipt, { backgroundColor: T.chip }]} />}
                         <View style={{ flex: 1 }}>
@@ -492,7 +501,7 @@ export default function CashScreen() {
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     style={{ marginBottom: 10 }}
-                    renderItem={({ item }) => <AttachmentItem item={item} onRemove={removeAttachment} onPreview={setPreviewUri} />}
+                    renderItem={({ item }) => <AttachmentItem item={item} onRemove={removeAttachment} onPreview={(uri) => { setPreviewUri(uri); setPreviewCacheKey(null) }} />}
                   />
                 )}
                 {attachments.length < MAX_ATTACHMENTS && (
@@ -526,13 +535,13 @@ export default function CashScreen() {
 
       {/* Full-screen image preview — works for both locally selected proofs and
           submitted handover photos from history. Tap anywhere or X to close. */}
-      <Modal visible={!!previewUri} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setPreviewUri(null)}>
-        <Pressable style={s.previewOverlay} onPress={() => setPreviewUri(null)}>
-          <TouchableOpacity style={s.previewClose} onPress={() => setPreviewUri(null)} hitSlop={12}>
+      <Modal visible={!!previewUri} transparent animationType="fade" statusBarTranslucent onRequestClose={() => { setPreviewUri(null); setPreviewCacheKey(null) }}>
+        <Pressable style={s.previewOverlay} onPress={() => { setPreviewUri(null); setPreviewCacheKey(null) }}>
+          <TouchableOpacity style={s.previewClose} onPress={() => { setPreviewUri(null); setPreviewCacheKey(null) }} hitSlop={12}>
             <Text style={s.previewCloseText}>✕</Text>
           </TouchableOpacity>
           {previewUri && (
-            <Image source={{ uri: previewUri }} style={s.previewImage} resizeMode="contain" />
+            <CachedImage uri={previewUri} cacheKey={previewCacheKey} style={s.previewImage} resizeMode="contain" />
           )}
         </Pressable>
       </Modal>

@@ -101,6 +101,16 @@ type MediaConfig struct {
 	SigningSecret string `envconfig:"MEDIA_SIGNING_SECRET"`
 	// SignedURLTTL is how long a signed private-media URL remains valid.
 	SignedURLTTL time.Duration `envconfig:"MEDIA_SIGNED_URL_TTL" default:"15m"`
+	// SignedURLCacheBucket buckets the expiry timestamp used to mint a
+	// signed private-media URL so repeated mints for the same asset+variant
+	// within one bucket window produce byte-identical URLs — letting the
+	// requester's own device (Cache-Control: private, see
+	// media.Handler.PrivateDelivery) reuse a previously-downloaded image
+	// instead of redownloading it on every screen open. 0 disables bucketing
+	// (every mint gets a fresh, unique expiry, as before). Every minted URL
+	// still remains valid for at least SignedURLTTL regardless of where in
+	// the bucket window it was minted — see Service.signedURLExpiry.
+	SignedURLCacheBucket time.Duration `envconfig:"MEDIA_SIGNED_URL_CACHE_BUCKET" default:"5m"`
 	// QuarantineRetention is how long a deleted asset's physical file is
 	// kept in quarantine before the purge job removes it permanently.
 	QuarantineRetention time.Duration `envconfig:"MEDIA_QUARANTINE_RETENTION" default:"720h"` // 30 days
