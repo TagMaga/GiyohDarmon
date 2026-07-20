@@ -234,17 +234,18 @@ func (s *Service) buildIncomeReport(
 	}
 
 	resp := &IncomeReportResponse{
-		UserID:           userID,
-		PeriodStart:      from,
-		PeriodEnd:        to,
-		TotalIncome:      round2(totalIncome),
-		TotalRevenue:     round2(orderTotals.TotalRevenue),
-		TotalDeliveryFee: round2(orderTotals.TotalDeliveryFee),
-		NetProfit:        round2(totalIncome),
-		OrdersCount:      ordersCount,
-		DeliveredCount:   ordersCount, // only delivered orders emit financial events
-		AveragePerOrder:  avg,
-		ByEventType:      byType,
+		UserID:             userID,
+		PeriodStart:        from,
+		PeriodEnd:          to,
+		TotalIncome:        round2(totalIncome),
+		TotalRevenue:       round2(orderTotals.TotalRevenue),
+		TotalDeliveryFee:   round2(orderTotals.TotalDeliveryFee),
+		TotalCourierPayout: round2(orderTotals.TotalCourierPayout),
+		NetProfit:          round2(totalIncome),
+		OrdersCount:        ordersCount,
+		DeliveredCount:     ordersCount, // only delivered orders emit financial events
+		AveragePerOrder:    avg,
+		ByEventType:        byType,
 	}
 
 	// 3. Optional enriched events list.
@@ -257,16 +258,17 @@ func (s *Service) buildIncomeReport(
 		events := make([]IncomeEventResponse, len(eventRows))
 		for i, r := range eventRows {
 			events[i] = IncomeEventResponse{
-				ID:          r.ID,
-				OrderID:     r.OrderID,
-				EventType:   r.EventType,
-				Amount:      r.Amount,
-				CreatedAt:   r.CreatedAt,
-				OrderNumber: r.OrderNumber,
-				OrderType:   r.OrderType,
-				NetRevenue:  r.NetRevenue,
-				TotalAmount: r.TotalAmount,
-				DeliveryFee: r.DeliveryFee,
+				ID:            r.ID,
+				OrderID:       r.OrderID,
+				EventType:     r.EventType,
+				Amount:        r.Amount,
+				CreatedAt:     r.CreatedAt,
+				OrderNumber:   r.OrderNumber,
+				OrderType:     r.OrderType,
+				NetRevenue:    r.NetRevenue,
+				TotalAmount:   r.TotalAmount,
+				DeliveryFee:   r.DeliveryFee,
+				CourierPayout: r.CourierPayout,
 			}
 		}
 		resp.Events = events
@@ -324,7 +326,6 @@ func buildTeamReport(
 		Members:     members,
 	}
 }
-
 
 // ─── Period helpers ───────────────────────────────────────────────────────────
 
