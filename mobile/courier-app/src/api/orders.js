@@ -3,6 +3,7 @@ import client from './client'
 export const getMyOrders = (params) => client.get('/courier/my-orders', { params })
 export const getClaimableOrders = () => client.get('/courier/available')
 export const claimOrder = (id) => client.post(`/courier/available/${id}/claim`)
+export const unclaimOrder = (id) => client.post(`/courier/available/${id}/unclaim`)
 
 const STATUS_ENDPOINT = {
   in_delivery:     'start',

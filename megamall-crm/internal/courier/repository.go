@@ -51,9 +51,9 @@ func (r *Repository) createAssignment(tx *gorm.DB, ctx context.Context, orderID,
 	return id, nil
 }
 
-// verifyActiveAssignment checks that the is_active=true assignment for orderID
-// belongs to courierID. Returns apperrors.Forbidden if not.
-func (r *Repository) verifyActiveAssignment(ctx context.Context, orderID, courierID uuid.UUID) error {
+// getActiveAssignment returns the currently active assignment row for
+// orderID, verifying it belongs to courierID.
+func (r *Repository) getActiveAssignment(ctx context.Context, orderID, courierID uuid.UUID) (*activeAssignmentRow, error) {
 	var row activeAssignmentRow
 	err := r.db.WithContext(ctx).
 		Table("order_assignments").
@@ -61,15 +61,50 @@ func (r *Repository) verifyActiveAssignment(ctx context.Context, orderID, courie
 		Where("order_id = ? AND is_active = TRUE", orderID).
 		First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return apperrors.Forbidden("no active assignment found for this order")
+		return nil, apperrors.Forbidden("no active assignment found for this order")
 	}
 	if err != nil {
-		return fmt.Errorf("get active assignment: %w", err)
+		return nil, fmt.Errorf("get active assignment: %w", err)
 	}
 	if row.CourierID != courierID {
-		return apperrors.Forbidden("you are not the assigned courier for this order")
+		return nil, apperrors.Forbidden("you are not the assigned courier for this order")
 	}
-	return nil
+	return &row, nil
+}
+
+// verifyActiveAssignment checks that the is_active=true assignment for orderID
+// belongs to courierID. Returns apperrors.Forbidden if not.
+func (r *Repository) verifyActiveAssignment(ctx context.Context, orderID, courierID uuid.UUID) error {
+	_, err := r.getActiveAssignment(ctx, orderID, courierID)
+	return err
+}
+
+// GetActiveAssignmentTime returns when the caller's active assignment for
+// orderID began — UnclaimOrder uses it to enforce its short undo window.
+func (r *Repository) GetActiveAssignmentTime(ctx context.Context, orderID, courierID uuid.UUID) (time.Time, error) {
+	row, err := r.getActiveAssignment(ctx, orderID, courierID)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return row.AssignedAt, nil
+}
+
+// GetOrderStatus returns orderID's current status. UnclaimOrder uses it to
+// confirm the order is still just-claimed (assigned), not already picked up.
+func (r *Repository) GetOrderStatus(ctx context.Context, orderID uuid.UUID) (orders.OrderStatus, error) {
+	var status orders.OrderStatus
+	err := r.db.WithContext(ctx).
+		Table("orders").
+		Select("status").
+		Where("id = ? AND deleted_at IS NULL", orderID).
+		Scan(&status).Error
+	if err != nil {
+		return "", fmt.Errorf("get order status: %w", err)
+	}
+	if status == "" {
+		return "", apperrors.NotFound("order")
+	}
+	return status, nil
 }
 
 // ─── My Orders ────────────────────────────────────────────────────────────────

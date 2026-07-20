@@ -87,6 +87,21 @@ func (h *Handler) claimOrder(c *gin.Context) {
 	response.NoContent(c)
 }
 
+func (h *Handler) unclaimOrder(c *gin.Context) {
+	orderID, err := parseID(c, "id")
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	order, svcErr := h.svc.UnclaimOrder(c.Request.Context(), claims.UserID, orderID)
+	if svcErr != nil {
+		response.HandleError(c, svcErr)
+		return
+	}
+	response.OK(c, order)
+}
+
 // ─── Delivery transitions ─────────────────────────────────────────────────────
 
 func (h *Handler) startDelivery(c *gin.Context) {
