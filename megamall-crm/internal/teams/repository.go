@@ -85,8 +85,18 @@ func (r *Repository) List(ctx context.Context, filter ListTeamsFilter, actorID u
 	return list, int(total), nil
 }
 
+// Update persists t's name/team_lead_id/manager_id/is_active. Select is
+// required here: GORM's struct-based Updates silently skips zero-value
+// fields (a nil ManagerID/TeamLeadID or IsActive=false), which would make
+// clearing a manager/lead or deactivating a team a silent no-op — Select
+// forces those columns to be written regardless of whether the Go value is
+// the zero value.
 func (r *Repository) Update(ctx context.Context, t *Team) error {
-	if err := r.db.WithContext(ctx).Model(t).Where("deleted_at IS NULL").Updates(t).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Model(t).
+		Where("deleted_at IS NULL").
+		Select("name", "team_lead_id", "manager_id", "is_active", "updated_at").
+		Updates(t).Error; err != nil {
 		if strings.Contains(err.Error(), "uq_teams_name") {
 			return fmt.Errorf("team name already exists")
 		}
