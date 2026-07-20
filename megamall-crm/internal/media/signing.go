@@ -37,11 +37,15 @@ func signingPayload(key, variant string, expiry int64) string {
 }
 
 // NewSignedURLQuery builds the query string suffix ("?exp=..&sig=..[&v=..]")
-// for a private media delivery URL, valid for ttl from now.
-func NewSignedURLQuery(secret, key, variant string, ttl time.Duration) string {
-	expiry := time.Now().Add(ttl).Unix()
-	sig := Sign(secret, key, variant, expiry)
-	q := fmt.Sprintf("exp=%d&sig=%s", expiry, sig)
+// for a private media delivery URL that is valid until expiry. The caller
+// (Service.signedURLExpiry) decides expiry, including any cache-bucketing,
+// rather than this function computing time.Now() itself — two calls that
+// pass the same expiry for the same key+variant must produce byte-identical
+// output, which a fresh time.Now() per call would prevent.
+func NewSignedURLQuery(secret, key, variant string, expiry time.Time) string {
+	exp := expiry.Unix()
+	sig := Sign(secret, key, variant, exp)
+	q := fmt.Sprintf("exp=%d&sig=%s", exp, sig)
 	if variant != "" {
 		q += "&v=" + variant
 	}

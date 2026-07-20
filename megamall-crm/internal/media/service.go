@@ -409,12 +409,29 @@ func (s *Service) SignedURL(asset *Asset, variant string) (SignedURLResponse, er
 		key = v.StorageKey
 	}
 
-	expiresAt := time.Now().Add(s.cfg.SignedURLTTL)
-	query := NewSignedURLQuery(s.cfg.SigningSecret, key, variant, s.cfg.SignedURLTTL)
+	expiresAt := s.signedURLExpiry()
+	query := NewSignedURLQuery(s.cfg.SigningSecret, key, variant, expiresAt)
 	return SignedURLResponse{
 		URL:       fmt.Sprintf("/media/private/%s?%s", key, query),
 		ExpiresAt: expiresAt,
 	}, nil
+}
+
+// signedURLExpiry returns the expiry for a newly minted signed URL. When
+// SignedURLCacheBucket is set, it anchors to the current bucket's floor
+// (time.Truncate) rather than raw time.Now(), so every mint within the same
+// bucket window — e.g. the courier app re-fetching its handover list a few
+// times a minute — produces the same expiry, and therefore the same URL,
+// letting the device's own HTTP cache serve it instead of redownloading.
+// Every mint still remains valid for at least SignedURLTTL from the moment
+// it's minted, regardless of where in the bucket window that falls.
+func (s *Service) signedURLExpiry() time.Time {
+	bucket := s.cfg.SignedURLCacheBucket
+	if bucket <= 0 {
+		return time.Now().Add(s.cfg.SignedURLTTL)
+	}
+	anchor := time.Now().Truncate(bucket)
+	return anchor.Add(bucket + s.cfg.SignedURLTTL)
 }
 
 // Delete removes the DB association and quarantines every physical file
