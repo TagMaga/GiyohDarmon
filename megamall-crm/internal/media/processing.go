@@ -50,6 +50,90 @@ const masterWebpQuality = 90
 // path; see the size-vs-original comparison in ProcessProductImage).
 const masterWebpFallbackQuality = 75
 
+// maxVariantBytes is the hard ceiling every persisted image variant is
+// capped to (2026-07-20 requirement: no photo the pipeline saves should
+// exceed 300KB, replacing the ~900KB proof previews users were seeing).
+// Enforced by capToMaxBytes actually re-encoding at lower quality/width
+// until the output fits, not by picking one fixed setting and hoping.
+const maxVariantBytes = 300 * 1024
+
+// minCappedWidth is the narrowest capToMaxBytes will ever shrink an image
+// to while chasing maxVariantBytes. Below this a receipt's numbers or a
+// product photo's detail become useless even though the byte count would
+// still technically satisfy the cap, so capToMaxBytes stops here and keeps
+// whatever size the lowest quality at this width produced — a variant
+// slightly over the cap beats one shrunk into illegibility.
+const minCappedWidth = 320
+
+// qualityFloor is the lowest WebP quality capToMaxBytes will try before
+// resorting to shrinking dimensions.
+const qualityFloor = 30
+
+// qualityLadder returns a descending sequence of qualities to try, starting
+// at start and stepping down by 10 to qualityFloor.
+func qualityLadder(start int) []int {
+	var out []int
+	for q := start; q > qualityFloor; q -= 10 {
+		out = append(out, q)
+	}
+	out = append(out, qualityFloor)
+	return out
+}
+
+// capToMaxBytes re-encodes buf as WebP until the result is at or under
+// maxBytes: it first steps quality down through qualityLadder(startQuality)
+// at startWidth (0 = keep source dimensions), and only if quality alone
+// isn't enough does it halve the width (never below minCappedWidth) and
+// retry the same quality ladder. It always returns the smallest encode
+// attempted, even if every attempt still exceeds maxBytes — a source too
+// complex to compress further at minCappedWidth is not a processing
+// failure, it just keeps its best-effort result.
+func capToMaxBytes(ctx context.Context, timeout time.Duration, buf []byte, startWidth, maxBytes, startQuality int) ([]byte, error) {
+	width := startWidth
+	var best []byte
+	for {
+		for _, q := range qualityLadder(startQuality) {
+			var out []byte
+			err := processWithTimeout(ctx, timeout, func() error {
+				opts := bimg.Options{
+					Type:          bimg.WEBP,
+					Quality:       q,
+					StripMetadata: true,
+					Enlarge:       false,
+					NoAutoRotate:  false,
+				}
+				if width > 0 {
+					opts.Width = width
+				}
+				var perr error
+				out, perr = bimg.NewImage(buf).Process(opts)
+				return perr
+			})
+			if err != nil {
+				return nil, err
+			}
+			if best == nil || len(out) < len(best) {
+				best = out
+			}
+			if len(out) <= maxBytes {
+				return out, nil
+			}
+		}
+		if width == 0 {
+			meta, err := bimg.NewImage(buf).Metadata()
+			if err != nil {
+				return best, nil
+			}
+			width = meta.Size.Width
+		}
+		nextWidth := width / 2
+		if nextWidth < minCappedWidth || nextWidth >= width {
+			return best, nil
+		}
+		width = nextWidth
+	}
+}
+
 // isSideways reports whether an EXIF orientation value implies a 90/270
 // degree rotation, which swaps the visual width and height relative to the
 // raw stored pixel grid that bimg.Metadata's Size reports. Values 5-8 are
@@ -121,19 +205,7 @@ func ProcessProductImage(ctx context.Context, timeout time.Duration, uploadDir, 
 		if effSrcWidth < width {
 			width = effSrcWidth
 		}
-		var out []byte
-		err := processWithTimeout(ctx, timeout, func() error {
-			var perr error
-			out, perr = bimg.NewImage(buf).Process(bimg.Options{
-				Width:         width,
-				Type:          bimg.WEBP,
-				Quality:       webpQuality,
-				StripMetadata: true,
-				Enlarge:       false,
-				NoAutoRotate:  false,
-			})
-			return perr
-		})
+		out, err := capToMaxBytes(ctx, timeout, buf, width, maxVariantBytes, webpQuality)
 		if err != nil {
 			return nil, nil, fmt.Errorf("process %s variant: %w", spec.Name, err)
 		}
@@ -213,6 +285,21 @@ func ProcessProductImage(ctx context.Context, timeout time.Duration, uploadDir, 
 		return variants, nil, nil
 	}
 
+	// A master that beats the original can still land well above
+	// maxVariantBytes (a full-resolution re-encode of a large, detailed
+	// photo). Cap it the same as every other variant; capToMaxBytes only
+	// ever shrinks further, never re-grows, so this can't undo the
+	// never-larger-than-original guarantee just established above.
+	if len(master) > maxVariantBytes {
+		capped, cerr := capToMaxBytes(ctx, timeout, buf, 0, maxVariantBytes, masterWebpQuality)
+		if cerr != nil {
+			return nil, nil, fmt.Errorf("cap webp master: %w", cerr)
+		}
+		if len(capped) < len(master) {
+			master = capped
+		}
+	}
+
 	masterMeta, merr := bimg.NewImage(master).Metadata()
 	if merr != nil {
 		return nil, nil, fmt.Errorf("read master metadata: %w", merr)
@@ -250,10 +337,19 @@ func selectMaster(primary, fallback []byte, originalLen int) []byte {
 // the owner's cash-handovers table), never for reading the proof itself.
 const proofThumbWidth = 320
 
+// previewStartQuality is the quality capToMaxBytes starts from for a proof
+// preview — high, since legibility of receipt text/sums/dates/transaction
+// IDs matters more here than for an ordinary photo, but still subject to
+// the same maxVariantBytes cap as every other variant (2026-07-20).
+const previewStartQuality = 95
+
 // ProcessPrivateProofPreview generates two WebP variants for a private
 // proof/receipt/screenshot (prepayment proof, cash-handover proof):
-//   - "preview": full-resolution, deliberately *not* aggressively compressed,
-//     so text/sums/dates/transaction IDs stay legible when actually opened.
+//   - "preview": starts at quality 95 with no resize — legibility of
+//     text/sums/dates/transaction IDs is prioritized over file size — but is
+//     still capped at maxVariantBytes via capToMaxBytes like every other
+//     variant, so an unusually large/detailed proof doesn't stay multi-
+//     hundred-KB just because it's a proof.
 //   - "thumb": a small (proofThumbWidth-wide) variant for list/table
 //     thumbnails, which have no need for full resolution or quality-95
 //     bytes just to paint a 40x40 dot — see the 2026-07 report of the
@@ -272,19 +368,7 @@ func ProcessPrivateProofPreview(ctx context.Context, timeout time.Duration, uplo
 		effSrcWidth = srcMeta.Size.Height
 	}
 
-	var preview []byte
-	err = processWithTimeout(ctx, timeout, func() error {
-		var perr error
-		preview, perr = bimg.NewImage(buf).Process(bimg.Options{
-			// No resize — proofs are usually already screen/phone
-			// resolution; downsizing risks making numbers illegible.
-			Type:          bimg.WEBP,
-			Quality:       95, // high quality: legibility over file size
-			StripMetadata: true,
-			NoAutoRotate:  false,
-		})
-		return perr
-	})
+	preview, err := capToMaxBytes(ctx, timeout, buf, 0, maxVariantBytes, previewStartQuality)
 	if err != nil {
 		return nil, fmt.Errorf("process proof preview: %w", err)
 	}
@@ -301,19 +385,7 @@ func ProcessPrivateProofPreview(ctx context.Context, timeout time.Duration, uplo
 	if effSrcWidth < thumbWidth {
 		thumbWidth = effSrcWidth // never upscale (see ProcessProductImage's clamp for why Enlarge:false alone isn't enough)
 	}
-	var thumb []byte
-	err = processWithTimeout(ctx, timeout, func() error {
-		var perr error
-		thumb, perr = bimg.NewImage(buf).Process(bimg.Options{
-			Width:         thumbWidth,
-			Type:          bimg.WEBP,
-			Quality:       webpQuality,
-			StripMetadata: true,
-			Enlarge:       false,
-			NoAutoRotate:  false,
-		})
-		return perr
-	})
+	thumb, err := capToMaxBytes(ctx, timeout, buf, thumbWidth, maxVariantBytes, webpQuality)
 	if err != nil {
 		return nil, fmt.Errorf("process proof thumb: %w", err)
 	}
