@@ -750,10 +750,11 @@
 .dv2-history-filters--desktop-only { display: none; }
 @media (min-width: 768px) {
   .dv2-history-filters--desktop-only { display: flex; }
-  /* Keep the filter row on one line on desktop; scroll horizontally instead of wrapping */
+  /* Wrap onto a second line instead of scrolling horizontally — an
+     overflow:auto row would clip the date/amount popovers, which render
+     taller than the filter row itself. */
   .dv2-history-filters {
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    flex-wrap: wrap;
   }
   .dv2-history-filters > .dv2-cash-range,
   .dv2-history-filters > .dv2-cash-select,
@@ -762,6 +763,36 @@
   }
   .dv2-history-filters .dv2-cash-select { min-width: 150px; }
   .dv2-history-filters .dv2-search-field { min-width: 130px; }
+
+  /* Pill-style filter triggers (date / courier / status / amount) — matches
+     FinanceFilterBar's DesktopTrigger look so filter bars read consistently
+     across the admin. */
+  .dv2-history-filters .dv2-cash-select,
+  .dv2-history-filters .dv2-cash-range-btn {
+    min-height: 36px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--text2);
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow: none;
+  }
+  .dv2-history-filters .dv2-cash-select:hover,
+  .dv2-history-filters .dv2-cash-range-btn:hover {
+    background: var(--surface2);
+  }
+
+  /* CashRangePicker's mobile-only trigger duplicates the desktop
+     DesktopDateRangePicker(variant="trigger") button — Tailwind's md:hidden
+     and this file's own unconditional .dv2-cash-range-btn rule are the same
+     specificity, so without a bump here source order decides and the mobile
+     button can end up winning (shown) on desktop too. */
+  .dv2-cash-range-btn.dv2-cash-range-btn--mobile-only {
+    display: none;
+  }
 }
 .dv2-filter-row {
   display: flex;

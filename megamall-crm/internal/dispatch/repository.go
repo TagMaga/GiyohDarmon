@@ -424,6 +424,12 @@ func (r *Repository) ListCashTransactions(ctx context.Context, filter CashTransa
 	if filter.Status != "" {
 		q = q.Where("ch.status = ?", filter.Status)
 	}
+	if filter.AmountMin != nil {
+		q = q.Where("COALESCE(ch.actual_returned, ch.total_to_return) >= ?", *filter.AmountMin)
+	}
+	if filter.AmountMax != nil {
+		q = q.Where("COALESCE(ch.actual_returned, ch.total_to_return) <= ?", *filter.AmountMax)
+	}
 
 	var total int64
 	if err := q.Session(&gorm.Session{}).Count(&total).Error; err != nil {

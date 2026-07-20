@@ -110,6 +110,8 @@ function DispatcherBoardDesktop() {
   const [transactionsRange, setTransactionsRange] = useState(() => ({ preset: 'all', from: '', to: '' }))
   const [transactionsCourier, setTransactionsCourier] = useState('')
   const [transactionsStatus, setTransactionsStatus] = useState('')
+  const [transactionsAmountMin, setTransactionsAmountMin] = useState('')
+  const [transactionsAmountMax, setTransactionsAmountMax] = useState('')
   const [transactionsPage, setTransactionsPage] = useState(1)
   const [historyRange, setHistoryRange] = useState(() => ({ preset: 'all', from: '', to: '' }))
   const [historyFilters, setHistoryFilters] = useState(() => ({
@@ -140,7 +142,9 @@ function DispatcherBoardDesktop() {
     page: transactionsPage,
     limit: 30,
     ...(transactionsStatus ? { status: transactionsStatus } : {}),
-  }), [transactionsRange, transactionsCourier, transactionsPage, transactionsStatus])
+    ...(transactionsAmountMin !== '' ? { amount_min: transactionsAmountMin } : {}),
+    ...(transactionsAmountMax !== '' ? { amount_max: transactionsAmountMax } : {}),
+  }), [transactionsRange, transactionsCourier, transactionsPage, transactionsStatus, transactionsAmountMin, transactionsAmountMax])
   const cashTransactions = useQuery({
     queryKey: KEYS.dispatcher.cashTransactions(transactionParams),
     queryFn: () => fetchCashTransactions(transactionParams),
@@ -459,6 +463,8 @@ function DispatcherBoardDesktop() {
             range={transactionsRange}
             courierId={transactionsCourier}
             status={transactionsStatus}
+            amountMin={transactionsAmountMin}
+            amountMax={transactionsAmountMax}
             loading={cashTransactions.isPending}
             error={cashTransactions.error}
             confirming={confirmingTransaction}
@@ -466,6 +472,7 @@ function DispatcherBoardDesktop() {
             onRange={(range) => { setTransactionsRange(range); setTransactionsPage(1) }}
             onCourier={(id) => { setTransactionsCourier(id); setTransactionsPage(1) }}
             onStatus={(status) => { setTransactionsStatus(status); setTransactionsPage(1) }}
+            onAmount={(min, max) => { setTransactionsAmountMin(min); setTransactionsAmountMax(max); setTransactionsPage(1) }}
             onPage={setTransactionsPage}
             onRetry={() => cashTransactions.refetch()}
             onConfirm={(id) => doConfirmTransaction(id)}
@@ -1112,10 +1119,11 @@ function hasCashSettlementActivity(row) {
 }
 
 function CashTransactionsView({
-  rows, pageMeta, couriers, range, courierId, status, loading, error, confirming, rejecting,
-  onRange, onCourier, onStatus, onPage, onRetry, onConfirm, onReject, onPreview,
+  rows, pageMeta, couriers, range, courierId, status, amountMin, amountMax, loading, error, confirming, rejecting,
+  onRange, onCourier, onStatus, onAmount, onPage, onRetry, onConfirm, onReject, onPreview,
 }) {
   const [rangeOpen, setRangeOpen] = useState(false)
+  const [amountOpen, setAmountOpen] = useState(false)
   const [localSearch, setLocalSearch] = useState('')
 
   const filteredRows = useMemo(() => {
@@ -1156,6 +1164,7 @@ function CashTransactionsView({
             <option value="confirmed">🟢 Принят</option>
             <option value="rejected">🔴 Отклонён</option>
           </select>
+          <AmountRangePicker min={amountMin} max={amountMax} open={amountOpen} onOpen={setAmountOpen} onApply={onAmount} />
         </div>
       </div>
 
@@ -1497,10 +1506,10 @@ function CashRangePicker({ range, open, onOpen, onRange }) {
         from={range.from}
         to={range.to}
         onChange={applyDesktopRange}
-        buttonClassName="dv2-cash-range-btn"
+        variant="trigger"
         timezoneLabel="Часовой пояс: локальное время"
       />
-      <button className="dv2-cash-range-btn md:hidden" onClick={() => onOpen(!open)} aria-expanded={open}>
+      <button className="dv2-cash-range-btn dv2-cash-range-btn--mobile-only md:hidden" onClick={() => onOpen(!open)} aria-expanded={open}>
         <CalendarDays size={15} />
         <span>{activeLabel}</span>
         <ChevronDown size={14} />
@@ -1519,6 +1528,45 @@ function CashRangePicker({ range, open, onOpen, onRange }) {
       )}
     </div>
   )
+}
+
+function AmountRangePicker({ min, max, open, onOpen, onApply }) {
+  const [draftMin, setDraftMin] = useState(min)
+  const [draftMax, setDraftMax] = useState(max)
+
+  useEffect(() => {
+    if (open) { setDraftMin(min); setDraftMax(max) }
+  }, [open, min, max])
+
+  function apply() {
+    onApply(draftMin, draftMax)
+    onOpen(false)
+  }
+
+  return (
+    <div className="dv2-cash-range">
+      <button type="button" className="dv2-cash-range-btn" onClick={() => onOpen(!open)} aria-expanded={open}>
+        <span>{amountRangeLabel(min, max)}</span>
+        <ChevronDown size={14} />
+      </button>
+      {open && (
+        <div className="dv2-cash-range-popover">
+          <div className="dv2-cash-custom">
+            <label>От<input type="number" min="0" inputMode="decimal" value={draftMin} onChange={(e) => setDraftMin(e.target.value)} placeholder="0" /></label>
+            <label>До<input type="number" min="0" inputMode="decimal" value={draftMax} onChange={(e) => setDraftMax(e.target.value)} placeholder="∞" /></label>
+            <button className="dv2-cash-apply" onClick={apply}>OK</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function amountRangeLabel(min, max) {
+  if (!min && !max) return 'Сумма'
+  if (min && max) return `${min}–${max} сом`
+  if (min) return `от ${min} сом`
+  return `до ${max} сом`
 }
 
 function CashMetric({ label, value, tone }) {

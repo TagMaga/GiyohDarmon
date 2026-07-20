@@ -111,6 +111,8 @@ type CashTransactionFilter struct {
 	To        *time.Time
 	CourierID *uuid.UUID
 	Status    string
+	AmountMin *float64
+	AmountMax *float64
 }
 
 type CashTransactionRow struct {
