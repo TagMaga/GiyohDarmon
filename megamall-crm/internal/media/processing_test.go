@@ -541,6 +541,129 @@ func TestProcessPrivateProofPreview_NeverUpscalesThumb(t *testing.T) {
 	}
 }
 
+// ─── maxVariantBytes hard cap ───────────────────────────────────────────────
+//
+// 2026-07-20 requirement: no persisted variant — including the proof
+// "preview" variant, previously deliberately left near-original size for
+// legibility — should exceed maxVariantBytes (300KB). Enforced by
+// capToMaxBytes stepping quality down, then (if quality alone isn't enough)
+// halving width no lower than minCappedWidth.
+
+func TestCapToMaxBytes_LeavesAlreadySmallImageUnshrunk(t *testing.T) {
+	// A flat/simple fixture compresses to a tiny WebP well under the cap at
+	// the very first quality attempt — capToMaxBytes must not shrink its
+	// dimensions just because it can.
+	png := fixture(t, "transparent.png") // 1200x900
+
+	out, err := capToMaxBytes(context.Background(), 20*time.Second, png, 0, maxVariantBytes, 95)
+	if err != nil {
+		t.Fatalf("capToMaxBytes: %v", err)
+	}
+	meta, err := bimg.NewImage(out).Metadata()
+	if err != nil {
+		t.Fatalf("read output metadata: %v", err)
+	}
+	if meta.Size.Width != 1200 || meta.Size.Height != 900 {
+		t.Errorf("output size = %dx%d, want untouched 1200x900 (already under cap, no shrink needed)", meta.Size.Width, meta.Size.Height)
+	}
+	if len(out) > maxVariantBytes {
+		t.Errorf("output %d bytes exceeds the %d-byte cap", len(out), maxVariantBytes)
+	}
+}
+
+func TestCapToMaxBytes_ShrinksDetailedLargeImageUnderCap(t *testing.T) {
+	// A large, high-entropy photo at quality 95 with no resize would land
+	// far above 300KB — capToMaxBytes must step quality down and, if that
+	// isn't enough, shrink width until the result fits (or hits the floor).
+	jpg := buildPhotoLikeJPEG(t, 3000, 2000, 95)
+
+	out, err := capToMaxBytes(context.Background(), 30*time.Second, jpg, 0, maxVariantBytes, 95)
+	if err != nil {
+		t.Fatalf("capToMaxBytes: %v", err)
+	}
+	if len(out) > maxVariantBytes {
+		t.Errorf("output %d bytes exceeds the %d-byte cap", len(out), maxVariantBytes)
+	}
+	meta, err := bimg.NewImage(out).Metadata()
+	if err != nil {
+		t.Fatalf("read output metadata: %v", err)
+	}
+	if meta.Size.Width < minCappedWidth {
+		t.Errorf("output width %d fell below the %d-px floor", meta.Size.Width, minCappedWidth)
+	}
+}
+
+func TestCapToMaxBytes_NeverShrinksBelowFloor(t *testing.T) {
+	// Even a pathologically incompressible source (pure random noise, which
+	// defeats WebP's prediction entirely) must not be shrunk past
+	// minCappedWidth — capToMaxBytes accepts a still-over-cap result at the
+	// floor rather than shrinking further.
+	img := image.NewRGBA(image.Rect(0, 0, 2000, 2000))
+	rng := rand.New(rand.NewSource(7))
+	for y := 0; y < 2000; y++ {
+		for x := 0; x < 2000; x++ {
+			img.Set(x, y, color.RGBA{R: uint8(rng.Intn(256)), G: uint8(rng.Intn(256)), B: uint8(rng.Intn(256)), A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 100}); err != nil {
+		t.Fatalf("encode noise jpeg: %v", err)
+	}
+
+	out, err := capToMaxBytes(context.Background(), 30*time.Second, buf.Bytes(), 0, maxVariantBytes, 90)
+	if err != nil {
+		t.Fatalf("capToMaxBytes: %v", err)
+	}
+	meta, err := bimg.NewImage(out).Metadata()
+	if err != nil {
+		t.Fatalf("read output metadata: %v", err)
+	}
+	if meta.Size.Width < minCappedWidth {
+		t.Errorf("output width %d fell below the %d-px floor even though the cap couldn't be met", meta.Size.Width, minCappedWidth)
+	}
+}
+
+func TestProcessProductImage_AllVariantsUnderMaxBytes(t *testing.T) {
+	jpg := fixture(t, "large_photo_6000x4000.jpg")
+	dir := t.TempDir()
+
+	variants, master, err := ProcessProductImage(context.Background(), 60*time.Second, dir, "capped.jpg", jpg)
+	if err != nil {
+		t.Fatalf("ProcessProductImage: %v", err)
+	}
+	for name, v := range variants {
+		if v.Bytes > maxVariantBytes {
+			t.Errorf("variant %q is %d bytes, exceeds the %d-byte cap", name, v.Bytes, maxVariantBytes)
+		}
+	}
+	if master != nil && len(master) > maxVariantBytes {
+		t.Errorf("master is %d bytes, exceeds the %d-byte cap", len(master), maxVariantBytes)
+	}
+}
+
+func TestProcessPrivateProofPreview_CappedForLargeDetailedSource(t *testing.T) {
+	// A large, photo-like proof (e.g. a phone-camera receipt photo) would,
+	// uncapped, stay near quality-95/full-resolution — now it must be
+	// brought under maxVariantBytes just like every other variant.
+	jpg := buildPhotoLikeJPEG(t, 3000, 2000, 95)
+	dir := t.TempDir()
+
+	variants, err := ProcessPrivateProofPreview(context.Background(), 30*time.Second, dir, "bigproof.jpg", jpg)
+	if err != nil {
+		t.Fatalf("ProcessPrivateProofPreview: %v", err)
+	}
+	preview, ok := variants["preview"]
+	if !ok {
+		t.Fatal("expected a \"preview\" variant")
+	}
+	if preview.Bytes > maxVariantBytes {
+		t.Errorf("preview is %d bytes, exceeds the %d-byte cap", preview.Bytes, maxVariantBytes)
+	}
+	if preview.Bytes >= len(jpg) {
+		t.Errorf("capped preview (%d bytes) should be smaller than the %d-byte original", preview.Bytes, len(jpg))
+	}
+}
+
 func TestWriteAtomic_NoTempFileLeftOnSuccess(t *testing.T) {
 	dir := t.TempDir()
 	if err := writeAtomic(dir, "final.bin", []byte("hello")); err != nil {
