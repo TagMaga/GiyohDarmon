@@ -1213,7 +1213,7 @@ function CashTransactionRow({ row, busy, onConfirm, onReject, onPreview }) {
       <td><span className="dv2-cash-num green">{formatMoney(row.amount)}</span></td>
       <td><StatusBadge status={row.status} /></td>
       <td className="dv2-note-cell">{note || '—'}</td>
-      <td><PhotoButton url={row.photo_url} onPreview={onPreview} /></td>
+      <td><PhotoButton row={row} onPreview={onPreview} /></td>
       <td>
         {isPending ? (
           <div className="dv2-action-stack">
@@ -1247,7 +1247,7 @@ function CashTransactionCard({ row, busy, onConfirm, onReject, onPreview }) {
         <Info label="Дата" value={formatFullDate(row.created_at)} />
         <Info label="Сумма" value={formatMoney(row.amount)} />
         <Info full label="Примечание" value={transactionNote(row) || '—'} />
-        <Info label="Фото" value={<PhotoButton url={row.photo_url} onPreview={onPreview} />} />
+        <Info label="Фото" value={<PhotoButton row={row} onPreview={onPreview} />} />
       </div>
       {isPending && (
         <div className="dv2-card-actions">
@@ -1425,12 +1425,25 @@ function OrderStatusBadge({ status }) {
   return <span className={`dv2-cash-status ${tone}`}>{label}</span>
 }
 
-function PhotoButton({ url, onPreview }) {
-  if (!url) return <span className="dv2-muted">—</span>
+// row.photo_url only reflects the legacy proof_url column, which is empty
+// for handovers submitted through the media pipeline — fall back to the
+// first resolved media asset (see CashTransactionRow.MediaAssets doc
+// comment in internal/dispatch/dto.go), preferring its small thumb variant
+// for the table dot and the full-resolution url for the lightbox preview.
+function resolveTransactionPhoto(row) {
+  if (row.photo_url) return { thumb: row.photo_url, full: row.photo_url }
+  const first = Array.isArray(row.media_assets) ? row.media_assets[0] : null
+  if (first?.url) return { thumb: first.thumb_url || first.url, full: first.url }
+  return null
+}
+
+function PhotoButton({ row, onPreview }) {
+  const photo = resolveTransactionPhoto(row)
+  if (!photo) return <span className="dv2-muted">—</span>
   return (
-    <button className="dv2-photo-thumb dv2-photo-lg" onClick={() => onPreview(url)} title="Нажмите для полноэкранного просмотра">
+    <button className="dv2-photo-thumb dv2-photo-lg" onClick={() => onPreview(photo.full)} title="Нажмите для полноэкранного просмотра">
       <ImageIcon size={16} className="dv2-photo-icon" />
-      <img src={url} alt="" />
+      <img src={photo.thumb} alt="" />
     </button>
   )
 }

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/megamall/crm/internal/courier"
 	"github.com/megamall/crm/internal/orders"
 )
 
@@ -128,6 +129,11 @@ type CashTransactionRow struct {
 	PhotoURL        *string    `json:"photo_url"`
 	ConfirmedBy     *uuid.UUID `json:"confirmed_by"`
 	ConfirmedAt     *time.Time `json:"confirmed_at"`
+	// MediaAssets is resolved fresh at request time by the handler (never
+	// scanned from SQL) — see courier.Service.ResolveCashHandoverMediaAssets.
+	// PhotoURL above only reflects the legacy proof_url column, which is
+	// empty for handovers submitted through the media pipeline.
+	MediaAssets []courier.HandoverMediaAsset `json:"media_assets,omitempty"`
 }
 
 type OrderHistoryFilter struct {
