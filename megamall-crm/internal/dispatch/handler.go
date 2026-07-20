@@ -98,6 +98,9 @@ func (h *Handler) listCashTransactions(c *gin.Context) {
 		response.HandleError(c, svcErr)
 		return
 	}
+	for i := range rows {
+		rows[i].MediaAssets = h.courierSvc.ResolveCashHandoverMediaAssets(c.Request.Context(), rows[i].ID)
+	}
 	response.OKWithMeta(c, rows, pagination.BuildMeta(p, total))
 }
 

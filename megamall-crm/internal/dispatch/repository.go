@@ -474,7 +474,20 @@ func (r *Repository) ListCashTransactions(ctx context.Context, filter CashTransa
 
 	out := make([]CashTransactionRow, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, CashTransactionRow(row))
+		out = append(out, CashTransactionRow{
+			ID:              row.ID,
+			CourierID:       row.CourierID,
+			CourierName:     row.CourierName,
+			CourierPhone:    row.CourierPhone,
+			CreatedAt:       row.CreatedAt,
+			Amount:          row.Amount,
+			Status:          row.Status,
+			Note:            row.Note,
+			RejectionReason: row.RejectionReason,
+			PhotoURL:        row.PhotoURL,
+			ConfirmedBy:     row.ConfirmedBy,
+			ConfirmedAt:     row.ConfirmedAt,
+		})
 	}
 	return out, int(total), nil
 }

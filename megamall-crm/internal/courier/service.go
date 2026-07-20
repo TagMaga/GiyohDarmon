@@ -179,6 +179,14 @@ func (s *Service) resolveCashHandoverProofs(ctx context.Context, handoverID uuid
 	return assets
 }
 
+// ResolveCashHandoverMediaAssets is the public entry point for callers that
+// only have a handover ID (e.g. internal/dispatch's cash-transactions list,
+// which projects rows via a raw SQL join rather than loading a full
+// *CashHandover) — see resolveCashHandoverProofs for behavior.
+func (s *Service) ResolveCashHandoverMediaAssets(ctx context.Context, handoverID uuid.UUID) []HandoverMediaAsset {
+	return s.resolveCashHandoverProofs(ctx, handoverID)
+}
+
 // ToHandoverResponse builds h's client-facing response, including a
 // freshly-resolved MediaAssets list — the one entry point handlers
 // (internal/courier and internal/dispatch, which delegates to this service)
