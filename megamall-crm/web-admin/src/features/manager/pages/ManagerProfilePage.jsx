@@ -1,9 +1,12 @@
 import { useLocation, Outlet, Link, NavLink } from 'react-router-dom'
 import { Info, Users, UserCheck, ChevronRight, LogOut, Percent } from 'lucide-react'
+import { useMemo } from 'react'
 import { useSellerMe, useSellerCompensation } from '../../seller/hooks/useSellerMe'
 import useManagerPersonalOrders from '../hooks/useManagerPersonalOrders'
 import useMyManagerTeam from '../hooks/useMyManagerTeam'
 import useTeamMembers from '../../people/hooks/useTeamMembers'
+import useEmployeesByIds from '../../people/hooks/useEmployeesByIds'
+import { buildUserMap } from '../../people/utils/peopleHelpers'
 import useAuthStore from '../../../shared/store/authStore'
 import { M, MobileShell, Card, SectionLabel } from '../../seller/components/mobileUi'
 import { withCacheBust } from '../../../shared/api/mediaUpload'
@@ -25,6 +28,9 @@ export default function ManagerProfilePage() {
   const { data: compensation } = useSellerCompensation()
   const { team } = useMyManagerTeam()
   const { data: members = [] } = useTeamMembers(team?.id)
+  const memberIds = useMemo(() => members.map(m => m.user_id ?? m.UserID).filter(Boolean), [members])
+  const { data: teamEmployees = [] } = useEmployeesByIds(memberIds)
+  const userMap = useMemo(() => buildUserMap(teamEmployees), [teamEmployees])
   const { allItems: orders = [] } = useManagerPersonalOrders()
   const logout = useAuthStore(s => s.clearAuth)
 
@@ -33,7 +39,7 @@ export default function ManagerProfilePage() {
   const avatarUrl = withCacheBust(me?.avatar_url, me?.updated_at)
   const commissionPct = compensation?.commission_rate != null ? +(compensation.commission_rate * 100).toFixed(1) : null
   const tenure = monthsOnline(me?.hire_date ?? me?.created_at)
-  const teamSize = members.length
+  const teamSize = members.filter(m => (userMap[m.user_id ?? m.UserID]?.role ?? userMap[m.user_id ?? m.UserID]?.Role) === 'seller').length
   const teamDesc = team ? (teamSize > 0 ? `${teamSize} продавцов` : 'Пока без продавцов') : 'Состав команды'
 
   return (
