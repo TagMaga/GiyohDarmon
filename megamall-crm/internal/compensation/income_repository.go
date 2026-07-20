@@ -80,15 +80,17 @@ func (r *Repository) GetUserIncomeOrderTotals(
 	var row incomeOrderTotalsRow
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT
-			COALESCE(SUM(x.total_amount), 0)  AS total_revenue,
-			COALESCE(SUM(x.delivery_fee), 0)  AS total_delivery_fee,
-			COALESCE(SUM(x.net_revenue), 0)   AS total_net_revenue
+			COALESCE(SUM(x.total_amount), 0)    AS total_revenue,
+			COALESCE(SUM(x.delivery_fee), 0)    AS total_delivery_fee,
+			COALESCE(SUM(x.net_revenue), 0)     AS total_net_revenue,
+			COALESCE(SUM(x.courier_payout), 0)  AS total_courier_payout
 		FROM (
 			SELECT DISTINCT ON (o.id)
 				o.id,
-				COALESCE(o.total_amount, 0)  AS total_amount,
-				COALESCE(o.delivery_fee, 0)  AS delivery_fee,
-				COALESCE(o.net_revenue, 0)   AS net_revenue
+				COALESCE(o.total_amount, 0)    AS total_amount,
+				COALESCE(o.delivery_fee, 0)    AS delivery_fee,
+				COALESCE(o.net_revenue, 0)     AS net_revenue,
+				COALESCE(o.courier_payout, 0)  AS courier_payout
 			FROM financial_events fe
 			JOIN orders o ON o.id = fe.order_id AND o.deleted_at IS NULL
 			WHERE fe.user_id    = ?
@@ -143,9 +145,10 @@ func (r *Repository) GetUserIncomeEvents(
 			fe.created_at,
 			COALESCE(o.order_number,        '')  AS order_number,
 			COALESCE(o.order_type::text,    '')  AS order_type,
-			COALESCE(o.net_revenue,   0)  AS net_revenue,
-			COALESCE(o.total_amount,  0)  AS total_amount,
-			COALESCE(o.delivery_fee,  0)  AS delivery_fee
+			COALESCE(o.net_revenue,     0)  AS net_revenue,
+			COALESCE(o.total_amount,    0)  AS total_amount,
+			COALESCE(o.delivery_fee,    0)  AS delivery_fee,
+			COALESCE(o.courier_payout,  0)  AS courier_payout
 		FROM financial_events fe
 		LEFT JOIN orders o ON o.id = fe.order_id
 		WHERE fe.user_id    =  ?

@@ -88,26 +88,32 @@ function periodOrderTotals(orders = [], from, to) {
     const date = order.delivered_at ?? order.updated_at ?? order.created_at
     if (!dateInRange(date, from, to)) return acc
 
-    const deliveryFee = Number(order.delivery_fee ?? 0)
+    // courier_payout (what MegaMall pays the courier) is the real per-order
+    // deduction the commission math uses — not delivery_fee (what the client
+    // was charged), which can differ or be unset.
+    const courierPayout = Number(order.courier_payout ?? 0)
     const revenue = Number(
       order.total_amount ?? (
-        order.total_order_amount != null ? Number(order.total_order_amount) - deliveryFee : 0
+        order.total_order_amount != null ? Number(order.total_order_amount) - courierPayout : 0
       )
     )
     acc.revenue += Number.isFinite(revenue) ? revenue : 0
-    acc.deliveryFee += Number.isFinite(deliveryFee) ? deliveryFee : 0
+    acc.courierPayout += Number.isFinite(courierPayout) ? courierPayout : 0
     return acc
-  }, { revenue: 0, deliveryFee: 0 })
+  }, { revenue: 0, courierPayout: 0 })
 }
 
 /** Per-row "(revenue − delivery) × rate% = amount" breakdown, using the
  *  seller's current commission rate (from HR settings) rather than a value
  *  reverse-engineered from the stored amount, which produced a misleading
- *  rate whenever net_revenue didn't match the actual commission math. */
+ *  rate whenever net_revenue didn't match the actual commission math. The
+ *  "delivery" deduction is courier_payout (what MegaMall pays the courier),
+ *  matching what the commission math actually subtracts — not delivery_fee
+ *  (what the client was charged), which can differ or be unset. */
 function orderBreakdown(ev, fallbackPct) {
   if (ev.total_amount == null || fallbackPct == null) return null
   const total = Number(ev.total_amount)
-  const delivery = Number(ev.delivery_fee ?? 0)
+  const delivery = Number(ev.courier_payout ?? 0)
   return `(${fmtAmount(total)} − ${fmtAmount(delivery)}) × ${fallbackPct}% = ${fmtAmount(ev.amount)}`
 }
 
@@ -119,14 +125,11 @@ function eventOrderTotals(events = []) {
     if (key) seen.add(key)
 
     const totalAmount = Number(ev.total_amount ?? 0)
-    const netRevenue = Number(ev.net_revenue ?? 0)
-    const deliveryFee = Number(
-      ev.delivery_fee ?? (totalAmount > 0 && netRevenue > 0 ? totalAmount - netRevenue : 0)
-    )
+    const courierPayout = Number(ev.courier_payout ?? 0)
     acc.revenue += Number.isFinite(totalAmount) ? totalAmount : 0
-    acc.deliveryFee += Number.isFinite(deliveryFee) ? Math.max(0, deliveryFee) : 0
+    acc.courierPayout += Number.isFinite(courierPayout) ? Math.max(0, courierPayout) : 0
     return acc
-  }, { revenue: 0, deliveryFee: 0 })
+  }, { revenue: 0, courierPayout: 0 })
 }
 
 export default function SellerIncomePage() {
@@ -153,7 +156,7 @@ export default function SellerIncomePage() {
   const orderTotals = useMemo(() => periodOrderTotals(orders, from, to), [orders, from, to])
   const totalIncome = report?.total_income ?? 0
   const totalRevenue = report?.total_revenue || eventTotals.revenue || orderTotals.revenue || 0
-  const totalDeliveryFee = report?.total_delivery_fee || eventTotals.deliveryFee || orderTotals.deliveryFee || 0
+  const totalDeliveryFee = report?.total_courier_payout || eventTotals.courierPayout || orderTotals.courierPayout || 0
   const netProfit = report?.net_profit ?? totalIncome
   const payableAmount = pendingPayout > 0 ? pendingPayout : netProfit
   const prevRevenue = prevReport?.total_revenue ?? 0

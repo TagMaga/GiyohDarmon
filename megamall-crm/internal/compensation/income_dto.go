@@ -52,23 +52,25 @@ type incomeTotalRow struct {
 }
 
 type incomeOrderTotalsRow struct {
-	TotalRevenue     float64 `gorm:"column:total_revenue"`
-	TotalDeliveryFee float64 `gorm:"column:total_delivery_fee"`
-	TotalNetRevenue  float64 `gorm:"column:total_net_revenue"`
+	TotalRevenue       float64 `gorm:"column:total_revenue"`
+	TotalDeliveryFee   float64 `gorm:"column:total_delivery_fee"`
+	TotalNetRevenue    float64 `gorm:"column:total_net_revenue"`
+	TotalCourierPayout float64 `gorm:"column:total_courier_payout"`
 }
 
 // incomeEventRow is scanned from the enriched events query (JOIN orders).
 type incomeEventRow struct {
-	ID          uuid.UUID          `gorm:"column:id"`
-	OrderID     *uuid.UUID         `gorm:"column:order_id"`
-	EventType   FinancialEventType `gorm:"column:event_type"`
-	Amount      float64            `gorm:"column:amount"`
-	CreatedAt   time.Time          `gorm:"column:created_at"`
-	OrderNumber string             `gorm:"column:order_number"`
-	OrderType   string             `gorm:"column:order_type"`
-	NetRevenue  float64            `gorm:"column:net_revenue"`
-	TotalAmount float64            `gorm:"column:total_amount"`
-	DeliveryFee float64            `gorm:"column:delivery_fee"`
+	ID            uuid.UUID          `gorm:"column:id"`
+	OrderID       *uuid.UUID         `gorm:"column:order_id"`
+	EventType     FinancialEventType `gorm:"column:event_type"`
+	Amount        float64            `gorm:"column:amount"`
+	CreatedAt     time.Time          `gorm:"column:created_at"`
+	OrderNumber   string             `gorm:"column:order_number"`
+	OrderType     string             `gorm:"column:order_type"`
+	NetRevenue    float64            `gorm:"column:net_revenue"`
+	TotalAmount   float64            `gorm:"column:total_amount"`
+	DeliveryFee   float64            `gorm:"column:delivery_fee"`
+	CourierPayout float64            `gorm:"column:courier_payout"`
 }
 
 // teamMemberIncomeRow is scanned for the per-member team income breakdown.
@@ -96,24 +98,33 @@ type IncomeEventResponse struct {
 	NetRevenue  float64            `json:"net_revenue,omitempty"`
 	TotalAmount float64            `json:"total_amount,omitempty"`
 	DeliveryFee float64            `json:"delivery_fee,omitempty"`
+	// CourierPayout is what MegaMall actually pays the courier for this order —
+	// the amount the commission math subtracts before applying the seller's
+	// rate (internal/orders/financial.go), as opposed to DeliveryFee (what the
+	// client was charged), which can differ or be unset.
+	CourierPayout float64 `json:"courier_payout,omitempty"`
 }
 
 // IncomeReportResponse is returned by GET /hr/income/me and GET /hr/income/users/:id.
 //
 // orders_count == delivered_count because only delivered orders emit financial events.
 type IncomeReportResponse struct {
-	UserID           uuid.UUID             `json:"user_id"`
-	PeriodStart      time.Time             `json:"period_start"`
-	PeriodEnd        time.Time             `json:"period_end"`
-	TotalIncome      float64               `json:"total_income"`
-	TotalRevenue     float64               `json:"total_revenue"`
-	TotalDeliveryFee float64               `json:"total_delivery_fee"`
-	NetProfit        float64               `json:"net_profit"`
-	OrdersCount      int                   `json:"orders_count"`
-	DeliveredCount   int                   `json:"delivered_count"`
-	AveragePerOrder  float64               `json:"average_per_order"`
-	ByEventType      IncomeByType          `json:"by_event_type"`
-	Events           []IncomeEventResponse `json:"events,omitempty"`
+	UserID           uuid.UUID `json:"user_id"`
+	PeriodStart      time.Time `json:"period_start"`
+	PeriodEnd        time.Time `json:"period_end"`
+	TotalIncome      float64   `json:"total_income"`
+	TotalRevenue     float64   `json:"total_revenue"`
+	TotalDeliveryFee float64   `json:"total_delivery_fee"`
+	// TotalCourierPayout sums orders.courier_payout (what MegaMall pays the
+	// courier — the real per-order commission deduction), as opposed to
+	// TotalDeliveryFee (what the client was charged), which can differ or be unset.
+	TotalCourierPayout float64               `json:"total_courier_payout"`
+	NetProfit          float64               `json:"net_profit"`
+	OrdersCount        int                   `json:"orders_count"`
+	DeliveredCount     int                   `json:"delivered_count"`
+	AveragePerOrder    float64               `json:"average_per_order"`
+	ByEventType        IncomeByType          `json:"by_event_type"`
+	Events             []IncomeEventResponse `json:"events,omitempty"`
 }
 
 // TeamMemberIncome is one member's income inside a TeamIncomeResponse.
