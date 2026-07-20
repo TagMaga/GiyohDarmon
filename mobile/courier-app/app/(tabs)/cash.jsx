@@ -66,7 +66,11 @@ function AttachmentItem({ item, onRemove, onPreview }) {
         }
       </TouchableOpacity>
       <Text style={at.name} numberOfLines={1}>{item.name || 'файл'}</Text>
-      <TouchableOpacity style={at.removeBtn} onPress={() => onRemove(item.uri)}>
+      <TouchableOpacity
+        style={at.removeBtn}
+        onPress={() => onRemove(item.uri)}
+        hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+      >
         <Text style={at.removeText}>✕</Text>
       </TouchableOpacity>
     </View>
@@ -79,8 +83,9 @@ const at = StyleSheet.create({
   filePlaceholder: { width: 72, height: 72, borderRadius: 12, backgroundColor: '#f1f4f8', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: C.line },
   fileIcon: { fontSize: 28 },
   name: { fontSize: 9, color: C.muted, marginTop: 4, textAlign: 'center', width: 72 },
-  removeBtn: { position: 'absolute', top: -4, right: 0, width: 18, height: 18, borderRadius: 9, backgroundColor: C.red, justifyContent: 'center', alignItems: 'center' },
-  removeText: { color: '#fff', fontSize: 10, fontWeight: '700', lineHeight: 18 },
+  // 28px visual target + 8px hitSlop on every side → 44px effective touch target
+  removeBtn: { position: 'absolute', top: -9, right: -9, width: 28, height: 28, borderRadius: 14, backgroundColor: C.red, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#f0f4fc' },
+  removeText: { color: '#fff', fontSize: 13, fontWeight: '700', lineHeight: 13 },
 })
 
 export default function CashScreen() {
@@ -144,6 +149,20 @@ export default function CashScreen() {
   }, [])
 
   const removeAttachment = (uri) => setAttachments(prev => prev.filter(a => a.uri !== uri))
+
+  // Closing with entered data (amount, attachments, or a note) is a lossy
+  // action — the sheet never persists a draft — so it needs a confirm step
+  // instead of silently discarding whatever the courier just typed/attached.
+  const closeHandoverSheet = () => {
+    if (submitting) return
+    const hasData = actualAmount.trim().length > 0 || attachments.length > 0 || notes.trim().length > 0
+    const discard = () => { setShowHandover(false); setAttachments([]); setActualAmount(''); setNotes('') }
+    if (!hasData) { discard(); return }
+    Alert.alert('Отменить сдачу?', 'Данные будут потеряны', [
+      { text: 'Продолжить', style: 'cancel' },
+      { text: 'Отменить сдачу', style: 'destructive', onPress: discard },
+    ])
+  }
 
   const handleHandover = async () => {
     const expected = toReturn
@@ -426,8 +445,8 @@ export default function CashScreen() {
       </ScrollView>
 
       {/* Handover bottom sheet */}
-      <Modal visible={showHandover} animationType="slide" transparent statusBarTranslucent>
-        <Pressable style={s.overlay} onPress={() => { if (!submitting) { setShowHandover(false); setAttachments([]); setActualAmount(''); setNotes('') } }}>
+      <Modal visible={showHandover} animationType="slide" transparent statusBarTranslucent onRequestClose={closeHandoverSheet}>
+        <Pressable style={s.overlay} onPress={closeHandoverSheet}>
           <Pressable style={s.sheet} onPress={e => e.stopPropagation()}>
             <GlassFill fill="#f0f4fc" />
             <Sheen radius={32} opacity={0.35} />

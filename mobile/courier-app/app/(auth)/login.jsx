@@ -23,11 +23,13 @@ export default function LoginScreen() {
   const [loginVal, setLoginVal] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
   const setAuth = useAuthStore(s => s.setAuth)
   const setUser = useAuthStore(s => s.setUser)
 
   const handleLogin = async () => {
-    if (!loginVal || !password) { Alert.alert('Ошибка', 'Введите логин и пароль'); return }
+    if (!loginVal || !password) { setError('Введите телефон и пароль'); return }
+    setError(null)
     setLoading(true)
     try {
       const { data } = await login({ phone: loginVal, password })
@@ -44,9 +46,11 @@ export default function LoginScreen() {
       router.replace('/(tabs)/dashboard')
     } catch (err) {
       if (err.response) {
-        // Server responded — a real auth/validation error.
-        const msg = err.response.data?.error?.message || err.response.data?.error || 'Неверный логин или пароль'
-        Alert.alert('Ошибка', String(msg))
+        // Server responded — a real auth/validation error. Shown inline,
+        // right under the field it applies to, instead of an Alert —
+        // matches the design's inline-validation state for this screen.
+        const msg = err.response.data?.error?.message || err.response.data?.error || 'Неверный телефон или пароль'
+        setError(String(msg))
       } else {
         // No response = the request never reached the server. Surface the actual
         // cause (timeout, DNS, cleartext-blocked, connection refused, ...) instead
@@ -75,18 +79,19 @@ export default function LoginScreen() {
           <Text style={s.sub}>MegaMall Delivery</Text>
 
           <View style={s.field}>
-            <Text style={s.label}>ЛОГИН</Text>
+            <Text style={s.label}>ТЕЛЕФОН</Text>
             <TextInput
-              style={s.input} placeholder="+992 ··· ···" placeholderTextColor={C.text2}
-              value={loginVal} onChangeText={setLoginVal}
+              style={[s.input, error && s.inputError]} placeholder="+992 ··· ···" placeholderTextColor={C.text2}
+              value={loginVal} onChangeText={(v) => { setLoginVal(v); setError(null) }}
               autoCapitalize="none" keyboardType="phone-pad"
             />
+            {error && <Text style={s.errorText}>{error}</Text>}
           </View>
           <View style={s.field}>
             <Text style={s.label}>ПАРОЛЬ</Text>
             <TextInput
               style={s.input} placeholder="••••••••" placeholderTextColor={C.text2}
-              value={password} onChangeText={setPassword} secureTextEntry
+              value={password} onChangeText={(v) => { setPassword(v); setError(null) }} secureTextEntry
             />
           </View>
 
@@ -128,6 +133,8 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderColor: C.border, borderRadius: 16,
     paddingHorizontal: 14, fontSize: 16, color: C.text, fontWeight: '500',
   },
+  inputError: { borderColor: 'rgba(255,69,58,0.55)' },
+  errorText: { fontSize: 12, fontWeight: '600', color: '#ff6b61', marginTop: 6 },
   btn: {
     width: '100%', height: 50, backgroundColor: C.accent,
     borderRadius: 999, justifyContent: 'center', alignItems: 'center', marginTop: 8,

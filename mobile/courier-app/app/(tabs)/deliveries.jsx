@@ -25,13 +25,17 @@ export default function DeliveriesScreen() {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [openStep, setOpenStep]           = useState('detail')
   const [actionLoading, setActionLoading] = useState(false)
+  const [error, setError]                 = useState(null)
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
 
   const fetchOrders = async () => {
     try {
       const { data } = await getMyOrders()
       setOrders(data.data || [])
+      setHasLoadedOnce(true)
+      setError(null)
     } catch (e) {
-      Alert.alert('Ошибка загрузки', e?.response?.data?.error?.message || 'Не удалось загрузить заказы')
+      setError(e?.response?.data?.error?.message || 'Не удалось загрузить заказы')
     } finally { setLoading(false); setRefreshing(false) }
   }
 
@@ -118,6 +122,15 @@ export default function DeliveriesScreen() {
         ))}
       </ScrollView>
 
+      {hasLoadedOnce && error && (
+        <View style={[s.inlineError, { backgroundColor: T.chip, borderColor: T.chipEdge }]}>
+          <Text style={[s.inlineErrorText, { color: T.muted }]} numberOfLines={1}>⚠️ Не удалось загрузить заказы</Text>
+          <TouchableOpacity onPress={() => fetchOrders()}>
+            <Text style={s.inlineErrorRetry}>Повторить</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Order list */}
       <ScrollView
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchOrders() }} tintColor={C.blue} />}
@@ -129,6 +142,19 @@ export default function DeliveriesScreen() {
               <OrderCardSkeleton />
               <OrderCardSkeleton />
             </>)
+          : (!hasLoadedOnce && error)
+            ? (
+              <FadeSlideIn>
+                <View style={s.empty}>
+                  <Text style={s.emptyIcon}>📦</Text>
+                  <Text style={[s.emptyTitle, { color: T.muted }]}>Не удалось загрузить</Text>
+                  <Text style={[s.emptySub, { color: T.muted }]}>Проверьте соединение и попробуйте снова</Text>
+                  <TouchableOpacity style={s.retryBtn} onPress={() => { setLoading(true); fetchOrders() }}>
+                    <Text style={s.retryText}>Повторить</Text>
+                  </TouchableOpacity>
+                </View>
+              </FadeSlideIn>
+            )
           : filtered.length === 0
             ? (
               <FadeSlideIn>
@@ -183,5 +209,10 @@ const s = StyleSheet.create({
   empty:       { alignItems: 'center', paddingTop: 80 },
   emptyIcon:   { fontSize: 40, marginBottom: 12, opacity: 0.4 },
   emptyTitle:  { fontSize: 16, fontWeight: '700', color: C.muted, marginBottom: 4 },
-  emptySub:    { fontSize: 13, color: C.muted },
+  emptySub:    { fontSize: 13, color: C.muted, textAlign: 'center', marginBottom: 16 },
+  retryBtn:    { backgroundColor: C.blue, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 24, minHeight: 44, justifyContent: 'center' },
+  retryText:   { color: '#fff', fontSize: 15, fontWeight: '700' },
+  inlineError: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 16, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 14, marginHorizontal: 18, marginBottom: 4, gap: 10 },
+  inlineErrorText:   { fontSize: 13, fontWeight: '600', flex: 1 },
+  inlineErrorRetry:  { fontSize: 13, fontWeight: '700', color: C.blue },
 })

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, ScrollView, StyleSheet, RefreshControl, Alert, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
@@ -23,7 +23,11 @@ export default function ClaimableScreen() {
   const [loading, setLoading]   = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [claiming, setClaiming] = useState(null)
+  const [claimedToast, setClaimedToast] = useState(null)
+  const toastTimer = useRef(null)
   const currentUserName = useAuthStore((st) => st.user?.full_name) || ''
+
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
 
   const fetchOrders = async () => {
     try {
@@ -50,6 +54,9 @@ export default function ClaimableScreen() {
       animateLayout()
       setOrders(prev => prev.filter(o => o.id !== order.id))
       fetchOrders()
+      setClaimedToast(order.order_number)
+      if (toastTimer.current) clearTimeout(toastTimer.current)
+      toastTimer.current = setTimeout(() => setClaimedToast(null), 2800)
     } catch (e) {
       Alert.alert('Ошибка', e.response?.data?.error?.message || 'Не удалось взять заказ')
     } finally { setClaiming(null) }
@@ -161,6 +168,12 @@ export default function ClaimableScreen() {
             })
         }
       </ScrollView>
+
+      {claimedToast && (
+        <FadeSlideIn style={s.toast} from={16}>
+          <Text style={s.toastText} numberOfLines={1}>Заказ {claimedToast} взят</Text>
+        </FadeSlideIn>
+      )}
     </SafeAreaView>
   )
 }
@@ -212,4 +225,12 @@ const s = StyleSheet.create({
   },
   claimBtnDisabled: { opacity: 0.45 },
   claimBtnText:     { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+  toast: {
+    position: 'absolute', left: 18, right: 18, bottom: 18,
+    backgroundColor: '#0c162a', borderRadius: 18, paddingVertical: 14, paddingHorizontal: 16,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 28, elevation: 8,
+  },
+  toastText: { color: 'rgba(255,255,255,0.92)', fontWeight: '600', fontSize: 13 },
 })
