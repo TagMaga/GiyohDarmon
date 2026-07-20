@@ -235,6 +235,56 @@ func (s *Service) ClaimOrder(ctx context.Context, courierID uuid.UUID, orderID u
 	return nil
 }
 
+// unclaimWindow bounds how long after claiming a courier may undo it via
+// UnclaimOrder. This is a true "undo" for the claim button — not a general
+// release-back-to-pool tool. Dispatchers already have that, unrestricted and
+// covering more statuses, via dispatch.Service.UnassignCourier.
+const unclaimWindow = 5 * time.Second
+
+// UnclaimOrder releases an order the courier claimed moments ago, returning
+// it to the confirmed pool. Only allowed while still `assigned` (before the
+// courier taps "В путь") and only within unclaimWindow of claiming.
+//
+// The actual state transition delegates to orders.Service.ChangeStatus, the
+// same atomic release-assignment pipeline dispatch.Service.UnassignCourier
+// uses — it already permits an assigned courier to move their own order back
+// to confirmed (see orders.Service.validateTransitionRole, case
+// StatusAssigned / role "courier"), so this method's only added
+// responsibility is the time-window check.
+func (s *Service) UnclaimOrder(ctx context.Context, courierID uuid.UUID, orderID uuid.UUID) (*orders.Order, error) {
+	assignedAt, err := s.repo.GetActiveAssignmentTime(ctx, orderID, courierID)
+	if err != nil {
+		return nil, err
+	}
+	if time.Since(assignedAt) > unclaimWindow {
+		return nil, apperrors.BadRequest("время отмены истекло")
+	}
+	status, err := s.repo.GetOrderStatus(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if status != orders.StatusAssigned {
+		return nil, apperrors.BadRequest("заказ уже в пути")
+	}
+
+	comment := "courier cancelled claim"
+	updated, err := s.ordersSvc.ChangeStatus(ctx, courierID, "courier", orderID, orders.ChangeStatusRequest{
+		Status:  orders.StatusConfirmed,
+		Comment: &comment,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	s.logger.LogAsync(activity.Entry{
+		ActorID:    &courierID,
+		Action:     "unclaim_order",
+		EntityType: "order",
+		EntityID:   &orderID,
+	})
+	return updated, nil
+}
+
 // GetOrderDetail returns full order detail for a courier, enforcing ownership.
 func (s *Service) GetOrderDetail(ctx context.Context, courierID uuid.UUID, orderID uuid.UUID) (*MyOrderResponse, error) {
 	return s.repo.GetOrderByIDForCourier(ctx, courierID, orderID)

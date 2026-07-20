@@ -20,6 +20,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	// Claimable orders
 	rg.GET("/available",              auth, courierRoles, h.availableOrders)
 	rg.POST("/available/:id/claim",   auth, courierRoles, h.claimOrder)
+	rg.POST("/available/:id/unclaim", auth, courierRoles, h.unclaimOrder)
 
 	// Per-order detail and delivery workflow
 	rg.GET("/orders/:id",            auth, courierRoles, h.orderDetail)

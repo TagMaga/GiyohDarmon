@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import useAuthStore from '../../src/store/authStore'
+import useCourierStatusStore from '../../src/store/courierStatusStore'
 import { logout as apiLogout } from '../../src/api/auth'
 import { API_URL } from '../../src/api/client'
 import { GlassBackdrop, useGlass } from '../../src/components/glass'
@@ -17,6 +18,7 @@ const C = {
 
 export default function ProfileScreen() {
   const { user, refreshToken, logout } = useAuthStore()
+  const isOnline = useCourierStatusStore((st) => st.isOnline)
   const { T, dark } = useGlass()
 
   const handleLogout = async () => {
@@ -58,9 +60,11 @@ export default function ProfileScreen() {
           <View style={[s.roleBadge, { backgroundColor: T.chip }]}>
             <Text style={[s.roleText, { color: T.blue }]}>🛵  КУРЬЕР</Text>
           </View>
-          <View style={s.statusPill}>
-            <View style={[s.statusDot, { backgroundColor: T.green }]} />
-            <Text style={[s.statusText, { color: T.green }]}>Онлайн</Text>
+          <View style={[s.statusPill, !isOnline && s.statusPillOff]}>
+            <View style={[s.statusDot, { backgroundColor: isOnline ? T.green : '#8a93a3' }]} />
+            <Text style={[s.statusText, { color: isOnline ? T.green : '#657084' }]}>
+              {isOnline ? 'На линии' : 'Не на линии'}
+            </Text>
           </View>
         </View>
 
@@ -155,6 +159,7 @@ const s = StyleSheet.create({
   roleBadge: { backgroundColor: C.accentDim, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 },
   roleText: { fontSize: 11, fontWeight: '700', color: C.accent, letterSpacing: 0.6 },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(52,199,89,0.14)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99 },
+  statusPillOff: { backgroundColor: 'rgba(154,162,184,0.16)' },
   statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green },
   statusText: { fontSize: 11, color: C.green, fontWeight: '600' },
   card: {

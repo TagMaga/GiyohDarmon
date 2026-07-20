@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import { getMyOrders, getCashSummary, getClaimableOrders, updateOrderStatus, updateCourierStatus } from '../../src/api/orders'
 import useAuthStore from '../../src/store/authStore'
+import useCourierStatusStore from '../../src/store/courierStatusStore'
 import { OrderDetailSheet, C } from '../../src/components/OrderDetailSheet'
 import { OrderCard } from '../../src/components/OrderCard'
 import Avatar from '../../src/components/Avatar'
@@ -23,7 +24,8 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing]   = useState(false)
   const [detailOrder, setDetailOrder] = useState(null)
   const [actionLoading, setActionLoading] = useState(false)
-  const [isOnline, setIsOnline]       = useState(true)
+  const isOnline                      = useCourierStatusStore((st) => st.isOnline)
+  const setOnline                     = useCourierStatusStore((st) => st.setOnline)
   const [error, setError]             = useState(null)
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
   const { T }                         = useGlass()
@@ -63,7 +65,7 @@ export default function DashboardScreen() {
   const handleToggleOnline = () => {
     const next = !isOnline
     animateLayout()
-    setIsOnline(next)
+    setOnline(next)
     updateCourierStatus(next ? 'online' : 'offline').catch((e) => {
       console.warn('[dashboard] failed to log courier status:', e?.message)
     })
@@ -160,7 +162,7 @@ export default function DashboardScreen() {
               <Sheen radius={22} />
               <Text style={s.kpiChevron}>›</Text>
               <CountUp value={active} style={[s.kpiNum, { color: C.blue }]} />
-              <Text style={[s.kpiLabel, { color: T.muted }]}>активный</Text>
+              <Text style={[s.kpiLabel, { color: T.muted }]}>в работе</Text>
             </PressScale>
             <PressScale style={[s.kpi, { backgroundColor: T.card, borderColor: T.cardEdge }]} scaleTo={0.94} onPress={() => router.push('/(tabs)/claimable')}>
               <Sheen radius={22} />
@@ -212,7 +214,7 @@ export default function DashboardScreen() {
                   <Sheen radius={28} />
                   <View style={s.iconBox}><Text style={{ fontSize: 26 }}>📈</Text></View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.statusTitle, { color: T.ink }]}>Рейтинг 4.9 за неделю</Text>
+                    <Text style={[s.statusTitle, { color: T.ink }]}>{done} доставки · {active} в работе</Text>
                     <Text style={[s.statusSub, { color: T.muted }]}>{fmt(salary)} TJS заработано сегодня</Text>
                   </View>
                 </View>

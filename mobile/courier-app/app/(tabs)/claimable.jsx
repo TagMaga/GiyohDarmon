@@ -1,8 +1,8 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { View, Text, ScrollView, StyleSheet, RefreshControl, Alert, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
-import { getClaimableOrders, claimOrder } from '../../src/api/orders'
+import { getClaimableOrders, claimOrder, unclaimOrder } from '../../src/api/orders'
 import useAuthStore from '../../src/store/authStore'
 import { resolveCreator } from '../../src/lib/creator'
 import { C } from '../../src/components/OrderDetailSheet'
@@ -23,7 +23,12 @@ export default function ClaimableScreen() {
   const [loading, setLoading]   = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [claiming, setClaiming] = useState(null)
+  const [claimedToast, setClaimedToast] = useState(null)
+  const [unclaiming, setUnclaiming] = useState(false)
+  const toastTimer = useRef(null)
   const currentUserName = useAuthStore((st) => st.user?.full_name) || ''
+
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
 
   const fetchOrders = async () => {
     try {
@@ -50,9 +55,31 @@ export default function ClaimableScreen() {
       animateLayout()
       setOrders(prev => prev.filter(o => o.id !== order.id))
       fetchOrders()
+      // Toast stays up exactly as long as the backend's undo window
+      // (UnclaimOrder rejects past 5s of the claim) — never longer, so
+      // "Отменить" never looks tappable after the server would refuse it.
+      setClaimedToast({ id: order.id, orderNumber: order.order_number })
+      if (toastTimer.current) clearTimeout(toastTimer.current)
+      toastTimer.current = setTimeout(() => setClaimedToast(null), 5000)
     } catch (e) {
       Alert.alert('Ошибка', e.response?.data?.error?.message || 'Не удалось взять заказ')
     } finally { setClaiming(null) }
+  }
+
+  const handleUndoClaim = async () => {
+    if (!claimedToast || unclaiming) return
+    const { id } = claimedToast
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setUnclaiming(true)
+    try {
+      await unclaimOrder(id)
+      setClaimedToast(null)
+      animateLayout()
+      fetchOrders()
+    } catch (e) {
+      Alert.alert('Ошибка', e?.response?.data?.error?.message || 'Не удалось отменить заказ')
+      setClaimedToast(null)
+    } finally { setUnclaiming(false) }
   }
 
   const fmt = (n) => Number(n || 0).toLocaleString()
@@ -161,6 +188,18 @@ export default function ClaimableScreen() {
             })
         }
       </ScrollView>
+
+      {claimedToast && (
+        <FadeSlideIn style={s.toast} from={16}>
+          <Text style={s.toastText} numberOfLines={1}>Заказ {claimedToast.orderNumber} взят</Text>
+          <PressScale onPress={handleUndoClaim} disabled={unclaiming} scaleTo={0.92}>
+            {unclaiming
+              ? <ActivityIndicator color="#6db2ff" size="small" />
+              : <Text style={s.toastUndo}>Отменить</Text>
+            }
+          </PressScale>
+        </FadeSlideIn>
+      )}
     </SafeAreaView>
   )
 }
@@ -212,4 +251,13 @@ const s = StyleSheet.create({
   },
   claimBtnDisabled: { opacity: 0.45 },
   claimBtnText:     { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+  toast: {
+    position: 'absolute', left: 18, right: 18, bottom: 18,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+    backgroundColor: '#0c162a', borderRadius: 18, paddingVertical: 14, paddingHorizontal: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 28, elevation: 8,
+  },
+  toastText: { flex: 1, color: 'rgba(255,255,255,0.92)', fontWeight: '600', fontSize: 13 },
+  toastUndo: { color: '#6db2ff', fontWeight: '700', fontSize: 13 },
 })
