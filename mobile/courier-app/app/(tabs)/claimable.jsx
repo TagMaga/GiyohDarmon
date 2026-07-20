@@ -253,7 +253,11 @@ const s = StyleSheet.create({
   claimBtnText:     { color: '#fff', fontWeight: '700', fontSize: 16 },
 
   toast: {
-    position: 'absolute', left: 18, right: 18, bottom: 18,
+    // The floating tab bar sits at bottom:24, height:68 (see (tabs)/_layout.jsx)
+    // and is rendered by the navigator above this screen's own content, so a
+    // small `bottom` here would render fully hidden behind it, not just
+    // visually behind — unreachable, not just unattractive.
+    position: 'absolute', left: 18, right: 18, bottom: 106,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10,
     backgroundColor: '#0c162a', borderRadius: 18, paddingVertical: 14, paddingHorizontal: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 28, elevation: 8,
