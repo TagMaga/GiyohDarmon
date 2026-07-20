@@ -10,7 +10,15 @@ import { CalendarCheck } from 'lucide-react'
 import { fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import { M, MobileShell, Card, DarkCard, Chip } from '../components/mobileUi'
 
-function toDateStr(d) { return d.toISOString().slice(0, 10) }
+// Local calendar date, not UTC — toISOString() would roll dates back a day
+// for any timezone ahead of UTC (e.g. midnight local on the 1st becomes the
+// 30th/31st in UTC), which threw off the "current month" default range.
+function toDateStr(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
 
 function currentMonthRange() {
   const now = new Date()
@@ -92,17 +100,15 @@ function periodOrderTotals(orders = [], from, to) {
   }, { revenue: 0, deliveryFee: 0 })
 }
 
-/** Per-row "(revenue − delivery) × rate% = amount" breakdown, using the order's
- *  actual snapshot rate (amount / net_revenue) rather than the seller's current
- *  flat rate, since CommissionConfig can change between orders. */
+/** Per-row "(revenue − delivery) × rate% = amount" breakdown, using the
+ *  seller's current commission rate (from HR settings) rather than a value
+ *  reverse-engineered from the stored amount, which produced a misleading
+ *  rate whenever net_revenue didn't match the actual commission math. */
 function orderBreakdown(ev, fallbackPct) {
-  if (ev.total_amount == null) return null
+  if (ev.total_amount == null || fallbackPct == null) return null
   const total = Number(ev.total_amount)
   const delivery = Number(ev.delivery_fee ?? 0)
-  const net = ev.net_revenue != null ? Number(ev.net_revenue) : total - delivery
-  const rate = net > 0 ? Math.round((Number(ev.amount) / net) * 1000) / 10 : fallbackPct
-  if (rate == null) return null
-  return `(${fmtAmount(total)} − ${fmtAmount(delivery)}) × ${rate}% = ${fmtAmount(ev.amount)}`
+  return `(${fmtAmount(total)} − ${fmtAmount(delivery)}) × ${fallbackPct}% = ${fmtAmount(ev.amount)}`
 }
 
 function eventOrderTotals(events = []) {

@@ -60,7 +60,10 @@ export default function DeliveriesScreen() {
     setActionLoading(true)
     try {
       await updateOrderStatus(order.id, 'in_delivery')
-      closeDetail(); fetchOrders()
+      // Keep the detail sheet open — just refresh its status in place — so the
+      // courier can go straight on to "Доставлен" without reopening it.
+      setSelectedOrder((prev) => (prev && prev.id === order.id ? { ...prev, status: 'in_delivery' } : prev))
+      fetchOrders()
     } catch (e) {
       Alert.alert('Ошибка', e?.response?.data?.error?.message || 'Не удалось начать доставку')
     } finally { setActionLoading(false) }
