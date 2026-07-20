@@ -90,6 +90,22 @@ func (s *Service) Assign(ctx context.Context, req AssignRequest) (*UserHierarchy
 	return h, nil
 }
 
+// AssignTeamID sets userID's hierarchy team_id, leaving any existing
+// parent_id untouched (creating an entry with no parent if the user doesn't
+// have one yet). Narrower than Assign — for callers (e.g. teams.Service)
+// that only need to attach a user to a team through a path that must never
+// clobber that user's existing reporting line.
+func (s *Service) AssignTeamID(ctx context.Context, userID uuid.UUID, teamID uuid.UUID) error {
+	exists, err := s.userExists(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("validate user: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("user %s not found", userID)
+	}
+	return s.repo.UpsertTeamID(ctx, userID, teamID)
+}
+
 // GetUserChain returns the upward chain for a user, scoped to what
 // actorRole/actorID may see: owner sees anyone; a caller can always see their
 // own chain; otherwise manager/sales_team_lead may only see users within a

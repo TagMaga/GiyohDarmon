@@ -145,6 +145,10 @@ func main() {
 	hierarchySvc := hierarchy.NewService(hierarchyRepo, userExistsFn, teamExistsFn, userBriefsFn, teamBriefFn)
 	authSvc := auth.NewService(authRepo, cfg.JWT, userByPhoneFn, teamForUserFn)
 
+	// Wire hierarchy sync after hierarchySvc exists (breaks the circular init
+	// order — hierarchy depends on teams via teamExistsFn/teamBriefFn).
+	teamSvc.SetHierarchyAssigner(hierarchySvc.AssignTeamID)
+
 	// Wire role resolver after all services exist (breaks the circular init order).
 	authSvc.SetRoleResolver(func(ctx context.Context, userID uuid.UUID) (users.Role, error) {
 		u, err := userRepo.GetByID(ctx, userID)

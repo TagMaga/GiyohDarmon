@@ -33,6 +33,24 @@ func (r *Repository) Upsert(ctx context.Context, h *UserHierarchy) error {
 	return nil
 }
 
+// UpsertTeamID sets team_id for userID's hierarchy entry, creating one with
+// no parent if none exists yet. Unlike Upsert, it never touches parent_id on
+// conflict — callers that only need to attach a user to a team (not set or
+// change their reporting line) must not risk clobbering an existing
+// parent_id relationship.
+func (r *Repository) UpsertTeamID(ctx context.Context, userID, teamID uuid.UUID) error {
+	err := r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "user_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"team_id"}),
+		}).
+		Create(&UserHierarchy{ID: uuid.New(), UserID: userID, TeamID: &teamID}).Error
+	if err != nil {
+		return fmt.Errorf("upsert hierarchy team id: %w", err)
+	}
+	return nil
+}
+
 // GetByUserID returns the hierarchy entry for a user, or nil if none.
 func (r *Repository) GetByUserID(ctx context.Context, userID uuid.UUID) (*UserHierarchy, error) {
 	var h UserHierarchy

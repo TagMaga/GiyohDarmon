@@ -14,13 +14,54 @@ import (
 // UserExistsFn is an injected dependency to check user existence across module boundary.
 type UserExistsFn func(ctx context.Context, id uuid.UUID) (bool, error)
 
+// HierarchyAssignFn upserts userID's hierarchy team_id, leaving any existing
+// parent assignment untouched. Injected after construction via
+// SetHierarchyAssigner rather than passed to NewService — hierarchy.Service
+// is built after teams.Service in main.go and itself depends on teams
+// (TeamExistsFn/TeamBriefFn), so the two modules can't construct each other
+// directly; mirrors internal/users' SetSessionRevoker/SetMediaAdapters
+// post-construction wiring.
+type HierarchyAssignFn func(ctx context.Context, userID uuid.UUID, teamID uuid.UUID) error
+
 type Service struct {
-	repo       *Repository
-	userExists UserExistsFn
+	repo            *Repository
+	userExists      UserExistsFn
+	assignHierarchy HierarchyAssignFn
 }
 
 func NewService(repo *Repository, userExists UserExistsFn) *Service {
 	return &Service{repo: repo, userExists: userExists}
+}
+
+// SetHierarchyAssigner injects the hierarchy sync hook. Left nil in tests
+// that don't care about hierarchy sync — Create/Update skip it in that case.
+func (s *Service) SetHierarchyAssigner(fn HierarchyAssignFn) {
+	s.assignHierarchy = fn
+}
+
+// syncHierarchy keeps user_hierarchy in step with t's manager_id/
+// team_lead_id. Team rosters (TeamProfilePage's member counts), the "my
+// team" self-service lookups, and cross-module RBAC scoping (e.g.
+// users.Service.List's per-caller team scope) all read user_hierarchy, not
+// these two columns — CreateTeamModal/EditTeamModal only ever write the
+// columns, so without this a manager/lead assigned through either dialog
+// would show a correct team but an empty roster, and would themselves be
+// scoped to zero users everywhere else in the app.
+func (s *Service) syncHierarchy(ctx context.Context, t *Team) error {
+	if s.assignHierarchy == nil {
+		return nil
+	}
+	if t.TeamLeadID != nil {
+		if err := s.assignHierarchy(ctx, *t.TeamLeadID, t.ID); err != nil {
+			return apperrors.Internal(fmt.Errorf("sync team lead hierarchy: %w", err))
+		}
+	}
+	if t.ManagerID != nil {
+		if err := s.assignHierarchy(ctx, *t.ManagerID, t.ID); err != nil {
+			return apperrors.Internal(fmt.Errorf("sync manager hierarchy: %w", err))
+		}
+	}
+	return nil
 }
 
 func (s *Service) Create(ctx context.Context, req CreateTeamRequest) (*Team, error) {
@@ -41,6 +82,10 @@ func (s *Service) Create(ctx context.Context, req CreateTeamRequest) (*Team, err
 			return nil, apperrors.Conflict("team name is already taken")
 		}
 		return nil, apperrors.Internal(err)
+	}
+
+	if err := s.syncHierarchy(ctx, t); err != nil {
+		return nil, err
 	}
 
 	return t, nil
@@ -118,6 +163,10 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateTeamReques
 			return nil, apperrors.Conflict("team name is already taken")
 		}
 		return nil, apperrors.Internal(err)
+	}
+
+	if err := s.syncHierarchy(ctx, t); err != nil {
+		return nil, err
 	}
 
 	return t, nil
