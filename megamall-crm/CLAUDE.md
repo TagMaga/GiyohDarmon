@@ -98,6 +98,7 @@ Goose, sequential `migrations/NNNNN_description.sql` files with `-- +goose Up` /
 - Never work directly on `main` — create/use a feature branch.
 - Never include unrelated files in a commit (review `git status`/`git diff` before staging).
 - Give a final report only after the change is merged, deployed, and verified live — not before.
+- Standing instruction from the repo owner: once a change is ready, create the PR and merge it (after CI is green) without pausing to ask for confirmation — this applies in every session, including SAFE MODE below. Still stop and report on CI failure, merge conflict, or auth problems instead of forcing past them.
 
 ### FAST MODE — small frontend-only UI changes
 
@@ -115,4 +116,4 @@ Applies to anything touching the Go backend, migrations/schema, auth, `internal/
 - Audit the relevant code first and share findings before proposing changes.
 - Ask clarifying questions before writing code.
 - Wait for explicit approval of the implementation plan before writing/changing code.
-- Wait for explicit approval before merging — do not auto-merge even if CI is green.
+- Once the plan is approved and CI is green, create the PR and merge it without waiting for further confirmation (see standing instruction above).

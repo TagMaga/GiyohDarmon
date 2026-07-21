@@ -17,6 +17,7 @@ import { useToast }     from '../../../shared/components/ToastProvider'
 import { fmtAmount }    from '../../../shared/orderStatusConfig'
 import useCurrentUser   from '../../../shared/hooks/useCurrentUser'
 import useMyPayouts     from '../../../shared/hooks/useMyPayouts'
+import { generateUUID } from '../../../shared/utils/uuid'
 import usePayables       from '../hooks/usePayables'
 import useCreatePayouts  from '../hooks/useCreatePayouts'
 import { M, Card, InitialsAvatar, Chip } from '../../seller/components/mobileUi'
@@ -84,7 +85,7 @@ function OverviewTab() {
   // impatient re-click) so the server recognizes a resend and replays the
   // original result instead of creating a second batch of payouts. Only
   // rotates once a submission actually succeeds.
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID())
+  const [idempotencyKey, setIdempotencyKey] = useState(() => generateUUID())
 
   // Seed amount inputs with "remaining" whenever fresh payables data arrives.
   useEffect(() => {
@@ -135,7 +136,7 @@ function OverviewTab() {
       })
       setConfirmOpen(false)
       setSelected(new Set())
-      setIdempotencyKey(crypto.randomUUID()) // fresh key for the next, unrelated submission
+      setIdempotencyKey(generateUUID()) // fresh key for the next, unrelated submission
       toast.success('Выплата проведена · появится в Финансах владельца')
     } catch (err) {
       toast.error(err?.response?.data?.error?.message ?? 'Не удалось провести выплату')
