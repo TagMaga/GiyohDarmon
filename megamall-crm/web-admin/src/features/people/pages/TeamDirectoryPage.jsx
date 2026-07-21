@@ -1027,7 +1027,10 @@ function DocumentsField({ personId }) {
               {doc.verification_status !== 'verified' && (
                 <button
                   type="button"
-                  onClick={() => statusMut.mutate({ documentId: doc.id, status: 'verified' })}
+                  onClick={() => {
+                    if (!confirm(`Отметить документ «${doc.original_filename}» как проверенный?`)) return
+                    statusMut.mutate({ documentId: doc.id, status: 'verified' })
+                  }}
                   disabled={statusMut.isPending}
                   className="rounded-lg px-2 py-1 text-[10.5px] font-black text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-50"
                   title="Проверить документ"
@@ -1038,7 +1041,10 @@ function DocumentsField({ personId }) {
               {doc.verification_status !== 'rejected' && (
                 <button
                   type="button"
-                  onClick={() => statusMut.mutate({ documentId: doc.id, status: 'rejected' })}
+                  onClick={() => {
+                    if (!confirm(`Отклонить документ «${doc.original_filename}»?`)) return
+                    statusMut.mutate({ documentId: doc.id, status: 'rejected' })
+                  }}
                   disabled={statusMut.isPending}
                   className="rounded-lg px-2 py-1 text-[10.5px] font-black text-amber-600 transition-colors hover:bg-amber-50 disabled:opacity-50"
                   title="Отклонить документ"
@@ -1051,6 +1057,7 @@ function DocumentsField({ personId }) {
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
+                if (!confirm(`Удалить документ «${doc.original_filename}»? Это действие необратимо.`)) return
                 deleteMut.mutate(doc.id)
               }}
               disabled={deleteMut.isPending}
