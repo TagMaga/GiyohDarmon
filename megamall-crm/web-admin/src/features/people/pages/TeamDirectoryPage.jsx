@@ -880,8 +880,8 @@ function DocumentsField({ personId }) {
   const inputRef = useRef(null)
   const qc = useQueryClient()
   const toast = useToast()
-  const [documentType, setDocumentType] = useState('passport')
-  const [expiresAt, setExpiresAt] = useState('')
+  const documentType = 'passport'
+  const expiresAt = ''
 
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['user-documents', personId],
@@ -958,24 +958,6 @@ function DocumentsField({ personId }) {
       <div className="flex items-center gap-1.5 mb-2">
         <Upload size={11} className="text-slate-400" />
         <span className="text-[10.5px] font-semibold text-slate-400 uppercase tracking-wider">Документы</span>
-      </div>
-      <div className="mb-2 grid grid-cols-2 gap-2">
-        <select
-          value={documentType}
-          onChange={e => setDocumentType(e.target.value)}
-          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[12.5px] font-semibold text-slate-700 outline-none transition-colors focus:border-indigo-300"
-        >
-          {DOCUMENT_TYPES.map(type => (
-            <option key={type.value} value={type.value}>{type.label}</option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={expiresAt}
-          onChange={e => setExpiresAt(e.target.value)}
-          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[12.5px] font-semibold text-slate-700 outline-none transition-colors focus:border-indigo-300"
-          title="Срок действия"
-        />
       </div>
       <button
         type="button"

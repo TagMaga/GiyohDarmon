@@ -1557,7 +1557,7 @@ function AmountRangePicker({ min, max, open, onOpen, onApply }) {
   }
 
   return (
-    <div className="dv2-cash-range">
+    <div className="dv2-cash-range dv2-cash-range--end">
       <button type="button" className="dv2-cash-range-btn" onClick={() => onOpen(!open)} aria-expanded={open}>
         <span>{amountRangeLabel(min, max)}</span>
         <ChevronDown size={14} />

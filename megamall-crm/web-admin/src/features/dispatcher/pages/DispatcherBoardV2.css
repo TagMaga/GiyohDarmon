@@ -852,6 +852,10 @@
   box-shadow: var(--sh);
   padding: 10px;
 }
+.dv2-cash-range--end .dv2-cash-range-popover {
+  left: auto;
+  right: 0;
+}
 .dv2-cash-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .dv2-cash-preset {
   min-height: 32px;
