@@ -175,11 +175,28 @@ export function isProductActive(p) {
   return p.is_active ?? p.IsActive ?? false
 }
 
+export function getBatchUnitCost(m) {
+  if (!m) return null
+  return m.batch_unit_cost ?? m.BatchUnitCost ?? null
+}
+
 export function getLastMovementForProduct(productId, movements = []) {
   return movements.find((m) => {
     const pid = m.product_id ?? m.ProductID
     return pid === productId
   }) ?? null
+}
+
+// getLastPrice returns the unit cost of the most recent 'purchase' movement
+// for this product (the actual last price paid), or null if it has never
+// been received — callers fall back to the product's static purchase_price
+// for legacy products with no receiving history.
+export function getLastPrice(productId, movements = []) {
+  const lastPurchase = movements.find((m) => {
+    const pid = m.product_id ?? m.ProductID
+    return pid === productId && getMovementType(m) === 'purchase'
+  })
+  return getBatchUnitCost(lastPurchase)
 }
 
 // ── Movement helpers ───────────────────────────────────────────────────────────

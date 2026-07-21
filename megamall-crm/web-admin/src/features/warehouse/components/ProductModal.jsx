@@ -177,8 +177,12 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
         {isEdit && (
           <Field label="SKU *" value={form.sku} onChange={v => setField('sku', v)} placeholder="P-001" />
         )}
-        <Field label="Закупочная цена" type="number" min="0" value={form.purchase_price} onChange={v => setField('purchase_price', v)} placeholder="0" />
-        <Field label="Цена продажи" type="number" min="0" value={form.sale_price} onChange={v => setField('sale_price', v)} placeholder="0" />
+        {isEdit && (
+          <>
+            <Field label="Закупочная цена" type="number" min="0" value={form.purchase_price} onChange={v => setField('purchase_price', v)} placeholder="0" />
+            <Field label="Цена продажи" type="number" min="0" value={form.sale_price} onChange={v => setField('sale_price', v)} placeholder="0" />
+          </>
+        )}
       </div>
 
       {/* Photo upload */}

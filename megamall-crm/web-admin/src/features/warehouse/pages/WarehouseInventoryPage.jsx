@@ -19,6 +19,7 @@ import {
   getAvailableQty,
   getId,
   getLastMovementForProduct,
+  getLastPrice,
   getProductBarcode,
   getProductImageSrcSet,
   getProductImageVariant,
@@ -156,7 +157,7 @@ function InventoryTable({ rows, data, onProduct, onReceive, onWriteoff, onEdit }
             <th className="px-3 py-2.5 text-right">На складе</th>
             <th className="px-3 py-2.5 text-right">Доступно</th>
             <th className="px-3 py-2.5 text-right">Резерв</th>
-            <th className="px-3 py-2.5 text-right">Закупка</th>
+            <th className="px-3 py-2.5 text-right">Посл. цена</th>
             <th className="px-3 py-2.5 text-right">Продажа</th>
             <th className="px-3 py-2.5 text-right">Стоимость</th>
             <th className="px-3 py-2.5 text-left">Статус</th>
@@ -182,7 +183,7 @@ function InventoryTable({ rows, data, onProduct, onReceive, onWriteoff, onEdit }
                 <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-950">{getQuantity(inv)}</td>
                 <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-emerald-700">{getAvailableQty(inv)}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums text-amber-700">{getReservedQty(inv)}</td>
-                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-600">{fmtMoney(getPurchasePrice(product))}</td>
+                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-600">{fmtMoney(getLastPrice(getId(product), data.movements) ?? getPurchasePrice(product))}</td>
                 <td className="px-3 py-2.5 text-right font-bold tabular-nums text-indigo-700">{fmtMoney(getSalePrice(product))}</td>
                 <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-700">{fmtMoney(stockValue)}</td>
                 <td className="px-3 py-2.5">
