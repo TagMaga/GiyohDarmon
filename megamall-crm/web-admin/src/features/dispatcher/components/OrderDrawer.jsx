@@ -382,18 +382,44 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
             {prepayments.length > 0 && (
               <div className="mx-4 mb-3">
                 <div className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: TEXT3 }}>Записи предоплат</div>
-                {prepayments.map((p, i) => (
-                  <div key={p.id ?? i} className="flex items-center justify-between py-1.5" style={{ borderBottom: i < prepayments.length - 1 ? `1px solid ${BORDER2}` : 'none' }}>
-                    <div>
-                      <div className="text-xs font-semibold tabular-nums" style={{ color: TEXT1 }}>{fmt(p.amount)} сом</div>
-                      <div className="text-[10px]" style={{ color: TEXT3 }}>{fmtDate(p.created_at)}</div>
+                {prepayments.map((p, i) => {
+                  const isImage = /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(p.proof_url ?? '')
+                  return (
+                    <div key={p.id ?? i} className="flex items-center justify-between gap-2 py-1.5" style={{ borderBottom: i < prepayments.length - 1 ? `1px solid ${BORDER2}` : 'none' }}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {p.proof_url && (
+                          <a
+                            href={p.proof_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="group relative flex-shrink-0 w-9 h-9 rounded-lg overflow-hidden block"
+                            style={{ background: CARD, border: `1px solid ${BORDER}` }}
+                            title="Скриншот оплаты"
+                          >
+                            {isImage ? (
+                              <>
+                                <img src={p.proof_url} alt="Скриншот оплаты" className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: 'rgba(0,0,0,0.5)' }}>
+                                  <ZoomIn size={12} style={{ color: '#fff' }} />
+                                </div>
+                              </>
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-base">📄</div>
+                            )}
+                          </a>
+                        )}
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold tabular-nums" style={{ color: TEXT1 }}>{fmt(p.amount)} сом</div>
+                          <div className="text-[10px]" style={{ color: TEXT3 }}>{fmtDate(p.created_at)}</div>
+                        </div>
+                      </div>
+                      {p.verified_at
+                        ? <span className="text-[10px] font-bold flex-shrink-0" style={{ color: GREEN }}>✓ Подтверждена</span>
+                        : <span className="text-[10px] flex-shrink-0" style={{ color: AMBER }}>Ожидает</span>
+                      }
                     </div>
-                    {p.verified_at
-                      ? <span className="text-[10px] font-bold" style={{ color: GREEN }}>✓ Подтверждена</span>
-                      : <span className="text-[10px]" style={{ color: AMBER }}>Ожидает</span>
-                    }
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 

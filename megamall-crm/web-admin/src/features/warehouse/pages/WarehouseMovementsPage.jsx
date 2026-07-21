@@ -11,7 +11,7 @@ import { STATUS_LABELS, STATUS_BADGE } from '../../../shared/orderStatusConfig'
 import ReceivingEditModal from '../components/ReceivingEditModal'
 import useWarehouseData from '../hooks/useWarehouseData'
 import { fetchReceivingHistory } from '../api'
-import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getId, getMovementType, getProductImageSrcSet, getProductImageVariant, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
+import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getBatchUnitCost, getId, getMovementType, getProductImageSrcSet, getProductImageVariant, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
 
 const TYPES = [
   { value: '', label: 'Все типы' },
@@ -89,6 +89,7 @@ export function MovementList({ rows, data, emptyTitle = 'Движения не �
               <th className="px-3 py-2.5 text-right">Кол-во</th>
               <th className="px-3 py-2.5 text-right">Было</th>
               <th className="px-3 py-2.5 text-right">Стало</th>
+              <th className="px-3 py-2.5 text-right">Закупочная цена</th>
               <th className="px-3 py-2.5 text-left">Пользователь</th>
               <th className="px-3 py-2.5 text-left">Дата</th>
               <th className="px-3 py-2.5 text-left">Комментарий</th>
@@ -191,6 +192,7 @@ function MovementRow({ m, data, onOpen, onEdit, showActions }) {
       <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-950">{m.quantity ?? m.Quantity}</td>
       <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{m.previous_quantity ?? m.PreviousQuantity ?? '—'}</td>
       <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">{m.new_quantity ?? m.NewQuantity ?? '—'}</td>
+      <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{type === 'purchase' ? fmtMoney(getBatchUnitCost(m) ?? 0) : '—'}</td>
       <td className="px-3 py-2.5 text-slate-500">{m.created_by_name ?? m.CreatedByName ?? '—'}</td>
       <td className="px-3 py-2.5 text-xs text-slate-400">{fmtDate(m.created_at ?? m.CreatedAt)}</td>
       <td className="max-w-[220px] px-3 py-2.5 text-xs text-slate-500">
@@ -220,6 +222,9 @@ function MovementCard({ m, data, onOpen, onEdit, showActions }) {
         <p className="text-xl font-bold tabular-nums text-slate-950">{m.quantity ?? m.Quantity}</p>
         <p className="text-right text-xs text-slate-400">{fmtDate(m.created_at ?? m.CreatedAt)}<br />{m.created_by_name ?? m.CreatedByName ?? '—'}</p>
       </div>
+      {type === 'purchase' && (
+        <p className="mt-2 text-xs text-slate-500">Закупочная цена: <span className="font-semibold text-slate-700">{fmtMoney(getBatchUnitCost(m) ?? 0)}</span></p>
+      )}
       <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
         <MovementReason m={m} />
       </div>

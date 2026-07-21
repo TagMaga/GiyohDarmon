@@ -14,15 +14,11 @@ import {
   getProductImageVariant,
   getProductName,
   getProductSku,
-  getPurchasePrice,
-  getSalePrice,
 } from '../utils/warehouseHelpers'
 
 const emptyForm = {
   name: '',
   sku: '',
-  purchase_price: '',
-  sale_price: '',
   image_url: '',
 }
 
@@ -52,8 +48,6 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
     setForm({
       name: getProductName(product) === '—' ? '' : getProductName(product),
       sku: getProductSku(product) === '—' ? '' : getProductSku(product),
-      purchase_price: getPurchasePrice(product) ?? '',
-      sale_price: getSalePrice(product) ?? '',
       image_url: existingImage ?? '',
     })
     // Detail variant for the edit-form preview when available — falls back
@@ -114,8 +108,6 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
         name: form.name.trim(),
       }
       if (isEdit) payload.sku = form.sku.trim()
-      if (form.purchase_price !== '') payload.purchase_price = Number(form.purchase_price)
-      if (form.sale_price !== '')     payload.sale_price     = Number(form.sale_price)
 
       // A newly uploaded image via the media pipeline is attached
       // atomically as part of create/update itself (the backend handles
@@ -177,8 +169,6 @@ export default function ProductModal({ open, onClose, product, suppliers = [] })
         {isEdit && (
           <Field label="SKU *" value={form.sku} onChange={v => setField('sku', v)} placeholder="P-001" />
         )}
-        <Field label="Закупочная цена" type="number" min="0" value={form.purchase_price} onChange={v => setField('purchase_price', v)} placeholder="0" />
-        <Field label="Цена продажи" type="number" min="0" value={form.sale_price} onChange={v => setField('sale_price', v)} placeholder="0" />
       </div>
 
       {/* Photo upload */}

@@ -5,7 +5,7 @@ import Button from '../../../shared/components/Button'
 import Alert from '../../../shared/components/Alert'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
-import { createReceiving } from '../api'
+import { createReceiving, updateProduct } from '../api'
 import { getAvailableQty, getId, getProductName, getProductSku, getQuantity, isUUID } from '../utils/warehouseHelpers'
 
 export default function ReceivingModal({ open, onClose, products, inventory = [], initialProduct = null }) {
@@ -14,6 +14,7 @@ export default function ReceivingModal({ open, onClose, products, inventory = []
   const [productId, setProductId] = useState('')
   const [quantity, setQuantity] = useState('')
   const [unitCost, setUnitCost] = useState('')
+  const [salePrice, setSalePrice] = useState('')
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
@@ -33,21 +34,26 @@ export default function ReceivingModal({ open, onClose, products, inventory = []
   const batchValue = !Number.isNaN(qty) && !Number.isNaN(cost) ? qty * cost : null
 
   const mutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!isUUID(productId)) throw new Error('Выберите товар')
       if (Number.isNaN(qty) || qty < 1) throw new Error('Количество прихода должно быть ≥ 1')
       if (Number.isNaN(cost) || cost < 0) throw new Error('Закупочная цена должна быть ≥ 0')
-      return createReceiving({
+      const receiving = await createReceiving({
         product_id: productId,
         quantity: qty,
         unit_cost: cost,
         notes: notes.trim() || undefined,
       })
+      if (salePrice !== '') {
+        await updateProduct(productId, { sale_price: Number(salePrice) })
+      }
+      return receiving
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.warehouse.inventory })
       qc.invalidateQueries({ queryKey: KEYS.warehouse.movements })
       qc.invalidateQueries({ queryKey: KEYS.warehouse.batchesRoot })
+      if (salePrice !== '') qc.invalidateQueries({ queryKey: KEYS.warehouse.products })
       toast.success('Приёмка проведена — партия создана')
       handleClose()
     },
@@ -57,6 +63,7 @@ export default function ReceivingModal({ open, onClose, products, inventory = []
     setProductId('')
     setQuantity('')
     setUnitCost('')
+    setSalePrice('')
     setNotes('')
     mutation.reset()
     onClose()
@@ -87,6 +94,7 @@ export default function ReceivingModal({ open, onClose, products, inventory = []
         <Select label="Товар *" value={productId} onChange={setProductId} placeholder="Выберите товар" options={products.filter((p) => isUUID(getId(p))).map((p) => ({ value: getId(p), label: `${getProductName(p)} (${getProductSku(p)})` }))} />
         <Field label="Количество прихода *" type="number" min="1" value={quantity} onChange={setQuantity} placeholder="0" />
         <Field label="Закупочная цена за ед. *" type="number" min="0" step="0.01" value={unitCost} onChange={setUnitCost} placeholder="0.00" />
+        <Field label="Цена продажи" type="number" min="0" step="0.01" value={salePrice} onChange={setSalePrice} placeholder="0.00" />
         <Field label="Примечание" value={notes} onChange={setNotes} placeholder="Необязательно" />
       </div>
 
