@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert,
   ActivityIndicator, TextInput, RefreshControl, Image, Modal,
-  Pressable, FlatList,
+  Pressable, FlatList, Dimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
@@ -107,6 +107,23 @@ export default function CashScreen() {
   const [previewCacheKey, setPreviewCacheKey] = useState(null)
   const [delivered, setDelivered]   = useState([])
 
+  // Inline popover replacing the old Alert.alert action sheets for
+  // "Период"/"Статус" — `openFilter` names which one is showing and
+  // `popoverAnchor` is its measured screen position.
+  const [openFilter, setOpenFilter] = useState(null) // null | 'period' | 'status'
+  const [popoverAnchor, setPopoverAnchor] = useState({ top: 0, left: 0 })
+  const periodChipRef = useRef(null)
+  const statusChipRef = useRef(null)
+
+  // Inline validation/result state for the handover sheet — replaces the
+  // Alert.alert-based confirm/success/error flow with banners rendered in place.
+  const [amountError, setAmountError] = useState(null)
+  const [attachError, setAttachError] = useState(null)
+  const [handoverError, setHandoverError] = useState(null)
+  const [toast, setToast] = useState(null) // { type: 'ok'|'err', title, subtitle }
+  const toastTimer = useRef(null)
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current) }, [])
+
   const fetchData = async () => {
     try {
       const [s, h, d] = await Promise.all([
@@ -141,6 +158,7 @@ export default function CashScreen() {
   }
 
   const addAssets = useCallback((assets) => {
+    setAttachError(null)
     setAttachments(prev => {
       const toAdd = assets.slice(0, MAX_ATTACHMENTS - prev.length).map(a => ({
         uri: a.uri, type: a.type === 'video' ? 'video/mp4' : (a.mimeType || 'image/jpeg'),
@@ -158,7 +176,10 @@ export default function CashScreen() {
   const closeHandoverSheet = () => {
     if (submitting) return
     const hasData = actualAmount.trim().length > 0 || attachments.length > 0 || notes.trim().length > 0
-    const discard = () => { setShowHandover(false); setAttachments([]); setActualAmount(''); setNotes('') }
+    const discard = () => {
+      setShowHandover(false); setAttachments([]); setActualAmount(''); setNotes('')
+      setAmountError(null); setAttachError(null); setHandoverError(null)
+    }
     if (!hasData) { discard(); return }
     Alert.alert('Отменить сдачу?', 'Данные будут потеряны', [
       { text: 'Продолжить', style: 'cancel' },
@@ -166,43 +187,51 @@ export default function CashScreen() {
     ])
   }
 
-  const handleHandover = async () => {
-    const expected = toReturn
-    const amt = parseFloat(actualAmount)
-    if (!amt || amt <= 0) { Alert.alert('Укажите сумму', 'Введите сумму перевода'); return }
-    if (attachments.length === 0) { Alert.alert('Нет подтверждения', 'Прикрепите скриншот перевода'); return }
+  const showToast = (t) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToast(t)
+    toastTimer.current = setTimeout(() => setToast(null), 4500)
+  }
 
-    Alert.alert('Отправить на проверку?', `Сумма: ${fmt(amt)} TJS`, [
-      { text: 'Отмена', style: 'cancel' },
-      { text: 'Отправить', onPress: async () => {
-        setSubmitting(true)
-        try {
-          // Each attachment uploads through the centralized media pipeline
-          // only (category=cash_handover_proof, PRIVATE). This must never
-          // fall back to the legacy /uploads endpoint — see
-          // securePrivateUpload's doc comment in src/api/media.js. If the
-          // pipeline is unavailable or rejects a file, the upload throws
-          // and the catch below shows a clear error; nothing is sent
-          // anywhere else.
-          const results = await Promise.all(
-            attachments.map(a => securePrivateUpload({ uri: a.uri, type: a.type, name: a.name }, 'cash_handover_proof'))
-          )
-          const mediaAssetIds = results.map(r => r.asset.id)
-          await submitHandover({
-            media_asset_ids: mediaAssetIds,
-            actual_amount: amt,
-            notes: notes || undefined,
-          })
-          Alert.alert('Отправлено!', 'Запрос на передачу наличных отправлен на проверку')
-          setAttachments([]); setActualAmount(''); setNotes(''); setShowHandover(false); fetchData()
-        } catch (e) {
-          const msg = e?.response?.status === 404
-            ? 'Загрузка защищённых файлов временно недоступна. Обратитесь к администратору.'
-            : (e?.response?.data?.error?.message || 'Попробуйте ещё раз')
-          Alert.alert('Ошибка', msg)
-        } finally { setSubmitting(false) }
-      }},
-    ])
+  // No confirm/success/error Alert popups here — validation shows inline
+  // under the relevant field, and the result shows as an inline banner
+  // (in the sheet on failure, as a screen toast on success) instead.
+  const handleHandover = async () => {
+    setHandoverError(null)
+    const amt = parseFloat(actualAmount)
+    const amountBad = !amt || amt <= 0
+    const attachmentsBad = attachments.length === 0
+    setAmountError(amountBad ? 'Введите сумму перевода' : null)
+    setAttachError(attachmentsBad ? 'Прикрепите скриншот перевода' : null)
+    if (amountBad || attachmentsBad) return
+
+    setSubmitting(true)
+    try {
+      // Each attachment uploads through the centralized media pipeline
+      // only (category=cash_handover_proof, PRIVATE). This must never
+      // fall back to the legacy /uploads endpoint — see
+      // securePrivateUpload's doc comment in src/api/media.js. If the
+      // pipeline is unavailable or rejects a file, the upload throws
+      // and the catch below shows a clear error; nothing is sent
+      // anywhere else.
+      const results = await Promise.all(
+        attachments.map(a => securePrivateUpload({ uri: a.uri, type: a.type, name: a.name }, 'cash_handover_proof'))
+      )
+      const mediaAssetIds = results.map(r => r.asset.id)
+      await submitHandover({
+        media_asset_ids: mediaAssetIds,
+        actual_amount: amt,
+        notes: notes || undefined,
+      })
+      setAttachments([]); setActualAmount(''); setNotes(''); setShowHandover(false)
+      showToast({ type: 'ok', title: 'Отправлено на проверку', subtitle: `${fmt(amt)} TJS · диспетчер подтвердит` })
+      fetchData()
+    } catch (e) {
+      const msg = e?.response?.status === 404
+        ? 'Загрузка защищённых файлов временно недоступна. Обратитесь к администратору.'
+        : (e?.response?.data?.error?.message || 'Проверьте соединение и попробуйте ещё раз')
+      setHandoverError({ title: 'Не удалось отправить', subtitle: msg })
+    } finally { setSubmitting(false) }
   }
 
   // Earnings = courier's fixed delivery fee per delivered order (independent of
@@ -259,17 +288,21 @@ export default function CashScreen() {
     return true
   })
 
-  const openPeriodFilter = () => Alert.alert('Период', '', [
-    ...PERIOD_OPTIONS.map(o => ({ text: o.label, onPress: () => setPeriodFilter(o.key) })),
-    { text: 'Отмена', style: 'cancel' },
-  ])
-  const openStatusFilter = () => Alert.alert('Статус', '', [
-    ...STATUS_OPTIONS.map(o => ({ text: o.label, onPress: () => setStatusFilter(o.key) })),
-    { text: 'Отмена', style: 'cancel' },
-  ])
+  const POPOVER_WIDTH = 190
+  const measureAndOpen = (ref, key) => {
+    ref.current?.measure((x, y, width, height, pageX, pageY) => {
+      const screenW = Dimensions.get('window').width
+      setPopoverAnchor({
+        top: pageY + height + 8,
+        left: Math.max(16, Math.min(pageX, screenW - POPOVER_WIDTH - 16)),
+      })
+      setOpenFilter(key)
+    })
+  }
+  const togglePeriodPopover = () => openFilter === 'period' ? setOpenFilter(null) : measureAndOpen(periodChipRef, 'period')
+  const toggleStatusPopover = () => openFilter === 'status' ? setOpenFilter(null) : measureAndOpen(statusChipRef, 'status')
+  const toggleQuickPeriod = (key) => { setOpenFilter(null); animateLayout(); setPeriodFilter(prev => prev === key ? 'all' : key) }
 
-  const periodLabel = PERIOD_OPTIONS.find(o => o.key === periodFilter)?.label || 'Период'
-  const statusLabel = STATUS_OPTIONS.find(o => o.key === statusFilter)?.label || 'Статус'
   const amtNum = parseFloat(actualAmount) || 0
   const diff = amtNum - toReturn
   const hasDiff = amtNum > 0
@@ -288,6 +321,21 @@ export default function CashScreen() {
             <Text style={[s.headSub, { color: T.muted }]}>{dayjs().format('dddd, D MMMM')}</Text>
           </View>
         </View>
+
+        {/* Result banner — replaces the old "Отправлено!"/"Ошибка" Alert popups */}
+        {toast && (
+          <FadeSlideIn style={s.pageToast}>
+            <View style={[s.toastBanner, toast.type === 'ok' ? s.toastOk : s.toastErr]}>
+              <View style={[s.toastIcon, { backgroundColor: toast.type === 'ok' ? C.green : C.red }]}>
+                <Text style={s.toastIconText}>{toast.type === 'ok' ? '✓' : '!'}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.toastTitle, { color: toast.type === 'ok' ? '#1d8a48' : '#c02c22' }]}>{toast.title}</Text>
+                {!!toast.subtitle && <Text style={[s.toastSubtitle, { color: toast.type === 'ok' ? '#1d8a48' : '#c02c22' }]}>{toast.subtitle}</Text>}
+              </View>
+            </View>
+          </FadeSlideIn>
+        )}
 
         {loading
           ? (
@@ -328,7 +376,11 @@ export default function CashScreen() {
               <PressScale
                 style={[s.submitBtn, toReturn === 0 && s.submitBtnDisabled]}
                 scaleTo={0.96}
-                onPress={() => toReturn > 0 && setShowHandover(true)}
+                onPress={() => {
+                  if (toReturn === 0) return
+                  setAmountError(null); setAttachError(null); setHandoverError(null)
+                  setShowHandover(true)
+                }}
               >
                 <Text style={s.submitBtnText}>
                   {toReturn === 0 ? 'Касса сдана' : 'Сдать наличные'}
@@ -366,26 +418,44 @@ export default function CashScreen() {
             {/* Handover tab */}
             {cashTab === 'handover' && (
               <FadeSlideIn delay={140} from={10}>
-                <View style={s.filterRow}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow} contentContainerStyle={s.filterRowContent}>
                   <PressScale
                     scaleTo={0.94}
-                    style={[s.filterChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, periodFilter !== 'all' && s.filterChipActive]}
-                    onPress={openPeriodFilter}
+                    style={[s.quickChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, periodFilter === 'today' && s.quickChipOn]}
+                    onPress={() => toggleQuickPeriod('today')}
                   >
-                    <Text style={[s.filterChipText, { color: T.muted }, periodFilter !== 'all' && s.filterChipTextActive]}>
-                      {periodLabel} ▼
-                    </Text>
+                    <Text style={[s.quickChipText, { color: T.muted }, periodFilter === 'today' && s.quickChipTextOn]}>Сегодня</Text>
                   </PressScale>
                   <PressScale
                     scaleTo={0.94}
-                    style={[s.filterChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, statusFilter !== 'all' && s.filterChipActive]}
-                    onPress={openStatusFilter}
+                    style={[s.quickChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, periodFilter === 'week' && s.quickChipOn]}
+                    onPress={() => toggleQuickPeriod('week')}
                   >
-                    <Text style={[s.filterChipText, { color: T.muted }, statusFilter !== 'all' && s.filterChipTextActive]}>
-                      {statusLabel} ▼
-                    </Text>
+                    <Text style={[s.quickChipText, { color: T.muted }, periodFilter === 'week' && s.quickChipTextOn]}>Неделя</Text>
                   </PressScale>
-                </View>
+                  <View ref={periodChipRef} collapsable={false}>
+                    <PressScale
+                      scaleTo={0.94}
+                      style={[s.filterChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, (periodFilter === 'month' || openFilter === 'period') && s.filterChipActive]}
+                      onPress={togglePeriodPopover}
+                    >
+                      <Text style={[s.filterChipText, { color: T.muted }, (periodFilter === 'month' || openFilter === 'period') && s.filterChipTextActive]}>
+                        Период ⌄
+                      </Text>
+                    </PressScale>
+                  </View>
+                  <View ref={statusChipRef} collapsable={false}>
+                    <PressScale
+                      scaleTo={0.94}
+                      style={[s.filterChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, (statusFilter !== 'all' || openFilter === 'status') && s.filterChipActive]}
+                      onPress={toggleStatusPopover}
+                    >
+                      <Text style={[s.filterChipText, { color: T.muted }, (statusFilter !== 'all' || openFilter === 'status') && s.filterChipTextActive]}>
+                        Статус ⌄
+                      </Text>
+                    </PressScale>
+                  </View>
+                </ScrollView>
                 <View style={[s.histCard, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
                   {filteredHistory.length === 0 && (
                     <View style={{ padding: 24, alignItems: 'center' }}>
@@ -471,13 +541,14 @@ export default function CashScreen() {
               <View style={s.field}>
                 <Text style={s.fieldLabel}>Сумма перевода *</Text>
                 <TextInput
-                  style={s.amountInput}
+                  style={[s.amountInput, amountError && s.amountInputErr]}
                   placeholder="0"
                   placeholderTextColor={C.muted}
                   value={actualAmount}
-                  onChangeText={setActualAmount}
+                  onChangeText={(v) => { setActualAmount(v); if (amountError) setAmountError(null) }}
                   keyboardType="decimal-pad"
                 />
+                {amountError && <Text style={s.inlineErr}>⚠ {amountError}</Text>}
               </View>
 
               {hasDiff && (
@@ -505,12 +576,13 @@ export default function CashScreen() {
                   />
                 )}
                 {attachments.length < MAX_ATTACHMENTS && (
-                  <TouchableOpacity style={s.uploadArea} onPress={pickGallery} activeOpacity={0.7}>
+                  <TouchableOpacity style={[s.uploadArea, attachError && s.uploadAreaErr]} onPress={pickGallery} activeOpacity={0.7}>
                     <Text style={s.uploadPlus}>＋</Text>
                     <Text style={s.uploadText}>Добавить подтверждение</Text>
                     <Text style={s.uploadSub}>Галерея</Text>
                   </TouchableOpacity>
                 )}
+                {attachError && <Text style={s.inlineErr}>⚠ {attachError}</Text>}
               </View>
 
               <View style={s.field}>
@@ -525,10 +597,50 @@ export default function CashScreen() {
                 />
               </View>
 
+              {handoverError && (
+                <View style={[s.toastBanner, s.toastErr]}>
+                  <View style={[s.toastIcon, { backgroundColor: C.red }]}><Text style={s.toastIconText}>!</Text></View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.toastTitle, { color: '#c02c22' }]}>{handoverError.title}</Text>
+                    <Text style={[s.toastSubtitle, { color: '#c02c22' }]}>{handoverError.subtitle}</Text>
+                  </View>
+                  <TouchableOpacity onPress={handleHandover}><Text style={s.toastRetry}>Повторить</Text></TouchableOpacity>
+                </View>
+              )}
+
               <TouchableOpacity style={[s.submitBigBtn, submitting && { opacity: 0.5 }]} onPress={handleHandover} disabled={submitting}>
                 {submitting ? <ActivityIndicator color="#fff" /> : <Text style={s.submitBigBtnText}>↑ Отправить на проверку</Text>}
               </TouchableOpacity>
             </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Inline filter popover — replaces the old Alert.alert action sheets for
+          "Период"/"Статус". Positioned under the chip that opened it. */}
+      <Modal visible={!!openFilter} transparent animationType="fade" onRequestClose={() => setOpenFilter(null)}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpenFilter(null)}>
+          <Pressable
+            style={[s.popover, { top: popoverAnchor.top, left: popoverAnchor.left, backgroundColor: T.card, borderColor: T.cardEdge }]}
+            onPress={() => {}}
+          >
+            {(openFilter === 'period' ? PERIOD_OPTIONS : STATUS_OPTIONS).map(o => {
+              const selected = (openFilter === 'period' ? periodFilter : statusFilter) === o.key
+              return (
+                <TouchableOpacity
+                  key={o.key}
+                  style={[s.popItem, selected && { backgroundColor: T.chip }]}
+                  onPress={() => {
+                    if (openFilter === 'period') { animateLayout(); setPeriodFilter(o.key) }
+                    else { animateLayout(); setStatusFilter(o.key) }
+                    setOpenFilter(null)
+                  }}
+                >
+                  <Text style={[s.popItemText, { color: T.ink }, selected && s.popItemTextSel]}>{o.label}</Text>
+                  {selected && <Text style={s.popTick}>✓</Text>}
+                </TouchableOpacity>
+              )
+            })}
           </Pressable>
         </Pressable>
       </Modal>
@@ -578,12 +690,39 @@ const s = StyleSheet.create({
   kpiLabel:      { fontSize: 12, color: C.muted, fontWeight: '600', marginBottom: 6 },
   kpiValue:      { fontSize: 28, fontWeight: '700', color: C.ink, letterSpacing: -1 },
   kpiUnit:       { fontSize: 12, color: C.muted, fontWeight: '700', marginTop: 2 },
-  // Filter chips
-  filterRow:          { flexDirection: 'row', marginHorizontal: 18, gap: 10, marginBottom: 14 },
-  filterChip:         { backgroundColor: '#eef1f6', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)' },
+  // Filter chips — scrollable row: quick-toggle pills + two chips that open
+  // the inline popover below (see `popover` styles further down).
+  filterRow:          { marginBottom: 14 },
+  filterRowContent:   { flexDirection: 'row', paddingHorizontal: 18, gap: 10, alignItems: 'center' },
+  quickChip:          { height: 36, justifyContent: 'center', backgroundColor: '#eef1f6', borderRadius: 999, paddingHorizontal: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)' },
+  quickChipOn:        { backgroundColor: '#0f172a', borderColor: '#0f172a' },
+  quickChipText:      { fontSize: 13, fontWeight: '700', color: C.muted },
+  quickChipTextOn:    { color: '#fff' },
+  filterChip:         { height: 36, justifyContent: 'center', backgroundColor: '#eef1f6', borderRadius: 999, paddingHorizontal: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.62)' },
   filterChipActive:   { backgroundColor: 'rgba(10,132,255,0.14)', borderColor: C.blue },
   filterChipText:     { fontSize: 13, fontWeight: '600', color: C.muted },
   filterChipTextActive: { color: C.blue },
+  // Inline dropdown popover — replaces the old Alert.alert action sheet,
+  // positioned under whichever chip opened it (see `measureAndOpen`).
+  popover: {
+    position: 'absolute', width: 190, borderRadius: 16, borderWidth: 1, padding: 6,
+    shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.2, shadowRadius: 30, elevation: 10,
+  },
+  popItem:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 11, borderRadius: 10 },
+  popItemText:    { fontSize: 13.5, fontWeight: '600' },
+  popItemTextSel: { color: C.blue, fontWeight: '700' },
+  popTick:        { color: C.blue, fontWeight: '900' },
+  // Result banners — replace the old success/error/validation Alert popups
+  pageToast:      { marginHorizontal: 18, marginBottom: 14 },
+  toastBanner:    { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 18, padding: 14 },
+  toastOk:        { backgroundColor: '#e8f8f0' },
+  toastErr:       { backgroundColor: '#fdecec', marginTop: 14 },
+  toastIcon:      { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  toastIconText:  { color: '#fff', fontSize: 14, fontWeight: '700' },
+  toastTitle:     { fontSize: 13.5, fontWeight: '700' },
+  toastSubtitle:  { fontSize: 12, fontWeight: '600', marginTop: 2, opacity: 0.85 },
+  toastRetry:     { color: C.red, fontWeight: '800', fontSize: 13 },
+  inlineErr:      { color: C.red, fontWeight: '700', fontSize: 12, marginTop: 8 },
   histCard: { marginHorizontal: 18, backgroundColor: C.card, borderWidth: 1, borderColor: 'rgba(255,255,255,0.68)', borderRadius: 28, overflow: 'hidden', shadowColor: '#0f1f37', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 18, elevation: 2 },
   cashItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderBottomWidth: 1, borderBottomColor: C.line },
   receipt: { width: 50, height: 62, borderRadius: 10, backgroundColor: '#f8f8f8' },
@@ -602,10 +741,12 @@ const s = StyleSheet.create({
   field: {},
   fieldLabel: { fontSize: 14, color: C.muted, fontWeight: '700', marginBottom: 10 },
   amountInput: { borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.62)', backgroundColor: '#eef1f6', borderRadius: 22, paddingVertical: 18, fontSize: 28, fontWeight: '700', textAlign: 'center', color: C.ink },
+  amountInputErr: { borderColor: C.red },
   diffRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1 },
   diffLabel: { fontSize: 13, fontWeight: '700', color: C.muted },
   diffVal: { fontSize: 15, fontWeight: '700' },
   uploadArea: { borderWidth: 1.5, borderColor: 'rgba(120,144,180,0.40)', borderStyle: 'dashed', borderRadius: 22, paddingVertical: 24, alignItems: 'center', backgroundColor: '#eef1f6' },
+  uploadAreaErr: { borderColor: C.red },
   uploadPlus: { fontSize: 34, fontWeight: '700', color: C.ink, marginBottom: 8 },
   uploadText: { fontSize: 16, fontWeight: '700', color: C.muted },
   uploadSub: { fontSize: 12, color: C.muted, marginTop: 4 },
