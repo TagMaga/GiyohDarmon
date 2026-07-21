@@ -17,6 +17,7 @@ import Modal from '../../../shared/components/Modal'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { fmtAmount } from '../../../shared/orderStatusConfig'
 import useCurrentUser from '../../../shared/hooks/useCurrentUser'
+import { generateUUID } from '../../../shared/utils/uuid'
 import usePayables from '../hooks/usePayables'
 import useCreatePayouts from '../hooks/useCreatePayouts'
 import usePayeePayoutHistory from '../hooks/usePayeePayoutHistory'
@@ -67,7 +68,7 @@ export default function TeamLeadSellerFinanceDetailPage() {
         period_end: to,
         method,
         note: '',
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: generateUUID(),
       })
       setConfirmOpen(false)
       toast.success('Выплата проведена · появится в Финансах владельца')
