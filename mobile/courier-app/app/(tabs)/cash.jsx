@@ -255,13 +255,13 @@ export default function CashScreen() {
     date: o.delivered_at ?? o.assigned_at ?? o.created_at,
     address: o.customer_address ?? o.customer?.address,
   }))
-  const earningsTotal = earnings.reduce((sum, e) => sum + e.fee, 0)
   const toReturn  = Math.max(0, Number(summary?.cash_to_handover || 0))
   const salary    = Number(summary?.total_delivery_fees || 0)
   const collected = toReturn + salary
   const cashOrders = summary?.orders_collected || 0
+  // Pending-review amount on the hero card is a real-time status, not tied
+  // to the display filters below — it always reflects the full history.
   const pendingHandover = history.filter(h => h.status === 'pending').reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0)
-  const totalHandedOver = history.filter(h => h.status === 'confirmed').reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0)
 
   const PERIOD_OPTIONS = [
     { key: 'all',   label: 'Все' },
@@ -276,17 +276,26 @@ export default function CashScreen() {
     { key: 'rejected',  label: 'Отклонено' },
   ]
 
+  const withinPeriod = (dateStr) => {
+    if (periodFilter === 'all' || !dateStr) return true
+    const d = dayjs(dateStr)
+    const now = dayjs()
+    if (periodFilter === 'today' && !d.isSame(now, 'day')) return false
+    if (periodFilter === 'week'  && d.isBefore(now.subtract(7,  'day'))) return false
+    if (periodFilter === 'month' && d.isBefore(now.subtract(30, 'day'))) return false
+    return true
+  }
+
   const filteredHistory = history.filter(h => {
     if (statusFilter !== 'all' && h.status !== statusFilter) return false
-    if (periodFilter !== 'all' && h.created_at) {
-      const d = dayjs(h.created_at)
-      const now = dayjs()
-      if (periodFilter === 'today' && !d.isSame(now, 'day')) return false
-      if (periodFilter === 'week'  && d.isBefore(now.subtract(7,  'day'))) return false
-      if (periodFilter === 'month' && d.isBefore(now.subtract(30, 'day'))) return false
-    }
-    return true
+    return withinPeriod(h.created_at)
   })
+  const filteredEarnings = earnings.filter(e => withinPeriod(e.date))
+
+  // The KPI totals mirror whatever the period/status chips below currently
+  // select, so they always match the list the courier is looking at.
+  const totalHandedOver = filteredHistory.reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0)
+  const earningsTotal = filteredEarnings.reduce((sum, e) => sum + e.fee, 0)
 
   const POPOVER_WIDTH = 190
   const measureAndOpen = (ref, key) => {
@@ -395,7 +404,7 @@ export default function CashScreen() {
               <PressScale
                 style={[s.kpiCard, { backgroundColor: T.chip, borderColor: T.chipEdge }, cashTab === 'handover' && s.kpiCardActive, cashTab === 'handover' && { backgroundColor: T.card }]}
                 scaleTo={0.95}
-                onPress={() => { animateLayout(); setCashTab('handover') }}
+                onPress={() => { setOpenFilter(null); animateLayout(); setCashTab('handover') }}
               >
                 <Sheen radius={20} />
                 <Text style={[s.kpiLabel, { color: T.muted }]}>Сдано наличных</Text>
@@ -405,7 +414,7 @@ export default function CashScreen() {
               <PressScale
                 style={[s.kpiCard, { backgroundColor: T.chip, borderColor: T.chipEdge }, cashTab === 'earnings' && s.kpiCardActive, cashTab === 'earnings' && { backgroundColor: T.card }]}
                 scaleTo={0.95}
-                onPress={() => { animateLayout(); setCashTab('earnings') }}
+                onPress={() => { setOpenFilter(null); animateLayout(); setCashTab('earnings') }}
               >
                 <Sheen radius={20} />
                 <Text style={[s.kpiLabel, { color: T.muted }]}>Заработки</Text>
@@ -415,35 +424,38 @@ export default function CashScreen() {
             </View>
             </FadeSlideIn>
 
-            {/* Handover tab */}
-            {cashTab === 'handover' && (
-              <FadeSlideIn delay={140} from={10}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow} contentContainerStyle={s.filterRowContent}>
+            {/* Filter chips — shared by both tabs (KPI totals above and the
+                lists below both derive from these), so they stay visible
+                regardless of which KPI card is selected. "Статус" only
+                applies to handovers, so it's hidden on the earnings tab. */}
+            <FadeSlideIn delay={140}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.filterRow} contentContainerStyle={s.filterRowContent}>
+                <PressScale
+                  scaleTo={0.94}
+                  style={[s.quickChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, periodFilter === 'today' && s.quickChipOn]}
+                  onPress={() => toggleQuickPeriod('today')}
+                >
+                  <Text style={[s.quickChipText, { color: T.muted }, periodFilter === 'today' && s.quickChipTextOn]}>Сегодня</Text>
+                </PressScale>
+                <PressScale
+                  scaleTo={0.94}
+                  style={[s.quickChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, periodFilter === 'week' && s.quickChipOn]}
+                  onPress={() => toggleQuickPeriod('week')}
+                >
+                  <Text style={[s.quickChipText, { color: T.muted }, periodFilter === 'week' && s.quickChipTextOn]}>Неделя</Text>
+                </PressScale>
+                <View ref={periodChipRef} collapsable={false}>
                   <PressScale
                     scaleTo={0.94}
-                    style={[s.quickChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, periodFilter === 'today' && s.quickChipOn]}
-                    onPress={() => toggleQuickPeriod('today')}
+                    style={[s.filterChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, (periodFilter === 'month' || openFilter === 'period') && s.filterChipActive]}
+                    onPress={togglePeriodPopover}
                   >
-                    <Text style={[s.quickChipText, { color: T.muted }, periodFilter === 'today' && s.quickChipTextOn]}>Сегодня</Text>
+                    <Text style={[s.filterChipText, { color: T.muted }, (periodFilter === 'month' || openFilter === 'period') && s.filterChipTextActive]}>
+                      Период ⌄
+                    </Text>
                   </PressScale>
-                  <PressScale
-                    scaleTo={0.94}
-                    style={[s.quickChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, periodFilter === 'week' && s.quickChipOn]}
-                    onPress={() => toggleQuickPeriod('week')}
-                  >
-                    <Text style={[s.quickChipText, { color: T.muted }, periodFilter === 'week' && s.quickChipTextOn]}>Неделя</Text>
-                  </PressScale>
-                  <View ref={periodChipRef} collapsable={false}>
-                    <PressScale
-                      scaleTo={0.94}
-                      style={[s.filterChip, { backgroundColor: T.chip, borderColor: T.chipEdge }, (periodFilter === 'month' || openFilter === 'period') && s.filterChipActive]}
-                      onPress={togglePeriodPopover}
-                    >
-                      <Text style={[s.filterChipText, { color: T.muted }, (periodFilter === 'month' || openFilter === 'period') && s.filterChipTextActive]}>
-                        Период ⌄
-                      </Text>
-                    </PressScale>
-                  </View>
+                </View>
+                {cashTab === 'handover' && (
                   <View ref={statusChipRef} collapsable={false}>
                     <PressScale
                       scaleTo={0.94}
@@ -455,7 +467,13 @@ export default function CashScreen() {
                       </Text>
                     </PressScale>
                   </View>
-                </ScrollView>
+                )}
+              </ScrollView>
+            </FadeSlideIn>
+
+            {/* Handover tab */}
+            {cashTab === 'handover' && (
+              <FadeSlideIn delay={0} from={10}>
                 <View style={[s.histCard, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
                   {filteredHistory.length === 0 && (
                     <View style={{ padding: 24, alignItems: 'center' }}>
@@ -499,12 +517,14 @@ export default function CashScreen() {
             {cashTab === 'earnings' && (
               <FadeSlideIn delay={0} from={10}>
               <View style={[s.histCard, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
-                {earnings.length === 0 ? (
+                {filteredEarnings.length === 0 ? (
                   <View style={{ padding: 24, alignItems: 'center' }}>
-                    <Text style={{ color: T.muted, fontWeight: '600' }}>Пока нет доставленных заказов</Text>
+                    <Text style={{ color: T.muted, fontWeight: '600' }}>
+                      {earnings.length === 0 ? 'Пока нет доставленных заказов' : 'Нет записей по фильтру'}
+                    </Text>
                   </View>
-                ) : earnings.map((e, i) => (
-                  <View key={e.id || i} style={[s.cashItem, { borderBottomColor: T.hairline }, i === earnings.length - 1 && { borderBottomWidth: 0 }]}>
+                ) : filteredEarnings.map((e, i) => (
+                  <View key={e.id || i} style={[s.cashItem, { borderBottomColor: T.hairline }, i === filteredEarnings.length - 1 && { borderBottomWidth: 0 }]}>
                     <View style={s.earnIcon}><Text style={{ fontSize: 20 }}>💰</Text></View>
                     <View style={{ flex: 1 }}>
                       <Text style={[s.cashItemTitle, { color: T.ink }]}>Доставка {e.number}</Text>
