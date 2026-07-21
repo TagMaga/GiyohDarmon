@@ -26,6 +26,11 @@ export default function RejectPrepaymentModal({ open, onClose, order }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.board })
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.newOrders })
+      const id = getOrderId(order)
+      if (id) {
+        qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(id) })
+        qc.invalidateQueries({ queryKey: KEYS.dispatcher.prepayments(id) })
+      }
       toast.success('Предоплата отклонена')
       handleClose()
     },

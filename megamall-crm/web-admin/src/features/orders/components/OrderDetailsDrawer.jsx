@@ -4,21 +4,55 @@
  * Shows:
  *   - Customer: name, phone, address
  *   - Order: product, qty, total, delivery fee, net revenue
+ *   - Prepayment: status and any submitted proof screenshots
+ *   - Files: order attachments (e.g. payment proof, customer chat)
  *   - Assignment: seller, manager, team lead, team
  *   - Financial breakdown from finance events (if available)
  *
  * Owner read-only — no action buttons for order workflow.
  */
 import { useState } from 'react'
-import { X, User2, Package, Users2, TrendingUp, Loader2, MessageCircle } from 'lucide-react'
+import { X, User2, Package, Users2, TrendingUp, Loader2, MessageCircle, Banknote, Paperclip, ZoomIn, CheckCircle } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import Badge from '../../../shared/components/Badge'
 import { STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import { useOwnerOrder, useOrderFinanceEvents } from '../hooks/useOwnerOrder'
 import { formatOrderLabel } from '../../../features/dispatcher/utils/orderHelpers'
 import { fetchCities } from '../../seller/api'
+import { fetchOrderPrepayments } from '../../dispatcher/api'
 import { KEYS } from '../../../shared/queryKeys'
 import OrderCommentsPanel from './OrderCommentsPanel'
+
+const PREPAY_STATUS_LABEL = {
+  pending_verification: { label: '⏳ Ожидает проверки',       accent: 'text-amber-700' },
+  verified:             { label: '✓ Предоплата подтверждена', accent: 'text-emerald-700' },
+  rejected:             { label: '✗ Отклонена',               accent: 'text-rose-600' },
+}
+
+function ProofThumb({ url, title }) {
+  if (!url) return null
+  const isImage = /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url)
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      title={title}
+      className="group relative flex-shrink-0 w-9 h-9 rounded-lg overflow-hidden block border border-slate-200 bg-slate-50"
+    >
+      {isImage ? (
+        <>
+          <img src={url} alt={title} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/50">
+            <ZoomIn size={12} className="text-white" />
+          </div>
+        </>
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-base">📄</div>
+      )}
+    </a>
+  )
+}
 
 const EVENT_LABEL = {
   seller_commission:       'Комиссия продавца',
@@ -65,6 +99,13 @@ function OrderContent({ orderId, userMap, teamMap }) {
     staleTime: 10 * 60 * 1000,
   })
   const citiesById = Object.fromEntries(cities.map((c) => [c.id, c.name]))
+
+  const { data: prepayments = [] } = useQuery({
+    queryKey: KEYS.dispatcher.prepayments(orderId),
+    queryFn:  () => fetchOrderPrepayments(orderId),
+    enabled:  !!orderId && !!(order?.prepayment_required || order?.prepayment_amount > 0),
+    staleTime: 30_000,
+  })
 
   if (orderLoading) {
     return (
@@ -117,6 +158,10 @@ function OrderContent({ orderId, userMap, teamMap }) {
 
   // Items list (when available from single-order fetch)
   const items = order.items ?? []
+  const attachments = Array.isArray(order.attachments) ? order.attachments : []
+  const prepayAmt = Number(field('prepayment_amount', 'PrepaymentAmount') ?? 0)
+  const prepayStatus = field('prepayment_status', 'PrepaymentStatus')
+  const prepayInfo = prepayStatus ? PREPAY_STATUS_LABEL[prepayStatus] : null
 
   return (
     <div className="space-y-6">
@@ -161,6 +206,45 @@ function OrderContent({ orderId, userMap, teamMap }) {
         <Row label="Итого к оплате" value={`${fmtAmount(total)} с`} accent="text-slate-900 font-bold" />
         <Row label="Чистая выручка" value={`${fmtAmount(netRevenue)} с`} accent="text-emerald-700" />
       </Section>
+
+      {/* Prepayment */}
+      {(prepayAmt > 0 || prepayments.length > 0) && (
+        <Section icon={<Banknote size={14} />} title="Предоплата">
+          {prepayInfo && (
+            <div className={`text-xs font-semibold ${prepayInfo.accent}`}>{prepayInfo.label}</div>
+          )}
+          {prepayments.map((p, i) => (
+            <div key={p.id ?? i} className="flex items-center justify-between gap-2 py-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <ProofThumb url={p.proof_url} title="Скриншот оплаты" />
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold tabular-nums text-slate-800">{fmtAmount(p.amount)} с</div>
+                  <div className="text-[10px] text-slate-400">{fmtDate(p.created_at)}</div>
+                </div>
+              </div>
+              {p.verified_at
+                ? <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 flex-shrink-0"><CheckCircle size={11} />Подтверждена</span>
+                : <span className="text-[10px] text-amber-700 flex-shrink-0">Ожидает</span>
+              }
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {/* Files */}
+      {attachments.length > 0 && (
+        <Section icon={<Paperclip size={14} />} title={`Файлы · ${attachments.length}`}>
+          <div className="flex flex-wrap gap-2">
+            {attachments.map((att) => (
+              <ProofThumb
+                key={att.id}
+                url={att.file_url}
+                title={att.type === 'payment_proof' ? 'Скриншот оплаты' : att.type === 'customer_chat' ? 'Переписка' : 'Файл'}
+              />
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Assignment */}
       <Section icon={<Users2 size={14} />} title="Ответственные">

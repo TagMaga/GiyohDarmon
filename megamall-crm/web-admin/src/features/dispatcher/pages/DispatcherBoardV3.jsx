@@ -264,7 +264,13 @@ function DispatcherBoardDesktop() {
   })
   const { mutate: doVerifyPrepayment, isPending: isVerifyingPrepayment } = useMutation({
     mutationFn: (order) => verifyPrepayment(requiredOrderId(order)),
-    onSuccess: () => { invalidate(); toast.success('Предоплата подтверждена') },
+    onSuccess: (_, order) => {
+      invalidate()
+      const orderId = requiredOrderId(order)
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(orderId) })
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.prepayments(orderId) })
+      toast.success('Предоплата подтверждена')
+    },
     onError: onErr,
   })
   const { mutate: doConfirmTransaction, isPending: confirmingTransaction } = useMutation({
