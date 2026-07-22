@@ -98,7 +98,7 @@ export default function OrderDetailSheet({ order, open, onClose, customerMap, co
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
             <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.04em', color: C.text3 }}>Получить</div>
             <div style={{ fontSize: 22, fontWeight: 900, color: C.violetDk, lineHeight: 1.1 }}>
-              {fmt(amountToCollect)}<span style={{ fontSize: 11, fontWeight: 600, color: C.text3 }}> сом</span>
+              {fmt(amountToCollect)}<span style={{ fontSize: 11, fontWeight: 600, color: C.text3 }}> c</span>
             </div>
           </div>
         </div>
@@ -137,7 +137,7 @@ export default function OrderDetailSheet({ order, open, onClose, customerMap, co
         ) : items.map((item, i) => (
           <div key={item.id ?? i} style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: i < items.length - 1 ? `1px solid ${C.border2}` : 'none' }}>
             <span style={{ fontSize: 12.5 }}>{item.product_name ?? item.name} <span style={{ fontSize: 10.5, color: C.text3 }}>×{item.quantity ?? 1}</span></span>
-            <span style={{ fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: C.text2 }}>{fmt(item.total_price ?? item.price ?? 0)} сом</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: C.text2 }}>{fmt(item.total_price ?? item.price ?? 0)} c</span>
           </div>
         ))}
       </div>
@@ -146,12 +146,12 @@ export default function OrderDetailSheet({ order, open, onClose, customerMap, co
       <div style={{ padding: '13px 4px 4px', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', color: C.text3 }}>Финансы</div>
       <div style={{ padding: '0 4px 14px', borderBottom: `1px solid ${C.border2}` }}>
         <div style={{ background: C.cardAlt, border: `1px solid ${C.border}`, borderRadius: 13, padding: '12px 13px' }}>
-          <FinRow label="Товары" value={`${fmt(productTotal)} сом`} />
-          <FinRow label={`Доставка${isExpress ? ' ⚡' : ''}`} value={deliveryFee > 0 ? `${fmt(deliveryFee)} сом` : 'Бесплатно'} color={deliveryFee > 0 ? C.amber : C.green} />
-          {prepayAmt > 0 && <FinRow label="Предоплата" value={`−${fmt(prepayAmt)} сом`} color={C.green} />}
+          <FinRow label="Товары" value={`${fmt(productTotal)} c`} />
+          <FinRow label={`Доставка${isExpress ? ' ⚡' : ''}`} value={deliveryFee > 0 ? `${fmt(deliveryFee)} c` : 'Бесплатно'} color={deliveryFee > 0 ? C.amber : C.green} />
+          {prepayAmt > 0 && <FinRow label="Предоплата" value={`−${fmt(prepayAmt)} c`} color={C.green} />}
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, marginTop: 2, borderTop: `1px solid ${C.border}` }}>
             <span style={{ fontSize: 12.5, fontWeight: 800, color: C.text2 }}>Курьер получит</span>
-            <span style={{ fontSize: 15, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: C.violetDk }}>{fmt(amountToCollect)} сом</span>
+            <span style={{ fontSize: 15, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: C.violetDk }}>{fmt(amountToCollect)} c</span>
           </div>
         </div>
         {prepayStatus === 'pending_verification' && (

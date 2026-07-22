@@ -361,13 +361,13 @@ const DELIVERY_TYPES = [
   { key: 'fast',   label: 'Срочная доставка' },
 ]
 const TARIFF_TYPES = [
-  { key: 'fixed',   label: 'Фиксированная (сом)' },
+  { key: 'fixed',   label: 'Фиксированная (c)' },
   { key: 'percent', label: 'Процент (%)' },
 ]
 const fmtRule = (r) => {
-  const from = `${r.amount_from} сом`
-  const to   = r.amount_to != null ? `${r.amount_to} сом` : '∞'
-  const val  = r.tariff_type === 'percent' ? `${r.tariff_value}%` : `${r.tariff_value} сом`
+  const from = `${r.amount_from} c`
+  const to   = r.amount_to != null ? `${r.amount_to} c` : '∞'
+  const val  = r.tariff_type === 'percent' ? `${r.tariff_value}%` : `${r.tariff_value} c`
   return `${from} – ${to} → ${val}`
 }
 
@@ -472,11 +472,11 @@ export function TariffsModal({ courier, onClose }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             <div>
-              <Label>Сумма от (сом)</Label>
+              <Label>Сумма от (c)</Label>
               <input style={field.base} type="number" min="0" value={form.amount_from} onChange={setF('amount_from')} placeholder="0" />
             </div>
             <div>
-              <Label>Сумма до (сом)</Label>
+              <Label>Сумма до (c)</Label>
               <input style={field.base} type="number" min="0" value={form.amount_to} onChange={setF('amount_to')} placeholder="∞ (без ограничений)" />
             </div>
           </div>
@@ -492,7 +492,7 @@ export function TariffsModal({ courier, onClose }) {
               <input
                 style={field.base} type="number" min="0" step="0.01"
                 value={form.tariff_value} onChange={setF('tariff_value')}
-                placeholder={form.tariff_type === 'percent' ? '5 (= 5%)' : '15 (сом)'}
+                placeholder={form.tariff_type === 'percent' ? '5 (= 5%)' : '15 (c)'}
               />
             </div>
           </div>
@@ -528,13 +528,13 @@ export function TariffsModal({ courier, onClose }) {
               >
                 <div>
                   <span style={{ fontSize: 13, color: T.text2 }}>
-                    {r.amount_from} – {r.amount_to != null ? r.amount_to : '∞'} сом
+                    {r.amount_from} – {r.amount_to != null ? r.amount_to : '∞'} c
                   </span>
                   <span style={{ margin: '0 8px', color: T.text3 }}>→</span>
                   <span style={{ fontWeight: 700, color: T.text1, fontSize: 14 }}>
                     {r.tariff_type === 'percent'
                       ? `${r.tariff_value}%`
-                      : `${r.tariff_value} сом`}
+                      : `${r.tariff_value} c`}
                   </span>
                   <span style={{ marginLeft: 8, fontSize: 11, color: T.text3 }}>
                     ({r.tariff_type === 'percent' ? 'процент' : 'фиксировано'})

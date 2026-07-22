@@ -88,7 +88,7 @@ Goose, sequential `migrations/NNNNN_description.sql` files with `-- +goose Up` /
 - `features/<domain>/` — `api.js` (thin axios wrappers + `unwrap()` for the `{success, data}` envelope), `hooks/` (TanStack Query hooks), `pages/`, `components/`. Query keys are centralized in `shared/queryKeys.js` (`KEYS.<domain>.<name>`) — never inline a query key array.
 - `shared/hooks/useCurrentUser.js` decodes the JWT client-side for `{userId, role}`; `shared/store/authStore` (zustand) holds the token.
 - `Modal.jsx` (`shared/components/`) is the shared dialog primitive and already renders as a bottom sheet on mobile (`items-end` + `rounded-t-*`) / centered modal on desktop — reuse it instead of building a new sheet/drawer component.
-- Currency is always shown as the "смн" abbreviation in copy, never a symbol.
+- Currency is always shown as the "c" abbreviation in copy, never a symbol.
 
 ## Workflow rules (permanent)
 

@@ -90,7 +90,7 @@ export function CourierDetailSheet({ courierId, couriers, open, onClose }) {
         <StatBox label="Активных заказов" value={Number(courier.active_orders ?? 0)} />
         <StatBox label="Доставлено всего" value={fmt(settlement?.delivered ?? 0)} color={C.green} />
         <StatBox label="Успех доставки" value={settlement?.success_rate != null ? `${Math.round(settlement.success_rate)}%` : '—'} />
-        <StatBox label="К сдаче" value={`${fmt(courier.cash_owed ?? 0)} сом`} color={C.red} />
+        <StatBox label="К сдаче" value={`${fmt(courier.cash_owed ?? 0)} c`} color={C.red} />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px 10px' }}>
@@ -114,7 +114,7 @@ export function CourierDetailSheet({ courierId, couriers, open, onClose }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
             <select value={form.tariff_type} onChange={(e) => setForm((p) => ({ ...p, tariff_type: e.target.value }))} style={miniInput}>
-              <option value="fixed">Фикс. (сом)</option>
+              <option value="fixed">Фикс. (c)</option>
               <option value="percent">Процент (%)</option>
             </select>
             <input placeholder="Значение" type="number" value={form.tariff_value} onChange={(e) => setForm((p) => ({ ...p, tariff_value: e.target.value }))} style={miniInput} />
@@ -130,9 +130,9 @@ export function CourierDetailSheet({ courierId, couriers, open, onClose }) {
           <div style={{ padding: '12px 0', textAlign: 'center', fontSize: 11.5, color: C.text3 }}>Тарифов нет</div>
         ) : visibleTariffs.map((tf, i) => (
           <div key={tf.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: i < visibleTariffs.length - 1 ? `1px solid ${C.border2}` : 'none' }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600 }}>{tf.amount_from}–{tf.amount_to != null ? tf.amount_to : '∞'} сом</div>
+            <div style={{ fontSize: 12.5, fontWeight: 600 }}>{tf.amount_from}–{tf.amount_to != null ? tf.amount_to : '∞'} c</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{tf.tariff_type === 'percent' ? `${tf.tariff_value}%` : `${tf.tariff_value} сом`}</div>
+              <div style={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{tf.tariff_type === 'percent' ? `${tf.tariff_value}%` : `${tf.tariff_value} c`}</div>
               <button onClick={() => removeTariff(tf.id)} style={{ border: 'none', background: 'transparent', color: C.red, cursor: 'pointer', display: 'flex' }}><Trash2 size={13} /></button>
             </div>
           </div>
@@ -210,7 +210,7 @@ export function FleetSheet({ open, onClose, couriers, onSelect }) {
                 <a href={`tel:${c.phone}`} onClick={(e) => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, color: C.green, padding: '5px 10px', borderRadius: 9, background: C.greenBg }}>
                   <Phone size={11} />Позвонить
                 </a>
-                <span style={{ fontSize: 11.5, fontWeight: 700, color: C.green }}>{fmt(c.cash_owed ?? 0)} сом</span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: C.green }}>{fmt(c.cash_owed ?? 0)} c</span>
               </div>
             </button>
           )

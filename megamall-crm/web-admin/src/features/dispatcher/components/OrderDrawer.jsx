@@ -185,7 +185,7 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
           )}
           {/* Total amount */}
           <span className="text-xs font-bold tabular-nums ml-auto flex-shrink-0" style={{ color: TEXT2 }}>
-            {fmt(totalOrderAmt)} сом
+            {fmt(totalOrderAmt)} c
           </span>
           <span className="text-[10px] font-mono flex-shrink-0" style={{ color: TEXT3 }}>{fmtDate(o.created_at)}</span>
           <button
@@ -240,7 +240,7 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
               {amountToCollect > 0
                 ? <div className="text-xl font-bold tabular-nums leading-none" style={{ color: VIOLET }}>
                     {fmt(amountToCollect)}
-                    <span className="text-[10px] font-normal ml-0.5" style={{ color: TEXT3 }}>сом</span>
+                    <span className="text-[10px] font-normal ml-0.5" style={{ color: TEXT3 }}>c</span>
                   </div>
                 : <div className="text-sm font-bold" style={{ color: GREEN }}>✓ Оплачено</div>
               }
@@ -262,7 +262,7 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
                 <span className="text-[10px]" style={{ color: TEXT3 }}>· {courierDisp.label}</span>
               )}
               {courierCash > 0 && (
-                <span className="text-[10px] ml-auto tabular-nums" style={{ color: AMBER }}>💰 {fmt(courierCash)} сом</span>
+                <span className="text-[10px] ml-auto tabular-nums" style={{ color: AMBER }}>💰 {fmt(courierCash)} c</span>
               )}
             </div>
           ) : ['confirmed', 'new'].includes(o.status) ? (
@@ -294,7 +294,7 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
                       <span className="ml-1.5 text-[10px]" style={{ color: TEXT3 }}>×{item.quantity ?? 1}</span>
                     </span>
                     <span className="text-xs font-semibold tabular-nums flex-shrink-0" style={{ color: TEXT2 }}>
-                      {fmt(item.total_price ?? item.price ?? 0)} сом
+                      {fmt(item.total_price ?? item.price ?? 0)} c
                     </span>
                   </div>
                 ))}
@@ -308,16 +308,16 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
           <SectionHeader icon={<Banknote size={10} />} title="Финансы" />
           <div style={{ borderBottom: `1px solid ${BORDER2}` }}>
             <div className="mx-4 mb-3 rounded-xl p-3 space-y-1.5" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-              <PayRow label="Товары"                     value={`${fmt(productTotal)} сом`} />
+              <PayRow label="Товары"                     value={`${fmt(productTotal)} c`} />
               <PayRow
                 label={`Доставка${isExpress ? ' ⚡' : ''}`}
-                value={deliveryFee > 0 ? `${fmt(deliveryFee)} сом` : 'Бесплатно'}
+                value={deliveryFee > 0 ? `${fmt(deliveryFee)} c` : 'Бесплатно'}
                 valueColor={deliveryFee > 0 ? AMBER : GREEN}
               />
               {prepayAmt > 0 && (
                 <PayRow
                   label={payLabel === 'full_prepayment' ? 'Предоплата (полная)' : 'Предоплата (частичная)'}
-                  value={`−${fmt(prepayAmt)} сом`}
+                  value={`−${fmt(prepayAmt)} c`}
                   valueColor={GREEN}
                 />
               )}
@@ -325,7 +325,7 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold" style={{ color: TEXT2 }}>Курьер получит</span>
                   {amountToCollect > 0
-                    ? <span className="text-base font-bold tabular-nums" style={{ color: VIOLET }}>{fmt(amountToCollect)} сом</span>
+                    ? <span className="text-base font-bold tabular-nums" style={{ color: VIOLET }}>{fmt(amountToCollect)} c</span>
                     : <span className="text-sm font-bold" style={{ color: GREEN }}>✓ Оплачено</span>
                   }
                 </div>
@@ -409,7 +409,7 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
                           </a>
                         )}
                         <div className="min-w-0">
-                          <div className="text-xs font-semibold tabular-nums" style={{ color: TEXT1 }}>{fmt(p.amount)} сом</div>
+                          <div className="text-xs font-semibold tabular-nums" style={{ color: TEXT1 }}>{fmt(p.amount)} c</div>
                           <div className="text-[10px]" style={{ color: TEXT3 }}>{fmtDate(p.created_at)}</div>
                         </div>
                       </div>

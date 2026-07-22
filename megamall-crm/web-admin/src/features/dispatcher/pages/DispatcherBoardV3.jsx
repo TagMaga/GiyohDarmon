@@ -771,7 +771,7 @@ function CourierCard({ courier, selected, pending, hasSelectedOrder, onSelect })
       </div>
       <div className="dv2-courier-row">
         <span>Активных <strong>{active}</strong></span>
-        <span className="dv2-cash">{fmt(cash)} сом</span>
+        <span className="dv2-cash">{fmt(cash)} c</span>
       </div>
       {Array.isArray(courier.city_names) && courier.city_names.length > 0 && (
         <div className="dv2-courier-cities">
@@ -924,7 +924,7 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
       <div className="dv2-oc-name">{customer.full_name || customer.phone || 'Клиент —'}</div>
       <div className="dv2-oc-addr">{address}</div>
       <div className="dv2-oc-foot">
-        <div className="dv2-oc-amount">{fmt(order.total_amount)} сом</div>
+        <div className="dv2-oc-amount">{fmt(order.total_amount)} c</div>
         <div className="dv2-oc-courier"><span className="dv2-oc-dot" /><span>{courierDisp.name || 'Без курьера'}</span></div>
       </div>
       <div className="dv2-oc-actions" onClick={(e) => e.stopPropagation()}>
@@ -969,7 +969,7 @@ function DetailPanel({ order, customerMap, courierMap, onClose, onAction }) {
                 <div className="dv2-info-grid">
                   <Info label="Клиент" value={customer.full_name || '—'} />
                   <Info label="Телефон" value={customer.phone || '—'} />
-                  <Info label="Сумма" value={`${fmt(order.total_amount)} сом`} />
+                  <Info label="Сумма" value={`${fmt(order.total_amount)} c`} />
                   <Info label="Возраст" value={orderAge(order) || '—'} />
                   <Info full label="Адрес" value={resolveAddress(order) || customer?.address || resolveCity(order) || customer?.city || '—'} />
                 </div>
@@ -1082,8 +1082,8 @@ function CashView({ rows, couriers, loading, error, onRetry, onCourierUpdated })
                 <td><span className="dv2-cash-num red">{fmt(row.failed ?? 0)}</span></td>
                 <td>{formatPercent(row.success_rate)}</td>
                 <td>{formatDuration(row.avg_delivery_seconds)}</td>
-                <td><span className="dv2-cash-num red">{fmt(row.cash_debt ?? 0)} сом</span></td>
-                <td><span className="dv2-cash-num purple">{fmt(row.earnings ?? 0)} сом</span></td>
+                <td><span className="dv2-cash-num red">{fmt(row.cash_debt ?? 0)} c</span></td>
+                <td><span className="dv2-cash-num purple">{fmt(row.earnings ?? 0)} c</span></td>
                 <td>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     <button title="Изменить" onClick={() => setEditTarget(courier)} style={{ background: 'rgba(139,92,246,0.12)', border: 'none', borderRadius: 7, color: '#8b5cf6', cursor: 'pointer', padding: '6px 8px', display: 'flex', alignItems: 'center' }}><Pencil size={14} /></button>
@@ -1583,9 +1583,9 @@ function AmountRangePicker({ min, max, open, onOpen, onApply }) {
 
 function amountRangeLabel(min, max) {
   if (!min && !max) return 'Сумма'
-  if (min && max) return `${min}–${max} сом`
-  if (min) return `от ${min} сом`
-  return `до ${max} сом`
+  if (min && max) return `${min}–${max} c`
+  if (min) return `от ${min} c`
+  return `до ${max} c`
 }
 
 function CashMetric({ label, value, tone }) {
@@ -1620,8 +1620,8 @@ function CashCourierCard({ row }) {
         <Info label="Неудача" value={fmt(row.failed ?? 0)} />
         <Info label="Успех" value={formatPercent(row.success_rate)} />
         <Info label="Ср. время" value={formatDuration(row.avg_delivery_seconds)} />
-        <Info label="Долг" value={`${fmt(row.cash_debt ?? 0)} сом`} />
-        <Info full label="Заработок" value={`${fmt(row.earnings ?? 0)} сом`} />
+        <Info label="Долг" value={`${fmt(row.cash_debt ?? 0)} c`} />
+        <Info full label="Заработок" value={`${fmt(row.earnings ?? 0)} c`} />
       </div>
     </div>
   )
@@ -1691,7 +1691,7 @@ function formatFullDate(value) {
 }
 
 function formatMoney(value) {
-  return `${fmt(value ?? 0)} сом`
+  return `${fmt(value ?? 0)} c`
 }
 
 function cashPresetRange(preset, current) {

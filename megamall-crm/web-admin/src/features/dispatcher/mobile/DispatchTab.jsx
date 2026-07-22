@@ -168,7 +168,7 @@ function OrderCard({ order, customerMap, courierMap, onSelect, onAction, isConfi
       <div style={{ fontSize: 12, color: C.text4, marginBottom: 11 }}>{address}</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
-          {fmt(order.total_amount)} <span style={{ fontSize: 11, fontWeight: 600, color: C.text3 }}>сом</span>
+          {fmt(order.total_amount)} <span style={{ fontSize: 11, fontWeight: 600, color: C.text3 }}>c</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: C.text4 }}>
           <span style={{ width: 6, height: 6, borderRadius: '50%', background: courierDisp.name ? '#10b981' : '#D6D3CB' }} />

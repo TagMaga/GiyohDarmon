@@ -165,7 +165,7 @@ function ConfirmHandoverModal({ open, onClose, handover }) {
       onClose={handleClose}
       title="Принять сдачу наличных"
       description={handover
-        ? `Ожидается: ${fmt(handover.total_to_return)} сом`
+        ? `Ожидается: ${fmt(handover.total_to_return)} c`
         : ''}
       footer={
         <>
@@ -192,7 +192,7 @@ function ConfirmHandoverModal({ open, onClose, handover }) {
           </p>
         </div>
         <div>
-          <label className="input-label">Фактически сдано (сом) *</label>
+          <label className="input-label">Фактически сдано (c) *</label>
           <input
             type="number"
             step="0.01"

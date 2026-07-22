@@ -264,21 +264,21 @@ function VerifyModal({ row, open, onClose, onConfirm, onReject, onDelete, updati
             <div className="text-center p-3 bg-slate-50 rounded-xl">
               <p className="text-[11px] text-slate-400 mb-1">Ожидалось</p>
               <p className="text-lg font-black text-slate-700 tabular-nums">{fmtMoney(row.total_to_return)}</p>
-              <p className="text-[10px] text-slate-400">сом</p>
+              <p className="text-[10px] text-slate-400">c</p>
             </div>
             <div className="text-center p-3 bg-slate-50 rounded-xl">
               <p className="text-[11px] text-slate-400 mb-1">Отправил</p>
               <p className={`text-lg font-black tabular-nums ${actualAmt != null ? 'text-indigo-700' : 'text-slate-300'}`}>
                 {actualAmt != null ? fmtMoney(actualAmt) : '—'}
               </p>
-              <p className="text-[10px] text-slate-400">сом</p>
+              <p className="text-[10px] text-slate-400">c</p>
             </div>
             <div className="text-center p-3 bg-slate-50 rounded-xl">
               <p className="text-[11px] text-slate-400 mb-1">Разница</p>
               <p className="text-lg font-black tabular-nums">
                 {diff == null ? <span className="text-slate-300">—</span> : <DiffCell expected={row.total_to_return} actual={actualAmt} />}
               </p>
-              <p className="text-[10px] text-slate-400">сом</p>
+              <p className="text-[10px] text-slate-400">c</p>
             </div>
           </div>
 
@@ -380,11 +380,11 @@ function VerifyModal({ row, open, onClose, onConfirm, onReject, onDelete, updati
         <div className="space-y-4">
           <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm text-emerald-800">
             Курьер <strong>{row.courier_name}</strong> утверждает, что перевёл&nbsp;
-            <strong>{fmtMoney(row.actual_returned ?? row.total_to_return)} сом</strong>.
+            <strong>{fmtMoney(row.actual_returned ?? row.total_to_return)} c</strong>.
             Проверьте свой кошелёк/банк и введите фактически полученную сумму.
           </div>
           <div>
-            <label className="input-label">Фактически получено (сом)</label>
+            <label className="input-label">Фактически получено (c)</label>
             <input
               type="number"
               step="0.01"
@@ -395,7 +395,7 @@ function VerifyModal({ row, open, onClose, onConfirm, onReject, onDelete, updati
               autoFocus
             />
             <p className="text-xs text-slate-400 mt-1.5">
-              Оставьте пустым чтобы принять сумму курьера ({fmtMoney(row.actual_returned ?? row.total_to_return)} сом)
+              Оставьте пустым чтобы принять сумму курьера ({fmtMoney(row.actual_returned ?? row.total_to_return)} c)
             </p>
           </div>
         </div>
@@ -546,11 +546,11 @@ export default function CashHandoversPage({ courierId } = {}) {
                           {fmtDateShort(row.created_at)}
                         </td>
                         <td className="px-4 py-3 tabular-nums text-slate-700 font-medium text-xs">
-                          {fmtMoney(row.total_to_return)} сом
+                          {fmtMoney(row.total_to_return)} c
                         </td>
                         <td className="px-4 py-3 tabular-nums text-xs">
                           {(() => { const a = displayActual(row); return a != null
-                            ? <span className="text-indigo-700 font-medium">{fmtMoney(a)} сом</span>
+                            ? <span className="text-indigo-700 font-medium">{fmtMoney(a)} c</span>
                             : <span className="text-slate-300">—</span>
                           })()}
                         </td>
@@ -558,7 +558,7 @@ export default function CashHandoversPage({ courierId } = {}) {
                           <DiffCell expected={row.total_to_return} actual={displayActual(row)} />
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 tabular-nums">
-                          {fmtMoney(row.total_delivery_fees)} сом
+                          {fmtMoney(row.total_delivery_fees)} c
                         </td>
                         <td className="px-4 py-3">
                           <ReceiptThumb
@@ -618,9 +618,9 @@ export default function CashHandoversPage({ courierId } = {}) {
                       <Badge variant={sc.badge} size="sm">{sc.label}</Badge>
                     </div>
                     <div className="flex gap-4 text-xs">
-                      <span className="text-slate-500">Ожидалось: <strong>{fmtMoney(row.total_to_return)} сом</strong></span>
+                      <span className="text-slate-500">Ожидалось: <strong>{fmtMoney(row.total_to_return)} c</strong></span>
                       {(() => { const a = displayActual(row); return a != null && (
-                        <span className="text-indigo-700">Отправил: <strong>{fmtMoney(a)} сом</strong></span>
+                        <span className="text-indigo-700">Отправил: <strong>{fmtMoney(a)} c</strong></span>
                       )})()}
                     </div>
                     <div className="flex items-center justify-between">
@@ -694,7 +694,7 @@ export default function CashHandoversPage({ courierId } = {}) {
         }
       >
         <p className="text-sm text-slate-600">
-          Передача от <strong>{deleteTarget?.courier_name}</strong> ({fmtMoney(deleteTarget?.total_to_return)} сом)
+          Передача от <strong>{deleteTarget?.courier_name}</strong> ({fmtMoney(deleteTarget?.total_to_return)} c)
           от {fmtDate(deleteTarget?.created_at)} будет удалена.
         </p>
       </Modal>

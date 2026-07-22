@@ -30,7 +30,7 @@ export default function CouriersTab({ couriers, cashOwed, loading, onOpenCourier
       <div style={{ display: 'flex', gap: 10, padding: '0 18px 12px' }}>
         <SummaryCard value={`${onlineCount}/${couriers.length}`} label="Онлайн" />
         <SummaryCard value={fmt(activeTotal)} label="Заказов в пути" />
-        <SummaryCard value={fmt(cashOwed)} label="К сдаче, сом" color={C.green} />
+        <SummaryCard value={fmt(cashOwed)} label="К сдаче, c" color={C.green} />
       </div>
 
       <div className="dm-scroll" style={{ display: 'flex', gap: 7, padding: '0 18px 14px', overflowX: 'auto' }}>

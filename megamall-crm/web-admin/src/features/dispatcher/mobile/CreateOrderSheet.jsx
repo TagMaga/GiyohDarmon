@@ -197,7 +197,7 @@ export default function CreateOrderSheet({ open, onClose }) {
               <button key={p.id} onClick={() => { addToCart(p); setProductSearch('') }} style={{ textAlign: 'left', padding: 10, borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${C.border}`, background: C.cardAlt }}>
                 <Package size={13} color={C.text3} style={{ marginBottom: 5 }} />
                 <div style={{ fontSize: 11, fontWeight: 700, lineHeight: 1.2 }}>{p.name}</div>
-                <div style={{ fontSize: 10, color: C.violetDk, marginTop: 2 }}>{(p.sale_price ?? p.base_price ?? 0).toLocaleString('ru-RU')} сом</div>
+                <div style={{ fontSize: 10, color: C.violetDk, marginTop: 2 }}>{(p.sale_price ?? p.base_price ?? 0).toLocaleString('ru-RU')} c</div>
               </button>
             ))}
           </div>
@@ -210,14 +210,14 @@ export default function CreateOrderSheet({ open, onClose }) {
         ) : cartItems.map((it, i) => (
           <div key={it.product_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 0', borderBottom: i < cartItems.length - 1 ? `1px solid ${C.border2}` : 'none' }}>
             <span style={{ fontSize: 12.5 }}>{it.name} ×{it.quantity}</span>
-            <span style={{ fontSize: 12.5, fontWeight: 700 }}>{it.total_price.toLocaleString('ru-RU')} сом</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700 }}>{it.total_price.toLocaleString('ru-RU')} c</span>
           </div>
         ))}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px 14px' }}>
         <span style={{ fontSize: 13, fontWeight: 800 }}>Итого</span>
-        <span style={{ fontSize: 19, fontWeight: 900, color: C.violetDk }}>{productTotal.toLocaleString('ru-RU')} сом</span>
+        <span style={{ fontSize: 19, fontWeight: 900, color: C.violetDk }}>{productTotal.toLocaleString('ru-RU')} c</span>
       </div>
 
       <SheetPrimaryButton onClick={() => canSubmit && submit()} disabled={!canSubmit || isPending}>

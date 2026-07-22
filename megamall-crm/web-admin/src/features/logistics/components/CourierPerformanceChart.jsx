@@ -63,7 +63,7 @@ export default function CourierPerformanceChart({ data = [], loading }) {
               <p className="font-semibold">{fmtLabel(point.date)}</p>
               <p>Доставлено: {point.delivered}</p>
               {point.failed > 0 && <p>Неудачно: {point.failed}</p>}
-              <p>Кэш: {fmtMoney(point.cash_collected)} сом</p>
+              <p>Кэш: {fmtMoney(point.cash_collected)} c</p>
               <p>Ср.время: {fmtMin(point.avg_delivery_minutes)}</p>
             </div>
             <div
@@ -100,7 +100,7 @@ export default function CourierPerformanceChart({ data = [], loading }) {
           <p className="text-[11px] text-slate-400">Неудачно</p>
         </div>
         <div>
-          <p className="text-lg font-bold text-slate-700">{fmtMoney(data.reduce((s, d) => s + d.cash_collected, 0))} сом</p>
+          <p className="text-lg font-bold text-slate-700">{fmtMoney(data.reduce((s, d) => s + d.cash_collected, 0))} c</p>
           <p className="text-[11px] text-slate-400">Собрано кэша</p>
         </div>
       </div>

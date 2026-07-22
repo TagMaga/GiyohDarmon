@@ -207,11 +207,11 @@ export default function CouriersTable({ couriers = [], loading }) {
                   </td>
                   <td className="px-4 py-3">
                     {c.cash_debt > 0
-                      ? <span className="text-rose-600 font-semibold tabular-nums">{fmtMoney(c.cash_debt)} сом</span>
+                      ? <span className="text-rose-600 font-semibold tabular-nums">{fmtMoney(c.cash_debt)} c</span>
                       : <span className="text-slate-300">—</span>
                     }
                   </td>
-                  <td className="px-4 py-3 text-slate-700 tabular-nums text-xs">{fmtMoney(c.earnings)} сом</td>
+                  <td className="px-4 py-3 text-slate-700 tabular-nums text-xs">{fmtMoney(c.earnings)} c</td>
                   <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">{fmtDate(c.last_activity_at)}</td>
                   <td className="px-4 py-3">
                     <ActionButtons courier={c} />
@@ -257,7 +257,7 @@ export default function CouriersTable({ couriers = [], loading }) {
                 <div>
                   <p className="text-slate-400">Долг</p>
                   <p className={`font-medium ${c.cash_debt > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
-                    {c.cash_debt > 0 ? `${fmtMoney(c.cash_debt)} сом` : '—'}
+                    {c.cash_debt > 0 ? `${fmtMoney(c.cash_debt)} c` : '—'}
                   </p>
                 </div>
               </div>

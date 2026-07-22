@@ -67,10 +67,10 @@ export default function CourierOrdersTable({ data, loading, page, onPage }) {
                   {o.delivery_address ?? '—'}
                 </td>
                 <td className="px-4 py-3 text-slate-800 font-medium tabular-nums text-xs">
-                  {fmtAmount(o.total_amount)} сом
+                  {fmtAmount(o.total_amount)} c
                 </td>
                 <td className="px-4 py-3 text-slate-500 tabular-nums text-xs">
-                  {fmtAmount(o.delivery_fee)} сом
+                  {fmtAmount(o.delivery_fee)} c
                 </td>
                 <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
                   {fmtDate(o.assigned_at)}
@@ -110,7 +110,7 @@ export default function CourierOrdersTable({ data, loading, page, onPage }) {
             </div>
             <p className="text-sm font-medium text-slate-900">{o.customer_name}</p>
             <div className="flex gap-4 text-xs text-slate-500">
-              <span>{fmtAmount(o.total_amount)} сом</span>
+              <span>{fmtAmount(o.total_amount)} c</span>
               <span>· Время: {fmtMin(o.delivery_minutes)}</span>
             </div>
           </div>

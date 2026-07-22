@@ -76,7 +76,7 @@ export default function DeliverySettingsTab() {
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 pr-12 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   placeholder="0"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium">сом</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-400 font-medium">c</span>
               </div>
               {Number(normalFee) === 0 && (
                 <p className="text-xs text-emerald-600 font-semibold mt-1.5">Бесплатно для клиента</p>
@@ -108,7 +108,7 @@ export default function DeliverySettingsTab() {
                   className="w-full rounded-xl border border-amber-200 bg-white px-4 py-2.5 pr-12 text-sm font-bold text-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-400 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   placeholder="0"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-amber-500 font-medium">сом</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-amber-500 font-medium">c</span>
               </div>
               {Number(expressFee) === 0 && (
                 <p className="text-xs text-emerald-600 font-semibold mt-1.5">Бесплатно для клиента</p>
@@ -119,13 +119,13 @@ export default function DeliverySettingsTab() {
           <div className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3 flex items-center justify-between text-sm">
             <span className="text-slate-500">Обычная</span>
             <span className="font-bold text-slate-700">
-              {Number(normalFee) > 0 ? `${Number(normalFee).toLocaleString('ru-RU')} сом` : 'Бесплатно'}
+              {Number(normalFee) > 0 ? `${Number(normalFee).toLocaleString('ru-RU')} c` : 'Бесплатно'}
             </span>
           </div>
           <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-3 flex items-center justify-between text-sm">
             <span className="text-amber-600">Быстрая</span>
             <span className="font-bold text-amber-700">
-              {Number(expressFee) > 0 ? `${Number(expressFee).toLocaleString('ru-RU')} сом` : 'Бесплатно'}
+              {Number(expressFee) > 0 ? `${Number(expressFee).toLocaleString('ru-RU')} c` : 'Бесплатно'}
             </span>
           </div>
 
