@@ -172,3 +172,35 @@ type UpdateHandoverReq struct {
 	Comment        *string  `json:"comment"`
 	AdminNote      *string  `json:"admin_note"`
 }
+
+// EditHandoverReq corrects an already-finalized (confirmed/rejected/disputed)
+// handover. Unlike UpdateHandoverReq — the initial pending→decision flow —
+// this only allows landing on a terminal status, and every applied change is
+// recorded in cash_handover_edits with the optional Reason.
+type EditHandoverReq struct {
+	Status         *string  `json:"status" validate:"omitempty,oneof=confirmed rejected"`
+	ActualReturned *float64 `json:"actual_returned" validate:"omitempty,min=0,max=1000000"`
+	Comment        *string  `json:"comment"`
+	AdminNote      *string  `json:"admin_note"`
+	Reason         *string  `json:"reason"`
+}
+
+// HandoverEditRow is one append-only entry of a handover's edit history —
+// the initial confirm/reject decision plus every later correction.
+type HandoverEditRow struct {
+	ID                uuid.UUID  `json:"id"`
+	HandoverID        uuid.UUID  `json:"handover_id"`
+	EditorID          *uuid.UUID `json:"editor_id"`
+	EditorName        *string    `json:"editor_name"`
+	Action            string     `json:"action"` // confirm | reject | update | edit
+	OldStatus         *string    `json:"old_status"`
+	NewStatus         *string    `json:"new_status"`
+	OldActualReturned *float64   `json:"old_actual_returned"`
+	NewActualReturned *float64   `json:"new_actual_returned"`
+	OldAdminNote      *string    `json:"old_admin_note"`
+	NewAdminNote      *string    `json:"new_admin_note"`
+	OldComment        *string    `json:"old_comment"`
+	NewComment        *string    `json:"new_comment"`
+	Reason            *string    `json:"reason"`
+	CreatedAt         time.Time  `json:"created_at"`
+}

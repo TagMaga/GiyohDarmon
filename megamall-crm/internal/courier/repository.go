@@ -799,6 +799,7 @@ func (r *Repository) CreateStatusLog(ctx context.Context, s *CourierStatusLog) e
 //	courier_collected = total_amount + delivery_fee - prepayment_amount
 //	delivery_fee      = courier_payout kept as courier salary
 //	courier_returns   = courier_collected - courier_payout
+//
 // LockCourierForHandover serializes concurrent handover submissions for the
 // same courier. A plain row lock on `orders` doesn't work here because the
 // orders rows themselves are never written to by a handover — only new rows
@@ -968,6 +969,29 @@ func (r *Repository) GetCashSummary(ctx context.Context, courierID uuid.UUID) (*
 		return nil, fmt.Errorf("cash summary: %w", err)
 	}
 
+	// Confirmed-handover shortfall (all-time, signed): when a handover is
+	// confirmed with actual_returned below total_to_return, its orders drop
+	// out of the debt query above even though part of their cash never
+	// arrived — the courier saw "0" while the owner's table showed e.g. −9.
+	// The signed sum keeps that residue in the courier's debt until the
+	// owner either edits the handover's actual amount up or confirms a
+	// later handover with the extra on top (an overpayment there nets the
+	// residue back out). NULL actual_returned means "accepted as declared"
+	// (same COALESCE rule the owner dashboard uses), i.e. zero difference.
+	var shortfall float64
+	if err := r.db.WithContext(ctx).Raw(`
+		SELECT COALESCE(SUM(total_to_return - COALESCE(actual_returned, total_to_return)), 0)
+		FROM cash_handovers
+		WHERE courier_id = ?
+		  AND status = 'confirmed'
+	`, courierID).Scan(&shortfall).Error; err != nil {
+		return nil, fmt.Errorf("handover shortfall: %w", err)
+	}
+	debt := pending.CashToHandover + shortfall
+	if debt < 0 {
+		debt = 0
+	}
+
 	// Split handover totals by status: confirmed (settled today) vs pending
 	// (submitted, awaiting dispatcher). Pending is reported separately and must
 	// NOT reduce the debt above.
@@ -989,7 +1013,7 @@ func (r *Repository) GetCashSummary(ctx context.Context, courierID uuid.UUID) (*
 
 	return &CashSummaryResponse{
 		OrdersCollected:   int(pending.Count),
-		CashToHandover:    pending.CashToHandover,
+		CashToHandover:    debt,
 		TotalDeliveryFees: pending.TotalFees,
 		AlreadyHanded:     ht.Confirmed,
 		PendingAmount:     ht.Pending,

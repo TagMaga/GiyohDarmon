@@ -909,7 +909,7 @@ func (r *Repository) CreateHandover(ctx context.Context, req CreateHandoverReq) 
 	return r.getHandoverByID(ctx, id)
 }
 
-func (r *Repository) UpdateHandover(ctx context.Context, id uuid.UUID, req UpdateHandoverReq) (*HandoverListRow, error) {
+func (r *Repository) UpdateHandover(ctx context.Context, id uuid.UUID, editorID uuid.UUID, req UpdateHandoverReq) (*HandoverListRow, error) {
 	existing, err := r.getHandoverByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -923,29 +923,187 @@ func (r *Repository) UpdateHandover(ctx context.Context, id uuid.UUID, req Updat
 		}
 	}
 
+	after := *existing
 	updates := map[string]interface{}{}
 	if req.Comment != nil {
 		updates["comment"] = *req.Comment
+		after.Comment = req.Comment
 	}
 	if req.AdminNote != nil {
 		updates["admin_note"] = *req.AdminNote
+		after.AdminNote = req.AdminNote
 	}
 	if req.ActualReturned != nil {
 		updates["actual_returned"] = *req.ActualReturned
+		after.ActualReturned = req.ActualReturned
 	}
+	action := "update"
 	if req.Status != nil {
 		updates["status"] = *req.Status
-		if *req.Status == "confirmed" {
+		after.Status = *req.Status
+		switch *req.Status {
+		case "confirmed":
 			now := time.Now().UTC()
 			updates["confirmed_at"] = now
+			action = "confirm"
+		case "rejected":
+			action = "reject"
 		}
 	}
 	if len(updates) > 0 {
-		if err := r.db.WithContext(ctx).Table("cash_handovers").Where("id = ?", id).Updates(updates).Error; err != nil {
-			return nil, fmt.Errorf("update handover: %w", err)
+		err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if err := tx.Table("cash_handovers").Where("id = ?", id).Updates(updates).Error; err != nil {
+				return fmt.Errorf("update handover: %w", err)
+			}
+			return recordHandoverEdit(tx, ctx, id, &editorID, action, existing, &after, nil)
+		})
+		if err != nil {
+			return nil, err
 		}
 	}
 	return r.getHandoverByID(ctx, id)
+}
+
+// EditHandover corrects a handover that has already been finalized
+// (confirmed/rejected/disputed) — the "we made a mistake" path. The
+// initial pending→decision flow stays on UpdateHandover; this method only
+// allows landing on confirmed/rejected (enforced by the DTO oneof) and
+// appends every applied change to cash_handover_edits inside the same
+// transaction, so a correction can never happen without its audit row.
+func (r *Repository) EditHandover(ctx context.Context, id uuid.UUID, editorID uuid.UUID, req EditHandoverReq) (*HandoverListRow, error) {
+	existing, err := r.getHandoverByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	switch existing.Status {
+	case "confirmed", "rejected", "disputed":
+		// finalized — editable here
+	default:
+		return nil, apperrors.BadRequest("only confirmed, rejected or disputed handovers can be edited; use the regular update for pending ones")
+	}
+
+	newStatus := existing.Status
+	if req.Status != nil {
+		newStatus = *req.Status
+	}
+	newAdminNote := existing.AdminNote
+	if req.AdminNote != nil {
+		newAdminNote = req.AdminNote
+	}
+	if newStatus == "rejected" && (newAdminNote == nil || *newAdminNote == "") {
+		return nil, apperrors.BadRequest("admin_note (rejection reason) is required when rejecting")
+	}
+
+	after := *existing
+	updates := map[string]interface{}{}
+	if req.Status != nil && *req.Status != existing.Status {
+		updates["status"] = *req.Status
+		after.Status = *req.Status
+		if *req.Status == "confirmed" {
+			now := time.Now().UTC()
+			updates["confirmed_at"] = now
+			after.ConfirmedAt = &now
+		} else {
+			// No longer confirmed — the confirmation timestamp no longer
+			// describes the row's state.
+			updates["confirmed_at"] = gorm.Expr("NULL")
+			after.ConfirmedAt = nil
+		}
+	}
+	if req.ActualReturned != nil && (existing.ActualReturned == nil || *existing.ActualReturned != *req.ActualReturned) {
+		updates["actual_returned"] = *req.ActualReturned
+		after.ActualReturned = req.ActualReturned
+	}
+	if req.AdminNote != nil && !strPtrEqual(existing.AdminNote, req.AdminNote) {
+		updates["admin_note"] = *req.AdminNote
+		after.AdminNote = req.AdminNote
+	}
+	if req.Comment != nil && !strPtrEqual(existing.Comment, req.Comment) {
+		updates["comment"] = *req.Comment
+		after.Comment = req.Comment
+	}
+	if len(updates) == 0 {
+		return nil, apperrors.BadRequest("nothing to change")
+	}
+
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Table("cash_handovers").Where("id = ?", id).Updates(updates).Error; err != nil {
+			return fmt.Errorf("edit handover: %w", err)
+		}
+		return recordHandoverEdit(tx, ctx, id, &editorID, "edit", existing, &after, req.Reason)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return r.getHandoverByID(ctx, id)
+}
+
+// ListHandoverEdits returns a handover's full edit history, oldest first.
+func (r *Repository) ListHandoverEdits(ctx context.Context, handoverID uuid.UUID) ([]HandoverEditRow, error) {
+	if _, err := r.getHandoverByID(ctx, handoverID); err != nil {
+		return nil, err
+	}
+	var rows []HandoverEditRow
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT
+			e.id,
+			e.handover_id,
+			e.editor_id,
+			u.full_name          AS editor_name,
+			e.action,
+			e.old_status::text   AS old_status,
+			e.new_status::text   AS new_status,
+			e.old_actual_returned,
+			e.new_actual_returned,
+			e.old_admin_note,
+			e.new_admin_note,
+			e.old_comment,
+			e.new_comment,
+			e.reason,
+			e.created_at
+		FROM cash_handover_edits e
+		LEFT JOIN users u ON u.id = e.editor_id
+		WHERE e.handover_id = ?
+		ORDER BY e.created_at ASC, e.id ASC
+	`, handoverID).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("list handover edits: %w", err)
+	}
+	return rows, nil
+}
+
+// recordHandoverEdit appends one audit row describing a handover change.
+// Always called inside the same transaction as the change itself.
+// created_at is set from Go's clock rather than the column's NOW() default:
+// NOW() is fixed for a whole transaction, so two edits inside one enclosing
+// transaction would tie on created_at and lose their ordering.
+func recordHandoverEdit(tx *gorm.DB, ctx context.Context, handoverID uuid.UUID, editorID *uuid.UUID, action string, before, after *HandoverListRow, reason *string) error {
+	err := tx.WithContext(ctx).Exec(`
+		INSERT INTO cash_handover_edits
+			(handover_id, editor_id, action,
+			 old_status, new_status,
+			 old_actual_returned, new_actual_returned,
+			 old_admin_note, new_admin_note,
+			 old_comment, new_comment,
+			 reason, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, handoverID, editorID, action,
+		before.Status, after.Status,
+		before.ActualReturned, after.ActualReturned,
+		before.AdminNote, after.AdminNote,
+		before.Comment, after.Comment,
+		reason, time.Now().UTC()).Error
+	if err != nil {
+		return fmt.Errorf("record handover edit: %w", err)
+	}
+	return nil
+}
+
+func strPtrEqual(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 func (r *Repository) DeleteHandover(ctx context.Context, id uuid.UUID) error {

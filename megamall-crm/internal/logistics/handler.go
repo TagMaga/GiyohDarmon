@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	apperrors "github.com/megamall/crm/pkg/errors"
+	"github.com/megamall/crm/pkg/middleware"
 	"github.com/megamall/crm/pkg/pagination"
 	"github.com/megamall/crm/pkg/response"
 	"github.com/megamall/crm/pkg/validator"
@@ -251,12 +252,55 @@ func (h *Handler) updateHandover(c *gin.Context) {
 		response.HandleError(c, appErr)
 		return
 	}
-	row, err := h.repo.UpdateHandover(c.Request.Context(), id, req)
+	claims := middleware.ClaimsFromContext(c)
+	row, err := h.repo.UpdateHandover(c.Request.Context(), id, claims.UserID, req)
 	if err != nil {
 		response.HandleError(c, err)
 		return
 	}
 	response.OK(c, row)
+}
+
+// editHandover corrects an already-finalized handover (see
+// Repository.EditHandover). Deliberately a separate endpoint from the
+// pending-flow PATCH so the initial decision and later corrections stay
+// distinguishable in code, routes, and the audit trail.
+func (h *Handler) editHandover(c *gin.Context) {
+	id, err := parseUUID(c, "id")
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	var req EditHandoverReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.HandleError(c, apperrors.BadRequest("invalid request body"))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.HandleError(c, appErr)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	row, err := h.repo.EditHandover(c.Request.Context(), id, claims.UserID, req)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, row)
+}
+
+func (h *Handler) listHandoverHistory(c *gin.Context) {
+	id, err := parseUUID(c, "id")
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	rows, err := h.repo.ListHandoverEdits(c.Request.Context(), id)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, rows)
 }
 
 func (h *Handler) deleteHandover(c *gin.Context) {
