@@ -129,7 +129,7 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 			COUNT(*) FILTER (WHERE o.status = 'assigned')                   AS assigned_orders,
 			COUNT(*) FILTER (WHERE o.status = 'in_delivery')                AS in_delivery,
 			COUNT(*) FILTER (WHERE o.status = 'issue')                      AS issue_orders,
-			COALESCE(SUM(
+			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.status = 'delivered'
 				     AND o.id NOT IN (
 				         SELECT cho.order_id
@@ -139,7 +139,14 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 				     )
 				     THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount, 0) - COALESCE(o.courier_payout, 0))
 				     ELSE 0 END
-			), 0)                                                            AS cash_owed
+			), 0) + COALESCE((
+				-- confirmed-handover net shortfall (expected − actual on
+				-- confirmed handovers) — keeps this board's debt in sync
+				-- with the courier app's cash summary and the owner's
+				-- logistics dashboard (see internal/courier GetCashSummary)
+				SELECT SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return))
+				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
+			), 0))                                                           AS cash_owed
 		FROM users u
 		LEFT JOIN orders o ON o.courier_id = u.id
 		                   AND o.deleted_at IS NULL

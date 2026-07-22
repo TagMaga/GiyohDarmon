@@ -97,22 +97,31 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 	var cr cashRow
 	err = r.db.WithContext(ctx).Raw(`
 		SELECT
-			-- all unhandled delivered cash (expected = not in confirmed handover)
-			COALESCE(SUM(
+			-- all unhandled delivered cash (expected = not in confirmed handover),
+			-- plus what confirmed handovers still fell short by (net of
+			-- overpayments) — that money is still out with the couriers
+			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.id NOT IN (
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status = 'confirmed'
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
-			), 0) AS cash_expected,
-			-- cash actually in circulation (not in pending OR confirmed)
-			COALESCE(SUM(
+			), 0) + (
+				SELECT COALESCE(SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)), 0)
+				FROM cash_handovers ch2 WHERE ch2.status = 'confirmed'
+			)) AS cash_expected,
+			-- cash actually in circulation (not in pending OR confirmed),
+			-- plus the same confirmed-handover net shortfall
+			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.id NOT IN (
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status IN ('pending','confirmed')
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
-			), 0) AS cash_in_circulation
+			), 0) + (
+				SELECT COALESCE(SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)), 0)
+				FROM cash_handovers ch2 WHERE ch2.status = 'confirmed'
+			)) AS cash_in_circulation
 		FROM orders o
 		WHERE o.status = 'delivered'
 		  AND o.courier_id IS NOT NULL
@@ -261,13 +270,17 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 			u.full_name,
 			COUNT(*) FILTER (WHERE o.status = 'delivered') AS delivered_count,
 			COUNT(*) FILTER (WHERE o.status IN ('delivered','returned','cancelled')) AS terminal_count,
-			COALESCE(SUM(
+			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.status = 'delivered' AND o.id NOT IN (
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status IN ('pending','confirmed')
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
-			), 0) AS cash_debt
+			), 0) + COALESCE((
+				-- confirmed-handover net shortfall — see ListCouriers' shortfall_cte
+				SELECT SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return))
+				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
+			), 0)) AS cash_debt
 		FROM users u
 		LEFT JOIN orders o ON o.courier_id = u.id AND o.deleted_at IS NULL
 		WHERE u.role = 'courier' AND u.is_active = TRUE AND u.deleted_at IS NULL
@@ -333,13 +346,17 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 			u.full_name,
 			COUNT(*) FILTER (WHERE o.status = 'delivered') AS delivered_count,
 			COUNT(*) FILTER (WHERE o.status IN ('delivered','returned','cancelled')) AS terminal_count,
-			COALESCE(SUM(
+			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.status = 'delivered' AND o.id NOT IN (
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status IN ('pending','confirmed')
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
-			), 0) AS cash_debt
+			), 0) + COALESCE((
+				-- confirmed-handover net shortfall — see ListCouriers' shortfall_cte
+				SELECT SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return))
+				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
+			), 0)) AS cash_debt
 		FROM users u
 		LEFT JOIN orders o ON o.courier_id = u.id AND o.deleted_at IS NULL
 		WHERE u.role = 'courier' AND u.is_active = TRUE AND u.deleted_at IS NULL
@@ -450,6 +467,19 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 			  )
 			GROUP BY o.courier_id
 		),
+		-- Signed net difference on confirmed handovers (expected − actual):
+		-- money a courier still owes after a handover was confirmed short,
+		-- minus any confirmed overpayments. Mirrors the courier app's own
+		-- cash summary (internal/courier GetCashSummary) so both sides
+		-- report the same debt.
+		shortfall_cte AS (
+			SELECT
+				ch.courier_id,
+				SUM(ch.total_to_return - COALESCE(ch.actual_returned, ch.total_to_return)) AS net_shortfall
+			FROM cash_handovers ch
+			WHERE ch.status = 'confirmed'
+			GROUP BY ch.courier_id
+		),
 		earnings_cte AS (
 			SELECT fe.user_id AS courier_id, COALESCE(SUM(fe.amount), 0) AS earnings
 			FROM financial_events fe
@@ -475,17 +505,18 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 			COALESCE(r.delivered_total, 0) AS delivered_total,
 			COALESCE(r.terminal_total, 0)  AS terminal_total,
 			COALESCE(av.avg_minutes, 0)    AS avg_delivery_minutes,
-			COALESCE(d.cash_debt, 0)       AS cash_debt,
+			GREATEST(0, COALESCE(d.cash_debt, 0) + COALESCE(sf.net_shortfall, 0)) AS cash_debt,
 			COALESCE(e.earnings, 0)        AS earnings,
 			ac.last_activity_at
 		FROM users u
-		LEFT JOIN active_cte   a  ON a.courier_id  = u.id
-		LEFT JOIN today_cte    t  ON t.courier_id  = u.id
-		LEFT JOIN rate_cte     r  ON r.courier_id  = u.id
-		LEFT JOIN avgtime_cte  av ON av.courier_id = u.id
-		LEFT JOIN debt_cte     d  ON d.courier_id  = u.id
-		LEFT JOIN earnings_cte e  ON e.courier_id  = u.id
-		LEFT JOIN activity_cte ac ON ac.courier_id = u.id
+		LEFT JOIN active_cte    a  ON a.courier_id  = u.id
+		LEFT JOIN today_cte     t  ON t.courier_id  = u.id
+		LEFT JOIN rate_cte      r  ON r.courier_id  = u.id
+		LEFT JOIN avgtime_cte   av ON av.courier_id = u.id
+		LEFT JOIN debt_cte      d  ON d.courier_id  = u.id
+		LEFT JOIN shortfall_cte sf ON sf.courier_id = u.id
+		LEFT JOIN earnings_cte  e  ON e.courier_id  = u.id
+		LEFT JOIN activity_cte  ac ON ac.courier_id = u.id
 		WHERE u.role = 'courier' AND u.deleted_at IS NULL
 		ORDER BY u.full_name
 	`, todayStart, todayEnd).Scan(&rows).Error
@@ -596,13 +627,17 @@ func (r *Repository) GetCourier(ctx context.Context, courierID uuid.UUID) (*Cour
 				) tl_del ON TRUE
 				WHERE o2.courier_id = u.id AND o2.status = 'delivered' AND o2.deleted_at IS NULL
 			), 0) AS avg_delivery_minutes,
-			COALESCE(SUM(
+			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.status = 'delivered' AND o.id NOT IN (
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status IN ('pending','confirmed')
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
-			), 0) AS cash_debt,
+			), 0) + COALESCE((
+				-- confirmed-handover net shortfall — see ListCouriers' shortfall_cte
+				SELECT SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return))
+				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
+			), 0)) AS cash_debt,
 			COALESCE((
 				SELECT SUM(COALESCE(actual_returned, total_to_return))
 				FROM cash_handovers WHERE courier_id = u.id AND status = 'confirmed'
