@@ -43,11 +43,17 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
 
   useEffect(() => {
     if (!person || !open) return
-    // full_name is stored as a single string — first word is the name,
-    // the rest is the surname
-    const [first, ...rest] = (person.full_name ?? '').trim().split(/\s+/)
-    setFirstName(first ?? '')
-    setLastName(rest.join(' '))
+    // full_name and surname are separate columns. Older records saved
+    // before surname existed may still have it crammed into full_name —
+    // fall back to splitting on the first space only when surname is empty.
+    if (person.surname) {
+      setFirstName(person.full_name ?? '')
+      setLastName(person.surname)
+    } else {
+      const [first, ...rest] = (person.full_name ?? '').trim().split(/\s+/)
+      setFirstName(first ?? '')
+      setLastName(rest.join(' '))
+    }
     setPhone(person.phone ?? '')
     setRole(person.role ?? 'seller')
     setIsActive(person.is_active !== false)
@@ -90,7 +96,8 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
       }
 
       return updateEmployee(person.id, {
-        full_name:     `${firstName.trim()} ${lastName.trim()}`.trim(),
+        full_name:     firstName.trim(),
+        surname:       lastName.trim(),
         phone:         phone.trim()   || undefined,
         role,
         is_active:     isActive,

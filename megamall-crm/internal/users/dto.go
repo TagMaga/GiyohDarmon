@@ -12,6 +12,7 @@ type CreateUserRequest struct {
 	Email       *string    `json:"email"         validate:"omitempty,email"`
 	Password    string     `json:"password"      validate:"required,min=8,max=72"`
 	FullName    string     `json:"full_name"     validate:"required,min=2,max=255"`
+	Surname     *string    `json:"surname"       validate:"omitempty,max=255"`
 	Role        Role       `json:"role"          validate:"required"`
 	HireDate    *time.Time `json:"hire_date"     validate:"omitempty"`
 	DateOfBirth *time.Time `json:"date_of_birth" validate:"omitempty"`
@@ -28,6 +29,7 @@ type CreateUserRequest struct {
 type UpdateUserRequest struct {
 	Phone     *string `json:"phone"         validate:"omitempty,min=7,max=20"`
 	FullName  *string `json:"full_name"     validate:"omitempty,min=2,max=255"`
+	Surname   *string `json:"surname"       validate:"omitempty,max=255"`
 	Role      *Role   `json:"role"          validate:"omitempty"`
 	IsActive  *bool   `json:"is_active"`
 	AvatarURL *string `json:"avatar_url"    validate:"omitempty,max=500"`

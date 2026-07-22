@@ -1,12 +1,12 @@
 /**
  * CourierManageModals — three dispatcher-only courier management modals:
- *   1. EditCourierModal        — edit name, surname, phone, password, telegram_chat_id
+ *   1. EditCourierModal        — edit phone (login), telegram_chat_id, and service-zone
+ *                                cities. Name/surname/password are owned by HR (People) now.
  *   2. TariffsModal            — per-courier range-based tariff rules (normal / fast)
  *   3. ToggleOrderIntakeModal  — enable / disable a courier's ability to take new orders
  */
 import { useEffect, useRef, useState } from 'react'
 import { Pencil, Trash2, Plus, X, MapPin } from 'lucide-react'
-import PasswordInput from '../../../shared/components/PasswordInput'
 import {
   updateCourier,
   updateCourierOrderIntake,
@@ -155,10 +155,7 @@ function GhostBtn({ onClick, children }) {
 // ── 1. EDIT COURIER MODAL ────────────────────────────────────────────────────
 export function EditCourierModal({ courier, onClose, onSuccess }) {
   const [form, setForm] = useState({
-    full_name:        courier.full_name ?? '',
-    surname:          courier.surname   ?? '',
     phone:            courier.phone     ?? '',
-    password:         '',
     telegram_chat_id: courier.telegram_chat_id ?? '',
   })
 
@@ -210,18 +207,17 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
 
   const handleSave = async () => {
     setError('')
-    if (!form.full_name.trim())        return setError('Имя обязательно')
-    if (!form.surname.trim())          return setError('Фамилия обязательна')
     if (!form.phone.trim())            return setError('Телефон обязателен')
     if (!form.telegram_chat_id.trim()) return setError('Telegram Chat ID обязателен')
 
     setLoading(true)
     try {
       await updateCourier(courier.courier_id, {
-        full_name:        form.full_name.trim(),
-        surname:          form.surname.trim() || undefined,
+        // full_name/surname are edited via HR (People), not here — the
+        // backend still requires full_name on every save, so send it
+        // through unchanged rather than exposing it as an editable field.
+        full_name:        courier.full_name ?? '',
         phone:            form.phone.trim(),
-        password:         form.password.trim() || undefined,
         telegram_chat_id: form.telegram_chat_id.trim(),
         city_ids:         selectedCityIDs,
       })
@@ -237,34 +233,13 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
   return (
     <ModalShell
       title="✏️ Изменить курьера"
-      subtitle={`ID: ${courier.courier_id?.slice(0, 8)}…`}
+      subtitle={`${courier.full_name ?? ''} · ID: ${courier.courier_id?.slice(0, 8)}…`}
       onClose={onClose}
     >
       <div style={{ padding: '20px 24px 24px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 0 }}>
-          <FieldGroup>
-            <Label required>Имя</Label>
-            <input style={field.base} value={form.full_name} onChange={set('full_name')} placeholder="Имя" />
-          </FieldGroup>
-          <FieldGroup>
-            <Label required>Фамилия</Label>
-            <input style={field.base} value={form.surname} onChange={set('surname')} placeholder="Фамилия" />
-          </FieldGroup>
-        </div>
-
         <FieldGroup>
           <Label required>Телефон (логин)</Label>
           <input style={field.base} value={form.phone} onChange={set('phone')} placeholder="+992..." />
-        </FieldGroup>
-
-        <FieldGroup>
-          <Label>Пароль</Label>
-          <PasswordInput
-            theme="light"
-            style={field.base}
-            value={form.password} onChange={set('password')}
-            placeholder="Оставьте пустым, чтобы не менять"
-          />
         </FieldGroup>
 
         <FieldGroup>

@@ -49,7 +49,8 @@ export default function CreateEmployeeModal({ open, onClose }) {
       if (!address.trim())  throw new Error('Адрес обязателен')
       return createEmployee({
         phone:         phone.trim(),
-        full_name:     `${firstName.trim()} ${lastName.trim()}`,
+        full_name:     firstName.trim(),
+        surname:       lastName.trim(),
         role,
         password,
         hire_date:     hireDate + 'T00:00:00Z',
