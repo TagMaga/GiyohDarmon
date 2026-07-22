@@ -143,15 +143,25 @@ export default function CashScreen() {
   // the same fix and the reason it's needed.
   useFocusEffect(useCallback(() => { fetchData() }, []))
 
-  // Tapping the upload zone opens the gallery directly (no camera/gallery action
-  // sheet). The native gallery picker presents reliably over the open handover
-  // <Modal> inside Expo Go.
+  // Gallery and camera are two separate buttons (no camera/gallery action
+  // sheet). The native pickers present reliably over the open handover
+  // <Modal> inside Expo Go, unlike the old Alert.alert action sheet.
   const pickGallery = async () => {
     if (attachments.length >= MAX_ATTACHMENTS) { Alert.alert('Максимум', `Можно добавить не более ${MAX_ATTACHMENTS} файлов`); return }
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (status !== 'granted') { Alert.alert('Нет доступа', 'Разрешите доступ к галерее в настройках'); return }
     const remaining = MAX_ATTACHMENTS - attachments.length
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: remaining, quality: 0.8 })
+    if (result.canceled || !result.assets?.length) return
+    const resized = await Promise.all(result.assets.map(resizeForUpload))
+    addAssets(resized)
+  }
+
+  const takePhoto = async () => {
+    if (attachments.length >= MAX_ATTACHMENTS) { Alert.alert('Максимум', `Можно добавить не более ${MAX_ATTACHMENTS} файлов`); return }
+    const { status } = await ImagePicker.requestCameraPermissionsAsync()
+    if (status !== 'granted') { Alert.alert('Нет доступа', 'Разрешите доступ к камере в настройках'); return }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.8 })
     if (result.canceled || !result.assets?.length) return
     const resized = await Promise.all(result.assets.map(resizeForUpload))
     addAssets(resized)
@@ -596,11 +606,18 @@ export default function CashScreen() {
                   />
                 )}
                 {attachments.length < MAX_ATTACHMENTS && (
-                  <TouchableOpacity style={[s.uploadArea, attachError && s.uploadAreaErr]} onPress={pickGallery} activeOpacity={0.7}>
-                    <Text style={s.uploadPlus}>＋</Text>
-                    <Text style={s.uploadText}>Добавить подтверждение</Text>
-                    <Text style={s.uploadSub}>Галерея</Text>
-                  </TouchableOpacity>
+                  <View style={s.uploadRow}>
+                    <TouchableOpacity style={[s.uploadArea, attachError && s.uploadAreaErr]} onPress={pickGallery} activeOpacity={0.7}>
+                      <Text style={s.uploadPlus}>＋</Text>
+                      <Text style={s.uploadText}>Галерея</Text>
+                      <Text style={s.uploadSub}>Выбрать фото</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.uploadArea, attachError && s.uploadAreaErr]} onPress={takePhoto} activeOpacity={0.7}>
+                      <Text style={s.uploadPlus}>📷</Text>
+                      <Text style={s.uploadText}>Камера</Text>
+                      <Text style={s.uploadSub}>Сделать фото</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
                 {attachError && <Text style={s.inlineErr}>⚠ {attachError}</Text>}
               </View>
@@ -765,7 +782,8 @@ const s = StyleSheet.create({
   diffRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1 },
   diffLabel: { fontSize: 13, fontWeight: '700', color: C.muted },
   diffVal: { fontSize: 15, fontWeight: '700' },
-  uploadArea: { borderWidth: 1.5, borderColor: 'rgba(120,144,180,0.40)', borderStyle: 'dashed', borderRadius: 22, paddingVertical: 24, alignItems: 'center', backgroundColor: '#eef1f6' },
+  uploadRow: { flexDirection: 'row', gap: 10 },
+  uploadArea: { flex: 1, borderWidth: 1.5, borderColor: 'rgba(120,144,180,0.40)', borderStyle: 'dashed', borderRadius: 22, paddingVertical: 24, alignItems: 'center', backgroundColor: '#eef1f6' },
   uploadAreaErr: { borderColor: C.red },
   uploadPlus: { fontSize: 34, fontWeight: '700', color: C.ink, marginBottom: 8 },
   uploadText: { fontSize: 16, fontWeight: '700', color: C.muted },
