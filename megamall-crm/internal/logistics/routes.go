@@ -15,14 +15,17 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/dashboard", auth, ownerOnly, h.getDashboard)
 
 	// Courier list + detail
-	rg.GET("/couriers",                    auth, ownerOnly, h.listCouriers)
-	rg.GET("/couriers/:id",                auth, ownerOnly, h.getCourier)
-	rg.GET("/couriers/:id/orders",         auth, ownerOnly, h.listCourierOrders)
-	rg.GET("/couriers/:id/performance",    auth, ownerOnly, h.getCourierPerformance)
+	rg.GET("/couriers", auth, ownerOnly, h.listCouriers)
+	rg.GET("/couriers/:id", auth, ownerOnly, h.getCourier)
+	rg.GET("/couriers/:id/orders", auth, ownerOnly, h.listCourierOrders)
+	rg.GET("/couriers/:id/performance", auth, ownerOnly, h.getCourierPerformance)
 
 	// Cash handovers
-	rg.GET("/cash-handovers",     auth, ownerOnly, h.listHandovers)
-	rg.POST("/cash-handovers",    auth, ownerOnly, h.createHandover)
-	rg.PATCH("/cash-handovers/:id",  auth, ownerOnly, h.updateHandover)
+	rg.GET("/cash-handovers", auth, ownerOnly, h.listHandovers)
+	rg.POST("/cash-handovers", auth, ownerOnly, h.createHandover)
+	rg.PATCH("/cash-handovers/:id", auth, ownerOnly, h.updateHandover)
 	rg.DELETE("/cash-handovers/:id", auth, ownerOnly, h.deleteHandover)
+	// Post-decision correction + its audit trail
+	rg.POST("/cash-handovers/:id/edit", auth, ownerOnly, h.editHandover)
+	rg.GET("/cash-handovers/:id/history", auth, ownerOnly, h.listHandoverHistory)
 }

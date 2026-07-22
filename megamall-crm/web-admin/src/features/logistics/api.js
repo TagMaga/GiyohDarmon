@@ -69,3 +69,16 @@ export async function updateHandover(id, body) {
 export async function deleteHandover(id) {
   await client.delete(`/owner/logistics/cash-handovers/${id}`)
 }
+
+// Post-decision correction of a confirmed/rejected handover — distinct from
+// updateHandover (the pending confirm/reject flow) on the backend too.
+export async function editHandover(id, body) {
+  const res = await client.post(`/owner/logistics/cash-handovers/${id}/edit`, body)
+  return unwrap(res)
+}
+
+export async function fetchHandoverHistory(id) {
+  const res = await client.get(`/owner/logistics/cash-handovers/${id}/history`)
+  const data = unwrap(res)
+  return Array.isArray(data) ? data : []
+}

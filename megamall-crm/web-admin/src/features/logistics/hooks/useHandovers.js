@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { KEYS } from '../../../shared/queryKeys'
-import { fetchHandovers, createHandover, updateHandover, deleteHandover } from '../api'
+import { fetchHandovers, createHandover, updateHandover, deleteHandover, editHandover, fetchHandoverHistory } from '../api'
 
 export function useHandovers(params = {}) {
   return useQuery({
@@ -34,5 +34,26 @@ export function useDeleteHandover() {
   return useMutation({
     mutationFn: (id) => deleteHandover(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['logistics', 'handovers'] }),
+  })
+}
+
+export function useEditHandover() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }) => editHandover(id, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['logistics', 'handovers'] })
+      qc.invalidateQueries({ queryKey: ['logistics', 'dashboard'] })
+      qc.invalidateQueries({ queryKey: ['logistics', 'couriers'] })
+    },
+  })
+}
+
+export function useHandoverHistory(id, enabled = true) {
+  return useQuery({
+    queryKey: KEYS.logistics.handoverHistory(id),
+    queryFn:  () => fetchHandoverHistory(id),
+    enabled:  !!id && enabled,
+    staleTime: 0,
   })
 }

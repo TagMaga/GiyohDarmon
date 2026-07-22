@@ -5,14 +5,16 @@
  *  • Date-filtered table with receipt thumbnails
  *  • Verification modal: full image + all details + confirm/reject actions
  *  • Reject requires admin_note (mandatory)
+ *  • Post-decision "Изменить": corrects a confirmed/rejected handover, with
+ *    the full edit history (who/when/what changed) shown in the modal
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
-  CheckCircle2, XCircle, Trash2,
+  CheckCircle2, XCircle, Trash2, Pencil, History,
   Image as ImageIcon, FileText, AlertTriangle, Eye,
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
-import { useHandovers, useUpdateHandover, useDeleteHandover } from '../hooks/useHandovers'
+import { useHandovers, useUpdateHandover, useDeleteHandover, useEditHandover, useHandoverHistory } from '../hooks/useHandovers'
 import useLogisticsCouriers from '../hooks/useLogisticsCouriers'
 import Badge   from '../../../shared/components/Badge'
 import Modal   from '../../../shared/components/Modal'
@@ -42,6 +44,15 @@ const STATUS_CFG = {
   rejected:  { label: 'Отклонено', badge: 'rose'    },
   disputed:  { label: 'Спор',      badge: 'violet'  },
 }
+
+const ACTION_LABEL = {
+  confirm: 'Подтверждение',
+  reject:  'Отклонение',
+  update:  'Обновление',
+  edit:    'Изменение',
+}
+
+const statusLabel = (s) => STATUS_CFG[s]?.label ?? s ?? '—'
 
 // Parse proof_url + attachments_json (legacy) + media_assets (centralized
 // media pipeline — internal/courier.Service.ToHandoverResponse resolves
@@ -152,11 +163,34 @@ function ReceiptThumb({ proofUrl, attachmentsJson, mediaAssets, onClick }) {
 
 // ── Verification modal ────────────────────────────────────────────────────────
 
-function VerifyModal({ row, open, onClose, onConfirm, onReject, onDelete, updating, deleting }) {
+function VerifyModal({ row, open, initialView = 'detail', onClose, onConfirm, onReject, onDelete, onEdit, updating, deleting, editing }) {
   const [actualInput, setActualInput] = useState('')
   const [rejectReason, setRejectReason] = useState('')
-  const [view, setView] = useState('detail') // 'detail' | 'confirm' | 'reject'
+  const [view, setView] = useState('detail') // 'detail' | 'confirm' | 'reject' | 'edit'
   const [imgIdx, setImgIdx] = useState(0)
+
+  // Edit form (post-decision correction)
+  const [editStatus, setEditStatus]       = useState('confirmed')
+  const [editActual, setEditActual]       = useState('')
+  const [editAdminNote, setEditAdminNote] = useState('')
+  const [editReason, setEditReason]       = useState('')
+
+  // Re-seed the modal every time it opens for a (possibly different) row —
+  // including the requested starting view (row click → detail, pencil → edit).
+  useEffect(() => {
+    if (!open || !row) return
+    setView(initialView)
+    setImgIdx(0)
+    setActualInput('')
+    setRejectReason('')
+    setEditStatus(row.status === 'rejected' ? 'rejected' : 'confirmed')
+    const a = displayActual(row)
+    setEditActual(a != null ? String(a) : '')
+    setEditAdminNote(row.admin_note ?? '')
+    setEditReason('')
+  }, [open, row?.id, initialView]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const { data: history = [] } = useHandoverHistory(row?.id, open)
 
   if (!row) return null
 
@@ -165,6 +199,7 @@ function VerifyModal({ row, open, onClose, onConfirm, onReject, onDelete, updati
   const actualAmt = displayActual(row)
   const diff      = actualAmt != null ? actualAmt - row.total_to_return : null
   const isPending = row.status === 'pending' || row.status === 'disputed'
+  const isFinal   = row.status === 'confirmed' || row.status === 'rejected'
 
   function handleConfirm() {
     const amt = parseFloat(actualInput) || row.actual_returned || row.total_to_return
@@ -174,6 +209,18 @@ function VerifyModal({ row, open, onClose, onConfirm, onReject, onDelete, updati
   function handleReject() {
     if (!rejectReason.trim()) return
     onReject({ id: row.id, status: 'rejected', admin_note: rejectReason })
+  }
+
+  const editRejectNoteMissing = editStatus === 'rejected' && !editAdminNote.trim()
+
+  function handleEditSave() {
+    if (editRejectNoteMissing) return
+    const body = { id: row.id, status: editStatus }
+    const amt = parseFloat(editActual)
+    if (!isNaN(amt)) body.actual_returned = amt
+    if (editAdminNote.trim()) body.admin_note = editAdminNote.trim()
+    if (editReason.trim()) body.reason = editReason.trim()
+    onEdit(body)
   }
 
   function resetAndClose() {
@@ -210,6 +257,14 @@ function VerifyModal({ row, open, onClose, onConfirm, onReject, onDelete, updati
                   <Trash2 size={14} /> Удалить
                 </button>
               )}
+              {isFinal && (
+                <button
+                  onClick={() => setView('edit')}
+                  className="btn btn-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200"
+                >
+                  <Pencil size={14} /> Изменить
+                </button>
+              )}
             </div>
             <div className="flex gap-2">
               <button onClick={resetAndClose} className="btn btn-md btn-secondary">Закрыть</button>
@@ -228,6 +283,17 @@ function VerifyModal({ row, open, onClose, onConfirm, onReject, onDelete, updati
             <button onClick={() => setView('detail')} className="btn btn-md btn-secondary">Назад</button>
             <button onClick={handleConfirm} disabled={updating} className="btn btn-md btn-primary">
               {updating ? 'Сохранение…' : '✓ Подтвердить получение'}
+            </button>
+          </>
+        ) : view === 'edit' ? (
+          <>
+            <button onClick={() => setView('detail')} className="btn btn-md btn-secondary">Назад</button>
+            <button
+              onClick={handleEditSave}
+              disabled={editRejectNoteMissing || editing}
+              className="btn btn-md btn-primary disabled:opacity-40"
+            >
+              {editing ? 'Сохранение…' : 'Сохранить изменения'}
             </button>
           </>
         ) : (
@@ -372,6 +438,125 @@ function VerifyModal({ row, open, onClose, onConfirm, onReject, onDelete, updati
               <p className="text-sm text-amber-800">Квитанция не приложена</p>
             </div>
           )}
+
+          {/* Edit history — every confirm/reject decision and later correction */}
+          {history.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <History size={12} /> История изменений ({history.length})
+              </p>
+              <div className="space-y-2">
+                {history.map(e => (
+                  <div key={e.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-slate-700">{ACTION_LABEL[e.action] ?? e.action}</span>
+                      <span className="text-slate-400 whitespace-nowrap">{fmtDate(e.created_at)}</span>
+                    </div>
+                    {e.editor_name && (
+                      <p className="text-slate-500">Кем: <span className="font-medium text-slate-700">{e.editor_name}</span></p>
+                    )}
+                    {e.old_status !== e.new_status && (
+                      <p className="text-slate-500">
+                        Статус: {statusLabel(e.old_status)} → <span className="font-medium text-slate-700">{statusLabel(e.new_status)}</span>
+                      </p>
+                    )}
+                    {(e.old_actual_returned ?? null) !== (e.new_actual_returned ?? null) && (
+                      <p className="text-slate-500">
+                        Отправил: {e.old_actual_returned != null ? `${fmtMoney(e.old_actual_returned)} c` : '—'} →{' '}
+                        <span className="font-medium text-slate-700">
+                          {e.new_actual_returned != null ? `${fmtMoney(e.new_actual_returned)} c` : '—'}
+                        </span>
+                      </p>
+                    )}
+                    {e.new_admin_note && e.new_admin_note !== e.old_admin_note && (
+                      <p className="text-slate-500">Примечание: <span className="text-rose-700">{e.new_admin_note}</span></p>
+                    )}
+                    {e.reason && (
+                      <p className="text-slate-500">Причина изменения: <span className="text-slate-700 italic">{e.reason}</span></p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Edit view (post-decision correction) ─────────────────────────── */}
+      {view === 'edit' && (
+        <div className="space-y-4">
+          <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-800">
+            Исправление уже принятого решения по передаче от <strong>{row.courier_name}</strong>.
+            Все изменения сохраняются в истории.
+          </div>
+
+          <div>
+            <label className="input-label">Статус</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setEditStatus('confirmed')}
+                className={`btn btn-md flex-1 border ${editStatus === 'confirmed'
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+              >
+                <CheckCircle2 size={14} /> Подтверждено
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditStatus('rejected')}
+                className={`btn btn-md flex-1 border ${editStatus === 'rejected'
+                  ? 'bg-rose-600 text-white border-rose-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+              >
+                <XCircle size={14} /> Отклонено
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="input-label">Фактически получено (c)</label>
+            <input
+              type="number"
+              step="0.01"
+              placeholder={String(row.total_to_return)}
+              value={editActual}
+              onChange={e => setEditActual(e.target.value)}
+              className="input"
+              autoFocus
+            />
+            <p className="text-xs text-slate-400 mt-1.5">
+              Ожидалось: {fmtMoney(row.total_to_return)} c
+            </p>
+          </div>
+
+          <div>
+            <label className="input-label">
+              Примечание {editStatus === 'rejected' ? '(причина отклонения) *' : ''}
+            </label>
+            <textarea
+              rows={2}
+              className="input resize-none"
+              placeholder="Примечание для курьера…"
+              value={editAdminNote}
+              onChange={e => setEditAdminNote(e.target.value)}
+            />
+            {editRejectNoteMissing && (
+              <p className="text-xs text-rose-500 mt-1.5">Укажите причину отклонения</p>
+            )}
+          </div>
+
+          <div>
+            <label className="input-label">Причина изменения</label>
+            <textarea
+              rows={2}
+              className="input resize-none"
+              placeholder="Например: ошиблись в сумме при подтверждении…"
+              value={editReason}
+              onChange={e => setEditReason(e.target.value)}
+            />
+            <p className="text-xs text-slate-400 mt-1.5">Будет сохранена в истории изменений</p>
+          </div>
         </div>
       )}
 
@@ -445,10 +630,17 @@ export default function CashHandoversPage({ courierId } = {}) {
 
   const { mutate: updateHandover, isPending: updating } = useUpdateHandover()
   const { mutate: deleteHandover, isPending: deleting } = useDeleteHandover()
+  const { mutate: editHandover,   isPending: editingHandover } = useEditHandover()
 
   // ── Modals ──
   const [verifyRow, setVerifyRow]     = useState(null)
+  const [verifyView, setVerifyView]   = useState('detail') // starting view: 'detail' | 'edit'
   const [deleteTarget, setDeleteTarget] = useState(null)
+
+  function openVerify(row, view = 'detail') {
+    setVerifyView(view)
+    setVerifyRow(row)
+  }
 
   function handleVerifyConfirm({ id, status, actual_returned }) {
     updateHandover({ id, status, actual_returned }, {
@@ -458,6 +650,12 @@ export default function CashHandoversPage({ courierId } = {}) {
 
   function handleVerifyReject({ id, status, admin_note }) {
     updateHandover({ id, status, admin_note }, {
+      onSuccess: () => setVerifyRow(null),
+    })
+  }
+
+  function handleVerifyEdit(body) {
+    editHandover(body, {
       onSuccess: () => setVerifyRow(null),
     })
   }
@@ -532,7 +730,7 @@ export default function CashHandoversPage({ courierId } = {}) {
                     return (
                       <tr
                         key={row.id}
-                        onClick={() => setVerifyRow(row)}
+                        onClick={() => openVerify(row)}
                         className={[
                           'hover:bg-slate-50/50 transition-colors cursor-pointer',
                           isPending ? 'border-l-2 border-l-amber-400' : '',
@@ -565,7 +763,7 @@ export default function CashHandoversPage({ courierId } = {}) {
                             proofUrl={row.proof_url}
                             attachmentsJson={row.attachments_json}
                             mediaAssets={row.media_assets}
-                            onClick={() => setVerifyRow(row)}
+                            onClick={() => openVerify(row)}
                           />
                         </td>
                         <td className="px-4 py-3">
@@ -590,6 +788,15 @@ export default function CashHandoversPage({ courierId } = {}) {
                               </button>
                             </div>
                           )}
+                          {(row.status === 'confirmed' || row.status === 'rejected') && (
+                            <button
+                              title="Изменить (с историей)"
+                              onClick={() => openVerify(row, 'edit')}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-indigo-500 hover:bg-indigo-50 transition-colors"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     )
@@ -607,7 +814,7 @@ export default function CashHandoversPage({ courierId } = {}) {
                 return (
                   <div
                     key={row.id}
-                    onClick={() => setVerifyRow(row)}
+                    onClick={() => openVerify(row)}
                     className={`px-4 py-3 space-y-2 ${isPending ? 'border-l-2 border-l-amber-400' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -639,6 +846,12 @@ export default function CashHandoversPage({ courierId } = {}) {
                           </button>
                         </div>
                       )}
+                      {(row.status === 'confirmed' || row.status === 'rejected') && (
+                        <button onClick={e => { e.stopPropagation(); openVerify(row, 'edit') }}
+                          className="btn btn-sm bg-indigo-50 text-indigo-600 ml-auto">
+                          <Pencil size={13} /> Изменить
+                        </button>
+                      )}
                     </div>
                   </div>
                 )
@@ -669,12 +882,15 @@ export default function CashHandoversPage({ courierId } = {}) {
       <VerifyModal
         row={verifyRow}
         open={!!verifyRow}
+        initialView={verifyView}
         onClose={() => setVerifyRow(null)}
         onConfirm={handleVerifyConfirm}
         onReject={handleVerifyReject}
         onDelete={handleVerifyDelete}
+        onEdit={handleVerifyEdit}
         updating={updating}
         deleting={deleting}
+        editing={editingHandover}
       />
 
       {/* Delete confirmation */}

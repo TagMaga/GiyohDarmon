@@ -97,22 +97,31 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 	var cr cashRow
 	err = r.db.WithContext(ctx).Raw(`
 		SELECT
-			-- all unhandled delivered cash (expected = not in confirmed handover)
-			COALESCE(SUM(
+			-- all unhandled delivered cash (expected = not in confirmed handover),
+			-- plus what confirmed handovers still fell short by (net of
+			-- overpayments) — that money is still out with the couriers
+			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.id NOT IN (
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status = 'confirmed'
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
-			), 0) AS cash_expected,
-			-- cash actually in circulation (not in pending OR confirmed)
-			COALESCE(SUM(
+			), 0) + (
+				SELECT COALESCE(SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)), 0)
+				FROM cash_handovers ch2 WHERE ch2.status = 'confirmed'
+			)) AS cash_expected,
+			-- cash actually in circulation (not in pending OR confirmed),
+			-- plus the same confirmed-handover net shortfall
+			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.id NOT IN (
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status IN ('pending','confirmed')
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
-			), 0) AS cash_in_circulation
+			), 0) + (
+				SELECT COALESCE(SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)), 0)
+				FROM cash_handovers ch2 WHERE ch2.status = 'confirmed'
+			)) AS cash_in_circulation
 		FROM orders o
 		WHERE o.status = 'delivered'
 		  AND o.courier_id IS NOT NULL
@@ -261,13 +270,17 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 			u.full_name,
 			COUNT(*) FILTER (WHERE o.status = 'delivered') AS delivered_count,
 			COUNT(*) FILTER (WHERE o.status IN ('delivered','returned','cancelled')) AS terminal_count,
-			COALESCE(SUM(
+			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.status = 'delivered' AND o.id NOT IN (
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status IN ('pending','confirmed')
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
-			), 0) AS cash_debt
+			), 0) + COALESCE((
+				-- confirmed-handover net shortfall — see ListCouriers' shortfall_cte
+				SELECT SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return))
+				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
+			), 0)) AS cash_debt
 		FROM users u
 		LEFT JOIN orders o ON o.courier_id = u.id AND o.deleted_at IS NULL
 		WHERE u.role = 'courier' AND u.is_active = TRUE AND u.deleted_at IS NULL
@@ -333,13 +346,17 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 			u.full_name,
 			COUNT(*) FILTER (WHERE o.status = 'delivered') AS delivered_count,
 			COUNT(*) FILTER (WHERE o.status IN ('delivered','returned','cancelled')) AS terminal_count,
-			COALESCE(SUM(
+			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.status = 'delivered' AND o.id NOT IN (
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status IN ('pending','confirmed')
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
-			), 0) AS cash_debt
+			), 0) + COALESCE((
+				-- confirmed-handover net shortfall — see ListCouriers' shortfall_cte
+				SELECT SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return))
+				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
+			), 0)) AS cash_debt
 		FROM users u
 		LEFT JOIN orders o ON o.courier_id = u.id AND o.deleted_at IS NULL
 		WHERE u.role = 'courier' AND u.is_active = TRUE AND u.deleted_at IS NULL
@@ -450,6 +467,19 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 			  )
 			GROUP BY o.courier_id
 		),
+		-- Signed net difference on confirmed handovers (expected − actual):
+		-- money a courier still owes after a handover was confirmed short,
+		-- minus any confirmed overpayments. Mirrors the courier app's own
+		-- cash summary (internal/courier GetCashSummary) so both sides
+		-- report the same debt.
+		shortfall_cte AS (
+			SELECT
+				ch.courier_id,
+				SUM(ch.total_to_return - COALESCE(ch.actual_returned, ch.total_to_return)) AS net_shortfall
+			FROM cash_handovers ch
+			WHERE ch.status = 'confirmed'
+			GROUP BY ch.courier_id
+		),
 		earnings_cte AS (
 			SELECT fe.user_id AS courier_id, COALESCE(SUM(fe.amount), 0) AS earnings
 			FROM financial_events fe
@@ -475,17 +505,18 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 			COALESCE(r.delivered_total, 0) AS delivered_total,
 			COALESCE(r.terminal_total, 0)  AS terminal_total,
 			COALESCE(av.avg_minutes, 0)    AS avg_delivery_minutes,
-			COALESCE(d.cash_debt, 0)       AS cash_debt,
+			GREATEST(0, COALESCE(d.cash_debt, 0) + COALESCE(sf.net_shortfall, 0)) AS cash_debt,
 			COALESCE(e.earnings, 0)        AS earnings,
 			ac.last_activity_at
 		FROM users u
-		LEFT JOIN active_cte   a  ON a.courier_id  = u.id
-		LEFT JOIN today_cte    t  ON t.courier_id  = u.id
-		LEFT JOIN rate_cte     r  ON r.courier_id  = u.id
-		LEFT JOIN avgtime_cte  av ON av.courier_id = u.id
-		LEFT JOIN debt_cte     d  ON d.courier_id  = u.id
-		LEFT JOIN earnings_cte e  ON e.courier_id  = u.id
-		LEFT JOIN activity_cte ac ON ac.courier_id = u.id
+		LEFT JOIN active_cte    a  ON a.courier_id  = u.id
+		LEFT JOIN today_cte     t  ON t.courier_id  = u.id
+		LEFT JOIN rate_cte      r  ON r.courier_id  = u.id
+		LEFT JOIN avgtime_cte   av ON av.courier_id = u.id
+		LEFT JOIN debt_cte      d  ON d.courier_id  = u.id
+		LEFT JOIN shortfall_cte sf ON sf.courier_id = u.id
+		LEFT JOIN earnings_cte  e  ON e.courier_id  = u.id
+		LEFT JOIN activity_cte  ac ON ac.courier_id = u.id
 		WHERE u.role = 'courier' AND u.deleted_at IS NULL
 		ORDER BY u.full_name
 	`, todayStart, todayEnd).Scan(&rows).Error
@@ -596,13 +627,17 @@ func (r *Repository) GetCourier(ctx context.Context, courierID uuid.UUID) (*Cour
 				) tl_del ON TRUE
 				WHERE o2.courier_id = u.id AND o2.status = 'delivered' AND o2.deleted_at IS NULL
 			), 0) AS avg_delivery_minutes,
-			COALESCE(SUM(
+			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.status = 'delivered' AND o.id NOT IN (
 					SELECT cho.order_id FROM cash_handover_orders cho
 					JOIN cash_handovers ch ON ch.id = cho.handover_id
 					WHERE ch.status IN ('pending','confirmed')
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
-			), 0) AS cash_debt,
+			), 0) + COALESCE((
+				-- confirmed-handover net shortfall — see ListCouriers' shortfall_cte
+				SELECT SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return))
+				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
+			), 0)) AS cash_debt,
 			COALESCE((
 				SELECT SUM(COALESCE(actual_returned, total_to_return))
 				FROM cash_handovers WHERE courier_id = u.id AND status = 'confirmed'
@@ -909,7 +944,7 @@ func (r *Repository) CreateHandover(ctx context.Context, req CreateHandoverReq) 
 	return r.getHandoverByID(ctx, id)
 }
 
-func (r *Repository) UpdateHandover(ctx context.Context, id uuid.UUID, req UpdateHandoverReq) (*HandoverListRow, error) {
+func (r *Repository) UpdateHandover(ctx context.Context, id uuid.UUID, editorID uuid.UUID, req UpdateHandoverReq) (*HandoverListRow, error) {
 	existing, err := r.getHandoverByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -923,29 +958,187 @@ func (r *Repository) UpdateHandover(ctx context.Context, id uuid.UUID, req Updat
 		}
 	}
 
+	after := *existing
 	updates := map[string]interface{}{}
 	if req.Comment != nil {
 		updates["comment"] = *req.Comment
+		after.Comment = req.Comment
 	}
 	if req.AdminNote != nil {
 		updates["admin_note"] = *req.AdminNote
+		after.AdminNote = req.AdminNote
 	}
 	if req.ActualReturned != nil {
 		updates["actual_returned"] = *req.ActualReturned
+		after.ActualReturned = req.ActualReturned
 	}
+	action := "update"
 	if req.Status != nil {
 		updates["status"] = *req.Status
-		if *req.Status == "confirmed" {
+		after.Status = *req.Status
+		switch *req.Status {
+		case "confirmed":
 			now := time.Now().UTC()
 			updates["confirmed_at"] = now
+			action = "confirm"
+		case "rejected":
+			action = "reject"
 		}
 	}
 	if len(updates) > 0 {
-		if err := r.db.WithContext(ctx).Table("cash_handovers").Where("id = ?", id).Updates(updates).Error; err != nil {
-			return nil, fmt.Errorf("update handover: %w", err)
+		err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if err := tx.Table("cash_handovers").Where("id = ?", id).Updates(updates).Error; err != nil {
+				return fmt.Errorf("update handover: %w", err)
+			}
+			return recordHandoverEdit(tx, ctx, id, &editorID, action, existing, &after, nil)
+		})
+		if err != nil {
+			return nil, err
 		}
 	}
 	return r.getHandoverByID(ctx, id)
+}
+
+// EditHandover corrects a handover that has already been finalized
+// (confirmed/rejected/disputed) — the "we made a mistake" path. The
+// initial pending→decision flow stays on UpdateHandover; this method only
+// allows landing on confirmed/rejected (enforced by the DTO oneof) and
+// appends every applied change to cash_handover_edits inside the same
+// transaction, so a correction can never happen without its audit row.
+func (r *Repository) EditHandover(ctx context.Context, id uuid.UUID, editorID uuid.UUID, req EditHandoverReq) (*HandoverListRow, error) {
+	existing, err := r.getHandoverByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	switch existing.Status {
+	case "confirmed", "rejected", "disputed":
+		// finalized — editable here
+	default:
+		return nil, apperrors.BadRequest("only confirmed, rejected or disputed handovers can be edited; use the regular update for pending ones")
+	}
+
+	newStatus := existing.Status
+	if req.Status != nil {
+		newStatus = *req.Status
+	}
+	newAdminNote := existing.AdminNote
+	if req.AdminNote != nil {
+		newAdminNote = req.AdminNote
+	}
+	if newStatus == "rejected" && (newAdminNote == nil || *newAdminNote == "") {
+		return nil, apperrors.BadRequest("admin_note (rejection reason) is required when rejecting")
+	}
+
+	after := *existing
+	updates := map[string]interface{}{}
+	if req.Status != nil && *req.Status != existing.Status {
+		updates["status"] = *req.Status
+		after.Status = *req.Status
+		if *req.Status == "confirmed" {
+			now := time.Now().UTC()
+			updates["confirmed_at"] = now
+			after.ConfirmedAt = &now
+		} else {
+			// No longer confirmed — the confirmation timestamp no longer
+			// describes the row's state.
+			updates["confirmed_at"] = gorm.Expr("NULL")
+			after.ConfirmedAt = nil
+		}
+	}
+	if req.ActualReturned != nil && (existing.ActualReturned == nil || *existing.ActualReturned != *req.ActualReturned) {
+		updates["actual_returned"] = *req.ActualReturned
+		after.ActualReturned = req.ActualReturned
+	}
+	if req.AdminNote != nil && !strPtrEqual(existing.AdminNote, req.AdminNote) {
+		updates["admin_note"] = *req.AdminNote
+		after.AdminNote = req.AdminNote
+	}
+	if req.Comment != nil && !strPtrEqual(existing.Comment, req.Comment) {
+		updates["comment"] = *req.Comment
+		after.Comment = req.Comment
+	}
+	if len(updates) == 0 {
+		return nil, apperrors.BadRequest("nothing to change")
+	}
+
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Table("cash_handovers").Where("id = ?", id).Updates(updates).Error; err != nil {
+			return fmt.Errorf("edit handover: %w", err)
+		}
+		return recordHandoverEdit(tx, ctx, id, &editorID, "edit", existing, &after, req.Reason)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return r.getHandoverByID(ctx, id)
+}
+
+// ListHandoverEdits returns a handover's full edit history, oldest first.
+func (r *Repository) ListHandoverEdits(ctx context.Context, handoverID uuid.UUID) ([]HandoverEditRow, error) {
+	if _, err := r.getHandoverByID(ctx, handoverID); err != nil {
+		return nil, err
+	}
+	var rows []HandoverEditRow
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT
+			e.id,
+			e.handover_id,
+			e.editor_id,
+			u.full_name          AS editor_name,
+			e.action,
+			e.old_status::text   AS old_status,
+			e.new_status::text   AS new_status,
+			e.old_actual_returned,
+			e.new_actual_returned,
+			e.old_admin_note,
+			e.new_admin_note,
+			e.old_comment,
+			e.new_comment,
+			e.reason,
+			e.created_at
+		FROM cash_handover_edits e
+		LEFT JOIN users u ON u.id = e.editor_id
+		WHERE e.handover_id = ?
+		ORDER BY e.created_at ASC, e.id ASC
+	`, handoverID).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("list handover edits: %w", err)
+	}
+	return rows, nil
+}
+
+// recordHandoverEdit appends one audit row describing a handover change.
+// Always called inside the same transaction as the change itself.
+// created_at is set from Go's clock rather than the column's NOW() default:
+// NOW() is fixed for a whole transaction, so two edits inside one enclosing
+// transaction would tie on created_at and lose their ordering.
+func recordHandoverEdit(tx *gorm.DB, ctx context.Context, handoverID uuid.UUID, editorID *uuid.UUID, action string, before, after *HandoverListRow, reason *string) error {
+	err := tx.WithContext(ctx).Exec(`
+		INSERT INTO cash_handover_edits
+			(handover_id, editor_id, action,
+			 old_status, new_status,
+			 old_actual_returned, new_actual_returned,
+			 old_admin_note, new_admin_note,
+			 old_comment, new_comment,
+			 reason, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, handoverID, editorID, action,
+		before.Status, after.Status,
+		before.ActualReturned, after.ActualReturned,
+		before.AdminNote, after.AdminNote,
+		before.Comment, after.Comment,
+		reason, time.Now().UTC()).Error
+	if err != nil {
+		return fmt.Errorf("record handover edit: %w", err)
+	}
+	return nil
+}
+
+func strPtrEqual(a, b *string) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 func (r *Repository) DeleteHandover(ctx context.Context, id uuid.UUID) error {

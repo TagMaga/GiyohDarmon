@@ -114,7 +114,7 @@ type MyOrderResponse struct {
 // CashSummaryResponse uses field names matching the courier mobile app.
 type CashSummaryResponse struct {
 	OrdersCollected   int     `json:"orders_collected"`
-	CashToHandover    float64 `json:"cash_to_handover"`    // debt — excludes only CONFIRMED handovers
+	CashToHandover    float64 `json:"cash_to_handover"`    // debt — excludes only CONFIRMED handovers, plus any confirmed-handover shortfall (actual < expected)
 	TotalDeliveryFees float64 `json:"total_delivery_fees"` // courier earnings on still-owed orders
 	AlreadyHanded     float64 `json:"already_handed"`      // confirmed handovers today
 	PendingAmount     float64 `json:"pending_amount"`      // submitted, awaiting dispatcher confirmation
