@@ -23,7 +23,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/megamall/crm/config"
+	"github.com/megamall/crm/internal/hierarchy"
 	"github.com/megamall/crm/internal/media"
+	"github.com/megamall/crm/internal/teams"
 	"github.com/megamall/crm/internal/testutil"
 	"github.com/megamall/crm/internal/users"
 	"github.com/megamall/crm/tools/imagebench"
@@ -130,6 +132,29 @@ func ordersUploadAsset(t *testing.T, mediaSvc *media.Service, category media.Cat
 	return asset
 }
 
+// createTeamSeller creates a seller assigned to a (leaderless) team — the
+// minimum Service.Create now requires for a non-house order, without
+// pulling in setupTeamWithSeller's extra manager/team-lead fixtures that
+// these media-pipeline tests don't otherwise exercise.
+func createTeamSeller(t *testing.T, db *gorm.DB) *users.User {
+	t.Helper()
+	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	team := &teams.Team{
+		ID:       uuid.New(),
+		Name:     "Test Team " + uuid.New().String()[:8],
+		IsActive: true,
+	}
+	if err := teams.NewRepository(db).Create(context.Background(), team); err != nil {
+		t.Fatalf("create test team: %v", err)
+	}
+	if err := hierarchy.NewRepository(db).Upsert(context.Background(), &hierarchy.UserHierarchy{
+		ID: uuid.New(), UserID: seller.ID, TeamID: &team.ID,
+	}); err != nil {
+		t.Fatalf("assign seller hierarchy: %v", err)
+	}
+	return seller
+}
+
 func createOrderForMediaTest(t *testing.T, db *gorm.DB, svc *Service, sellerID uuid.UUID) *Order {
 	t.Helper()
 	customerID := createTestCustomer(t, db)
@@ -149,7 +174,7 @@ func createOrderForMediaTest(t *testing.T, db *gorm.DB, svc *Service, sellerID u
 func TestCreate_PrepaymentAttachmentMediaAssetID_Success(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, mediaSvc := setupOrderServiceWithMedia(t, db)
-	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	seller := createTeamSeller(t, db)
 
 	customerID := createTestCustomer(t, db)
 	cityID := createTestCity(t, db)
@@ -193,7 +218,7 @@ func TestCreate_PrepaymentAttachmentMediaAssetID_Success(t *testing.T) {
 func TestCreate_AttachmentCategoryMismatch_Rejected_NoOrder(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, mediaSvc := setupOrderServiceWithMedia(t, db)
-	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	seller := createTeamSeller(t, db)
 
 	customerID := createTestCustomer(t, db)
 	cityID := createTestCity(t, db)
@@ -224,7 +249,7 @@ func TestCreate_AttachmentCategoryMismatch_Rejected_NoOrder(t *testing.T) {
 func TestCreate_AttachmentURLAndMediaAssetID_BothSet_Rejected(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, _ := setupOrderServiceWithMedia(t, db)
-	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	seller := createTeamSeller(t, db)
 
 	customerID := createTestCustomer(t, db)
 	cityID := createTestCity(t, db)
@@ -249,7 +274,7 @@ func TestCreate_AttachmentURLAndMediaAssetID_BothSet_Rejected(t *testing.T) {
 func TestCreate_LegacyPaymentProofURL_StillWorks(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, _ := setupOrderServiceWithMedia(t, db)
-	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	seller := createTeamSeller(t, db)
 
 	customerID := createTestCustomer(t, db)
 	cityID := createTestCity(t, db)
@@ -279,7 +304,7 @@ func TestCreate_LegacyPaymentProofURL_StillWorks(t *testing.T) {
 func TestAddAttachment_MediaAssetID_Success(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, mediaSvc := setupOrderServiceWithMedia(t, db)
-	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	seller := createTeamSeller(t, db)
 	order := createOrderForMediaTest(t, db, svc, seller.ID)
 
 	asset := ordersUploadAsset(t, mediaSvc, media.CategoryOrderAttachment, seller.ID, "extra.png", ordersFixture(t, "transparent.png"))
@@ -310,7 +335,7 @@ func TestAddAttachment_MediaAssetID_Success(t *testing.T) {
 func TestAddAttachment_BothFieldsRejected(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, mediaSvc := setupOrderServiceWithMedia(t, db)
-	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	seller := createTeamSeller(t, db)
 	order := createOrderForMediaTest(t, db, svc, seller.ID)
 	asset := ordersUploadAsset(t, mediaSvc, media.CategoryOrderAttachment, seller.ID, "extra.png", ordersFixture(t, "transparent.png"))
 
@@ -327,7 +352,7 @@ func TestAddAttachment_BothFieldsRejected(t *testing.T) {
 func TestAddAttachment_NeitherFieldRejected(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, _ := setupOrderServiceWithMedia(t, db)
-	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	seller := createTeamSeller(t, db)
 	order := createOrderForMediaTest(t, db, svc, seller.ID)
 
 	_, err := svc.AddAttachment(context.Background(), seller.ID, order.ID, AddAttachmentRequest{Type: "customer_chat"})
@@ -341,7 +366,7 @@ func TestAddAttachment_NeitherFieldRejected(t *testing.T) {
 func TestAddPrepayment_MediaAssetID_Success(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, mediaSvc := setupOrderServiceWithMedia(t, db)
-	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	seller := createTeamSeller(t, db)
 	order := createOrderForMediaTest(t, db, svc, seller.ID)
 
 	asset := ordersUploadAsset(t, mediaSvc, media.CategoryPrepaymentProof, seller.ID, "proof.png", ordersFixture(t, "transparent.png"))
@@ -375,7 +400,7 @@ func TestAddPrepayment_MediaAssetID_Success(t *testing.T) {
 func TestAddPrepayment_CategoryMismatch_Rejected(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, mediaSvc := setupOrderServiceWithMedia(t, db)
-	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	seller := createTeamSeller(t, db)
 	order := createOrderForMediaTest(t, db, svc, seller.ID)
 
 	wrongCategory := ordersUploadAsset(t, mediaSvc, media.CategoryOrderAttachment, seller.ID, "wrong.png", ordersFixture(t, "transparent.png"))
@@ -400,7 +425,7 @@ func TestAddPrepayment_CategoryMismatch_Rejected(t *testing.T) {
 func TestAddPrepayment_LegacyProofURL_StillWorks(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, _ := setupOrderServiceWithMedia(t, db)
-	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	seller := createTeamSeller(t, db)
 	order := createOrderForMediaTest(t, db, svc, seller.ID)
 
 	url := "/uploads/legacy-proof.jpg"
@@ -424,7 +449,7 @@ func TestAddPrepayment_LegacyProofURL_StillWorks(t *testing.T) {
 func TestAddAttachment_MediaDisabled_RejectsMediaAssetID_NoOrphan(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, _, _ := buildTestOrderService(t, db)
-	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	seller := createTeamSeller(t, db)
 	order := createOrderForMediaTest(t, db, svc, seller.ID)
 
 	fakeAssetID := uuid.New()
@@ -448,7 +473,7 @@ func TestAddAttachment_MediaDisabled_RejectsMediaAssetID_NoOrphan(t *testing.T) 
 func TestAddPrepayment_MediaDisabled_LegacyFlowUnaffected(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, _, _ := buildTestOrderService(t, db)
-	seller := testutil.CreateUser(t, db, users.RoleSeller)
+	seller := createTeamSeller(t, db)
 	order := createOrderForMediaTest(t, db, svc, seller.ID)
 
 	p, err := svc.AddPrepayment(context.Background(), seller.ID, order.ID, AddPrepaymentRequest{Amount: 25})

@@ -4,7 +4,7 @@ import { useSellerMe } from '../../features/seller/hooks/useSellerMe'
 import useAuthStore from '../store/authStore'
 
 export default function useProfile() {
-  const { userId } = useCurrentUser()
+  const { userId, teamId } = useCurrentUser()
   const { phone, role } = useAuthStore()
   const { data: me } = useSellerMe()
 
@@ -25,5 +25,5 @@ export default function useProfile() {
     return 'U'
   }, [fullName, role])
 
-  return { fullName, initials, phone, role, userId, employee: me }
+  return { fullName, initials, phone, role, userId, teamId, employee: me }
 }
