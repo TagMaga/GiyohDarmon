@@ -49,7 +49,11 @@ export default function CreateEmployeeModal({ open, onClose }) {
       if (!address.trim())  throw new Error('Адрес обязателен')
       return createEmployee({
         phone:         phone.trim(),
-        full_name:     firstName.trim(),
+        // full_name stays the combined display name — dozens of other
+        // screens across the backend read it as such. surname rides along
+        // as the real, authoritative value so editing later never has to
+        // guess it back out by splitting full_name.
+        full_name:     `${firstName.trim()} ${lastName.trim()}`,
         surname:       lastName.trim(),
         role,
         password,
