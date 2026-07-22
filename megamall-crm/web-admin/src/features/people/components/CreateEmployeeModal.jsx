@@ -10,7 +10,7 @@ import PhoneInput    from '../../../shared/components/PhoneInput'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS }     from '../../../shared/queryKeys'
 import { createEmployee } from '../api'
-import { ALL_ROLES, ROLE_LABEL } from '../utils/peopleHelpers'
+import { ALL_ROLES, ROLE_LABEL, composeAddress } from '../utils/peopleHelpers'
 
 export default function CreateEmployeeModal({ open, onClose }) {
   const qc    = useQueryClient()
@@ -24,7 +24,10 @@ export default function CreateEmployeeModal({ open, onClose }) {
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [hireDate,        setHireDate]        = useState('')
   const [dob,             setDob]             = useState('')
-  const [address,         setAddress]         = useState('')
+  const [city,            setCity]            = useState('')
+  const [region,          setRegion]          = useState('')
+  const [street,          setStreet]          = useState('')
+  const [house,           setHouse]           = useState('')
   const [hireDateValid, setHireDateValid] = useState(true)
   const [dobValid,      setDobValid]      = useState(true)
   const [detailsOpen,   setDetailsOpen]   = useState(true)
@@ -33,7 +36,8 @@ export default function CreateEmployeeModal({ open, onClose }) {
 
   function resetForm() {
     setPhone(''); setFirstName(''); setLastName(''); setPassword(''); setPasswordConfirm(''); setRole('seller')
-    setHireDate(''); setDob(''); setAddress('')
+    setHireDate(''); setDob('')
+    setCity(''); setRegion(''); setStreet(''); setHouse('')
     setHireDateValid(true); setDobValid(true); setDetailsOpen(true)
   }
 
@@ -46,7 +50,8 @@ export default function CreateEmployeeModal({ open, onClose }) {
       if (password !== passwordConfirm) throw new Error('Пароли не совпадают')
       if (!hireDate)        throw new Error('Дата найма обязательна')
       if (!dob)             throw new Error('Дата рождения обязательна')
-      if (!address.trim())  throw new Error('Адрес обязателен')
+      if (!city.trim())     throw new Error('Город обязателен')
+      if (!street.trim())   throw new Error('Улица обязательна')
       return createEmployee({
         phone:         phone.trim(),
         full_name:     `${firstName.trim()} ${lastName.trim()}`,
@@ -54,7 +59,7 @@ export default function CreateEmployeeModal({ open, onClose }) {
         password,
         hire_date:     hireDate + 'T00:00:00Z',
         date_of_birth: dob      + 'T00:00:00Z',
-        address:       address.trim(),
+        address:       composeAddress({ city, region, street, house }),
       })
     },
     onSuccess: () => {
@@ -128,8 +133,21 @@ export default function CreateEmployeeModal({ open, onClose }) {
               <DateInput label="Дата найма *" value={hireDate} onChange={setHireDate} onValidityChange={setHireDateValid} />
               <DateInput label="Дата рождения *" value={dob} onChange={setDob} onValidityChange={setDobValid} />
             </div>
-            <div><label className="input-label">Адрес *</label>
-              <input value={address} onChange={e => setAddress(e.target.value)} className="input mt-1" placeholder="г. Душанбе, ул. ..." />
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="input-label">Город *</label>
+                <input value={city} onChange={e => setCity(e.target.value)} className="input mt-1" placeholder="Душанбе" />
+              </div>
+              <div><label className="input-label">Район</label>
+                <input value={region} onChange={e => setRegion(e.target.value)} className="input mt-1" placeholder="Сино" />
+              </div>
+            </div>
+            <div className="grid grid-cols-[1fr_96px] gap-3">
+              <div><label className="input-label">Улица *</label>
+                <input value={street} onChange={e => setStreet(e.target.value)} className="input mt-1" placeholder="Рудаки" />
+              </div>
+              <div><label className="input-label">Дом</label>
+                <input value={house} onChange={e => setHouse(e.target.value)} className="input mt-1" placeholder="12" />
+              </div>
             </div>
           </div>
         )}
