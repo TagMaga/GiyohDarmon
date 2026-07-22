@@ -133,14 +133,14 @@ Fetches `getClaimableOrders()` (backend already returns them pre-sorted urgent-f
 
 The most stateful screen. Two sub-tabs act as the primary navigation (not `Tabs` from Router — plain local state toggling between "Сдано наличных"/"Заработки" KPI cards):
 
-- **Handover formula**: `к сдаче = собранные наличные (COD) − зарплата курьера`, shown live as `{collected} − {salary} = {toReturn} TJS`. `collected = toReturn + salary`, i.e. derived from the backend summary (`cash_to_handover`, `total_delivery_fees`), not computed forward from orders.
+- **Handover formula**: `к сдаче = собранные наличные (COD) − зарплата курьера`, shown live as `{collected} − {salary} = {toReturn} c`. `collected = toReturn + salary`, i.e. derived from the backend summary (`cash_to_handover`, `total_delivery_fees`), not computed forward from orders.
 - **Submitting a handover**: requires both an amount and at least one attached photo (`expo-image-picker`, gallery only — no camera option, capped at `MAX_ATTACHMENTS = 5`). Each attachment is uploaded individually to `POST /uploads` first (multipart), then the resulting URLs are passed to `submitHandover({ proof_url, attachments_json, actual_amount, notes })` — the first URL as `proof_url`, the full list JSON-encoded into `attachments_json` if more than one. A live "разница" (difference) indicator compares the entered amount against the expected `toReturn` before submission.
 - **Earnings tab**: lists each delivered order's fixed courier payout — independent of whether that cash has been handed over yet.
 - Handover history and a full-screen image preview modal (for both freshly-picked and previously-submitted proof photos) round out the screen.
 
 ### Profile (`profile.jsx`)
 
-Read-only info (name, phone, avatar) plus the courier's **active tariff rules**, grouped by delivery type (`normal`/`fast`) and rendered as amount-range → rate rows (percent or flat TJS). This is the courier-facing view into the same tariff data the dispatcher/owner manage via `courier_tariffs` on the backend (see [dispatch tariff endpoints](../../megamall-crm/docs/API_REFERENCE.md#dispatch--apiv1dispatch)).
+Read-only info (name, phone, avatar) plus the courier's **active tariff rules**, grouped by delivery type (`normal`/`fast`) and rendered as amount-range → rate rows (percent or flat "c"). This is the courier-facing view into the same tariff data the dispatcher/owner manage via `courier_tariffs` on the backend (see [dispatch tariff endpoints](../../megamall-crm/docs/API_REFERENCE.md#dispatch--apiv1dispatch)).
 
 ## API surface used (`src/api/auth.js`, `src/api/orders.js`)
 

@@ -61,7 +61,7 @@ export function OrderCard({ order, onOpen, onStart, actionLoading }) {
       <View style={oc.amountRow}>
         <View style={oc.amountBox}>
           {collectAmt > 0
-            ? <><Text style={oc.amountLabel}>К оплате клиентом</Text><Text style={oc.amountVal}>{fmt(collectAmt)} сом</Text></>
+            ? <><Text style={oc.amountLabel}>К оплате клиентом</Text><Text style={oc.amountVal}>{fmt(collectAmt)} c</Text></>
             : <Text style={[oc.amountVal, { color: C.green, fontSize: 13 }]}>✓ Оплачено</Text>
           }
         </View>

@@ -195,7 +195,7 @@ export default function AssignCourierModal({ open, onClose, order, mode = 'assig
                       )}
                       {cash > 0 && (
                         <span className="text-[10px] text-[#047857]">
-                          <Wallet size={8} className="inline mr-0.5" />{fmt(cash)} сом
+                          <Wallet size={8} className="inline mr-0.5" />{fmt(cash)} c
                         </span>
                       )}
                       {!intakeEnabled && (

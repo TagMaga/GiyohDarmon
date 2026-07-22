@@ -142,9 +142,9 @@ export default function CourierProfilePage() {
     { label: 'Процент успеха',     value: fmtPct(courier.success_rate),              color: Number(courier.success_rate) >= 90 ? 'text-emerald-700' : Number(courier.success_rate) >= 70 ? 'text-amber-600' : 'text-rose-600' },
     { label: 'Ср. время доставки', value: fmtMin(courier.avg_delivery_minutes),      color: 'text-slate-700' },
     { label: 'Активных заказов',   value: fmtNum(courier.active_orders),             color: courier.active_orders > 0 ? 'text-indigo-700' : 'text-slate-400' },
-    { label: 'Долг (наличные)',    value: `${fmtMoney(courier.cash_debt)} сом`,      color: courier.cash_debt > 0 ? 'text-rose-600' : 'text-slate-400' },
-    { label: 'Передано всего',     value: `${fmtMoney(courier.total_handed_over)} сом`, color: 'text-slate-700' },
-    { label: 'Заработано',         value: `${fmtMoney(courier.earnings)} сом`,       color: 'text-indigo-600' },
+    { label: 'Долг (наличные)',    value: `${fmtMoney(courier.cash_debt)} c`,      color: courier.cash_debt > 0 ? 'text-rose-600' : 'text-slate-400' },
+    { label: 'Передано всего',     value: `${fmtMoney(courier.total_handed_over)} c`, color: 'text-slate-700' },
+    { label: 'Заработано',         value: `${fmtMoney(courier.earnings)} c`,       color: 'text-indigo-600' },
     { label: 'Неудачных доставок', value: fmtNum(courier.total_failed),              color: courier.total_failed > 0 ? 'text-rose-500' : 'text-slate-400' },
   ] : []
 

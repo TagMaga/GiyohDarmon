@@ -224,7 +224,7 @@ export default function CashScreen() {
         notes: notes || undefined,
       })
       setAttachments([]); setActualAmount(''); setNotes(''); setShowHandover(false)
-      showToast({ type: 'ok', title: 'Отправлено на проверку', subtitle: `${fmt(amt)} TJS · диспетчер подтвердит` })
+      showToast({ type: 'ok', title: 'Отправлено на проверку', subtitle: `${fmt(amt)} c · диспетчер подтвердит` })
       fetchData()
     } catch (e) {
       const msg = e?.response?.status === 404
@@ -367,19 +367,19 @@ export default function CashScreen() {
             <View style={[s.cashHero, { backgroundColor: T.card }]}>
               <Sheen radius={32} />
               <Text style={s.cashLabel}>нужно вернуть сегодня</Text>
-              <CountUp value={toReturn} style={s.cashSum} suffix=" TJS" duration={900} />
+              <CountUp value={toReturn} style={s.cashSum} suffix=" c" duration={900} />
               <View style={[s.formula, { backgroundColor: T.chip, borderColor: T.chipEdge }]}>
                 <Text style={[s.formulaVal, { color: T.ink }]}>{fmt(collected)}</Text>
                 <Text style={s.formulaMuted}>−</Text>
                 <Text style={s.formulaGreen}>{fmt(salary)}</Text>
                 <Text style={s.formulaMuted}>=</Text>
-                <Text style={s.formulaOrange}>{fmt(toReturn)} TJS</Text>
+                <Text style={s.formulaOrange}>{fmt(toReturn)} c</Text>
               </View>
               <Text style={[s.caption, { color: T.muted }]}>Собранные наличные − Ваша зарплата</Text>
               {pendingHandover > 0 && (
                 <View style={s.pendingRow}>
                   <Text style={s.pendingText}>На проверке у диспетчера</Text>
-                  <Text style={s.pendingVal}>{fmt(pendingHandover)} TJS</Text>
+                  <Text style={s.pendingVal}>{fmt(pendingHandover)} c</Text>
                 </View>
               )}
               <PressScale
@@ -409,7 +409,7 @@ export default function CashScreen() {
                 <Sheen radius={20} />
                 <Text style={[s.kpiLabel, { color: T.muted }]}>Сдано наличных</Text>
                 <CountUp value={totalHandedOver} style={[s.kpiValue, { color: T.ink }]} />
-                <Text style={[s.kpiUnit, { color: T.muted }]}>TJS</Text>
+                <Text style={[s.kpiUnit, { color: T.muted }]}>c</Text>
               </PressScale>
               <PressScale
                 style={[s.kpiCard, { backgroundColor: T.chip, borderColor: T.chipEdge }, cashTab === 'earnings' && s.kpiCardActive, cashTab === 'earnings' && { backgroundColor: T.card }]}
@@ -419,7 +419,7 @@ export default function CashScreen() {
                 <Sheen radius={20} />
                 <Text style={[s.kpiLabel, { color: T.muted }]}>Заработки</Text>
                 <CountUp value={earningsTotal} style={[s.kpiValue, { color: T.ink }]} />
-                <Text style={[s.kpiUnit, { color: T.muted }]}>TJS</Text>
+                <Text style={[s.kpiUnit, { color: T.muted }]}>c</Text>
               </PressScale>
             </View>
             </FadeSlideIn>
@@ -503,7 +503,7 @@ export default function CashScreen() {
                           <Text style={[s.cashItemTitle, { color: T.ink }]}>Сдано наличными</Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
-                          <Text style={s.cashAmount}>{fmt(amount)} TJS</Text>
+                          <Text style={s.cashAmount}>{fmt(amount)} c</Text>
                           <Text style={{ fontSize: 11, marginTop: 4, color: statusColor, fontWeight: '700' }}>{sLabel}</Text>
                         </View>
                       </View>
@@ -531,7 +531,7 @@ export default function CashScreen() {
                       <Text style={[s.cashItemTime, { color: T.muted }]}>{e.date ? dayjs(e.date).format('HH:mm') : '—'}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={s.cashAmount}>{fmt(e.fee)} TJS</Text>
+                      <Text style={s.cashAmount}>{fmt(e.fee)} c</Text>
                       <Text style={{ fontSize: 11, marginTop: 4, color: C.green, fontWeight: '700' }}>Получено</Text>
                     </View>
                   </View>
@@ -555,7 +555,7 @@ export default function CashScreen() {
 
               <View style={s.sheetRow}>
                 <Text style={s.sheetRowLabel}>Ожидается к сдаче</Text>
-                <Text style={s.sheetRowVal}>{fmt(toReturn)} TJS</Text>
+                <Text style={s.sheetRowVal}>{fmt(toReturn)} c</Text>
               </View>
 
               <View style={s.field}>
@@ -575,7 +575,7 @@ export default function CashScreen() {
                 <View style={[s.diffRow, Math.abs(diff) < 0.01 ? { backgroundColor: '#e8f8f0', borderColor: C.green } : diff < 0 ? { backgroundColor: '#fff1f1', borderColor: C.red } : { backgroundColor: '#fff5df', borderColor: C.orange }]}>
                   <Text style={s.diffLabel}>Разница</Text>
                   <Text style={[s.diffVal, Math.abs(diff) < 0.01 ? { color: C.green } : diff < 0 ? { color: C.red } : { color: C.orange }]}>
-                    {Math.abs(diff) < 0.01 ? '= 0' : diff > 0 ? `+${fmt(diff)} TJS` : `−${fmt(Math.abs(diff))} TJS`}
+                    {Math.abs(diff) < 0.01 ? '= 0' : diff > 0 ? `+${fmt(diff)} c` : `−${fmt(Math.abs(diff))} c`}
                   </Text>
                 </View>
               )}

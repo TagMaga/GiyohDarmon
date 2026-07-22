@@ -86,7 +86,7 @@ Two layout systems coexist:
 
 `shared/components/Modal.jsx` is the one shared dialog primitive — renders as a bottom sheet on mobile (`items-end` + rounded top corners) and a centered modal on desktop. Reused everywhere rather than each feature building its own sheet.
 
-Currency is always rendered as the literal string "смн" in the UI, never a currency symbol.
+Currency is always rendered as the literal string "c" in the UI, never a currency symbol.
 
 ---
 

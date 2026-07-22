@@ -127,11 +127,11 @@ function TariffRules({ rules }) {
           {groupRules.map((r, i) => (
             <View key={r.id} style={[s.tariffRow, i < groupRules.length - 1 && [s.infoRowBorder, { borderBottomColor: T.hairline }]]}>
               <Text style={[s.tariffRange, { color: T.muted }]}>
-                {r.amount_from} – {r.amount_to != null ? r.amount_to : '∞'} сом
+                {r.amount_from} – {r.amount_to != null ? r.amount_to : '∞'} c
               </Text>
               <View style={[s.tariffBadge, { backgroundColor: T.chip }]}>
                 <Text style={{ color: T.blue, fontSize: 13, fontWeight: '600' }}>
-                  {r.tariff_type === 'percent' ? `${r.tariff_value}%` : `${r.tariff_value} TJS`}
+                  {r.tariff_type === 'percent' ? `${r.tariff_value}%` : `${r.tariff_value} c`}
                 </Text>
               </View>
             </View>

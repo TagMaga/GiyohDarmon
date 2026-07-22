@@ -1199,7 +1199,7 @@ const DELIVERY_TYPES = [
   { key: 'fast',   label: 'Срочная доставка' },
 ]
 const TARIFF_TYPES = [
-  { key: 'fixed',   label: 'Фиксированная (сом)' },
+  { key: 'fixed',   label: 'Фиксированная (c)' },
   { key: 'percent', label: 'Процент (%)' },
 ]
 
@@ -1278,11 +1278,11 @@ function CourierTariffsModal({ open, onClose, courierId, courierName }) {
         <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-3">Добавить тариф</p>
         <div className="grid grid-cols-2 gap-2.5 mb-2.5">
           <div>
-            <label className="input-label">Сумма от (сом)</label>
+            <label className="input-label">Сумма от (c)</label>
             <input type="number" min="0" value={form.amount_from} onChange={setF('amount_from')} className="input mt-1" placeholder="0" />
           </div>
           <div>
-            <label className="input-label">Сумма до (сом)</label>
+            <label className="input-label">Сумма до (c)</label>
             <input type="number" min="0" value={form.amount_to} onChange={setF('amount_to')} className="input mt-1" placeholder="∞ (без ограничений)" />
           </div>
         </div>
@@ -1296,7 +1296,7 @@ function CourierTariffsModal({ open, onClose, courierId, courierName }) {
           <div>
             <label className="input-label">Значение</label>
             <input type="number" min="0" step="0.01" value={form.tariff_value} onChange={setF('tariff_value')}
-              className="input mt-1" placeholder={form.tariff_type === 'percent' ? '5 (= 5%)' : '15 (сом)'} />
+              className="input mt-1" placeholder={form.tariff_type === 'percent' ? '5 (= 5%)' : '15 (c)'} />
           </div>
         </div>
         {addError && <Alert variant="error" className="mb-3">{addError.response?.data?.error?.message ?? addError.message}</Alert>}
@@ -1318,10 +1318,10 @@ function CourierTariffsModal({ open, onClose, courierId, courierName }) {
           {visibleRules.map((r) => (
             <div key={r.id} className="flex items-center justify-between gap-2 bg-white border border-slate-100 rounded-xl px-3.5 py-2.5">
               <div className="text-[13px]">
-                <span className="text-slate-500">{r.amount_from} – {r.amount_to != null ? r.amount_to : '∞'} сом</span>
+                <span className="text-slate-500">{r.amount_from} – {r.amount_to != null ? r.amount_to : '∞'} c</span>
                 <span className="mx-2 text-slate-300">→</span>
                 <span className="font-bold text-slate-900">
-                  {r.tariff_type === 'percent' ? `${r.tariff_value}%` : `${r.tariff_value} сом`}
+                  {r.tariff_type === 'percent' ? `${r.tariff_value}%` : `${r.tariff_value} c`}
                 </span>
                 <span className="ml-2 text-[11px] text-slate-400">
                   ({r.tariff_type === 'percent' ? 'процент' : 'фиксировано'})

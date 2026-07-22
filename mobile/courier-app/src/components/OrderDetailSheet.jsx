@@ -499,7 +499,7 @@ export function OrderDetailSheet({
                     <Text style={d.productName}>{item.product_name || item.name || 'Товар'}</Text>
                     <Text style={d.productQty}>{item.quantity} шт</Text>
                   </View>
-                  <Text style={d.productPrice}>{fmt(item.total_price ?? item.price)} сом</Text>
+                  <Text style={d.productPrice}>{fmt(item.total_price ?? item.price)} c</Text>
                 </View>
               ))}
             </SectionCard>
@@ -507,19 +507,19 @@ export function OrderDetailSheet({
 
           {/* 3. PAYMENT ─────────────────────────────────────────── */}
           <SectionCard label="Оплата">
-            <PayRow label="Стоимость товаров" value={`${fmt(productTotal)} сом`} />
+            <PayRow label="Стоимость товаров" value={`${fmt(productTotal)} c`} />
             <PayRow
               label={`Доставка${order.delivery_method === 'express' ? ' (экспресс)' : ''}`}
-              value={deliveryFee > 0 ? `${fmt(deliveryFee)} сом` : 'Бесплатно'}
+              value={deliveryFee > 0 ? `${fmt(deliveryFee)} c` : 'Бесплатно'}
               valueColor={deliveryFee === 0 ? C.green : undefined}
             />
             {hasPrepay && (
-              <PayRow label={prepayLabel} value={`−${fmt(prepayAmt)} сом`} valueColor={C.green} />
+              <PayRow label={prepayLabel} value={`−${fmt(prepayAmt)} c`} valueColor={C.green} />
             )}
             <View style={d.collectRow}>
               <Text style={d.collectLabel}>К получению</Text>
               {collectAmt > 0
-                ? <Text style={d.collectVal}>{fmt(collectAmt)} сом</Text>
+                ? <Text style={d.collectVal}>{fmt(collectAmt)} c</Text>
                 : <Text style={[d.collectVal, { color: C.green, fontSize: 16 }]}>✓ Оплачено</Text>
               }
             </View>

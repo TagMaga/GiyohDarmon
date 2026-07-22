@@ -144,8 +144,8 @@ export default function DashboardScreen() {
           <View style={s.hero}>
             <Sheen radius={28} opacity={0.16} />
             <Text style={s.heroSmall}>заработок сегодня</Text>
-            <CountUp value={salary} style={s.heroMoney} suffix=" TJS" duration={900} />
-            <Text style={s.heroParagraph}>{done} доставок · {fmt(collected)} TJS наличные на руках</Text>
+            <CountUp value={salary} style={s.heroMoney} suffix=" c" duration={900} />
+            <Text style={s.heroParagraph}>{done} доставок · {fmt(collected)} c наличные на руках</Text>
           </View>
         </FadeSlideIn>
 
@@ -215,7 +215,7 @@ export default function DashboardScreen() {
                   <View style={s.iconBox}><Text style={{ fontSize: 26 }}>📈</Text></View>
                   <View style={{ flex: 1 }}>
                     <Text style={[s.statusTitle, { color: T.ink }]}>{done} доставки · {active} в работе</Text>
-                    <Text style={[s.statusSub, { color: T.muted }]}>{fmt(salary)} TJS заработано сегодня</Text>
+                    <Text style={[s.statusSub, { color: T.muted }]}>{fmt(salary)} c заработано сегодня</Text>
                   </View>
                 </View>
               </FadeSlideIn>

@@ -99,7 +99,7 @@ function HistoryCard({ row }) {
       <div style={{ fontSize: 11.5, color: C.text3, marginBottom: 11 }}>{fmtDate(row.created_at)} · {row.courier_name || '—'}</div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTop: `1px solid ${C.border2}` }}>
         <div style={{ fontSize: 11, color: C.text4 }}>Продавец: <strong style={{ color: C.text1 }}>{row.seller_name || '—'}</strong></div>
-        <div style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{fmt(row.total_amount)} сом</div>
+        <div style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{fmt(row.total_amount)} c</div>
       </div>
     </div>
   )

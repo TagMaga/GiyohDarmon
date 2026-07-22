@@ -73,7 +73,7 @@ export default function CashTab({ couriers, cashOwed }) {
       <div style={{ margin: '0 18px 14px', borderRadius: 18, padding: '16px 17px', background: C.gradient, color: '#fff', boxShadow: '0 12px 26px rgba(67,56,202,.28)' }}>
         <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', opacity: .8 }}>К сдаче сегодня</div>
         <div style={{ fontSize: 32, fontWeight: 900, lineHeight: 1.1, margin: '4px 0 12px' }}>
-          {fmt(cashOwed)} <span style={{ fontSize: 15, fontWeight: 700, opacity: .75 }}>сом</span>
+          {fmt(cashOwed)} <span style={{ fontSize: 15, fontWeight: 700, opacity: .75 }}>c</span>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <div style={{ flex: 1, background: 'rgba(255,255,255,.14)', borderRadius: 12, padding: '9px 11px' }}>
@@ -110,7 +110,7 @@ export default function CashTab({ couriers, cashOwed }) {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 17, fontWeight: 900, color: C.green }}>{fmt(h.total_to_return)}</div>
-                    <div style={{ fontSize: 10, color: C.text3 }}>сом</div>
+                    <div style={{ fontSize: 10, color: C.text3 }}>c</div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -183,7 +183,7 @@ function TxCard({ row, courierName, busy, onConfirm, onReject }) {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ fontSize: 12, color: C.text2, flex: 1 }}>{row.note ?? row.reason ?? '—'}</div>
-        <div style={{ fontSize: 16, fontWeight: 800, color: C.green }}>{fmt(row.amount)} сом</div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.green }}>{fmt(row.amount)} c</div>
       </div>
       {isPending && (
         rejecting ? (

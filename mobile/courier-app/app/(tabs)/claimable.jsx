@@ -148,7 +148,7 @@ export default function ClaimableScreen() {
                     {collectAmt > 0
                       ? (<>
                           <Text style={s.amountLabel}>Получить</Text>
-                          <Text style={s.amountVal}>{fmt(collectAmt)} сом</Text>
+                          <Text style={s.amountVal}>{fmt(collectAmt)} c</Text>
                         </>)
                       : <Text style={[s.amountVal, { color: C.green, fontSize: 14 }]}>✓ Оплачено</Text>
                     }
