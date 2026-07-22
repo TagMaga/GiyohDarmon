@@ -161,6 +161,52 @@ function ReceiptThumb({ proofUrl, attachmentsJson, mediaAssets, onClick }) {
   )
 }
 
+// Edit history — every confirm/reject decision and later correction. Shared
+// between the detail view and the edit view so a correction in progress can
+// still be made with the prior history in view, not just after the fact.
+function HistoryList({ history }) {
+  if (history.length === 0) return null
+  return (
+    <div>
+      <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+        <History size={12} /> История изменений ({history.length})
+      </p>
+      <div className="space-y-2">
+        {history.map(e => (
+          <div key={e.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold text-slate-700">{ACTION_LABEL[e.action] ?? e.action}</span>
+              <span className="text-slate-400 whitespace-nowrap">{fmtDate(e.created_at)}</span>
+            </div>
+            {e.editor_name && (
+              <p className="text-slate-500">Кем: <span className="font-medium text-slate-700">{e.editor_name}</span></p>
+            )}
+            {e.old_status !== e.new_status && (
+              <p className="text-slate-500">
+                Статус: {statusLabel(e.old_status)} → <span className="font-medium text-slate-700">{statusLabel(e.new_status)}</span>
+              </p>
+            )}
+            {(e.old_actual_returned ?? null) !== (e.new_actual_returned ?? null) && (
+              <p className="text-slate-500">
+                Отправил: {e.old_actual_returned != null ? `${fmtMoney(e.old_actual_returned)} c` : '—'} →{' '}
+                <span className="font-medium text-slate-700">
+                  {e.new_actual_returned != null ? `${fmtMoney(e.new_actual_returned)} c` : '—'}
+                </span>
+              </p>
+            )}
+            {e.new_admin_note && e.new_admin_note !== e.old_admin_note && (
+              <p className="text-slate-500">Примечание: <span className="text-rose-700">{e.new_admin_note}</span></p>
+            )}
+            {e.reason && (
+              <p className="text-slate-500">Причина изменения: <span className="text-slate-700 italic">{e.reason}</span></p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Verification modal ────────────────────────────────────────────────────────
 
 function VerifyModal({ row, open, initialView = 'detail', onClose, onConfirm, onReject, onDelete, onEdit, updating, deleting, editing }) {
@@ -220,7 +266,10 @@ function VerifyModal({ row, open, initialView = 'detail', onClose, onConfirm, on
     if (!isNaN(amt)) body.actual_returned = amt
     if (editAdminNote.trim()) body.admin_note = editAdminNote.trim()
     if (editReason.trim()) body.reason = editReason.trim()
-    onEdit(body)
+    // Back to the detail view (not a full close) so the just-recorded entry
+    // is visible in История изменений right away, instead of the modal
+    // simply disappearing with no confirmation the edit was saved.
+    onEdit(body, { onSaved: () => setView('detail') })
   }
 
   function resetAndClose() {
@@ -439,46 +488,7 @@ function VerifyModal({ row, open, initialView = 'detail', onClose, onConfirm, on
             </div>
           )}
 
-          {/* Edit history — every confirm/reject decision and later correction */}
-          {history.length > 0 && (
-            <div>
-              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                <History size={12} /> История изменений ({history.length})
-              </p>
-              <div className="space-y-2">
-                {history.map(e => (
-                  <div key={e.id} className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-slate-700">{ACTION_LABEL[e.action] ?? e.action}</span>
-                      <span className="text-slate-400 whitespace-nowrap">{fmtDate(e.created_at)}</span>
-                    </div>
-                    {e.editor_name && (
-                      <p className="text-slate-500">Кем: <span className="font-medium text-slate-700">{e.editor_name}</span></p>
-                    )}
-                    {e.old_status !== e.new_status && (
-                      <p className="text-slate-500">
-                        Статус: {statusLabel(e.old_status)} → <span className="font-medium text-slate-700">{statusLabel(e.new_status)}</span>
-                      </p>
-                    )}
-                    {(e.old_actual_returned ?? null) !== (e.new_actual_returned ?? null) && (
-                      <p className="text-slate-500">
-                        Отправил: {e.old_actual_returned != null ? `${fmtMoney(e.old_actual_returned)} c` : '—'} →{' '}
-                        <span className="font-medium text-slate-700">
-                          {e.new_actual_returned != null ? `${fmtMoney(e.new_actual_returned)} c` : '—'}
-                        </span>
-                      </p>
-                    )}
-                    {e.new_admin_note && e.new_admin_note !== e.old_admin_note && (
-                      <p className="text-slate-500">Примечание: <span className="text-rose-700">{e.new_admin_note}</span></p>
-                    )}
-                    {e.reason && (
-                      <p className="text-slate-500">Причина изменения: <span className="text-slate-700 italic">{e.reason}</span></p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <HistoryList history={history} />
         </div>
       )}
 
@@ -557,6 +567,8 @@ function VerifyModal({ row, open, initialView = 'detail', onClose, onConfirm, on
             />
             <p className="text-xs text-slate-400 mt-1.5">Будет сохранена в истории изменений</p>
           </div>
+
+          <HistoryList history={history} />
         </div>
       )}
 
@@ -654,9 +666,13 @@ export default function CashHandoversPage({ courierId } = {}) {
     })
   }
 
-  function handleVerifyEdit(body) {
+  function handleVerifyEdit(body, { onSaved } = {}) {
+    // Unlike confirm/reject (which move on to the next handover in the
+    // list), a correction stays open and returns to the detail view so the
+    // just-recorded history entry is visible immediately — see
+    // VerifyModal's handleEditSave.
     editHandover(body, {
-      onSuccess: () => setVerifyRow(null),
+      onSuccess: () => onSaved?.(),
     })
   }
 
