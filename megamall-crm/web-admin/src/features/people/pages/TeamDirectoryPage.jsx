@@ -1006,33 +1006,33 @@ function DocumentsField({ personId }) {
               </span>
             </a>
             <div className="flex flex-shrink-0 items-center gap-1">
-              {doc.verification_status !== 'verified' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!confirm(`Отметить документ «${doc.original_filename}» как проверенный?`)) return
-                    statusMut.mutate({ documentId: doc.id, status: 'verified' })
-                  }}
-                  disabled={statusMut.isPending}
-                  className="rounded-lg px-2 py-1 text-[10.5px] font-black text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-50"
-                  title="Проверить документ"
-                >
-                  Проверить
-                </button>
-              )}
-              {doc.verification_status !== 'rejected' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!confirm(`Отклонить документ «${doc.original_filename}»?`)) return
-                    statusMut.mutate({ documentId: doc.id, status: 'rejected' })
-                  }}
-                  disabled={statusMut.isPending}
-                  className="rounded-lg px-2 py-1 text-[10.5px] font-black text-amber-600 transition-colors hover:bg-amber-50 disabled:opacity-50"
-                  title="Отклонить документ"
-                >
-                  Отклонить
-                </button>
+              {doc.verification_status !== 'verified' && doc.verification_status !== 'rejected' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!confirm(`Отметить документ «${doc.original_filename}» как проверенный?`)) return
+                      statusMut.mutate({ documentId: doc.id, status: 'verified' })
+                    }}
+                    disabled={statusMut.isPending}
+                    className="rounded-lg px-2 py-1 text-[10.5px] font-black text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-50"
+                    title="Проверить документ"
+                  >
+                    Проверить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!confirm(`Отклонить документ «${doc.original_filename}»?`)) return
+                      statusMut.mutate({ documentId: doc.id, status: 'rejected' })
+                    }}
+                    disabled={statusMut.isPending}
+                    className="rounded-lg px-2 py-1 text-[10.5px] font-black text-amber-600 transition-colors hover:bg-amber-50 disabled:opacity-50"
+                    title="Отклонить документ"
+                  >
+                    Отклонить
+                  </button>
+                </>
               )}
             </div>
             <button
