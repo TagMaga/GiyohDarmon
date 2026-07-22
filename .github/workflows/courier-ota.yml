@@ -1,0 +1,70 @@
+name: Publish courier app OTA update
+
+# Publishes an EAS Update whenever courier-app code lands on main, so
+# couriers get JS/UI fixes without anyone running `eas update` from a
+# (possibly stale) local clone. Both channels are published: couriers run
+# production-channel builds; preview-channel builds stay current for
+# internal testing.
+#
+# OTA can only ship JS/asset changes. Native code, permissions, or Expo
+# SDK changes still need a full `eas build` (see mobile/courier-app/CLAUDE.md);
+# the fingerprint runtimeVersion policy makes such an update a no-op for
+# incompatible installs rather than a crash.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'mobile/courier-app/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: courier-app-ota
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP_DIR: mobile/courier-app
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+    steps:
+      - name: Verify EXPO_TOKEN secret is configured
+        if: ${{ env.EXPO_TOKEN == '' }}
+        run: |
+          echo "The EXPO_TOKEN repository secret is not set. Create an access token at" >&2
+          echo "https://expo.dev/settings/access-tokens and add it as a repository secret" >&2
+          echo "named EXPO_TOKEN (Settings → Secrets and variables → Actions)." >&2
+          exit 1
+
+      - name: Check out the exact revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/courier-app/package-lock.json
+
+      - name: Install app dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Publish OTA update (preview channel)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          npx --yes eas-cli update --channel preview --non-interactive \
+            --message "${GITHUB_SHA:0:7}: $(git log -1 --pretty=%s)"
+
+      - name: Publish OTA update (production channel)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          npx --yes eas-cli update --channel production --non-interactive \
+            --message "${GITHUB_SHA:0:7}: $(git log -1 --pretty=%s)"
