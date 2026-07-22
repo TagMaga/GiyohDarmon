@@ -1,7 +1,8 @@
 /**
  * CourierManageModals — three dispatcher-only courier management modals:
- *   1. EditCourierModal        — edit phone (login), telegram_chat_id, and service-zone
- *                                cities. Name/surname/password are owned by HR (People) now.
+ *   1. EditCourierModal        — edit the courier's service-zone cities. Name/surname/
+ *                                password/phone are owned by HR (People) now; telegram_chat_id
+ *                                has no editable home anywhere else in the app.
  *   2. TariffsModal            — per-courier range-based tariff rules (normal / fast)
  *   3. ToggleOrderIntakeModal  — enable / disable a courier's ability to take new orders
  */
@@ -154,11 +155,6 @@ function GhostBtn({ onClick, children }) {
 
 // ── 1. EDIT COURIER MODAL ────────────────────────────────────────────────────
 export function EditCourierModal({ courier, onClose, onSuccess }) {
-  const [form, setForm] = useState({
-    phone:            courier.phone     ?? '',
-    telegram_chat_id: courier.telegram_chat_id ?? '',
-  })
-
   // City / service zone state
   const [cities,          setCities]         = useState([])
   const [citiesLoading,   setCitiesLoading]  = useState(true)
@@ -179,8 +175,6 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
       .catch(() => {})
       .finally(() => setCitiesLoading(false))
   }, [])
-
-  const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }))
 
   const toggleCity = (id) => {
     setSelectedCityIDs((prev) =>
@@ -207,18 +201,17 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
 
   const handleSave = async () => {
     setError('')
-    if (!form.phone.trim())            return setError('Телефон обязателен')
-    if (!form.telegram_chat_id.trim()) return setError('Telegram Chat ID обязателен')
-
     setLoading(true)
     try {
       await updateCourier(courier.courier_id, {
-        // full_name/surname are edited via HR (People), not here — the
-        // backend still requires full_name on every save, so send it
-        // through unchanged rather than exposing it as an editable field.
+        // full_name/surname/phone are edited via HR (People) now.
+        // telegram_chat_id has no editable home anywhere else — it's just
+        // no longer editable here either. The backend still requires
+        // full_name, phone, and telegram_chat_id on every save, so send
+        // them through unchanged rather than exposing them as fields.
         full_name:        courier.full_name ?? '',
-        phone:            form.phone.trim(),
-        telegram_chat_id: form.telegram_chat_id.trim(),
+        phone:            courier.phone ?? '',
+        telegram_chat_id: courier.telegram_chat_id ?? '',
         city_ids:         selectedCityIDs,
       })
       onSuccess?.()
@@ -237,19 +230,6 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
       onClose={onClose}
     >
       <div style={{ padding: '20px 24px 24px' }}>
-        <FieldGroup>
-          <Label required>Телефон (логин)</Label>
-          <input style={field.base} value={form.phone} onChange={set('phone')} placeholder="+992..." />
-        </FieldGroup>
-
-        <FieldGroup>
-          <Label required>Telegram Chat ID</Label>
-          <input
-            style={field.base} value={form.telegram_chat_id}
-            onChange={set('telegram_chat_id')} placeholder="-1001234567890"
-          />
-        </FieldGroup>
-
         {/* ── Service zone / delivery cities ── */}
         <FieldGroup>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
