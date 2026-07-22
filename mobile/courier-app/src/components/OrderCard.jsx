@@ -37,9 +37,18 @@ export function OrderCard({ order, onOpen, onStart, actionLoading }) {
     >
       <View style={[oc.card, { backgroundColor: T.card, borderColor: T.cardEdge }, isUrgent(order) && oc.cardBorderUrgent]}>
       <Sheen radius={24} />
-      {/* Top: order number + status badge */}
+      {/* Top: order number + created date + status badge */}
       <View style={oc.topRow}>
-        <Text style={[oc.orderNum, { color: T.ink }]}>{order.order_number}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[oc.orderNum, { color: T.ink }]}>{order.order_number}</Text>
+          {order.created_at && (
+            <Text style={[oc.createdAt, { color: T.muted }]}>
+              {new Date(order.created_at).toLocaleString('ru-RU', {
+                day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+              })}
+            </Text>
+          )}
+        </View>
         <View style={[oc.badge, { backgroundColor: `${color}18` }]}>
           <Text style={[oc.badgeText, { color }]}>{STATUS_LABEL[order.status] || order.status}</Text>
         </View>
@@ -128,8 +137,9 @@ const oc = StyleSheet.create({
   cardBorderUrgent: {
     borderColor: C.orange, borderWidth: 2,
   },
-  topRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  topRow:    { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   orderNum:  { fontSize: 15, fontWeight: '700', color: C.ink, letterSpacing: -0.2 },
+  createdAt: { fontSize: 12, fontWeight: '600', color: C.muted, marginTop: 2 },
   badge:     { paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999 },
   badgeText: { fontSize: 11, fontWeight: '700' },
   infoRow:   { gap: 4 },
