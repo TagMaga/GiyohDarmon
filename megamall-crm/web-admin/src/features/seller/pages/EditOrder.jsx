@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShoppingCart, ArrowLeft } from 'lucide-react'
+import { ShoppingCart, ArrowLeft, Check } from 'lucide-react'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
 import { fetchOrder, updateOrder } from '../api'
@@ -458,6 +458,39 @@ export default function EditOrder() {
           {submitError && (
             <Alert variant="error" title="Ошибка">{submitError}</Alert>
           )}
+
+          {/* ── Save — flows at the end of the page, right after the totals ── */}
+          <div
+            style={{
+              background: '#fff', border: '1px solid #E7E5DE',
+              borderRadius: 20, padding: '14px 18px 16px', marginTop: 14,
+              boxShadow: '0 -8px 24px rgba(20,20,20,.05), 0 10px 28px rgba(20,20,20,.10)',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => submitMut.mutate()}
+              disabled={!canSubmit || submitMut.isPending}
+              className="w-full flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: 'linear-gradient(135deg,#6366F1,#4F46E5)', color: '#fff', border: 'none',
+                fontFamily: 'inherit', fontSize: 15, fontWeight: 700, padding: 15, borderRadius: 14,
+                cursor: 'pointer', boxShadow: '0 8px 20px rgba(99,102,241,.38)',
+              }}
+            >
+              {submitMut.isPending ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Сохраняем…
+                </>
+              ) : (
+                <>
+                  <Check size={18} />
+                  Сохранить изменения
+                </>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
