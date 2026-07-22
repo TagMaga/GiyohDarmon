@@ -51,7 +51,7 @@ func (s *Service) GetPayablesForTeamLead(
 	teamLeadID uuid.UUID,
 	fromStr, toStr string,
 ) (*PayablesResponse, error) {
-	from, to, err := parsePeriod(fromStr, toStr)
+	from, to, err := s.compSvc.ParsePeriod(fromStr, toStr)
 	if err != nil {
 		return nil, apperrors.BadRequest(err.Error())
 	}
@@ -338,30 +338,4 @@ func (s *Service) VoidPayout(ctx context.Context, actorID uuid.UUID, actorRole s
 		return apperrors.Internal(err)
 	}
 	return nil
-}
-
-// parsePeriod mirrors compensation's income_service.go parsePeriod/defaultPeriod
-// (unexported there) — kept in sync deliberately: same default-period semantics
-// (start of current month → end of today) so a payables call with no explicit
-// range agrees with what GetTeamIncome/GetMyIncome would compute by default.
-func parsePeriod(fromStr, toStr string) (time.Time, time.Time, error) {
-	now := time.Now().UTC()
-	from := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	to := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999999999, time.UTC)
-
-	if fromStr != "" {
-		t, err := time.Parse("2006-01-02", fromStr)
-		if err != nil {
-			return time.Time{}, time.Time{}, fmt.Errorf("invalid from date %q (use YYYY-MM-DD)", fromStr)
-		}
-		from = t.UTC()
-	}
-	if toStr != "" {
-		t, err := time.Parse("2006-01-02", toStr)
-		if err != nil {
-			return time.Time{}, time.Time{}, fmt.Errorf("invalid to date %q (use YYYY-MM-DD)", toStr)
-		}
-		to = t.Add(24*time.Hour - time.Nanosecond).UTC()
-	}
-	return from, to, nil
 }

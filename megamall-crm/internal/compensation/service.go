@@ -21,12 +21,17 @@ type Service struct {
 	snapshot *SnapshotBuilder
 	logger   *activity.Logger
 	db       *gorm.DB
+	loc      *time.Location // for interpreting bare YYYY-MM-DD period params as local midnight
 }
 
 // NewService wires up the compensation service and its sub-components.
-func NewService(repo *Repository, logger *activity.Logger, db *gorm.DB) *Service {
+func NewService(repo *Repository, logger *activity.Logger, db *gorm.DB, loc *time.Location) *Service {
 	resolver := NewRateResolver(repo)
 	snapshotBuilder := NewSnapshotBuilder(resolver, repo)
+
+	if loc == nil {
+		loc = time.UTC
+	}
 
 	return &Service{
 		repo:     repo,
@@ -34,6 +39,7 @@ func NewService(repo *Repository, logger *activity.Logger, db *gorm.DB) *Service
 		snapshot: snapshotBuilder,
 		logger:   logger,
 		db:       db,
+		loc:      loc,
 	}
 }
 
