@@ -207,7 +207,7 @@ func (s *Service) Create(ctx context.Context, req CreateUserRequest) (*User, err
 		FullName:     req.FullName,
 		Role:         req.Role,
 		IsActive:     true,
-		Status:       StatusOffline,
+		Status:       StatusOnline,
 		HireDate:     req.HireDate,
 		DateOfBirth:  req.DateOfBirth,
 		Address:      req.Address,
