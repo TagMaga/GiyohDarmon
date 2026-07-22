@@ -129,6 +129,37 @@ export function calcPerformance(orders = []) {
   return { total, delivered, revenue, avgOrder }
 }
 
+// ── Address helpers ───────────────────────────────────────────────────────────
+// users.address is a single TEXT column; the UI edits it as four parts
+// (city / region / street / house) joined with recognizable prefixes so a
+// stored string can be split back into the same fields.
+
+export function composeAddress({ city = '', region = '', street = '', house = '' }) {
+  const parts = []
+  if (city.trim())   parts.push(`г. ${city.trim()}`)
+  if (region.trim()) parts.push(`р-н ${region.trim()}`)
+  if (street.trim()) parts.push(`ул. ${street.trim()}`)
+  if (house.trim())  parts.push(`д. ${house.trim()}`)
+  return parts.join(', ')
+}
+
+export function parseAddress(address) {
+  const out = { city: '', region: '', street: '', house: '' }
+  const leftovers = []
+  ;(address ?? '').split(',').map(s => s.trim()).filter(Boolean).forEach(seg => {
+    let m
+    if      ((m = seg.match(/^г\.?\s+(.+)$/i)))          out.city   = out.city   || m[1]
+    else if ((m = seg.match(/^(?:р-н|район)\s+(.+)$/i))) out.region = out.region || m[1]
+    else if ((m = seg.match(/^(.+?)\s+(?:р-н|район)$/i))) out.region = out.region || m[1]
+    else if ((m = seg.match(/^ул\.?\s+(.+)$/i)))         out.street = out.street || m[1]
+    else if ((m = seg.match(/^(?:д\.?|дом)\s+(.+)$/i)))  out.house  = out.house  || m[1]
+    else leftovers.push(seg)
+  })
+  // legacy free-form addresses land in the street field so nothing is lost
+  if (leftovers.length) out.street = [out.street, ...leftovers].filter(Boolean).join(', ')
+  return out
+}
+
 // ── Role helpers ──────────────────────────────────────────────────────────────
 
 export function isCourier(user) { return user?.role === 'courier' || user?.Role === 'courier' }

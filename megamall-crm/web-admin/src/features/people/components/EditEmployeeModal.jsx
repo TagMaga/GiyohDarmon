@@ -8,7 +8,7 @@ import PasswordInput from '../../../shared/components/PasswordInput'
 import PhoneInput    from '../../../shared/components/PhoneInput'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { updateEmployee } from '../api'
-import { ALL_ROLES, ROLE_LABEL, STATUS_OPTIONS } from '../utils/peopleHelpers'
+import { ALL_ROLES, ROLE_LABEL, STATUS_OPTIONS, composeAddress, parseAddress } from '../utils/peopleHelpers'
 
 const MIN_PASSWORD_LENGTH = 8
 
@@ -35,7 +35,10 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
   const [status,          setStatus]          = useState('offline')
   const [hireDate,        setHireDate]        = useState('')
   const [dob,             setDob]             = useState('')
-  const [address,         setAddress]         = useState('')
+  const [city,            setCity]            = useState('')
+  const [region,          setRegion]          = useState('')
+  const [street,          setStreet]          = useState('')
+  const [house,           setHouse]           = useState('')
   const [newPassword,     setNewPassword]     = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [hireDateValid,   setHireDateValid]   = useState(true)
@@ -54,7 +57,8 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
     setStatus(person.status ?? 'offline')
     setHireDate(person.hire_date ? person.hire_date.slice(0, 10) : '')
     setDob(person.date_of_birth ? person.date_of_birth.slice(0, 10) : '')
-    setAddress(person.address ?? '')
+    const addr = parseAddress(person.address)
+    setCity(addr.city); setRegion(addr.region); setStreet(addr.street); setHouse(addr.house)
     setNewPassword('')
     setConfirmPassword('')
     setHireDateValid(true)
@@ -97,7 +101,7 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
         status,
         hire_date:     hireDate ? hireDate + 'T00:00:00Z' : undefined,
         date_of_birth: dob     ? dob + 'T00:00:00Z'     : undefined,
-        address:       address.trim() || undefined,
+        address:       composeAddress({ city, region, street, house }) || undefined,
         new_password:  wantsPasswordChange ? newPassword : undefined,
       })
     },
@@ -176,9 +180,25 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
           </label>
         </div>
 
-        <div>
-          <label className="input-label">Адрес</label>
-          <input value={address} onChange={e => setAddress(e.target.value)} className="input" placeholder="г. Душанбе, ул. ..." />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="input-label">Город</label>
+            <input value={city} onChange={e => setCity(e.target.value)} className="input" placeholder="Душанбе" />
+          </div>
+          <div>
+            <label className="input-label">Район</label>
+            <input value={region} onChange={e => setRegion(e.target.value)} className="input" placeholder="Сино" />
+          </div>
+        </div>
+        <div className="grid grid-cols-[1fr_96px] gap-4">
+          <div>
+            <label className="input-label">Улица</label>
+            <input value={street} onChange={e => setStreet(e.target.value)} className="input" placeholder="Рудаки" />
+          </div>
+          <div>
+            <label className="input-label">Дом</label>
+            <input value={house} onChange={e => setHouse(e.target.value)} className="input" placeholder="12" />
+          </div>
         </div>
 
         <div className="border-t border-slate-100 pt-4">
