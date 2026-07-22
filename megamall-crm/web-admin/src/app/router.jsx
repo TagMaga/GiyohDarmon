@@ -162,6 +162,7 @@ const router = createBrowserRouter([
         { path: 'income',   element: <Lazy><TeamLeadIncomePage /></Lazy> },
         { path: 'orders',              element: <Lazy><TeamLeadOrdersPage /></Lazy> },
         { path: 'orders/create',       element: <Lazy><CreateOrder /></Lazy> },
+        { path: 'orders/:id/edit',     element: <Lazy><EditOrder /></Lazy> },
         { path: 'sellers',  element: <Navigate to="/team-lead/team" replace /> },
         { path: 'managers', element: <Navigate to="/team-lead/team" replace /> },
         { path: 'reports',  element: <Lazy><TeamLeadReportsPage /></Lazy> },

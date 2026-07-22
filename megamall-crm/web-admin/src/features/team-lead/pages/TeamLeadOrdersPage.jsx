@@ -369,7 +369,7 @@ export default function TeamLeadOrdersPage() {
           onClose={() => setDetailOrder(null)}
           citiesById={citiesById}
           editBasePath="/team-lead/orders"
-          allowEdit={false}
+          allowEdit={true}
         />
       </div>
 

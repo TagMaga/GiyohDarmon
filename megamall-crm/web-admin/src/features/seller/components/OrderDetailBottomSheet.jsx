@@ -3,13 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { X, Send, Package, MessageCircle, Clock, Phone, ExternalLink, Pencil, User } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
-import { STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
+import { STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate, isOrderEditable } from '../../../shared/orderStatusConfig'
 import { useOrderComments, useAddOrderComment } from '../hooks/useOrderComments'
 import { roleLabel } from '../../orders/components/OrderCommentsPanel'
 import { fetchOrderTimeline } from '../../dispatcher/api'
 import { KEYS } from '../../../shared/queryKeys'
-
-const EDITABLE_STATUSES = new Set(['new', 'confirmed', 'assigned'])
 
 const ROLE_BADGE = {
   seller:     { label: 'Продавец',    color: '#7C3AED', bg: '#F5F3FF' },
@@ -56,7 +54,7 @@ export default function OrderDetailBottomSheet({ order, onClose, citiesById = {}
   const currentIdx = STATUS_ORDER.indexOf(order.status)
   const isTerminal = ['delivered', 'returned', 'cancelled'].includes(order.status)
   const phone = order.customer?.phone
-  const canEdit = allowEdit && EDITABLE_STATUSES.has(order.status)
+  const canEdit = allowEdit && isOrderEditable(order.status)
 
   function handleSend() {
     const text = comment.trim()

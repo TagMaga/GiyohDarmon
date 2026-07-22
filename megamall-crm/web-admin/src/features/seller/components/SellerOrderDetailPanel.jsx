@@ -2,14 +2,12 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { X, Send, Package, MessageCircle, Clock, Phone, ExternalLink, Calendar, MapPin, User, FileText, Pencil } from 'lucide-react'
-import { fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
+import { fmtAmount, fmtDate, isOrderEditable } from '../../../shared/orderStatusConfig'
 import { useOrderComments, useAddOrderComment } from '../hooks/useOrderComments'
 import { roleLabel } from '../../orders/components/OrderCommentsPanel'
 import { fetchOrderTimeline } from '../../dispatcher/api'
 import { KEYS } from '../../../shared/queryKeys'
 import { M, StatusPill } from './mobileUi'
-
-const EDITABLE_STATUSES = new Set(['new', 'confirmed', 'assigned'])
 
 const ROLE_BADGE = {
   seller:     { label: 'Продавец',  color: '#7C3AED', bg: '#F5F3FF' },
@@ -58,7 +56,7 @@ export default function SellerOrderDetailPanel({ order, onClose, citiesById = {}
   const currentIdx = STATUS_ORDER.indexOf(order.status)
   const phone  = order.customer?.phone
   const waHref = phone ? `https://wa.me/${phone.replace(/\D/g, '')}` : null
-  const canEdit = allowEdit && EDITABLE_STATUSES.has(order.status)
+  const canEdit = allowEdit && isOrderEditable(order.status)
 
   function handleSend() {
     const text = comment.trim()

@@ -15,7 +15,7 @@ import EmptyState                   from '../../../shared/components/EmptyState'
 import { TableRowSkeleton }         from '../../../shared/components/Skeleton'
 import OrderDetailsDrawer           from '../../orders/components/OrderDetailsDrawer'
 import TeamOrdersFilters            from '../../team-lead/components/TeamOrdersFilters'
-import { STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
+import { STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate, isOrderEditable } from '../../../shared/orderStatusConfig'
 import { formatOrderLabel, getOrderId } from '../../dispatcher/utils/orderHelpers'
 import useManagerPersonalOrders     from '../hooks/useManagerPersonalOrders'
 import useCurrentUser               from '../../../shared/hooks/useCurrentUser'
@@ -36,7 +36,6 @@ function field(o, ...keys) {
 }
 
 const HEADERS = ['№', 'Клиент', 'Товар', 'Сумма', 'Чистая выручка', 'Статус', 'Дата', '']
-const EDITABLE_STATUSES = new Set(['new', 'confirmed', 'assigned'])
 
 function DesktopRow({ order, onView, onEdit }) {
   const name    = field(order,'customer_name','CustomerName') ?? order.customer?.full_name ?? '—'
@@ -44,7 +43,7 @@ function DesktopRow({ order, onView, onEdit }) {
   const status  = order.status ?? order.Status ?? ''
   const amount  = field(order,'total_order_amount','total_amount','amount','total') ?? 0
   const net     = Number(field(order,'net_revenue','NetRevenue') ?? 0)
-  const canEdit = EDITABLE_STATUSES.has(status)
+  const canEdit = isOrderEditable(status)
 
   return (
     <tr className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
@@ -77,7 +76,7 @@ function MobileCard({ order, onView, onEdit }) {
   const name    = field(order,'customer_name','CustomerName') ?? order.customer?.full_name ?? '—'
   const status  = order.status ?? order.Status ?? ''
   const amount  = field(order,'total_order_amount','total_amount','amount','total') ?? 0
-  const canEdit = EDITABLE_STATUSES.has(status)
+  const canEdit = isOrderEditable(status)
 
   return (
     <div className="card p-4 space-y-2">
