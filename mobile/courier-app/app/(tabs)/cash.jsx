@@ -271,7 +271,11 @@ export default function CashScreen() {
   }))
   const toReturn  = Math.max(0, Number(summary?.cash_to_handover || 0))
   const salary    = Number(summary?.total_delivery_fees || 0)
-  const collected = toReturn + salary
+  // Today's real order sum, excluding any carried-over debt from past
+  // handovers (see carriedOverDebt below) — toReturn alone would silently
+  // fold that debt into "collected" and misrepresent it as today's cash.
+  const collected = Number(summary?.today_collected || 0) + salary
+  const carriedOverDebt = Number(summary?.carried_over_debt || 0)
   const cashOrders = summary?.orders_collected || 0
   // Pending-review amount on the hero card is a real-time status, not tied
   // to the display filters below — it always reflects the full history.
@@ -390,6 +394,14 @@ export default function CashScreen() {
                 <Text style={s.formulaOrange}>{fmt(toReturn)} c</Text>
               </View>
               <Text style={[s.caption, { color: T.muted }]}>Собранные наличные − Ваша зарплата</Text>
+              {carriedOverDebt !== 0 && (
+                <View style={[s.pendingRow, carriedOverDebt < 0 && s.creditRow]}>
+                  <Text style={[s.pendingText, carriedOverDebt < 0 && s.creditText]}>
+                    {carriedOverDebt > 0 ? 'Долг с прошлых сдач' : 'Переплата с прошлых сдач'}
+                  </Text>
+                  <Text style={[s.pendingVal, carriedOverDebt < 0 && s.creditText]}>{fmt(Math.abs(carriedOverDebt))} c</Text>
+                </View>
+              )}
               {pendingHandover > 0 && (
                 <View style={s.pendingRow}>
                   <Text style={s.pendingText}>На проверке у диспетчера</Text>
@@ -734,6 +746,8 @@ const s = StyleSheet.create({
   pendingRow: { marginTop: 14, paddingVertical: 14, paddingHorizontal: 15, borderRadius: 20, backgroundColor: 'rgba(255,149,0,0.14)', borderWidth: 1, borderColor: 'rgba(255,149,0,0.26)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   pendingText: { color: '#b87500', fontWeight: '700', fontSize: 13 },
   pendingVal: { color: '#b87500', fontWeight: '700', fontSize: 14 },
+  creditRow: { backgroundColor: 'rgba(52,199,89,0.14)', borderColor: 'rgba(52,199,89,0.26)' },
+  creditText: { color: '#1e9e46' },
   submitBtn: { width: '100%', marginTop: 16, borderRadius: 999, paddingVertical: 18, backgroundColor: C.blue, alignItems: 'center', shadowColor: C.blue, shadowOffset: { width: 0, height: 13 }, shadowOpacity: 0.25, shadowRadius: 26, elevation: 4 },
   submitBtnDisabled: { backgroundColor: 'rgba(140,152,172,0.55)', shadowOpacity: 0 },
   submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 17 },

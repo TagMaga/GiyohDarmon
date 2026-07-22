@@ -119,6 +119,8 @@ type CashSummaryResponse struct {
 	TotalDeliveryFees float64 `json:"total_delivery_fees"` // courier earnings on still-owed orders
 	AlreadyHanded     float64 `json:"already_handed"`      // confirmed handovers today
 	PendingAmount     float64 `json:"pending_amount"`      // submitted, awaiting dispatcher confirmation
+	TodayCollected    float64 `json:"today_collected"`     // sum of still-owed orders only — excludes CarriedOverDebt, unlike CashToHandover
+	CarriedOverDebt   float64 `json:"carried_over_debt"`   // signed residue from past confirmed handovers (positive = still owed, negative = credit); already folded into CashToHandover
 }
 
 // CourierMeResponse is the profile response for GET /courier/me.

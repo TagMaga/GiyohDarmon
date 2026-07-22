@@ -1025,6 +1025,8 @@ func (r *Repository) GetCashSummary(ctx context.Context, courierID uuid.UUID) (*
 		TotalDeliveryFees: pending.TotalFees,
 		AlreadyHanded:     ht.Confirmed,
 		PendingAmount:     ht.Pending,
+		TodayCollected:    pending.CashToHandover,
+		CarriedOverDebt:   shortfall,
 	}, nil
 }
 
