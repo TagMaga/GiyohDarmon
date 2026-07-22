@@ -26,42 +26,6 @@ const TYPE_CHIPS = [
   { key: 'owner_withdrawal', label: 'Списания' },
 ]
 
-function toYMD(date) {
-  return date.toISOString().slice(0, 10)
-}
-
-function computePresetRange(key) {
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  switch (key) {
-    case 'today':
-      return { from: toYMD(today), to: toYMD(today) }
-    case 'yesterday': {
-      const d = new Date(today); d.setDate(d.getDate() - 1)
-      return { from: toYMD(d), to: toYMD(d) }
-    }
-    case '7d': {
-      const s = new Date(today); s.setDate(s.getDate() - 6)
-      return { from: toYMD(s), to: toYMD(today) }
-    }
-    case '30d': {
-      const s = new Date(today); s.setDate(s.getDate() - 29)
-      return { from: toYMD(s), to: toYMD(today) }
-    }
-    case 'this_month': {
-      const s = new Date(today.getFullYear(), today.getMonth(), 1)
-      return { from: toYMD(s), to: toYMD(today) }
-    }
-    case 'prev_month': {
-      const s = new Date(today.getFullYear(), today.getMonth() - 1, 1)
-      const e = new Date(today.getFullYear(), today.getMonth(), 0)
-      return { from: toYMD(s), to: toYMD(e) }
-    }
-    default:
-      return null // custom — caller supplies its own from/to
-  }
-}
-
 // ── KPI card ──────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, sub, valueClass = 'text-slate-900', subColor = 'text-slate-400', featured = false }) {
   return (
@@ -342,7 +306,7 @@ function MobileBudgetView({
 export default function BudgetCompanyPage() {
   const qc = useQueryClient()
 
-  const [range, setRange] = useState(() => computePresetRange('this_month'))
+  const [range, setRange] = useState(() => ({ from: '', to: '' })) // Максимум — no bound
 
   // Other filters
   const [typeFilter, setTypeFilter]   = useState('')
