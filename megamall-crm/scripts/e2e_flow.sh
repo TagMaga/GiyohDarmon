@@ -223,12 +223,22 @@ ok "status=$(echo "$DELIVER_RESP" | jq -r '.data.status')"
 # FINANCIAL VALIDATION
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── Validate net_revenue = total_amount - delivery_fee ────────────────────────
-step "Validate net_revenue = total_amount - delivery_fee"
-EXPECTED_NET=$(echo "$TOTAL_AMOUNT - $DELIVERY_FEE" | bc -l | awk '{printf "%.5f", $1}')
+# net_revenue is only provisional (total_amount + delivery_fee) until delivery —
+# it's frozen to its final value (== commission_base) once courier_payout is
+# known, so re-fetch the order now that it's delivered.
+step "Re-fetch order after delivery (net_revenue is frozen at this point)"
+ORDER_AFTER_RESP=$(call GET "/orders/$ORDER_ID" "$OWNER_TOKEN")
+assert_success "$ORDER_AFTER_RESP" "fetch order after delivery"
+COURIER_PAYOUT=$(echo "$ORDER_AFTER_RESP" | jq -r '.data.courier_payout')
+NET_REVENUE=$(echo "$ORDER_AFTER_RESP" | jq -r '.data.net_revenue')
+ok "courier_payout=$COURIER_PAYOUT  net_revenue(frozen)=$NET_REVENUE"
+
+# ── Validate net_revenue = total_amount + delivery_fee - courier_payout ──────
+step "Validate net_revenue = total_amount + delivery_fee - courier_payout"
+EXPECTED_NET=$(echo "$TOTAL_AMOUNT + $DELIVERY_FEE - $COURIER_PAYOUT" | bc -l | awk '{printf "%.5f", $1}')
 ACTUAL_NET=$(printf "%.5f" "$NET_REVENUE")
 if within_tolerance "$ACTUAL_NET" "$EXPECTED_NET"; then
-  ok "net_revenue check passed: $ACTUAL_NET ≈ $EXPECTED_NET (total=$TOTAL_AMOUNT - fee=$DELIVERY_FEE)"
+  ok "net_revenue check passed: $ACTUAL_NET ≈ $EXPECTED_NET (total=$TOTAL_AMOUNT + fee=$DELIVERY_FEE - courier_payout=$COURIER_PAYOUT)"
 else
   fail "net_revenue mismatch: got $ACTUAL_NET expected $EXPECTED_NET"
 fi

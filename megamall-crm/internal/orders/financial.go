@@ -104,6 +104,18 @@ func (s *Service) emitFinancialEvents(
 		return fmt.Errorf("financial engine: courier_payout %.2f exceeds total_amount+delivery_fee %.2f", order.CourierPayout, order.TotalAmount+order.DeliveryFee)
 	}
 
+	// Freeze net_revenue to its final value (== commission_base) now that
+	// courier_payout is known. Prior to delivery it only held the provisional
+	// total_amount+delivery_fee figure (see orders/service.go: Create).
+	if order.NetRevenue != commissionBase {
+		if err := tx.WithContext(ctx).Model(&Order{}).
+			Where("id = ?", order.ID).
+			UpdateColumn("net_revenue", commissionBase).Error; err != nil {
+			return fmt.Errorf("freeze net_revenue: %w", err)
+		}
+		order.NetRevenue = commissionBase
+	}
+
 	// Compute the full breakdown using the canonical business-rule function.
 	// This is the same function used by the Preview endpoint — single source of truth.
 	breakdown, err := compensation.ApplyCommissionRules(
