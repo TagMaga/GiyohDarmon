@@ -5,7 +5,9 @@ package orders
 // Emits immutable FinancialEvent ledger entries when an order is delivered.
 //
 // Commission model:
-//   All commissions derive from commission_base = total_amount - courier_payout.
+//   All commissions derive from commission_base = total_amount + delivery_fee - courier_payout.
+//   Delivery-fee revenue is included in the base (net of what the courier is paid),
+//   so the company/seller also earn their normal share of the delivery margin.
 //
 //   team_lead_pool_gross is a fixed percentage of commission_base
 //   (team_lead_pool_rate). Sellers and managers are paid OUT OF this pool —
@@ -97,9 +99,9 @@ func (s *Service) emitFinancialEvents(
 		}
 	}
 
-	commissionBase := order.TotalAmount - order.CourierPayout
+	commissionBase := order.TotalAmount + order.DeliveryFee - order.CourierPayout
 	if commissionBase < 0 {
-		return fmt.Errorf("financial engine: courier_payout %.2f exceeds total_amount %.2f", order.CourierPayout, order.TotalAmount)
+		return fmt.Errorf("financial engine: courier_payout %.2f exceeds total_amount+delivery_fee %.2f", order.CourierPayout, order.TotalAmount+order.DeliveryFee)
 	}
 
 	// Compute the full breakdown using the canonical business-rule function.
