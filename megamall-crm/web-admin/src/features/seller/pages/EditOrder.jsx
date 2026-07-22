@@ -12,11 +12,8 @@ import CartItemRow from '../components/CartItemRow'
 import CartTotalsBreakdown from '../components/CartTotalsBreakdown'
 import DeliveryModeSelector from '../components/DeliveryModeSelector'
 import Alert from '../../../shared/components/Alert'
-import { fmtAmount } from '../../../shared/orderStatusConfig'
+import { fmtAmount, isOrderEditable } from '../../../shared/orderStatusConfig'
 import { Search, X, Package } from 'lucide-react'
-
-// Statuses the seller can still edit
-const EDITABLE_STATUSES = new Set(['new', 'confirmed', 'assigned'])
 
 // ── Product search (same as CreateOrder) ──────────────────────────────────────
 function ProductSearch({ products, loading, onAdd }) {
@@ -232,8 +229,8 @@ export default function EditOrder() {
   const productTotal = useMemo(() => calcProductTotal(cartItems), [cartItems])
   const totalAmount  = productTotal + deliveryFee
 
-  // Block editing if order is terminal
-  const isTerminal = order && !EDITABLE_STATUSES.has(order.status)
+  // Block editing once the order has been delivered
+  const isTerminal = order && !isOrderEditable(order.status)
 
   const submitMut = useMutation({
     onMutate: () => { setSubmitError(null) },
@@ -255,6 +252,9 @@ export default function EditOrder() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.seller.orders })
       qc.invalidateQueries({ queryKey: ['seller', 'order', id] })
+      // Manager's and team lead's order lists are built on useOwnerOrders,
+      // keyed under this prefix regardless of their filter params.
+      qc.invalidateQueries({ queryKey: ['orders', 'list'] })
       toast.success('Заказ успешно обновлён')
       navigate(-1)
     },

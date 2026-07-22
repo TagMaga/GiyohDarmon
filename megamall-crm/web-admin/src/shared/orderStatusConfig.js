@@ -31,6 +31,11 @@ export const STATUS_BADGE = {
   issue:                'rose',
 }
 
+/** An order can be edited (by seller/manager/team lead) unless it's already delivered. */
+export function isOrderEditable(status) {
+  return status !== 'delivered'
+}
+
 /** Statuses that a seller can filter by in their orders list */
 export const SELLER_STATUS_FILTERS = [
   { key: 'all',        label: 'Все'             },

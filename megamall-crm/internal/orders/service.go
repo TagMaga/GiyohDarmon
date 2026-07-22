@@ -842,7 +842,7 @@ func (s *Service) GetSnapshot(ctx context.Context, orderID uuid.UUID) (*compensa
 // Update applies a partial update to an order inside a transaction.
 // Sellers may update notes, delivery_address, delivery_method, customer contact,
 // items (triggers full inventory re-reservation and financial recalculation),
-// and prepayment / attachment fields. Terminal orders are rejected.
+// and prepayment / attachment fields. Delivered orders are rejected.
 func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req UpdateOrderRequest) (*Order, error) {
 	// Nil items slice  = "no change to items".
 	// Empty items slice = error; order must always have at least one item.
@@ -886,11 +886,8 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 		if o == nil {
 			return apperrors.NotFound("order")
 		}
-		if o.Status.IsTerminal() {
-			return apperrors.Unprocessable("cannot edit a terminal order")
-		}
-		if o.Status == StatusInDelivery {
-			return apperrors.Unprocessable("Этот заказ уже находится в доставке и больше не может быть изменён.")
+		if o.Status == StatusDelivered {
+			return apperrors.Unprocessable("Доставленный заказ больше нельзя изменить.")
 		}
 
 		// ── Snapshot old values for audit trail ──────────────────────────────
