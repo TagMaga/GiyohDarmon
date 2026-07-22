@@ -107,6 +107,7 @@ type MyOrderResponse struct {
 	PaymentLabel         string              `json:"payment_label"`
 	ScheduledAt          *time.Time          `json:"scheduled_at"`
 	AssignedAt           *time.Time          `json:"assigned_at"`
+	CreatedAt            time.Time           `json:"created_at"`
 	Notes                *string             `json:"notes"`
 	Items                []OrderItemResponse `json:"items"`
 }
