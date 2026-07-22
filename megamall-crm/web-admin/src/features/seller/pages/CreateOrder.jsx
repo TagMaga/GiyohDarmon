@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShoppingCart, Search, X, Package, AlertCircle } from 'lucide-react'
+import { ShoppingCart, Search, X, Package, AlertCircle, Users } from 'lucide-react'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
 import { createOrder, createCustomer } from '../api'
@@ -19,6 +19,7 @@ import DeliveryModeSelector from '../components/DeliveryModeSelector'
 import PaymentModeSelector from '../components/PaymentModeSelector'
 import OrderSuccessScreen from '../components/OrderSuccessScreen'
 import Alert from '../../../shared/components/Alert'
+import EmptyState from '../../../shared/components/EmptyState'
 import { fmtAmount } from '../../../shared/orderStatusConfig'
 import { M } from '../components/mobileUi'
 
@@ -170,8 +171,9 @@ export default function CreateOrder() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const location = useLocation()
-  const { role } = useProfile()
+  const { role, teamId } = useProfile()
   const orderType = ORDER_TYPE_BY_ROLE[role] ?? 'seller_order'
+  const needsTeam = role !== 'owner' && !teamId
 
   const [form, setForm] = useState(() => loadDraft() ?? EMPTY_FORM)
   const [success, setSuccess] = useState(null)
@@ -434,6 +436,18 @@ export default function CreateOrder() {
     }
     return true
   })()
+
+  if (needsTeam) {
+    return (
+      <div className="page-container">
+        <EmptyState
+          icon={<Users size={22} />}
+          title="Вы не привязаны к команде"
+          description="Оформление заказов доступно только участникам команды. Обратитесь к владельцу, чтобы вас добавили в команду."
+        />
+      </div>
+    )
+  }
 
   if (success) {
     return (

@@ -429,6 +429,20 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		effectiveSellerID = *req.SellerID
 	}
 
+	// A seller/manager/team-lead must belong to a team before they (or a
+	// dispatcher on their behalf) can place an order — house orders carry no
+	// seller/team attribution and are exempt. This mirrors the read done in
+	// resolveHierarchy but must fail fast, before any other work happens.
+	if req.OrderType != OrderTypeHouse {
+		sellerH, err := s.hierRepo.GetByUserID(ctx, effectiveSellerID)
+		if err != nil {
+			return nil, fmt.Errorf("check team membership: %w", err)
+		}
+		if sellerH == nil || sellerH.TeamID == nil {
+			return nil, apperrors.Unprocessable("you must be assigned to a team before creating orders — ask an owner to add you to a team")
+		}
+	}
+
 	// Customer must exist in the customers table.
 	if req.CustomerID == uuid.Nil {
 		return nil, apperrors.BadRequest("customer is required")
