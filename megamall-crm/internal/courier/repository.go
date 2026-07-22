@@ -138,6 +138,7 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID, stat
 		CourierCollectAmount float64            `gorm:"column:courier_collect_amount"`
 		ScheduledAt          *time.Time         `gorm:"column:scheduled_at"`
 		AssignedAt           *time.Time         `gorm:"column:assigned_at"`
+		CreatedAt            time.Time          `gorm:"column:created_at"`
 		Notes                *string            `gorm:"column:notes"`
 	}
 
@@ -164,6 +165,7 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID, stat
 			GREATEST(0, o.total_amount + o.delivery_fee - o.prepayment_amount) AS courier_collect_amount,
 			o.scheduled_at,
 			oa.assigned_at,
+			o.created_at,
 			o.notes
 		`).
 		Joins("LEFT JOIN customers c ON c.id = o.customer_id").
@@ -226,6 +228,7 @@ func (r *Repository) ListMyOrders(ctx context.Context, courierID uuid.UUID, stat
 			PaymentLabel:         paymentLabel(rw.PrepaymentAmount, totalOrderAmount),
 			ScheduledAt:          rw.ScheduledAt,
 			AssignedAt:           rw.AssignedAt,
+			CreatedAt:            rw.CreatedAt,
 			Notes:                rw.Notes,
 			Items:                []OrderItemResponse{},
 		})
@@ -329,6 +332,7 @@ func (r *Repository) ListAvailableOrders(ctx context.Context, courierID uuid.UUI
 		PrepaymentAmount     float64            `gorm:"column:prepayment_amount"`
 		CourierCollectAmount float64            `gorm:"column:courier_collect_amount"`
 		ScheduledAt          *time.Time         `gorm:"column:scheduled_at"`
+		CreatedAt            time.Time          `gorm:"column:created_at"`
 		Notes                *string            `gorm:"column:notes"`
 	}
 
@@ -349,7 +353,7 @@ func (r *Repository) ListAvailableOrders(ctx context.Context, courierID uuid.UUI
 			o.delivery_fee,
 			o.prepayment_amount,
 			GREATEST(0, o.total_amount + o.delivery_fee - o.prepayment_amount) AS courier_collect_amount,
-			o.scheduled_at, o.notes
+			o.scheduled_at, o.created_at, o.notes
 		`).
 		Joins("LEFT JOIN customers c ON c.id = o.customer_id").
 		Joins("LEFT JOIN users creator ON creator.id = o.seller_id").
@@ -403,6 +407,7 @@ func (r *Repository) ListAvailableOrders(ctx context.Context, courierID uuid.UUI
 			CourierCollectAmount: rw.CourierCollectAmount,
 			PaymentLabel:         paymentLabel(rw.PrepaymentAmount, totalOrderAmount),
 			ScheduledAt:          rw.ScheduledAt,
+			CreatedAt:            rw.CreatedAt,
 			Notes:                rw.Notes,
 		})
 	}
@@ -433,6 +438,7 @@ func (r *Repository) GetOrderByIDForCourier(ctx context.Context, courierID, orde
 		CourierCollectAmount float64            `gorm:"column:courier_collect_amount"`
 		ScheduledAt          *time.Time         `gorm:"column:scheduled_at"`
 		AssignedAt           *time.Time         `gorm:"column:assigned_at"`
+		CreatedAt            time.Time          `gorm:"column:created_at"`
 		Notes                *string            `gorm:"column:notes"`
 	}
 
@@ -459,6 +465,7 @@ func (r *Repository) GetOrderByIDForCourier(ctx context.Context, courierID, orde
 			GREATEST(0, o.total_amount + o.delivery_fee - o.prepayment_amount) AS courier_collect_amount,
 			o.scheduled_at,
 			oa.assigned_at,
+			o.created_at,
 			o.notes
 		`).
 		Joins("LEFT JOIN customers c ON c.id = o.customer_id").
@@ -518,6 +525,7 @@ func (r *Repository) GetOrderByIDForCourier(ctx context.Context, courierID, orde
 		PaymentLabel:         paymentLabel(rw.PrepaymentAmount, totalOrderAmount),
 		ScheduledAt:          rw.ScheduledAt,
 		AssignedAt:           rw.AssignedAt,
+		CreatedAt:            rw.CreatedAt,
 		Notes:                rw.Notes,
 		Items:                []OrderItemResponse{},
 	}
