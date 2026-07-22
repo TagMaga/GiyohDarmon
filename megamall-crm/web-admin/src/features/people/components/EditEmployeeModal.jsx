@@ -27,7 +27,8 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
   const qc    = useQueryClient()
   const toast = useToast()
 
-  const [fullName,        setFullName]        = useState('')
+  const [firstName,       setFirstName]       = useState('')
+  const [lastName,        setLastName]        = useState('')
   const [phone,           setPhone]           = useState('')
   const [role,            setRole]            = useState('seller')
   const [isActive,        setIsActive]        = useState(true)
@@ -42,7 +43,11 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
 
   useEffect(() => {
     if (!person || !open) return
-    setFullName(person.full_name ?? '')
+    // full_name is stored as a single string — first word is the name,
+    // the rest is the surname
+    const [first, ...rest] = (person.full_name ?? '').trim().split(/\s+/)
+    setFirstName(first ?? '')
+    setLastName(rest.join(' '))
     setPhone(person.phone ?? '')
     setRole(person.role ?? 'seller')
     setIsActive(person.is_active !== false)
@@ -63,7 +68,7 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
     newPassword.length < MIN_PASSWORD_LENGTH ||
     newPassword !== confirmPassword
   )
-  const canSave = fullName.trim() !== '' && !passwordInvalid && hireDateValid && dobValid
+  const canSave = firstName.trim() !== '' && lastName.trim() !== '' && !passwordInvalid && hireDateValid && dobValid
 
   function patchCache(updated) {
     qc.setQueryData(['people'], (old) =>
@@ -76,7 +81,8 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
 
   const { mutate, isPending, error, reset } = useMutation({
     mutationFn: async () => {
-      if (!fullName.trim()) throw new Error('Имя обязательно')
+      if (!firstName.trim()) throw new Error('Имя обязательно')
+      if (!lastName.trim())  throw new Error('Фамилия обязательна')
       if (wantsPasswordChange) {
         if (!newPassword.trim() || !confirmPassword.trim()) throw new Error('Заполните оба поля пароля')
         if (newPassword.length < MIN_PASSWORD_LENGTH) throw new Error(`Пароль минимум ${MIN_PASSWORD_LENGTH} символов`)
@@ -84,7 +90,7 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
       }
 
       return updateEmployee(person.id, {
-        full_name:     fullName.trim(),
+        full_name:     `${firstName.trim()} ${lastName.trim()}`.trim(),
         phone:         phone.trim()   || undefined,
         role,
         is_active:     isActive,
@@ -127,13 +133,18 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="input-label">Полное имя *</label>
-            <input value={fullName} onChange={e => setFullName(e.target.value)} className="input" placeholder="Имя Фамилия" />
+            <label className="input-label">Имя *</label>
+            <input value={firstName} onChange={e => setFirstName(e.target.value)} className="input" placeholder="Иван" />
           </div>
           <div>
-            <label className="input-label">Телефон</label>
-            <PhoneInput value={phone} onChange={setPhone} />
+            <label className="input-label">Фамилия *</label>
+            <input value={lastName} onChange={e => setLastName(e.target.value)} className="input" placeholder="Иванов" />
           </div>
+        </div>
+
+        <div>
+          <label className="input-label">Телефон</label>
+          <PhoneInput value={phone} onChange={setPhone} />
         </div>
 
         <div>

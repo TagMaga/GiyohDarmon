@@ -17,7 +17,8 @@ export default function CreateEmployeeModal({ open, onClose }) {
   const toast = useToast()
 
   const [phone,           setPhone]           = useState('')
-  const [fullName,        setFullName]        = useState('')
+  const [firstName,       setFirstName]       = useState('')
+  const [lastName,        setLastName]        = useState('')
   const [role,            setRole]            = useState('seller')
   const [password,        setPassword]        = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
@@ -26,30 +27,34 @@ export default function CreateEmployeeModal({ open, onClose }) {
   const [address,         setAddress]         = useState('')
   const [hireDateValid, setHireDateValid] = useState(true)
   const [dobValid,      setDobValid]      = useState(true)
-  const [optionalOpen,  setOptionalOpen]  = useState(false)
+  const [detailsOpen,   setDetailsOpen]   = useState(true)
 
   const passwordMismatch = passwordConfirm.length > 0 && password !== passwordConfirm
 
   function resetForm() {
-    setPhone(''); setFullName(''); setPassword(''); setPasswordConfirm(''); setRole('seller')
+    setPhone(''); setFirstName(''); setLastName(''); setPassword(''); setPasswordConfirm(''); setRole('seller')
     setHireDate(''); setDob(''); setAddress('')
-    setHireDateValid(true); setDobValid(true); setOptionalOpen(false)
+    setHireDateValid(true); setDobValid(true); setDetailsOpen(true)
   }
 
   const { mutate, isPending, error, reset } = useMutation({
     mutationFn: () => {
-      if (!phone.trim())    throw new Error('Телефон обязателен')
-      if (!fullName.trim()) throw new Error('Имя обязательно')
+      if (!phone.trim())     throw new Error('Телефон обязателен')
+      if (!firstName.trim()) throw new Error('Имя обязательно')
+      if (!lastName.trim())  throw new Error('Фамилия обязательна')
       if (password.length < 8) throw new Error('Пароль минимум 8 символов')
       if (password !== passwordConfirm) throw new Error('Пароли не совпадают')
+      if (!hireDate)        throw new Error('Дата найма обязательна')
+      if (!dob)             throw new Error('Дата рождения обязательна')
+      if (!address.trim())  throw new Error('Адрес обязателен')
       return createEmployee({
         phone:         phone.trim(),
-        full_name:     fullName.trim(),
+        full_name:     `${firstName.trim()} ${lastName.trim()}`,
         role,
         password,
-        hire_date:     hireDate ? hireDate + 'T00:00:00Z' : undefined,
-        date_of_birth: dob      ? dob      + 'T00:00:00Z' : undefined,
-        address:       address.trim() || undefined,
+        hire_date:     hireDate + 'T00:00:00Z',
+        date_of_birth: dob      + 'T00:00:00Z',
+        address:       address.trim(),
       })
     },
     onSuccess: () => {
@@ -76,8 +81,13 @@ export default function CreateEmployeeModal({ open, onClose }) {
     >
       {error && <Alert variant="error" className="mb-4">{error.response?.data?.error?.message ?? error.message}</Alert>}
       <div className="space-y-4">
-        <div><label className="input-label">Полное имя *</label>
-          <input value={fullName} onChange={e => setFullName(e.target.value)} className="input mt-1" placeholder="Иван Иванов" />
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="input-label">Имя *</label>
+            <input value={firstName} onChange={e => setFirstName(e.target.value)} className="input mt-1" placeholder="Иван" />
+          </div>
+          <div><label className="input-label">Фамилия *</label>
+            <input value={lastName} onChange={e => setLastName(e.target.value)} className="input mt-1" placeholder="Иванов" />
+          </div>
         </div>
         <div><label className="input-label">Телефон *</label>
           <PhoneInput value={phone} onChange={setPhone} className="mt-1" />
@@ -105,20 +115,20 @@ export default function CreateEmployeeModal({ open, onClose }) {
 
         <button
           type="button"
-          onClick={() => setOptionalOpen(o => !o)}
+          onClick={() => setDetailsOpen(o => !o)}
           className="flex items-center justify-between w-full px-3.5 py-3 bg-slate-50 border border-slate-100 rounded-2xl cursor-pointer"
         >
-          <span className="text-[13px] font-semibold text-slate-600">Дополнительно (необязательно)</span>
-          <ChevronDown size={16} className={`text-slate-500 transition-transform ${optionalOpen ? 'rotate-180' : ''}`} />
+          <span className="text-[13px] font-semibold text-slate-600">Дополнительно *</span>
+          <ChevronDown size={16} className={`text-slate-500 transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
         </button>
 
-        {optionalOpen && (
+        {detailsOpen && (
           <div className="space-y-4 px-0.5">
             <div className="grid grid-cols-2 gap-3">
-              <DateInput label="Дата найма" value={hireDate} onChange={setHireDate} onValidityChange={setHireDateValid} />
-              <DateInput label="Дата рождения" value={dob} onChange={setDob} onValidityChange={setDobValid} />
+              <DateInput label="Дата найма *" value={hireDate} onChange={setHireDate} onValidityChange={setHireDateValid} />
+              <DateInput label="Дата рождения *" value={dob} onChange={setDob} onValidityChange={setDobValid} />
             </div>
-            <div><label className="input-label">Адрес</label>
+            <div><label className="input-label">Адрес *</label>
               <input value={address} onChange={e => setAddress(e.target.value)} className="input mt-1" placeholder="г. Душанбе, ул. ..." />
             </div>
           </div>
