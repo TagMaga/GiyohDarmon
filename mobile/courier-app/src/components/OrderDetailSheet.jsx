@@ -577,6 +577,13 @@ export function OrderDetailSheet({
                       : null
                 }
               </View>
+              {order.created_at && (
+                <Text style={d.personCreatedAt}>
+                  {new Date(order.created_at).toLocaleString('ru-RU', {
+                    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                  })}
+                </Text>
+              )}
             </SectionCard>
           )}
 
@@ -792,6 +799,7 @@ const d = StyleSheet.create({
   personPhoneMuted:  { fontSize: 13, color: C.muted, fontWeight: '600' },
   rolePill:          { backgroundColor: `${C.violet}18`, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, flexShrink: 0 },
   rolePillText:      { fontSize: 11, fontWeight: '700', color: C.violet },
+  personCreatedAt:   { fontSize: 12, color: C.muted, fontWeight: '600', marginTop: 10, borderTopWidth: 1, borderTopColor: C.line, paddingTop: 10 },
 
   // Payment
   payRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 },
