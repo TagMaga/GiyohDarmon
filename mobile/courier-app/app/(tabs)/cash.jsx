@@ -237,24 +237,14 @@ export default function CashScreen() {
       showToast({ type: 'ok', title: 'Отправлено на проверку', subtitle: `${fmt(amt)} c · диспетчер подтвердит` })
       fetchData()
     } catch (e) {
-      const rawMsg = e?.response?.data?.error?.message
-      // Same race the proactive check above guards against (summary went
-      // stale between opening the sheet and submitting): every delivered
-      // order is already attached to a pending handover, so there's
-      // nothing left to submit. This isn't a real failure — the cash is
-      // already accounted for and awaiting dispatcher confirmation —
-      // so surface it as a normal toast rather than a retryable error
-      // banner (retrying would just fail the same way again).
-      if (rawMsg && /no eligible delivered orders/i.test(rawMsg)) {
-        setAttachments([]); setActualAmount(''); setNotes(''); setShowHandover(false)
-        showToast({ type: 'ok', title: 'Уже отправлено на проверку', subtitle: 'Все доставленные заказы уже включены в отчёт, ожидающий подтверждения диспетчера' })
-        fetchData()
-      } else {
-        const msg = e?.response?.status === 404
-          ? 'Загрузка защищённых файлов временно недоступна. Обратитесь к администратору.'
-          : (rawMsg || 'Проверьте соединение и попробуйте ещё раз')
-        setHandoverError({ title: 'Не удалось отправить', subtitle: msg })
-      }
+      // A declared amount with zero new deliveries is no longer an error —
+      // the backend now accepts it as a standalone settlement against past
+      // shortfall debt (see the proactive check above), so a rejection here
+      // is a real failure, not "already submitted elsewhere."
+      const msg = e?.response?.status === 404
+        ? 'Загрузка защищённых файлов временно недоступна. Обратитесь к администратору.'
+        : (e?.response?.data?.error?.message || 'Проверьте соединение и попробуйте ещё раз')
+      setHandoverError({ title: 'Не удалось отправить', subtitle: msg })
     } finally { setSubmitting(false) }
   }
 
@@ -414,10 +404,12 @@ export default function CashScreen() {
                   // The whole debt is already tied up in a handover pending
                   // dispatcher review (debt only drops on CONFIRM, not on
                   // submit — see GetCashSummary's doc comment), so there are
-                  // no new delivered orders to attach to another handover.
-                  // Say so up front instead of sending the courier through
-                  // the whole sheet (amount, screenshot, upload) only to
-                  // have the server reject it at the end.
+                  // no new delivered orders to attach to another one. The
+                  // backend would now accept a resubmission anyway (as a
+                  // standalone settlement — see SubmitHandover), but doing
+                  // so here would just duplicate the same pending amount
+                  // into a second handover, so head it off before the
+                  // courier fills out the whole sheet for nothing.
                   if (pendingHandover > 0 && toReturn <= pendingHandover + 0.01) {
                     showToast({ type: 'ok', title: 'Уже отправлено на проверку', subtitle: 'Новых доставленных заказов для сдачи пока нет — дождитесь подтверждения диспетчера' })
                     return

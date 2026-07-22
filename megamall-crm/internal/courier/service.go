@@ -459,6 +459,18 @@ func (s *Service) UpdateStatus(ctx context.Context, courierID uuid.UUID, req Upd
 //     returns = collected - courier_payout because the courier keeps their delivery salary.
 //  3. Sum totals.
 //  4. Create CashHandover + CashHandoverOrder rows in one transaction.
+//
+// A courier with zero eligible orders can still submit if they declare a
+// real ActualAmount: this produces a zero-line "settlement" handover
+// (TotalToReturn = 0) that carries only their declared payment. It exists
+// to let a courier pay down GetCashSummary's confirmed-handover shortfall
+// (money still owed from a past handover that was confirmed under the
+// expected amount) even when they have no new deliveries — the shortfall
+// math already treats ActualReturned > TotalToReturn on a confirmed
+// handover as an overpayment that nets the residue out, so this needs no
+// change on the read side. Like any amount mismatch, it lands as
+// 'disputed' on confirm and needs a dispatcher's post-decision edit to
+// settle as 'confirmed' (see cash_handover_edits).
 func (s *Service) SubmitHandover(ctx context.Context, courierID uuid.UUID, req SubmitHandoverRequest) (*CashHandover, error) {
 	if len(req.MediaAssetIDs) > MaxCashHandoverProofs {
 		return nil, apperrors.BadRequest(fmt.Sprintf("at most %d cash-handover proof images may be attached", MaxCashHandoverProofs))
@@ -502,7 +514,7 @@ func (s *Service) SubmitHandover(ctx context.Context, courierID uuid.UUID, req S
 		if err != nil {
 			return err
 		}
-		if len(eligible) == 0 {
+		if len(eligible) == 0 && (req.ActualAmount == nil || *req.ActualAmount <= 0) {
 			return apperrors.BadRequest("no eligible delivered orders found for handover")
 		}
 
