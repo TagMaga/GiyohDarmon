@@ -21,19 +21,8 @@ import CommissionsBreakdown      from '../components/CommissionsBreakdown'
 import FinanceEventsTable        from '../components/FinanceEventsTable'
 import useFinanceSummary         from '../hooks/useFinanceSummary'
 
-// ── Date helpers ───────────────────────────────────────────────────────────────
-
-function toYMD(date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function thisMonthDefault() {
-  const now = new Date()
-  const start = new Date(now.getFullYear(), now.getMonth(), 1)
-  return { from: toYMD(start), to: toYMD(now) }
+function defaultRange() {
+  return { from: '', to: '' } // Максимум — no bound
 }
 
 const EXPENSE_CATEGORIES = [
@@ -167,7 +156,7 @@ function AddExpenseModal({ open, onClose, onSubmit, loading, error }) {
 
 export default function OwnerFinancePage() {
   const queryClient = useQueryClient()
-  const [{ from, to }, setRange] = useState(() => thisMonthDefault())
+  const [{ from, to }, setRange] = useState(() => defaultRange())
   const [expenseOpen, setExpenseOpen] = useState(false)
 
   const summaryParams = { from, to }
