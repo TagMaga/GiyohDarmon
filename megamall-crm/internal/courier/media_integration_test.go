@@ -314,6 +314,68 @@ func TestSubmitHandover_NoEligibleOrders_ReleasesAttaches(t *testing.T) {
 	}
 }
 
+// TestSubmitHandover_NoEligibleOrders_WithDeclaredAmount_CreatesSettlementHandover
+// covers a courier settling old shortfall debt (see GetCashSummary's
+// confirmed-handover-shortfall carry-over) when they have no new
+// deliveries: declaring a real ActualAmount with zero eligible orders must
+// produce a zero-line handover instead of being rejected.
+func TestSubmitHandover_NoEligibleOrders_WithDeclaredAmount_CreatesSettlementHandover(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc, mediaSvc := setupCourierServiceWithMedia(t, db)
+	c := testutil.CreateUser(t, db, users.RoleCourier)
+	// Deliberately no delivered order for this courier.
+
+	asset := courierUploadAsset(t, mediaSvc, media.CategoryCashHandoverProof, c.ID, "proof.png", courierFixture(t, "transparent.png"))
+	amount := 89.03
+
+	handover, err := svc.SubmitHandover(context.Background(), c.ID, SubmitHandoverRequest{
+		MediaAssetIDs: []uuid.UUID{asset.ID},
+		ActualAmount:  &amount,
+	})
+	if err != nil {
+		t.Fatalf("SubmitHandover (settlement, no eligible orders): %v", err)
+	}
+	if len(handover.Orders) != 0 {
+		t.Errorf("settlement handover should have no order lines, got %d", len(handover.Orders))
+	}
+	if handover.TotalToReturn != 0 || handover.TotalCollected != 0 || handover.TotalDeliveryFees != 0 {
+		t.Errorf("settlement handover totals should all be zero, got to_return=%v collected=%v fees=%v",
+			handover.TotalToReturn, handover.TotalCollected, handover.TotalDeliveryFees)
+	}
+	if handover.ActualReturned == nil || *handover.ActualReturned != amount {
+		t.Errorf("ActualReturned = %v, want %v", handover.ActualReturned, amount)
+	}
+	if handover.Status != HandoverStatusPending {
+		t.Errorf("status = %v, want pending", handover.Status)
+	}
+
+	// The proof asset must actually attach (not be released as an orphan)
+	// since this submission succeeds.
+	reloaded, gErr := mediaSvc.GetByID(context.Background(), asset.ID)
+	if gErr != nil {
+		t.Fatalf("GetByID: %v", gErr)
+	}
+	if reloaded == nil || reloaded.OwnerEntityID == nil {
+		t.Error("proof asset should remain attached to the settlement handover")
+	}
+}
+
+// TestSubmitHandover_NoEligibleOrders_ZeroDeclaredAmount_StillRejected covers
+// the case where ActualAmount is present but non-positive — this must not
+// be treated as a settlement submission, since there'd be nothing to record.
+func TestSubmitHandover_NoEligibleOrders_ZeroDeclaredAmount_StillRejected(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	svc, _ := setupCourierServiceWithMedia(t, db)
+	c := testutil.CreateUser(t, db, users.RoleCourier)
+	// Deliberately no delivered order for this courier.
+
+	zero := 0.0
+	_, err := svc.SubmitHandover(context.Background(), c.ID, SubmitHandoverRequest{ActualAmount: &zero})
+	if err == nil {
+		t.Fatal("expected rejection: zero declared amount with no eligible orders")
+	}
+}
+
 func TestSubmitHandover_LegacyProofURLAndAttachmentsJSON_StillWork(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	svc, _ := setupCourierServiceWithMedia(t, db)
