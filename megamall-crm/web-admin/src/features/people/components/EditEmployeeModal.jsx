@@ -46,11 +46,24 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
 
   useEffect(() => {
     if (!person || !open) return
-    // full_name is stored as a single string — first word is the name,
-    // the rest is the surname
-    const [first, ...rest] = (person.full_name ?? '').trim().split(/\s+/)
-    setFirstName(first ?? '')
-    setLastName(rest.join(' '))
+    // full_name is the combined display name ("Иван Иванов"); surname is
+    // the real, separately-editable value. Strip surname's exact suffix
+    // off full_name to recover the given name. Older records saved before
+    // surname existed have no surname yet — fall back to splitting
+    // full_name on the first space for those.
+    const fullName = (person.full_name ?? '').trim()
+    const surname  = (person.surname ?? '').trim()
+    if (surname && fullName.endsWith(surname)) {
+      setFirstName(fullName.slice(0, fullName.length - surname.length).trim())
+      setLastName(surname)
+    } else if (surname) {
+      setFirstName(fullName)
+      setLastName(surname)
+    } else {
+      const [first, ...rest] = fullName.split(/\s+/)
+      setFirstName(first ?? '')
+      setLastName(rest.join(' '))
+    }
     setPhone(person.phone ?? '')
     setRole(person.role ?? 'seller')
     setIsActive(person.is_active !== false)
@@ -95,6 +108,7 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
 
       return updateEmployee(person.id, {
         full_name:     `${firstName.trim()} ${lastName.trim()}`.trim(),
+        surname:       lastName.trim(),
         phone:         phone.trim()   || undefined,
         role,
         is_active:     isActive,
