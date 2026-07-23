@@ -5,7 +5,8 @@ package orders
 // Key design rules enforced here:
 //   1. Every mutation runs inside a DB transaction.
 //   2. Financial snapshot is built + frozen at order creation (never recalculated).
-//   3. net_revenue = total_amount - delivery_fee  (base for all commissions).
+//   3. net_revenue = total_amount + delivery_fee - courier_payout (== commission_base),
+//      frozen at delivery once courier_payout is known.
 //   4. Inventory reservation increments reserved_quantity; quantity unchanged.
 //   5. Inventory deduction happens ONLY on delivered (quantity -= qty, reserved -= qty).
 //   6. Status transitions are validated by the state machine in model.go.
@@ -396,7 +397,8 @@ func (s *Service) validateActiveAssignee(ctx context.Context, userID uuid.UUID, 
 //  3. Resolve hierarchy snapshot.
 //  4. Build & save financial snapshot (freezes rates + delivery fee).
 //  5. Set financials: total_amount = subtotal, delivery_fee from snapshot,
-//     net_revenue = total_amount - delivery_fee.
+//     net_revenue = total_amount + delivery_fee (provisional; frozen to the
+//     final commission_base at delivery once courier_payout is known).
 //  6. Insert order + items.
 //  7. Reserve inventory (reserved_quantity += qty per item).
 //  8. Write initial timeline entry.
@@ -556,8 +558,10 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 			return err
 		}
 
-		// Stored initial net_revenue; final commission events subtract courier_payout at delivery.
-		netRevenue := totalAmount - deliveryFee
+		// Provisional net_revenue = commission_base before a courier is assigned
+		// (courier_payout is always 0 at creation time). Frozen to the final
+		// commission_base value at delivery (see financial.go: emitFinancialEvents).
+		netRevenue := totalAmount + deliveryFee
 
 		// Fail-fast: validate rate sums before accepting the order.
 		// Uses the same logic as the Financial Engine so there are no surprises at delivery.
@@ -1009,7 +1013,8 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 				return fmt.Errorf("resolve delivery fee: %w", err)
 			}
 			totalAmount := subtotal
-			netRevenue := totalAmount - deliveryFee
+			// Same provisional commission_base formula as order creation (see above).
+			netRevenue := totalAmount + deliveryFee - o.CourierPayout
 
 			o.Subtotal = subtotal
 			o.TotalAmount = totalAmount

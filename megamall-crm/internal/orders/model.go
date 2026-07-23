@@ -187,7 +187,8 @@ type Order struct {
 	//   subtotal          = sum of order item prices (product total)
 	//   total_amount      = subtotal  (same; delivery NOT added — kept for commission base)
 	//   delivery_fee      = fee from delivery_settings based on delivery_method
-	//   net_revenue       = total_amount - delivery_fee  (base for all commissions)
+	//   net_revenue       = total_amount + delivery_fee - courier_payout  (== commission_base;
+	//                       provisional until delivery since courier_payout is 0 until then)
 	//   total_order_amount = total_amount + delivery_fee (what client actually pays)
 	//   amount_to_collect  = total_order_amount - prepayment_amount
 	Subtotal         float64 `gorm:"type:numeric(12,2);not null;default:0"`

@@ -103,18 +103,21 @@ function periodOrderTotals(orders = [], from, to) {
   }, { revenue: 0, courierPayout: 0 })
 }
 
-/** Per-row "(revenue − delivery) × rate% = amount" breakdown, using the
- *  seller's current commission rate (from HR settings) rather than a value
- *  reverse-engineered from the stored amount, which produced a misleading
- *  rate whenever net_revenue didn't match the actual commission math. The
- *  "delivery" deduction is courier_payout (what MegaMall pays the courier),
- *  matching what the commission math actually subtracts — not delivery_fee
- *  (what the client was charged), which can differ or be unset. */
+/** Per-row "(order total − courier payout) × rate% = amount" breakdown, using
+ *  the seller's current commission rate (from HR settings) rather than a
+ *  value reverse-engineered from the stored amount, which produced a
+ *  misleading rate whenever net_revenue didn't match the actual commission
+ *  math. "Order total" is total_amount + delivery_fee (what the client actually
+ *  paid), matching commission_base (internal/orders/financial.go) — using
+ *  total_amount alone here under-counted delivery revenue and made the
+ *  formula not reconcile with the displayed amount. The deduction is
+ *  courier_payout (what MegaMall pays the courier), not delivery_fee (what
+ *  the client was charged), which can differ or be unset. */
 function orderBreakdown(ev, fallbackPct) {
   if (ev.total_amount == null || fallbackPct == null) return null
-  const total = Number(ev.total_amount)
-  const delivery = Number(ev.courier_payout ?? 0)
-  return `(${fmtAmount(total)} − ${fmtAmount(delivery)}) × ${fallbackPct}% = ${fmtAmount(ev.amount)}`
+  const orderTotal = Number(ev.total_amount) + Number(ev.delivery_fee ?? 0)
+  const courierPayout = Number(ev.courier_payout ?? 0)
+  return `(${fmtAmount(orderTotal)} − ${fmtAmount(courierPayout)}) × ${fallbackPct}% = ${fmtAmount(ev.amount)}`
 }
 
 function eventOrderTotals(events = []) {
