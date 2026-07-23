@@ -63,7 +63,7 @@ export default function SellerHome() {
           <DarkCard style={{ padding: '28px 30px' }}>
             <div className="flex items-center gap-[7px]">
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34D399' }} />
-              <span style={{ fontSize: 12.5, color: M.darkSub, fontWeight: 600, letterSpacing: '.02em' }}>Заработано сегодня</span>
+              <span style={{ fontSize: 12.5, color: M.darkSub, fontWeight: 600, letterSpacing: '.02em' }}>К выплате</span>
             </div>
             <div style={{ fontSize: 52, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', lineHeight: 1, marginTop: 16 }}>
               {isLoading ? '—' : fmtAmount(stats.todayEarnings)}{' '}
@@ -164,7 +164,7 @@ export default function SellerHome() {
           <DarkCard style={{ padding: '22px 22px 20px' }}>
             <div className="flex items-center gap-[7px]">
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#34D399' }} />
-              <span style={{ fontSize: 12.5, color: M.darkSub, fontWeight: 600, letterSpacing: '.02em' }}>Заработано сегодня</span>
+              <span style={{ fontSize: 12.5, color: M.darkSub, fontWeight: 600, letterSpacing: '.02em' }}>К выплате</span>
             </div>
             <div style={{ fontSize: 42, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', lineHeight: 1, marginTop: 12 }}>
               {isLoading ? '—' : fmtAmount(stats.todayEarnings)}{' '}
