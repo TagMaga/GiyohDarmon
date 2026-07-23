@@ -134,6 +134,16 @@ type HandoverListRow struct {
 	AdminNote         *string    `json:"admin_note"`
 	ConfirmedAt       *time.Time `json:"confirmed_at"`
 	CreatedAt         time.Time  `json:"created_at"`
+	// CourierDebtAfter is the courier's all-time running balance
+	// (confirmed handovers' total_to_return − actual_returned, cumulative,
+	// clamped at 0) as of this handover, computed over the courier's full
+	// history regardless of the list's own pagination/date filters — see
+	// ListHandovers' debt_after window function. Mirrors ListCouriers'/
+	// GetDashboard's shortfall_cte math (same formula, running instead of
+	// total-to-date) so it never disagrees with the courier app's own debt
+	// figure. A pending/disputed row carries forward the balance as it
+	// stood before that row, since only a confirmed decision moves debt.
+	CourierDebtAfter float64 `json:"courier_debt_after"`
 	// MediaAssets is resolved fresh (signed URLs, never persisted) by
 	// Handler.listHandovers via the adapters set through SetMediaAdapters —
 	// mirrors internal/courier.Service.ToHandoverResponse's

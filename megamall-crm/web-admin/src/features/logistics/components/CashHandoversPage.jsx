@@ -122,6 +122,28 @@ function DiffCell({ expected, actual }) {
   return <span className="text-amber-600 font-semibold tabular-nums">+{fmtMoney(abs)}</span>
 }
 
+// Courier's running all-time balance as of this handover (see backend
+// ListHandovers' courier_debt_after doc comment) — carries forward
+// regardless of whether this particular row had any new orders, so a
+// zero-order settlement never reads as "debt reset to 0".
+function DebtAfterCell({ amount }) {
+  const owes = (amount ?? 0) > 0.01
+  return (
+    <span className={`inline-flex ${owes ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'} font-semibold tabular-nums px-2 py-0.5 rounded-full text-xs`}>
+      {owes ? fmtMoney(amount) : '0'} c
+    </span>
+  )
+}
+
+// A handover with nothing new expected (no eligible orders that day) but a
+// real amount sent is a debt repayment, not a delivery settlement — see
+// internal/courier Service.SubmitHandover's zero-line-settlement doc
+// comment. Flag it so "Ожидалось: 0 c" doesn't read as an anomaly.
+function isDebtSettlement(row) {
+  const actual = displayActual(row)
+  return Math.abs(row.total_to_return) < 0.01 && actual != null && actual > 0.01
+}
+
 // Receipt thumbnail
 function ReceiptThumb({ proofUrl, attachmentsJson, mediaAssets, onClick }) {
   const urls = parseAttachments(proofUrl, attachmentsJson, mediaAssets)
@@ -732,7 +754,7 @@ export default function CashHandoversPage({ courierId } = {}) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    {['Курьер', 'Дата', 'Ожидалось', 'Отправил', 'Разница', 'Тариф', 'Квитанция', 'Статус', 'Действия'].map(h => (
+                    {['Курьер', 'Дата', 'Ожидалось', 'Отправил', 'Разница', 'Текущий долг', 'Тариф', 'Квитанция', 'Статус', 'Действия'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
                         {h}
                       </th>
@@ -755,6 +777,11 @@ export default function CashHandoversPage({ courierId } = {}) {
                         <td className="px-4 py-3">
                           <p className="font-semibold text-slate-900 text-sm">{row.courier_name}</p>
                           {row.courier_phone && <p className="text-[11px] text-slate-400">{row.courier_phone}</p>}
+                          {isDebtSettlement(row) && (
+                            <span className="inline-flex mt-1 text-[10px] font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
+                              Погашение долга
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
                           {fmtDateShort(row.created_at)}
@@ -770,6 +797,9 @@ export default function CashHandoversPage({ courierId } = {}) {
                         </td>
                         <td className="px-4 py-3 text-xs">
                           <DiffCell expected={row.total_to_return} actual={displayActual(row)} />
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <DebtAfterCell amount={row.courier_debt_after} />
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 tabular-nums">
                           {fmtMoney(row.total_delivery_fees)} c
@@ -837,14 +867,22 @@ export default function CashHandoversPage({ courierId } = {}) {
                       <div>
                         <p className="font-semibold text-slate-900 text-sm">{row.courier_name}</p>
                         <p className="text-xs text-slate-400">{fmtDate(row.created_at)}</p>
+                        {isDebtSettlement(row) && (
+                          <span className="inline-flex mt-1 text-[10px] font-semibold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">
+                            Погашение долга
+                          </span>
+                        )}
                       </div>
                       <Badge variant={sc.badge} size="sm">{sc.label}</Badge>
                     </div>
-                    <div className="flex gap-4 text-xs">
+                    <div className="flex gap-4 text-xs flex-wrap items-center">
                       <span className="text-slate-500">Ожидалось: <strong>{fmtMoney(row.total_to_return)} c</strong></span>
                       {(() => { const a = displayActual(row); return a != null && (
                         <span className="text-indigo-700">Отправил: <strong>{fmtMoney(a)} c</strong></span>
                       )})()}
+                      <span className="text-slate-500 flex items-center gap-1">
+                        Долг: <DebtAfterCell amount={row.courier_debt_after} />
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
                       {urls.length > 0 && (
