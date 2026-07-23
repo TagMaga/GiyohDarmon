@@ -29,6 +29,9 @@ jobs:
       DOMAIN: giyohdarmon.tj
       FRONTEND_ROOT: /var/www/megamall-crm/megamall-crm/web-admin/dist
     steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
       - name: Configure verified SSH access
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
@@ -42,105 +45,16 @@ jobs:
             'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOyShTb8NPuH+bPPBFOjV0e/8PI+Tg0pXPbq/V3dlUmq' \
             > "$HOME/.ssh/known_hosts"
 
-      - name: Diagnose current server state (read-only)
+      - name: Run HTTPS setup script on server
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
-        run: |
-          set -Eeuo pipefail
-          SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
-          ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" bash -s <<'REMOTE'
-            set -Eeuo pipefail
-            echo "== whoami / sudo -l =="
-            whoami
-            sudo -n -l || echo "(sudo -l failed or requires a password — non-fatal, continuing)"
-
-            echo
-            echo "== nginx installed? =="
-            command -v nginx && nginx -v 2>&1 || echo "nginx not found"
-
-            echo
-            echo "== certbot installed? =="
-            command -v certbot && certbot --version || echo "certbot not found"
-
-            echo
-            echo "== nginx sites-enabled =="
-            sudo -n ls -la /etc/nginx/sites-enabled/ 2>&1 || ls -la /etc/nginx/sites-enabled/ 2>&1 || true
-
-            echo
-            echo "== nginx sites-available configs (contents) =="
-            for f in /etc/nginx/sites-available/*; do
-              echo "--- $f ---"
-              sudo -n cat "$f" 2>&1 || cat "$f" 2>&1 || true
-            done
-
-            echo
-            echo "== existing TLS certs =="
-            sudo -n ls -la /etc/letsencrypt/live/ 2>&1 || echo "none / no permission"
-
-            echo
-            echo "== frontend root exists? =="
-            ls -la "${FRONTEND_ROOT:-/var/www/megamall-crm/megamall-crm/web-admin/dist}" 2>&1 || true
-REMOTE
-
-      - name: Apply HTTPS setup (certbot + nginx)
-        if: ${{ inputs.mode == 'apply' }}
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          MODE: ${{ inputs.mode }}
         run: |
           set -Eeuo pipefail
           SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
           ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" \
-            DOMAIN="$DOMAIN" FRONTEND_ROOT="$FRONTEND_ROOT" bash -s <<'REMOTE'
-            set -Eeuo pipefail
-
-            if ! command -v nginx >/dev/null; then
-              sudo -n apt-get update
-              sudo -n apt-get install -y nginx
-            fi
-
-            if ! command -v certbot >/dev/null; then
-              sudo -n apt-get install -y certbot python3-certbot-nginx
-            fi
-
-            sudo -n tee /etc/nginx/sites-available/megamall-crm >/dev/null <<NGINX
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${DOMAIN} www.${DOMAIN};
-
-    root ${FRONTEND_ROOT};
-    index index.html;
-
-    location / {
-        try_files \$uri \$uri/ /index.html;
-    }
-
-    location /api/ {
-        proxy_pass         http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header   Host              \$host;
-        proxy_set_header   X-Real-IP         \$remote_addr;
-        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 60s;
-    }
-}
-NGINX
-
-            sudo -n ln -sf /etc/nginx/sites-available/megamall-crm /etc/nginx/sites-enabled/megamall-crm
-            sudo -n nginx -t
-            sudo -n systemctl reload nginx
-
-            sudo -n certbot --nginx -d "${DOMAIN}" -d "www.${DOMAIN}" --redirect --agree-tos \
-              -m mahmadnazaralif@gmail.com --non-interactive || \
-            sudo -n certbot --nginx -d "${DOMAIN}" --redirect --agree-tos \
-              -m mahmadnazaralif@gmail.com --non-interactive
-
-            sudo -n nginx -t
-            sudo -n systemctl reload nginx
-
-            echo "HTTPS setup complete."
-REMOTE
+            "MODE='$MODE' DOMAIN='$DOMAIN' FRONTEND_ROOT='$FRONTEND_ROOT' bash -s" \
+            < scripts/setup_https_remote.sh
 
       - name: Verify HTTPS is live
         if: ${{ inputs.mode == 'apply' }}
