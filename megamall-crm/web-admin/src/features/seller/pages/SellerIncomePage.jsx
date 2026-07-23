@@ -48,18 +48,6 @@ function presetRange(key) {
   return currentMonthRange()
 }
 
-/** Previous range of the same length, ending the day before `from` */
-function previousRange(from, to) {
-  const f = new Date(from + 'T00:00:00')
-  const t = new Date(to + 'T00:00:00')
-  const days = Math.max(1, Math.round((t - f) / 86400000) + 1)
-  const prevTo = new Date(f)
-  prevTo.setDate(f.getDate() - 1)
-  const prevFrom = new Date(prevTo)
-  prevFrom.setDate(prevTo.getDate() - days + 1)
-  return { from: toDateStr(prevFrom), to: toDateStr(prevTo) }
-}
-
 /** Payouts run bi-monthly: periods 1–15 are paid on the 16th, 16–end on the 1st. */
 function nextPayoutDate() {
   const now = new Date()
@@ -143,8 +131,6 @@ export default function SellerIncomePage() {
   const [period, setPeriod] = useState('month')
 
   const { data: report, isLoading, isError, error } = useMyIncome({ from, to, include_events: true })
-  const prev = useMemo(() => previousRange(from, to), [from, to])
-  const { data: prevReport } = useMyIncome({ from: prev.from, to: prev.to })
   const { data: payouts = [], isLoading: payoutsLoading } = useSellerPayouts()
   const { orders = [], isLoading: ordersLoading } = useSellerOrders()
   const { data: compensation } = useSellerCompensation()
@@ -162,8 +148,6 @@ export default function SellerIncomePage() {
   const totalDeliveryFee = report?.total_courier_payout || eventTotals.courierPayout || orderTotals.courierPayout || 0
   const netProfit = report?.net_profit ?? totalIncome
   const payableAmount = pendingPayout > 0 ? pendingPayout : netProfit
-  const prevRevenue = prevReport?.total_revenue ?? 0
-  const deltaPct = prevRevenue > 0 ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 100) : null
   const totalsLoading = isLoading && ordersLoading
   const heroLabel = PERIOD_PRESETS.find(p => p.key === period)?.heroLabel ?? 'Заработок за период'
 
@@ -218,28 +202,11 @@ export default function SellerIncomePage() {
 
             <div className="grid gap-5" style={{ gridTemplateColumns: '1.6fr 1fr' }}>
               <DarkCard style={{ padding: '28px 30px' }}>
-                <span style={{ fontSize: 12.5, color: M.darkSub, fontWeight: 600, letterSpacing: '.02em' }}>{heroLabel}</span>
+                <span style={{ fontSize: 12.5, color: M.darkSub, fontWeight: 600, letterSpacing: '.02em' }}>К выплате</span>
                 <div style={{ fontSize: 50, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', lineHeight: 1, marginTop: 14 }}>
-                  {totalsLoading ? '—' : fmtAmount(totalRevenue)}{' '}
+                  {isLoading ? '—' : fmtAmount(payableAmount)}{' '}
                   <span style={{ fontSize: 26, fontWeight: 600, color: M.darkMuted }}>с</span>
                 </div>
-                {deltaPct !== null && (
-                  <div className="flex items-center gap-2" style={{ marginTop: 14 }}>
-                    <span
-                      className="inline-flex items-center gap-1"
-                      style={{
-                        fontSize: 12.5, fontWeight: 700,
-                        color: deltaPct >= 0 ? '#34D399' : '#F87171',
-                        background: deltaPct >= 0 ? 'rgba(52,211,153,.14)' : 'rgba(248,113,113,.14)',
-                        padding: '4px 10px', borderRadius: 8,
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={deltaPct < 0 ? { transform: 'scaleY(-1)' } : undefined}><path d="M7 17 17 7M17 7H8M17 7v9" /></svg>
-                      {deltaPct >= 0 ? '+' : ''}{deltaPct}%
-                    </span>
-                    <span style={{ fontSize: 12.5, color: M.darkMuted, fontWeight: 500 }}>к прошлому периоду</span>
-                  </div>
-                )}
               </DarkCard>
               <div className="grid grid-cols-3 gap-3">
                 <Card style={{ borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -251,8 +218,8 @@ export default function SellerIncomePage() {
                   <div style={{ fontSize: 22, fontWeight: 800, color: M.ink, marginTop: 5 }}>{commissionPct !== null ? `${commissionPct}%` : '—'}</div>
                 </Card>
                 <Card style={{ borderRadius: 16, padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <div style={{ fontSize: 12, color: M.sub, fontWeight: 600 }}>К выплате</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: M.amber, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>{isLoading ? '—' : fmtAmount(payableAmount)}</div>
+                  <div style={{ fontSize: 12, color: M.sub, fontWeight: 600 }}>{heroLabel}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: M.ink, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>{totalsLoading ? '—' : fmtAmount(totalRevenue)}</div>
                 </Card>
               </div>
             </div>
@@ -435,30 +402,13 @@ export default function SellerIncomePage() {
                 ))}
               </div>
 
-              {/* Earnings hero */}
+              {/* Payout hero */}
               <DarkCard>
-                <span style={{ fontSize: 12.5, color: M.darkSub, fontWeight: 600, letterSpacing: '.02em' }}>{heroLabel}</span>
+                <span style={{ fontSize: 12.5, color: M.darkSub, fontWeight: 600, letterSpacing: '.02em' }}>К выплате</span>
                 <div style={{ fontSize: 42, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', lineHeight: 1, marginTop: 11 }}>
-                  {totalsLoading ? '—' : fmtAmount(totalRevenue)}{' '}
+                  {isLoading ? '—' : fmtAmount(payableAmount)}{' '}
                   <span style={{ fontSize: 24, fontWeight: 600, color: M.darkMuted }}>с</span>
                 </div>
-                {deltaPct !== null && (
-                  <div className="flex items-center gap-[7px]" style={{ marginTop: 12 }}>
-                    <span
-                      className="inline-flex items-center gap-1"
-                      style={{
-                        fontSize: 12, fontWeight: 700,
-                        color: deltaPct >= 0 ? '#34D399' : '#F87171',
-                        background: deltaPct >= 0 ? 'rgba(52,211,153,.14)' : 'rgba(248,113,113,.14)',
-                        padding: '3px 9px', borderRadius: 8,
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" style={deltaPct < 0 ? { transform: 'scaleY(-1)' } : undefined}><path d="M7 17 17 7M17 7H8M17 7v9" /></svg>
-                      {deltaPct >= 0 ? '+' : ''}{deltaPct}%
-                    </span>
-                    <span style={{ fontSize: 12, color: M.darkMuted, fontWeight: 500 }}>к прошлому периоду</span>
-                  </div>
-                )}
               </DarkCard>
 
               {/* Info chips */}
@@ -476,9 +426,9 @@ export default function SellerIncomePage() {
                   </div>
                 </Card>
                 <Card style={{ borderRadius: 15, padding: '13px 11px' }}>
-                  <div style={{ fontSize: 11, color: M.sub, fontWeight: 600 }}>К выплате</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: M.amber, letterSpacing: '-.01em', marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
-                    {isLoading ? '—' : fmtAmount(payableAmount)}
+                  <div style={{ fontSize: 11, color: M.sub, fontWeight: 600 }}>{heroLabel}</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: M.ink, letterSpacing: '-.01em', marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
+                    {totalsLoading ? '—' : fmtAmount(totalRevenue)}
                   </div>
                 </Card>
               </div>
