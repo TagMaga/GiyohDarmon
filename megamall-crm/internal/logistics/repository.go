@@ -864,9 +864,25 @@ func (r *Repository) ListHandovers(ctx context.Context, p pagination.Params, cou
 			ch.comment,
 			ch.admin_note,
 			ch.confirmed_at,
-			ch.created_at
+			ch.created_at,
+			GREATEST(0, rd.debt_after) AS courier_debt_after
 		`).
-		Joins("JOIN users u ON u.id = ch.courier_id")
+		Joins("JOIN users u ON u.id = ch.courier_id").
+		// rd computes each handover's running courier balance over the
+		// courier's ENTIRE history (unfiltered by this query's own
+		// courier/status/date-range params), so debt_after is correct even
+		// when the visible page/filter doesn't include the handover(s) that
+		// created the debt. Same shortfall formula as ListCouriers'
+		// shortfall_cte, just as a running window sum instead of one total.
+		Joins(`LEFT JOIN (
+			SELECT
+				id,
+				SUM(CASE WHEN status = 'confirmed'
+				         THEN total_to_return - COALESCE(actual_returned, total_to_return)
+				         ELSE 0 END)
+					OVER (PARTITION BY courier_id ORDER BY created_at, id) AS debt_after
+			FROM cash_handovers
+		) rd ON rd.id = ch.id`)
 
 	if courierID != nil {
 		q = q.Where("ch.courier_id = ?", *courierID)
@@ -902,6 +918,7 @@ func (r *Repository) ListHandovers(ctx context.Context, p pagination.Params, cou
 		AdminNote         *string    `gorm:"column:admin_note"`
 		ConfirmedAt       *time.Time `gorm:"column:confirmed_at"`
 		CreatedAt         time.Time  `gorm:"column:created_at"`
+		CourierDebtAfter  float64    `gorm:"column:courier_debt_after"`
 	}
 	var rows []rawRow
 	if err := q.Order("ch.created_at DESC").Limit(p.Limit).Offset(p.Offset()).Scan(&rows).Error; err != nil {
@@ -926,6 +943,7 @@ func (r *Repository) ListHandovers(ctx context.Context, p pagination.Params, cou
 			AdminNote:         row.AdminNote,
 			ConfirmedAt:       row.ConfirmedAt,
 			CreatedAt:         row.CreatedAt,
+			CourierDebtAfter:  row.CourierDebtAfter,
 		})
 	}
 	return result, int(total), nil
