@@ -206,6 +206,7 @@ func (s *Service) Create(ctx context.Context, req CreateUserRequest) (*User, err
 		PasswordHash: string(hash),
 		FullName:     req.FullName,
 		Surname:      req.Surname,
+		Position:     req.Position,
 		Role:         req.Role,
 		IsActive:     true,
 		Status:       StatusOnline,
@@ -306,6 +307,9 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateUserReques
 	}
 	if req.Surname != nil {
 		u.Surname = req.Surname
+	}
+	if req.Position != nil {
+		u.Position = req.Position
 	}
 	if req.Role != nil {
 		if !req.Role.IsValid() {
