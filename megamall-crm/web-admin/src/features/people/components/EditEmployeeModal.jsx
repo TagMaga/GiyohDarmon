@@ -8,7 +8,7 @@ import PasswordInput from '../../../shared/components/PasswordInput'
 import PhoneInput    from '../../../shared/components/PhoneInput'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { updateEmployee } from '../api'
-import { ALL_ROLES, ROLE_LABEL, STATUS_OPTIONS, composeAddress, parseAddress } from '../utils/peopleHelpers'
+import { CREATABLE_ROLES, ROLE_LABEL, STATUS_OPTIONS, composeAddress, parseAddress } from '../utils/peopleHelpers'
 
 const MIN_PASSWORD_LENGTH = 8
 
@@ -31,6 +31,7 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
   const [lastName,        setLastName]        = useState('')
   const [phone,           setPhone]           = useState('')
   const [role,            setRole]            = useState('seller')
+  const [position,        setPosition]        = useState('')
   const [isActive,        setIsActive]        = useState(true)
   const [status,          setStatus]          = useState('offline')
   const [hireDate,        setHireDate]        = useState('')
@@ -66,6 +67,7 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
     }
     setPhone(person.phone ?? '')
     setRole(person.role ?? 'seller')
+    setPosition(person.position ?? '')
     setIsActive(person.is_active !== false)
     setStatus(person.status ?? 'offline')
     setHireDate(person.hire_date ? person.hire_date.slice(0, 10) : '')
@@ -109,6 +111,7 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
       return updateEmployee(person.id, {
         full_name:     `${firstName.trim()} ${lastName.trim()}`.trim(),
         surname:       lastName.trim(),
+        position:      position.trim() || null,
         phone:         phone.trim()   || undefined,
         role,
         is_active:     isActive,
@@ -133,6 +136,9 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
 
   const close = () => { reset(); onClose() }
   const roleLabel = ROLE_LABEL[person.role] ?? person.role
+  // Owner accounts aren't reassignable through this form — the dropdown
+  // only ever offers the roles it can actually set someone TO.
+  const isOwner = person.role === 'owner'
 
   return (
     <Modal
@@ -166,12 +172,20 @@ export default function EditEmployeeModal({ open, onClose, person, onSaved }) {
         </div>
 
         <div>
-          <label className="input-label">Должность *</label>
-          <select value={role} onChange={e => setRole(e.target.value)} className="input">
-            {ALL_ROLES.map(r => (
-              <option key={r} value={r}>{ROLE_LABEL[r]}</option>
-            ))}
+          <label className="input-label">Роль *</label>
+          <select value={role} onChange={e => setRole(e.target.value)} className="input" disabled={isOwner}>
+            {isOwner
+              ? <option value="owner">{ROLE_LABEL.owner}</option>
+              : CREATABLE_ROLES.map(r => (
+                <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+              ))}
           </select>
+          {isOwner && <p className="mt-1 text-xs text-slate-500">Роль владельца нельзя изменить через эту форму</p>}
+        </div>
+
+        <div>
+          <label className="input-label">Должность</label>
+          <input value={position} onChange={e => setPosition(e.target.value)} className="input" placeholder="Например, Менеджер по продажам" />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -10,7 +10,7 @@ import PhoneInput    from '../../../shared/components/PhoneInput'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS }     from '../../../shared/queryKeys'
 import { createEmployee } from '../api'
-import { ALL_ROLES, ROLE_LABEL, composeAddress } from '../utils/peopleHelpers'
+import { CREATABLE_ROLES, ROLE_LABEL, composeAddress } from '../utils/peopleHelpers'
 
 export default function CreateEmployeeModal({ open, onClose }) {
   const qc    = useQueryClient()
@@ -20,6 +20,7 @@ export default function CreateEmployeeModal({ open, onClose }) {
   const [firstName,       setFirstName]       = useState('')
   const [lastName,        setLastName]        = useState('')
   const [role,            setRole]            = useState('seller')
+  const [position,        setPosition]        = useState('')
   const [password,        setPassword]        = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [hireDate,        setHireDate]        = useState('')
@@ -35,7 +36,7 @@ export default function CreateEmployeeModal({ open, onClose }) {
   const passwordMismatch = passwordConfirm.length > 0 && password !== passwordConfirm
 
   function resetForm() {
-    setPhone(''); setFirstName(''); setLastName(''); setPassword(''); setPasswordConfirm(''); setRole('seller')
+    setPhone(''); setFirstName(''); setLastName(''); setPassword(''); setPasswordConfirm(''); setRole('seller'); setPosition('')
     setHireDate(''); setDob('')
     setCity(''); setRegion(''); setStreet(''); setHouse('')
     setHireDateValid(true); setDobValid(true); setDetailsOpen(true)
@@ -60,6 +61,7 @@ export default function CreateEmployeeModal({ open, onClose }) {
         // guess it back out by splitting full_name.
         full_name:     `${firstName.trim()} ${lastName.trim()}`,
         surname:       lastName.trim(),
+        position:      position.trim() || null,
         role,
         password,
         hire_date:     hireDate + 'T00:00:00Z',
@@ -104,10 +106,13 @@ export default function CreateEmployeeModal({ open, onClose }) {
         </div>
         <div><label className="input-label">Роль *</label>
           <select value={role} onChange={e => setRole(e.target.value)} className="input mt-1">
-            {ALL_ROLES.map(r => (
+            {CREATABLE_ROLES.map(r => (
               <option key={r} value={r}>{ROLE_LABEL[r]}</option>
             ))}
           </select>
+        </div>
+        <div><label className="input-label">Должность</label>
+          <input value={position} onChange={e => setPosition(e.target.value)} className="input mt-1" placeholder="Например, Менеджер по продажам" />
         </div>
         <div><label className="input-label">Пароль *</label>
           <PasswordInput value={password} onChange={e => setPassword(e.target.value)} className="input mt-1" placeholder="Минимум 8 символов" autoComplete="new-password" />

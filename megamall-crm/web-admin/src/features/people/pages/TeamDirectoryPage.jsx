@@ -415,7 +415,7 @@ function PersonCard({ person, teamColor, teamName, onClick }) {
       {/* Body */}
       <div className="flex min-h-[112px] flex-col rounded-b-2xl border-x border-b border-slate-100 bg-white px-4 py-3.5">
         <p className="h-5 text-[15px] font-bold text-slate-900 leading-5 truncate">{person.full_name}</p>
-        <p className="mt-0.5 h-5 text-[12.5px] text-slate-500 leading-5 font-medium truncate">{ROLE_LABEL[person.role] ?? person.role}</p>
+        <p className="mt-0.5 h-5 text-[12.5px] text-slate-500 leading-5 font-medium truncate">{person.position || ROLE_LABEL[person.role] || person.role}</p>
         <div className="mt-auto flex min-h-5 items-center justify-end border-t border-slate-50 pt-3">
           <span className={`text-[11px] text-slate-400 ${tenure ? '' : 'invisible'}`}>{tenure ?? '—'}</span>
         </div>
@@ -702,7 +702,7 @@ function DetailPanel({ person, teamId, teamColor, teamName, teams, employees, on
               {person.full_name}
             </h1>
           </div>
-          <p className="text-[15px] text-slate-500 font-medium mb-4">{ROLE_LABEL[person.role] ?? person.role}</p>
+          <p className="text-[15px] text-slate-500 font-medium mb-4">{person.position || ROLE_LABEL[person.role] || person.role}</p>
           <div className="flex gap-2 flex-wrap">
             {/* Status badge */}
             <span

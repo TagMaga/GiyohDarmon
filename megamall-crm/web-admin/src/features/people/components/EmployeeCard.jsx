@@ -34,7 +34,7 @@ export default function EmployeeCard({ user, teamMap = {}, teamId = null }) {
             {user.full_name ?? user.FullName}
           </p>
           <Badge variant={ROLE_BADGE[role] ?? 'slate'} size="sm">
-            {ROLE_LABEL[role] ?? role}
+            {user.position || ROLE_LABEL[role] || role}
           </Badge>
           {user.is_active === false && (
             <Badge variant="slate" size="sm">Неактивен</Badge>

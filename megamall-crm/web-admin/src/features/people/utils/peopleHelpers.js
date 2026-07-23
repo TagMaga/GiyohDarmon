@@ -43,6 +43,11 @@ export const TARIFF_ROLES = ['courier']
 
 export const ALL_ROLES = Object.keys(ROLE_LABEL)
 
+// Owner is excluded from the Create/Edit Employee role picker — a second
+// full-owner account is created outside the regular HR flow, not assigned
+// through this form.
+export const CREATABLE_ROLES = ALL_ROLES.filter(r => r !== 'owner')
+
 // ── Commission type labels ────────────────────────────────────────────────────
 
 export const COMMISSION_TYPE_LABEL = {
