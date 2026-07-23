@@ -34,7 +34,7 @@ func buildTestOrderService(t *testing.T, db *gorm.DB) (*Service, *hierarchy.Repo
 	teamRepo := teams.NewRepository(db)
 	invRepo := inventory.NewRepository(db)
 	activityLogger := activity.NewLogger(activity.NewRepository(db))
-	compSvc := compensation.NewService(compensation.NewRepository(db), activityLogger, db)
+	compSvc := compensation.NewService(compensation.NewRepository(db), activityLogger, db, time.UTC)
 	orderRepo := NewRepository(db, time.UTC)
 	userRepo := users.NewRepository(db)
 	sellerLookup := func(ctx context.Context, id uuid.UUID) (*SellerLookupResult, error) {

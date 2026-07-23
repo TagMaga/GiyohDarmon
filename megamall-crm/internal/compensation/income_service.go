@@ -82,7 +82,7 @@ func (s *Service) GetTeamIncome(
 		return nil, apperrors.Forbidden("only owner and team leads can view team income")
 	}
 
-	from, to, err := parsePeriod(params.From, params.To)
+	from, to, err := parsePeriod(params.From, params.To, s.loc)
 	if err != nil {
 		return nil, apperrors.BadRequest(err.Error())
 	}
@@ -193,7 +193,7 @@ func (s *Service) buildIncomeReport(
 	userID uuid.UUID,
 	params IncomeQueryParams,
 ) (*IncomeReportResponse, error) {
-	from, to, err := parsePeriod(params.From, params.To)
+	from, to, err := parsePeriod(params.From, params.To, s.loc)
 	if err != nil {
 		return nil, apperrors.BadRequest(err.Error())
 	}
@@ -329,19 +329,36 @@ func buildTeamReport(
 
 // ─── Period helpers ───────────────────────────────────────────────────────────
 
+// ParsePeriod is the exported form of parsePeriod, for callers outside this
+// package (e.g. internal/payouts, which reuses this instead of re-deriving
+// its own period-parsing logic) that need the same [from, to) semantics
+// this service already applies to its own income queries.
+func (s *Service) ParsePeriod(fromStr, toStr string) (time.Time, time.Time, error) {
+	return parsePeriod(fromStr, toStr, s.loc)
+}
+
 // parsePeriod parses optional YYYY-MM-DD strings into a [from, to) range.
+// Bare YYYY-MM-DD strings are treated as midnight in loc (so "today"/"this
+// month" means the local business day/month, not the UTC day/month) —
+// mirrors internal/finance/handler.go's parsePeriod. Without this, a seller
+// whose commission was earned in the early hours of the local day (e.g.
+// Dushanbe, UTC+5) could have that financial_events row land in what UTC
+// still considers "yesterday", silently excluding it from "today"'s report.
 // Returns start-of-current-month → end-of-today when both strings are empty.
-func parsePeriod(fromStr, toStr string) (time.Time, time.Time, error) {
-	from, to := defaultPeriod()
+func parsePeriod(fromStr, toStr string, loc *time.Location) (time.Time, time.Time, error) {
+	if loc == nil {
+		loc = time.UTC
+	}
+	from, to := defaultPeriod(loc)
 	if fromStr != "" {
-		t, err := time.Parse("2006-01-02", fromStr)
+		t, err := parseLocalDate(fromStr, loc)
 		if err != nil {
 			return time.Time{}, time.Time{}, fmt.Errorf("invalid from date %q (use YYYY-MM-DD)", fromStr)
 		}
 		from = t.UTC()
 	}
 	if toStr != "" {
-		t, err := time.Parse("2006-01-02", toStr)
+		t, err := parseLocalDate(toStr, loc)
 		if err != nil {
 			return time.Time{}, time.Time{}, fmt.Errorf("invalid to date %q (use YYYY-MM-DD)", toStr)
 		}
@@ -351,10 +368,20 @@ func parsePeriod(fromStr, toStr string) (time.Time, time.Time, error) {
 	return from, to, nil
 }
 
-// defaultPeriod returns (start of current month UTC, end of today UTC).
-func defaultPeriod() (time.Time, time.Time) {
-	now := time.Now().UTC()
-	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	end := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999999999, time.UTC)
-	return start, end
+// parseLocalDate parses a bare YYYY-MM-DD string as midnight in loc (not UTC).
+func parseLocalDate(s string, loc *time.Location) (time.Time, error) {
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc), nil
+}
+
+// defaultPeriod returns (start of current month, end of today) in loc,
+// converted to UTC for use as query bounds against UTC-stored timestamps.
+func defaultPeriod(loc *time.Location) (time.Time, time.Time) {
+	now := time.Now().In(loc)
+	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
+	end := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999999999, loc)
+	return start.UTC(), end.UTC()
 }

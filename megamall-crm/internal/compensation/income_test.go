@@ -63,9 +63,9 @@ func TestBuildTeamReport_AggregatesMembers(t *testing.T) {
 // ─── parsePeriod tests ────────────────────────────────────────────────────────
 
 // TestParsePeriod_DefaultsToCurrentMonth verifies that empty strings yield the
-// start of the current month as the from date.
+// start of the current month (in loc) as the from date.
 func TestParsePeriod_DefaultsToCurrentMonth(t *testing.T) {
-	from, _, err := parsePeriod("", "")
+	from, _, err := parsePeriod("", "", time.UTC)
 	if err != nil {
 		t.Fatalf("parsePeriod with empty strings failed: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestParsePeriod_DefaultsToCurrentMonth(t *testing.T) {
 
 // TestParsePeriod_ParsesCorrectly verifies date string parsing.
 func TestParsePeriod_ParsesCorrectly(t *testing.T) {
-	from, to, err := parsePeriod("2026-06-01", "2026-06-30")
+	from, to, err := parsePeriod("2026-06-01", "2026-06-30", time.UTC)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -95,12 +95,43 @@ func TestParsePeriod_ParsesCorrectly(t *testing.T) {
 
 // TestParsePeriod_InvalidDateReturnsError verifies bad date strings are rejected.
 func TestParsePeriod_InvalidDateReturnsError(t *testing.T) {
-	_, _, err := parsePeriod("not-a-date", "")
+	_, _, err := parsePeriod("not-a-date", "", time.UTC)
 	if err == nil {
 		t.Error("expected error for invalid from date")
 	}
-	_, _, err = parsePeriod("", "2026/06/30") // wrong separator
+	_, _, err = parsePeriod("", "2026/06/30", time.UTC) // wrong separator
 	if err == nil {
 		t.Error("expected error for invalid to date")
+	}
+}
+
+// TestParsePeriod_InterpretsBareDateInBusinessTimezone verifies the fix for
+// the "К выплате shows 0" bug: a bare YYYY-MM-DD "today" must be treated as
+// midnight in the business timezone (e.g. Asia/Dushanbe, UTC+5), not UTC —
+// otherwise an event recorded in the early hours of the local day (still
+// "today" locally, but still "yesterday" in UTC) is silently excluded from
+// the query window.
+func TestParsePeriod_InterpretsBareDateInBusinessTimezone(t *testing.T) {
+	dushanbe, err := time.LoadLocation("Asia/Dushanbe")
+	if err != nil {
+		t.Fatalf("load location: %v", err)
+	}
+
+	from, to, err := parsePeriod("2026-07-23", "2026-07-23", dushanbe)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Local midnight 2026-07-23 00:00 +05:00 is 2026-07-22 19:00 UTC.
+	wantFrom := time.Date(2026, 7, 22, 19, 0, 0, 0, time.UTC)
+	if !from.Equal(wantFrom) {
+		t.Errorf("from: got %v, want %v", from, wantFrom)
+	}
+
+	// An event at 2026-07-23 00:23 local (2026-07-22 19:23 UTC) must fall
+	// within [from, to] — this is exactly the order from the bug report.
+	eventUTC := time.Date(2026, 7, 22, 19, 23, 0, 0, time.UTC)
+	if eventUTC.Before(from) || eventUTC.After(to) {
+		t.Errorf("event at %v should fall within [%v, %v]", eventUTC, from, to)
 	}
 }

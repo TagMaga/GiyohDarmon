@@ -145,7 +145,7 @@ func (h *Handler) ListEvents(c *gin.Context) {
 	fromStr := c.Query("from")
 	toStr := c.Query("to")
 	if fromStr != "" || toStr != "" {
-		from, to, err := parsePeriod(fromStr, toStr)
+		from, to, err := h.svc.ParsePeriod(fromStr, toStr)
 		if err != nil {
 			response.Error(c, apperrors.BadRequest(err.Error()))
 			return

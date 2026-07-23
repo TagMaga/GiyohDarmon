@@ -89,9 +89,9 @@ func main() {
 	inventoryRepo := inventory.NewRepository(db)
 	activityLogger := activity.NewLogger(activity.NewRepository(db))
 
-	compSvc := compensation.NewService(compensation.NewRepository(db), activityLogger, db)
-
 	loc := cfg.Server.Location()
+
+	compSvc := compensation.NewService(compensation.NewRepository(db), activityLogger, db, loc)
 	orderRepo := orders.NewRepository(db, loc)
 	seedUserRepo := users.NewRepository(db)
 	orderSvc := orders.NewService(orderRepo, inventoryRepo, hierRepo, teamRepo, compSvc, activityLogger, db,

@@ -192,8 +192,9 @@ func main() {
 	})
 
 	// ── Compensation module ───────────────────────────────────────────────────
+	loc := cfg.Server.Location()
 	compensationRepo := compensation.NewRepository(db)
-	compensationSvc := compensation.NewService(compensationRepo, activityLogger, db)
+	compensationSvc := compensation.NewService(compensationRepo, activityLogger, db, loc)
 	compensationHandler := compensation.NewHandler(compensationSvc)
 
 	// ── Phase 1: centralized secure media pipeline ────────────────────────────
@@ -257,8 +258,6 @@ func main() {
 	customerRepo := customers.NewRepository(db)
 	customerSvc := customers.NewService(customerRepo, activityLogger)
 	customerHandler := customers.NewHandler(customerSvc)
-
-	loc := cfg.Server.Location()
 
 	// Finance is constructed before Budget: Budget's live balance formula reads
 	// Finance's accumulated net profit (internal/finance.Repository.GetNetProfit)
