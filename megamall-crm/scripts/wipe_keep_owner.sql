@@ -49,21 +49,16 @@ DELETE FROM writeoffs;
 DELETE FROM inventory;
 DELETE FROM product_images;
 DELETE FROM products;
-DELETE FROM categories;
 DELETE FROM suppliers;
-DELETE FROM warehouses;
 
 DELETE FROM payouts;
 DELETE FROM payout_batches;
-DELETE FROM seller_payouts;
 DELETE FROM employee_compensations;
 DELETE FROM company_budget_transactions;
 DELETE FROM expense_edits;
 DELETE FROM finance_business_expenses;
 DELETE FROM record_edits;
 DELETE FROM commission_configs;
-DELETE FROM delivery_tariffs;
-DELETE FROM delivery_tariff_ranges;
 DELETE FROM delivery_settings;
 DELETE FROM courier_tariff_rules;
 
