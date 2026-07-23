@@ -56,6 +56,12 @@ func TestGetCashSummary_ConfirmedShortfallStaysInDebt(t *testing.T) {
 	if s.CashToHandover != 9 {
 		t.Fatalf("cash_to_handover = %v, want 9 (the confirmed-handover shortfall)", s.CashToHandover)
 	}
+	if s.TodayCollected != 0 {
+		t.Fatalf("today_collected = %v, want 0 (no new delivered orders today)", s.TodayCollected)
+	}
+	if s.CarriedOverDebt != 9 {
+		t.Fatalf("carried_over_debt = %v, want 9 (the confirmed-handover shortfall)", s.CarriedOverDebt)
+	}
 }
 
 func TestGetCashSummary_OverpaymentNetsShortfallOut(t *testing.T) {
@@ -75,6 +81,9 @@ func TestGetCashSummary_OverpaymentNetsShortfallOut(t *testing.T) {
 	if s.CashToHandover != 0 {
 		t.Fatalf("cash_to_handover = %v, want 0 after the overpayment nets the shortfall", s.CashToHandover)
 	}
+	if s.CarriedOverDebt != 0 {
+		t.Fatalf("carried_over_debt = %v, want 0 after the overpayment nets the shortfall", s.CarriedOverDebt)
+	}
 }
 
 func TestGetCashSummary_PureOverpaymentNeverGoesNegative(t *testing.T) {
@@ -91,6 +100,9 @@ func TestGetCashSummary_PureOverpaymentNeverGoesNegative(t *testing.T) {
 	}
 	if s.CashToHandover != 0 {
 		t.Fatalf("cash_to_handover = %v, want 0 (floored, never negative)", s.CashToHandover)
+	}
+	if s.CarriedOverDebt != -50 {
+		t.Fatalf("carried_over_debt = %v, want -50 (signed credit, unfloored)", s.CarriedOverDebt)
 	}
 }
 

@@ -91,7 +91,7 @@ export default function DashboardScreen() {
   const initial   = firstName[0] || 'К'
   const fmt = (n) => Number(n || 0).toLocaleString()
   const salary    = deliveredOrders.reduce((sum, o) => sum + getPayout(o), 0)
-  const collected = summary?.cash_to_handover || 0
+  const collected = summary?.today_collected || 0
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
