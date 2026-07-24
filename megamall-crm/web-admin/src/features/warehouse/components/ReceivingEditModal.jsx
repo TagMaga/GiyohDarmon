@@ -6,8 +6,8 @@ import Button from '../../../shared/components/Button'
 import Alert from '../../../shared/components/Alert'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
-import { fetchReceivingHistory, updateReceiving } from '../api'
-import { fmtDate, fmtMoney, getId, getMovementType, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
+import { fetchReceivingHistory, updateProduct, updateReceiving } from '../api'
+import { fmtDate, fmtMoney, getId, getMovementType, getProductName, getProductSku, getSalePrice, isUUID } from '../utils/warehouseHelpers'
 
 function receivingNote(reason) {
   const text = (reason ?? '').trim()
@@ -60,23 +60,27 @@ export default function ReceivingEditModal({ movement, products = [], onClose })
   const [productId, setProductId] = useState('')
   const [quantity, setQuantity] = useState('')
   const [unitCost, setUnitCost] = useState('')
+  const [salePrice, setSalePrice] = useState('')
   const [notes, setNotes] = useState('')
   const movementId = getId(movement)
   const movementType = getMovementType(movement)
   const isWriteoff = movementType === 'writeoff'
 
-  useEffect(() => {
-    if (!movement) return
-    setProductId(movement.product_id ?? movement.ProductID ?? '')
-    setQuantity(String(movement.quantity ?? movement.Quantity ?? ''))
-    setUnitCost(String(movement.batch_unit_cost ?? ''))
-    setNotes(movementNote(movement))
-  }, [movement])
-
   const validProducts = useMemo(
     () => products.filter((p) => isUUID(getId(p))),
     [products]
   )
+
+  useEffect(() => {
+    if (!movement) return
+    const pid = movement.product_id ?? movement.ProductID ?? ''
+    setProductId(pid)
+    setQuantity(String(movement.quantity ?? movement.Quantity ?? ''))
+    setUnitCost(String(movement.batch_unit_cost ?? ''))
+    const product = validProducts.find((p) => getId(p) === pid)
+    setSalePrice(product ? String(getSalePrice(product) ?? '') : '')
+    setNotes(movementNote(movement))
+  }, [movement, validProducts])
 
   const { data: history = [], isLoading: historyLoading } = useQuery({
     queryKey: ['warehouse', 'receiving-history', movementId],
@@ -89,17 +93,24 @@ export default function ReceivingEditModal({ movement, products = [], onClose })
   const canSubmit = isUUID(productId) && qty > 0 && (isWriteoff || (!Number.isNaN(cost) && cost >= 0))
 
   const mutation = useMutation({
-    mutationFn: () => updateReceiving(movementId, {
-      product_id: productId,
-      quantity: qty,
-      unit_cost: isWriteoff ? 0 : cost,
-      notes: notes.trim() || undefined,
-    }),
+    mutationFn: async () => {
+      const receiving = await updateReceiving(movementId, {
+        product_id: productId,
+        quantity: qty,
+        unit_cost: isWriteoff ? 0 : cost,
+        notes: notes.trim() || undefined,
+      })
+      if (!isWriteoff && salePrice !== '') {
+        await updateProduct(productId, { sale_price: Number(salePrice) })
+      }
+      return receiving
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.warehouse.inventory })
       qc.invalidateQueries({ queryKey: KEYS.warehouse.movements })
       qc.invalidateQueries({ queryKey: KEYS.warehouse.batchesRoot })
       qc.invalidateQueries({ queryKey: ['warehouse', 'receiving-history', movementId] })
+      if (!isWriteoff && salePrice !== '') qc.invalidateQueries({ queryKey: KEYS.warehouse.products })
       toast.success(isWriteoff ? 'Списание обновлено' : 'Приёмка обновлена')
       onClose()
     },
@@ -149,6 +160,12 @@ export default function ReceivingEditModal({ movement, products = [], onClose })
           <label>
             <span className="input-label">Закупочная цена *</span>
             <input className="input" type="number" min="0" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+          </label>
+        )}
+        {!isWriteoff && (
+          <label>
+            <span className="input-label">Цена продажи</span>
+            <input className="input" type="number" min="0" step="0.01" value={salePrice} onChange={(e) => setSalePrice(e.target.value)} placeholder="0.00" />
           </label>
         )}
         <label>
