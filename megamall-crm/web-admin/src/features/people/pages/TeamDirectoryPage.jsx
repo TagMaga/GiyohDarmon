@@ -53,6 +53,9 @@ import { useToast }        from '../../../shared/components/ToastProvider'
 import AssignTeamModal     from '../components/AssignTeamModal'
 import CreateEmployeeModal from '../components/CreateEmployeeModal'
 import CreateTeamModal     from '../components/CreateTeamModal'
+import WorkerApplicationCard        from '../components/WorkerApplicationCard'
+import WorkerApplicationDetailModal from '../components/WorkerApplicationDetailModal'
+import useWorkerApplications        from '../hooks/useWorkerApplications'
 
 const PERSON_GRID_CLASS = 'grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-[7px]'
 
@@ -1890,11 +1893,16 @@ export default function TeamDirectoryPage() {
   const [teamFilter, setTeamFilter]   = useState('all')
   const [showCreateEmployee, setShowCreateEmployee] = useState(false)
   const [showCreateTeam, setShowCreateTeam]         = useState(false)
+  const [selectedApplication, setSelectedApplication] = useState(null)
   const { data: auditHistory = [] } = useQuery({
     queryKey: ['users-history'],
     queryFn: fetchAllUserHistory,
     enabled: tab === 'audit',
   })
+  // Unlike auditHistory, fetched eagerly (not gated to tab === 'applications')
+  // so the tab's pending-count badge is visible without having to click in —
+  // this is meant to surface like a notification, not a lazy-loaded report.
+  const { data: applications = [], isLoading: appLoading, isError: appError } = useWorkerApplications('pending')
 
   // Build a team name map
   const teamNameMap = useMemo(() => {
@@ -1998,12 +2006,18 @@ export default function TeamDirectoryPage() {
               ? 'Группы продаж, выручка, лидеры и участники'
               : tab === 'audit'
                 ? 'История изменений сотрудников'
-                : 'Все сотрудники компании'}
+                : tab === 'applications'
+                  ? 'Заявки с giyohdarmon.tj/new, ожидающие рассмотрения'
+                  : 'Все сотрудники компании'}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[13px] font-semibold text-slate-800 bg-white border border-slate-200 rounded-full px-4 py-1.5 shadow-sm">
-            {loading ? '…' : tab === 'groups' ? `${teams.length} групп` : tab === 'audit' ? `${auditHistory.length} событий` : `${filtered.length} чел.`}
+            {loading ? '…'
+              : tab === 'groups' ? `${teams.length} групп`
+              : tab === 'audit' ? `${auditHistory.length} событий`
+              : tab === 'applications' ? `${applications.length} заявок`
+              : `${filtered.length} чел.`}
           </span>
           {tab === 'employees' && (
             <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setShowCreateEmployee(true)}>
@@ -2022,6 +2036,7 @@ export default function TeamDirectoryPage() {
         {[
           { id: 'employees', label: 'Все сотрудники' },
           { id: 'groups', label: 'Groups' },
+          { id: 'applications', label: applications.length > 0 ? `Заявки (${applications.length})` : 'Заявки' },
           { id: 'audit', label: 'Журнал' },
         ].map(item => (
           <button
@@ -2125,6 +2140,35 @@ export default function TeamDirectoryPage() {
         )
       )}
 
+      {tab === 'applications' && (
+        <>
+          {appError && (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+              <p className="text-[15px] font-semibold text-rose-600">Не удалось загрузить заявки</p>
+            </div>
+          )}
+          {appLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-[88px] rounded-2xl border border-slate-100 bg-white animate-pulse" />
+              ))}
+            </div>
+          ) : applications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+              <Users size={36} className="opacity-40" />
+              <p className="text-[15px] font-semibold text-slate-600">Нет новых заявок</p>
+              <p className="text-[13px]">Заявки с формы giyohdarmon.tj/new появятся здесь.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {applications.map(a => (
+                <WorkerApplicationCard key={a.id} application={a} onOpen={() => setSelectedApplication(a)} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
       {tab === 'audit' && (
         <AuditJournal history={auditHistory} userMap={userMap} />
       )}
@@ -2138,6 +2182,11 @@ export default function TeamDirectoryPage() {
         onClose={() => setShowCreateTeam(false)}
         users={employees}
         showLeadManager={false}
+      />
+      <WorkerApplicationDetailModal
+        key={selectedApplication?.id ?? 'none'}
+        application={selectedApplication}
+        onClose={() => setSelectedApplication(null)}
       />
     </div>
   )
