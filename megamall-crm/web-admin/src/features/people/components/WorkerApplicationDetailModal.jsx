@@ -37,10 +37,10 @@ export default function WorkerApplicationDetailModal({ application, onClose }) {
   })
 
   // Invalidating the shared ['people'] prefix covers every employee-list
-  // query key in use across the app — TeamsHub's useEmployees
-  // (['people','employees',...]) and TeamDirectoryPage's useDirectory
-  // (['people']) use different keys for the same data, so a narrower
-  // invalidate would silently miss one of them.
+  // query key in use across the app — useEmployees (['people','employees',
+  // ...], used by e.g. TeamProfilePage) and TeamDirectoryPage's own
+  // useDirectory (['people']) use different keys for the same data, so a
+  // narrower invalidate would silently miss one of them.
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['people'] })
   }

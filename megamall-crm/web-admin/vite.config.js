@@ -47,7 +47,6 @@ export default defineConfig({
           'feature-owner': [
             './src/features/finance/pages/OwnerFinancePage.jsx',
             './src/features/orders/pages/OwnerOrdersPage.jsx',
-            './src/features/people/pages/TeamsHub.jsx',
             './src/features/people/pages/TeamProfilePage.jsx',
           ],
           'feature-team-lead': [
