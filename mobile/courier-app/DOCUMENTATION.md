@@ -83,7 +83,7 @@ Env: copy `.env.example` → `.env`, set `EXPO_PUBLIC_API_URL=http://<lan-ip>:80
 `resolveApiUrl()` picks the backend host depending on build type:
 
 - **In `__DEV__`** (Expo Go): derives the LAN IP from Metro's connection info (`Constants.expoConfig.hostUri` / `expoGoConfig.debuggerHost` / etc.) and points at `http://<that-host>:8080`. This means the app follows the dev machine's current WiFi IP automatically — no manual `.env` editing, and no stale-IP "wrong password" red herring when the laptop's IP changes.
-- **In production builds**: no Metro host exists, so it falls back to `EXPO_PUBLIC_API_URL`, then the encrypted production endpoint `https://134.122.81.40`.
+- **In production builds**: no Metro host exists, so it falls back to `EXPO_PUBLIC_API_URL`, then the production domain `https://giyohdarmon.tj` (the HTTPS cert only covers the domain, not the bare server IP — see `deploy.yml`).
 
 `client` is an axios instance with `baseURL: '{API_URL}/api/v1'`, 10s timeout.
 

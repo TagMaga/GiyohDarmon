@@ -28,7 +28,7 @@ function resolveApiUrl() {
     if (host) return `http://${host}:8080`
   }
 
-  return envUrl || 'https://134.122.81.40'
+  return envUrl || 'https://giyohdarmon.tj'
 }
 
 export const API_URL = resolveApiUrl()
