@@ -14,7 +14,7 @@ export default function WarehouseReceivingPage() {
   const [writeoffOpen, setWriteoffOpen] = useState(false)
   const rows = data.movements.filter((m) => {
     const type = getMovementType(m)
-    return type === 'purchase' || type === 'adjustment' || type === 'writeoff'
+    return type === 'purchase' || type === 'adjustment' || type === 'writeoff' || type === 'sale'
   })
 
   return (
