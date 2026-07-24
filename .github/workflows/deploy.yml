@@ -167,8 +167,10 @@ jobs:
             "sudo --non-interactive /var/www/megamall-crm/deploy.sh '$GITHUB_SHA' '/tmp/megamall-$GITHUB_SHA.tar.gz'"
 
       - name: Verify public application path
-        env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
         run: |
+          # Use the real public domain, not $SERVER_HOST (the bare IP) — the
+          # HTTPS cert only covers giyohdarmon.tj/www.giyohdarmon.tj, so
+          # curling the IP fails cert hostname verification (exit 60) even
+          # when the app itself deployed and is serving correctly.
           curl --fail --silent --show-error --retry 5 --retry-delay 2 \
-            --max-time 10 "https://$SERVER_HOST/api/v1/ready" >/dev/null
+            --max-time 10 "https://giyohdarmon.tj/api/v1/ready" >/dev/null
