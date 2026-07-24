@@ -31,7 +31,7 @@ function currentMonthRange() {
 const PERIOD_PRESETS = [
   { key: 'today', label: 'Сегодня', heroLabel: 'Заработок сегодня' },
   { key: 'week',  label: 'Неделя',  heroLabel: 'Заработок за неделю' },
-  { key: 'month', label: 'Месяц',   heroLabel: 'Заработок за месяц' },
+  { key: 'month', label: 'Месяц',   heroLabel: 'Продажа за месяц' },
 ]
 
 function presetRange(key) {
