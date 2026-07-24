@@ -41,16 +41,7 @@ export const KEYS = {
     couriers: ['users', 'couriers'],
   },
   hr: {
-    tariffActive: ['hr', 'tariffs', 'active'],
-    tariffs:      ['hr', 'tariffs'],
     configs:      ['hr', 'compensation', 'configs'],
-    history:      ['hr', 'compensation', 'history'],
-    preview:      ['hr', 'compensation', 'preview'],
-    events:       (orderId) => ['hr', 'events', orderId],
-    employee:     (userId)  => ['hr', 'compensation', 'employees', userId],
-    team:         (teamId)  => ['hr', 'compensation', 'teams', teamId],
-    teams:        ['hr', 'teams'],
-    users:        ['hr', 'users'],
     // Income reports (Phase 14)
     incomeMe:     (params)              => ['hr', 'income', 'me',    params  ?? {}],
     incomeUser:   (userId,  params)     => ['hr', 'income', 'users', userId,  params ?? {}],
