@@ -1025,7 +1025,7 @@ function CashView({ rows, couriers, loading, error, onRetry, onCourierUpdated })
     return m
   }, [couriers])
 
-  const visibleRows = useMemo(() => rows.filter(hasCashSettlementActivity), [rows])
+  const visibleRows = rows
 
   useEffect(() => {
     if (!error) return
@@ -1115,13 +1115,6 @@ function CashView({ rows, couriers, loading, error, onRetry, onCourierUpdated })
     )}
   </>
   )
-}
-
-function hasCashSettlementActivity(row) {
-  return Number(row.delivered ?? 0) > 0 ||
-    Number(row.failed ?? 0) > 0 ||
-    Number(row.cash_debt ?? 0) > 0 ||
-    Number(row.earnings ?? 0) > 0
 }
 
 function CashTransactionsView({

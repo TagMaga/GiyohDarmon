@@ -19,7 +19,7 @@ const NAV_CARDS = [
     to: '/seller/profile/info',
     icon: Info,
     label: 'Мои данные',
-    desc: 'Имя, телефон, Telegram',
+    desc: 'Имя, телефон',
     iconBg: '#EEF2FF',
     iconColor: '#4F46E5',
   },

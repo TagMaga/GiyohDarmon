@@ -52,7 +52,6 @@ type CourierListRow struct {
 	CourierID          uuid.UUID            `json:"courier_id"`
 	FullName           string               `json:"full_name"`
 	Phone              string               `json:"phone"`
-	TelegramChatID     *string              `json:"telegram_chat_id,omitempty"`
 	IsActive           bool                 `json:"is_active"`
 	OrderIntakeEnabled bool                 `json:"order_intake_enabled"`
 	OrderIntakeReason  *string              `json:"order_intake_reason,omitempty"`

@@ -72,10 +72,9 @@ type User struct {
 	// Position is a free-text job title for display only (e.g. "Генеральный
 	// директор") — distinct from Role, which is the permission enum used
 	// for RBAC. See migration 00084.
-	Position       *string `gorm:"column:position"`
-	TelegramChatID *string `gorm:"column:telegram_chat_id"`
-	Role           Role    `gorm:"type:user_role;not null"`
-	IsActive       bool    `gorm:"default:true;not null"`
+	Position *string `gorm:"column:position"`
+	Role     Role    `gorm:"type:user_role;not null"`
+	IsActive bool    `gorm:"default:true;not null"`
 	AvatarURL      *string
 	// AvatarMediaAssetID is non-nil once the avatar was uploaded through
 	// internal/media (category avatar, private visibility) rather than the

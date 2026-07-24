@@ -12,18 +12,12 @@ import (
 )
 
 // UpdateCourier edits a courier's profile fields: name, surname, phone (login),
-// password (optional), and telegram_chat_id.
+// and password (optional).
 // Does NOT touch financial records, debt, earnings, orders, or history.
 func (s *Service) UpdateCourier(ctx context.Context, courierID uuid.UUID, req UpdateCourierRequest) (*CourierProfileResponse, error) {
-	// Validate telegram_chat_id is present
-	if req.TelegramChatID == nil || strings.TrimSpace(*req.TelegramChatID) == "" {
-		return nil, apperrors.BadRequest("telegram_chat_id is required")
-	}
-
 	updates := map[string]interface{}{
-		"full_name":        strings.TrimSpace(req.FullName),
-		"phone":            strings.TrimSpace(req.Phone),
-		"telegram_chat_id": strings.TrimSpace(*req.TelegramChatID),
+		"full_name": strings.TrimSpace(req.FullName),
+		"phone":     strings.TrimSpace(req.Phone),
 	}
 
 	if req.Surname != nil {

@@ -389,7 +389,6 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 		CourierID          uuid.UUID  `gorm:"column:courier_id"`
 		FullName           string     `gorm:"column:full_name"`
 		Phone              string     `gorm:"column:phone"`
-		TelegramChatID     *string    `gorm:"column:telegram_chat_id"`
 		IsActive           bool       `gorm:"column:is_active"`
 		OrderIntakeEnabled bool       `gorm:"column:order_intake_enabled"`
 		OrderIntakeReason  *string    `gorm:"column:order_intake_reason"`
@@ -494,7 +493,6 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 			u.id          AS courier_id,
 			u.full_name,
 			u.phone,
-			u.telegram_chat_id,
 			u.is_active,
 			u.courier_order_intake_enabled AS order_intake_enabled,
 			u.courier_order_intake_reason  AS order_intake_reason,
@@ -540,7 +538,6 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 			CourierID:          row.CourierID,
 			FullName:           row.FullName,
 			Phone:              row.Phone,
-			TelegramChatID:     row.TelegramChatID,
 			IsActive:           row.IsActive,
 			OrderIntakeEnabled: row.OrderIntakeEnabled,
 			OrderIntakeReason:  row.OrderIntakeReason,

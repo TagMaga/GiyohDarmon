@@ -63,13 +63,12 @@ func (r *Repository) getCourierProfileResponse(ctx context.Context, courierID uu
 	}
 
 	return &CourierProfileResponse{
-		CourierID:      u.ID,
-		FullName:       u.FullName,
-		Surname:        u.Surname,
-		Phone:          u.Phone,
-		TelegramChatID: u.TelegramChatID,
-		IsActive:       u.IsActive,
-		CityIDs:        cityIDs,
+		CourierID: u.ID,
+		FullName:  u.FullName,
+		Surname:   u.Surname,
+		Phone:     u.Phone,
+		IsActive:  u.IsActive,
+		CityIDs:   cityIDs,
 	}, nil
 }
 

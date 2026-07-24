@@ -81,7 +81,6 @@ type UserResponse struct {
 	AvatarMediaAssetID *uuid.UUID `json:"avatar_media_asset_id,omitempty"`
 	AvatarWidth        *int       `json:"avatar_width,omitempty"`
 	AvatarHeight       *int       `json:"avatar_height,omitempty"`
-	TelegramChatID     *string    `json:"telegram_chat_id"`
 	Status             Status     `json:"status"`
 	HireDate           *time.Time `json:"hire_date"`
 	DateOfBirth        *time.Time `json:"date_of_birth"`
@@ -92,9 +91,8 @@ type UserResponse struct {
 
 // PatchMeRequest allows a user to update their own editable profile fields.
 type PatchMeRequest struct {
-	FullName       *string    `json:"full_name" validate:"omitempty,min=2,max=255"`
-	DateOfBirth    *time.Time `json:"date_of_birth" validate:"omitempty"`
-	TelegramChatID *string    `json:"telegram_chat_id" validate:"omitempty,max=100"`
+	FullName    *string    `json:"full_name" validate:"omitempty,min=2,max=255"`
+	DateOfBirth *time.Time `json:"date_of_birth" validate:"omitempty"`
 	// AvatarMediaAssetID sets the caller's own avatar via the secure media
 	// pipeline (category avatar) — self-service equivalent of
 	// UpdateUserRequest.AvatarMediaAssetID. See Service.PatchMe.
@@ -163,7 +161,6 @@ func ToResponse(u *User) UserResponse {
 		AvatarMediaAssetID: u.AvatarMediaAssetID,
 		AvatarWidth:        u.AvatarWidth,
 		AvatarHeight:       u.AvatarHeight,
-		TelegramChatID:     u.TelegramChatID,
 		Status:             u.Status,
 		HireDate:           u.HireDate,
 		DateOfBirth:        u.DateOfBirth,
