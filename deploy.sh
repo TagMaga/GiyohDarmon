@@ -17,6 +17,14 @@ HEALTH_DELAY=${HEALTH_DELAY:-1}
 # HTTPS; --resolve pins the connection to loopback while still using the
 # real hostname for the Host header, TLS SNI, and certificate validation.
 DOMAIN=${DOMAIN:-giyohdarmon.tj}
+# The nginx site file scripts/setup_https_remote.sh creates. This script
+# does NOT create it from scratch (that one-time bootstrap, including the
+# Certbot-issued SSL directives, stays that script's job) — it only patches
+# an already-provisioned file that's missing the /media and /uploads
+# proxy locations, so every deploy self-heals the gap those routes' absence
+# left in production (see "Syncing nginx" step below). If the file doesn't
+# exist yet, that step is a no-op.
+NGINX_SITE_CONF=${NGINX_SITE_CONF:-/etc/nginx/sites-available/megamall-crm}
 
 REVISION=${1:-}
 ARTIFACT=${2:-}
@@ -66,6 +74,82 @@ wait_for_health() {
   return 1
 }
 
+# sync_nginx_media_routes idempotently patches NGINX_SITE_CONF to add the
+# /media/ and /uploads/ proxy locations if they're missing, then validates
+# and reloads nginx. internal/media serves product images etc. at
+# /media/public|private/:key and the legacy uploader serves /uploads/:file,
+# both registered at the Go router root, outside /api/v1 (see
+# internal/media/routes.go and cmd/server/main.go) — nginx must proxy them
+# separately from the existing /api/ location or they fall through to the
+# SPA's index.html instead of reaching the backend. Backs up the file
+# first and restores it if `nginx -t` rejects the patched config, so a
+# malformed result never gets reloaded into the running nginx.
+sync_nginx_media_routes() {
+  if [[ ! -f "$NGINX_SITE_CONF" ]]; then
+    echo "  $NGINX_SITE_CONF not found — nginx not provisioned yet, skipping"
+    return 0
+  fi
+  if grep -qF 'location /media/ {' "$NGINX_SITE_CONF"; then
+    echo "  already present — skipping"
+    return 0
+  fi
+
+  local nginx_backup="$BACKUP/nginx-site-conf"
+  cp -a "$NGINX_SITE_CONF" "$nginx_backup"
+
+  local insert_file
+  insert_file=$(mktemp)
+  cat > "$insert_file" <<'NGINX_BLOCK'
+
+    # Media pipeline delivery routes (product images, avatars, etc.) —
+    # registered by internal/media at the router root, outside /api/v1
+    # (see internal/media/routes.go: RegisterDeliveryRoutes).
+    location /media/ {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    # Legacy /uploads/:filename delivery (receipt proofs, attachments
+    # predating the media pipeline) — same "falls through to the SPA"
+    # problem as /media/ above.
+    location /uploads/ {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+NGINX_BLOCK
+
+  awk -v insfile="$insert_file" '
+    /^    location \/api\/ \{$/ { in_api = 1 }
+    { print }
+    in_api && /^    \}$/ {
+      while ((getline line < insfile) > 0) print line
+      close(insfile)
+      in_api = 0
+    }
+  ' "$NGINX_SITE_CONF" > "$NGINX_SITE_CONF.new"
+  rm -f "$insert_file"
+  mv "$NGINX_SITE_CONF.new" "$NGINX_SITE_CONF"
+
+  if nginx -t; then
+    systemctl reload nginx
+    echo "  added /media and /uploads proxy locations"
+  else
+    echo "nginx config test failed after adding /media,/uploads locations; restoring previous config" >&2
+    cp -a "$nginx_backup" "$NGINX_SITE_CONF"
+    return 1
+  fi
+}
+
 rollback() {
   local failed_status=$?
   trap - ERR
@@ -101,7 +185,7 @@ rollback() {
 trap cleanup EXIT
 trap rollback ERR
 
-echo "1/6 - Validating release $REVISION"
+echo "1/7 - Validating release $REVISION"
 if tar -tzf "$ARTIFACT" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
   echo "Artifact contains an unsafe path" >&2
   exit 4
@@ -114,7 +198,7 @@ test -f "$STAGE/megamall-crm"
 test -f "$STAGE/frontend/index.html"
 chmod 0755 "$STAGE/megamall-crm"
 
-echo "2/6 - Preparing rollback copy"
+echo "2/7 - Preparing rollback copy"
 mkdir -p "$(dirname "$BACKEND_LIVE")" "$(dirname "$FRONTEND_LIVE")"
 if [[ -f "$BACKEND_LIVE" ]]; then
   cp -a "$BACKEND_LIVE" "$BACKUP/megamall-crm"
@@ -123,7 +207,7 @@ fi
 cp -a "$STAGE/frontend" "$FRONTEND_NEXT"
 install -m 0755 "$STAGE/megamall-crm" "${BACKEND_LIVE}.next"
 
-echo "3/6 - Switching frontend and backend artifacts"
+echo "3/7 - Switching frontend and backend artifacts"
 DEPLOY_STARTED=1
 if [[ -e "$FRONTEND_LIVE" ]]; then
   mv "$FRONTEND_LIVE" "$BACKUP/frontend"
@@ -131,13 +215,16 @@ fi
 mv "$FRONTEND_NEXT" "$FRONTEND_LIVE"
 mv -f "${BACKEND_LIVE}.next" "$BACKEND_LIVE"
 
-echo "4/6 - Restarting backend"
+echo "4/7 - Syncing nginx media/uploads proxy config"
+sync_nginx_media_routes
+
+echo "5/7 - Restarting backend"
 systemctl restart "$SERVICE"
 
-echo "5/6 - Checking application readiness"
+echo "6/7 - Checking application readiness"
 wait_for_health
 
-echo "6/6 - Recording successful release"
+echo "7/7 - Recording successful release"
 printf '%s\n' "$REVISION" > "$RELEASES/CURRENT"
 printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$BACKUP/DEPLOYED_AT"
 rm -f "$ARTIFACT"

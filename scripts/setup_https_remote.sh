@@ -79,7 +79,12 @@ server {
     # registered by internal/media at the router root, outside /api/v1
     # (see internal/media/routes.go: RegisterDeliveryRoutes). Without this,
     # /media/public/... falls through to location / and is served the SPA's
-    # index.html instead of the actual image.
+    # index.html instead of the actual image. This only runs (MODE=apply)
+    # when a human triggers the setup-https workflow by hand — deploy.sh's
+    # sync_nginx_media_routes patches these same two locations into an
+    # already-provisioned site file on every ordinary deploy too, since sudo
+    # for this script's own commands isn't NOPASSWD like deploy.sh's is.
+    # Keep both copies of the block content identical.
     location /media/ {
         proxy_pass         http://127.0.0.1:8080;
         proxy_http_version 1.1;
