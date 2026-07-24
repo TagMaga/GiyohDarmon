@@ -34,14 +34,13 @@ import useEmployees  from '../../people/hooks/useEmployees'
 import useTeams      from '../../people/hooks/useTeams'
 import { buildUserMap } from '../../people/utils/peopleHelpers'
 import PeriodRangeFilter from '../../../shared/components/PeriodRangeFilter'
+import { toLocalYMD } from '../../../shared/utils/date'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
-function toYMD(d) { return d.toISOString().slice(0, 10) }
-
 function todayDefault() {
   const now = new Date()
-  return { from: toYMD(now), to: toYMD(now) }
+  return { from: toLocalYMD(now), to: toLocalYMD(now) }
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────

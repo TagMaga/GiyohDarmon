@@ -18,16 +18,13 @@ import useEmployeesByIds from '../../people/hooks/useEmployeesByIds'
 import { buildUserMap } from '../../people/utils/peopleHelpers'
 import useManagerOrders from '../hooks/useManagerOrders'
 import { M, Card, InitialsAvatar, SectionLabel, StatusPill } from '../../seller/components/mobileUi'
-
-function toYMD(d) {
-  return d.toISOString().slice(0, 10)
-}
+import { toLocalYMD } from '../../../shared/utils/date'
 
 function currentMonth() {
   const now = new Date()
   return {
-    from: toYMD(new Date(now.getFullYear(), now.getMonth(), 1)),
-    to: toYMD(now),
+    from: toLocalYMD(new Date(now.getFullYear(), now.getMonth(), 1)),
+    to: toLocalYMD(now),
     label: now.toLocaleDateString('ru-RU', { month: 'long' }),
   }
 }

@@ -22,8 +22,7 @@ import useOwnerOrders         from '../../orders/hooks/useOwnerOrders'
 import useCurrentUser         from '../../../shared/hooks/useCurrentUser'
 import { formatOrderLabel, getOrderId } from '../../dispatcher/utils/orderHelpers'
 import { fmtDate }            from '../../../shared/orderStatusConfig'
-
-function toYMD(d) { return d.toISOString().slice(0, 10) }
+import { toLocalYMD }         from '../../../shared/utils/date'
 
 // ── Per-seller stats derived from orders ─────────────────────────────────────
 
@@ -198,8 +197,8 @@ export default function TeamLeadSellersPage() {
   const orderParams = useMemo(() => ({
     team_lead_id: userId,
     ...(teamId ? { team_id: teamId } : {}),
-    from:  new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10),
-    to:    now.toISOString().slice(0,10),
+    from:  toLocalYMD(new Date(now.getFullYear(), now.getMonth(), 1)),
+    to:    toLocalYMD(now),
     limit: 500,
     page:  1,
   }), [userId, teamId])

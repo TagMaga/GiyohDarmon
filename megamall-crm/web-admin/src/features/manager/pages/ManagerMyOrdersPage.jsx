@@ -23,11 +23,11 @@ import useEmployeesByIds            from '../../people/hooks/useEmployeesByIds'
 import useTeams                     from '../../people/hooks/useTeams'
 import { buildUserMap }             from '../../people/utils/peopleHelpers'
 import { M }                        from '../../seller/components/mobileUi'
+import { toLocalYMD }               from '../../../shared/utils/date'
 
-function toYMD(d) { return d.toISOString().slice(0, 10) }
 function currentMonthDefault() {
   const now = new Date()
-  return { from: toYMD(new Date(now.getFullYear(), now.getMonth(), 1)), to: toYMD(now) }
+  return { from: toLocalYMD(new Date(now.getFullYear(), now.getMonth(), 1)), to: toLocalYMD(now) }
 }
 
 function field(o, ...keys) {

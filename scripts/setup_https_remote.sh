@@ -74,6 +74,34 @@ server {
         proxy_set_header   X-Forwarded-Proto \$scheme;
         proxy_read_timeout 60s;
     }
+
+    # Media pipeline delivery routes (product images, avatars, etc.) —
+    # registered by internal/media at the router root, outside /api/v1
+    # (see internal/media/routes.go: RegisterDeliveryRoutes). Without this,
+    # /media/public/... falls through to location / and is served the SPA's
+    # index.html instead of the actual image.
+    location /media/ {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 60s;
+    }
+
+    # Legacy /uploads/:filename delivery (receipt proofs, attachments
+    # predating the media pipeline) — same "falls through to the SPA"
+    # problem as /media/ above.
+    location /uploads/ {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              \$host;
+        proxy_set_header   X-Real-IP         \$remote_addr;
+        proxy_set_header   X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 60s;
+    }
 }
 NGINX
 

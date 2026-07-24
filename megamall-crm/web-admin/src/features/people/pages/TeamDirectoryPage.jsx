@@ -39,6 +39,7 @@ import {
 import { withCacheBust, uploadToMedia } from '../../../shared/api/mediaUpload'
 import { translateMediaError } from '../../../shared/api/mediaErrors'
 import { ALL_ROLES, ROLE_LABEL, COMMISSION_TYPE_LABEL, STATUS_CFG, STATUS_OPTIONS, fmtDate, fmtMoney, fmtPct, isConfigActive } from '../utils/peopleHelpers'
+import { toLocalYMD } from '../../../shared/utils/date'
 import EditEmployeeModal   from '../components/EditEmployeeModal'
 import Modal               from '../../../shared/components/Modal'
 import DesktopDateRangePicker  from '../../../shared/components/DesktopDateRangePicker'
@@ -1089,7 +1090,7 @@ const COMM_ROWS = {
 const COMP_KIND_LABEL = { percent: 'Процент', fixed: 'Фиксированная', mixed: 'Смешанная', none: 'Не назначено' }
 const COMP_KIND_BADGE = { percent: 'indigo', fixed: 'emerald', mixed: 'violet', none: 'slate' }
 const DEFAULT_NOTE = 'Обновлено без примечания'
-const todayInputValue = () => new Date().toISOString().slice(0, 10)
+const todayInputValue = () => toLocalYMD(new Date())
 const DOCUMENT_TYPES = [
   { value: 'passport', label: 'Паспорт' },
   { value: 'contract', label: 'Договор' },
