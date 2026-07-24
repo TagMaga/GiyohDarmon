@@ -16,6 +16,13 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
+      // Media pipeline delivery routes (product images, avatars, etc.) —
+      // registered by internal/media at the router root, outside /api/v1
+      // (see internal/media/routes.go: RegisterDeliveryRoutes).
+      '/media': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
 
