@@ -11,6 +11,12 @@ LOCK_FILE=${LOCK_FILE:-/var/lock/megamall-crm-deploy.lock}
 SERVICE=${SERVICE:-megamall-crm.service}
 HEALTH_ATTEMPTS=${HEALTH_ATTEMPTS:-30}
 HEALTH_DELAY=${HEALTH_DELAY:-1}
+# Public hostname nginx serves — used to health-check through nginx itself
+# (not just the backend directly). Port 80 for this host redirects to HTTPS
+# (Certbot-managed) and 404s everything else, so the check must go over
+# HTTPS; --resolve pins the connection to loopback while still using the
+# real hostname for the Host header, TLS SNI, and certificate validation.
+DOMAIN=${DOMAIN:-giyohdarmon.tj}
 
 REVISION=${1:-}
 ARTIFACT=${2:-}
@@ -48,9 +54,11 @@ wait_for_health() {
       && curl --fail --silent --show-error --max-time 3 \
         http://127.0.0.1:8080/api/v1/ready >/dev/null \
       && curl --fail --silent --show-error --max-time 3 \
-        http://127.0.0.1/api/v1/ready >/dev/null \
+        --resolve "$DOMAIN:443:127.0.0.1" \
+        "https://$DOMAIN/api/v1/ready" >/dev/null \
       && curl --fail --silent --show-error --max-time 3 \
-        http://127.0.0.1/ >/dev/null; then
+        --resolve "$DOMAIN:443:127.0.0.1" \
+        "https://$DOMAIN/" >/dev/null; then
       return 0
     fi
     sleep "$HEALTH_DELAY"
