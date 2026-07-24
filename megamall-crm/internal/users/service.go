@@ -264,6 +264,24 @@ func (s *Service) PhoneExists(ctx context.Context, phone string) (bool, error) {
 	return u != nil, nil
 }
 
+// SystemUploaderID returns an existing owner's ID for use as
+// media_assets.uploaded_by_user_id when a media asset is created on behalf
+// of an unauthenticated actor (e.g. a public worker application document —
+// see internal/onboarding). That column is a hard NOT NULL REFERENCES
+// users(id) constraint (migration 00075), so there is no "no uploader"
+// value to fall back to; an owner always existing is the same invariant
+// internal/health's "owner_user" readiness check already assumes. Which
+// owner gets picked has no security effect — owner-level callers bypass
+// every media authorization check regardless of the recorded uploader (see
+// media.Service.Authorize).
+func (s *Service) SystemUploaderID(ctx context.Context) (uuid.UUID, error) {
+	id, err := s.repo.GetAnyOwnerID(ctx)
+	if err != nil {
+		return uuid.Nil, apperrors.Internal(err)
+	}
+	return id, nil
+}
+
 func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	u, err := s.repo.GetByID(ctx, id)
 	if err != nil {

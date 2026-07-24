@@ -48,6 +48,23 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
 	return &u, nil
 }
 
+// GetAnyOwnerID returns an existing active owner's ID — used as a
+// placeholder "system" actor for actions with no real authenticated user
+// (see users.Service.SystemUploaderID). Not scoped to a specific owner;
+// the caller only needs *a* valid users.id.
+func (r *Repository) GetAnyOwnerID(ctx context.Context) (uuid.UUID, error) {
+	var u User
+	result := r.db.WithContext(ctx).
+		Select("id").
+		Where("role = ? AND deleted_at IS NULL", RoleOwner).
+		Order("created_at ASC").
+		First(&u)
+	if result.Error != nil {
+		return uuid.Nil, fmt.Errorf("get any owner id: %w", result.Error)
+	}
+	return u.ID, nil
+}
+
 func (r *Repository) GetByPhone(ctx context.Context, phone string) (*User, error) {
 	var u User
 	result := r.db.WithContext(ctx).
