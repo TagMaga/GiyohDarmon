@@ -11,7 +11,7 @@ import { STATUS_LABELS, STATUS_BADGE } from '../../../shared/orderStatusConfig'
 import ReceivingEditModal from '../components/ReceivingEditModal'
 import useWarehouseData from '../hooks/useWarehouseData'
 import { fetchReceivingHistory } from '../api'
-import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getId, getMovementType, getMovementUnitCost, getProductImageSrcSet, getProductImageVariant, getProductName, getProductSku, getSaleUnitPrice, isUUID } from '../utils/warehouseHelpers'
+import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getId, getMovementType, getMovementUnitCost, getProductImageSrcSet, getProductImageVariant, getProductName, getProductSku, getSalePrice, getSaleUnitPrice, isUUID } from '../utils/warehouseHelpers'
 
 const TYPES = [
   { value: '', label: 'Все типы' },
@@ -139,6 +139,13 @@ function MovementReason({ m, className }) {
   return <span className={className}>{cleanReason(m)}</span>
 }
 
+function getDisplaySalePrice(m, product) {
+  const type = getMovementType(m)
+  if (type === 'sale') return getSaleUnitPrice(m)
+  if (type === 'purchase') return getSalePrice(product)
+  return null
+}
+
 function canEditMovement(m) {
   const type = getMovementType(m)
   return type === 'purchase' || type === 'writeoff'
@@ -194,7 +201,7 @@ function MovementRow({ m, data, onOpen, onEdit, showActions }) {
       <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{m.previous_quantity ?? m.PreviousQuantity ?? '—'}</td>
       <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">{m.new_quantity ?? m.NewQuantity ?? '—'}</td>
       <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{getMovementUnitCost(m) != null ? fmtMoney(getMovementUnitCost(m)) : '—'}</td>
-      <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{type === 'sale' && getSaleUnitPrice(m) != null ? fmtMoney(getSaleUnitPrice(m)) : '—'}</td>
+      <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{getDisplaySalePrice(m, product) != null ? fmtMoney(getDisplaySalePrice(m, product)) : '—'}</td>
       <td className="px-3 py-2.5 text-slate-500">{m.created_by_name ?? m.CreatedByName ?? '—'}</td>
       <td className="px-3 py-2.5 text-xs text-slate-400">{fmtDate(m.created_at ?? m.CreatedAt)}</td>
       <td className="max-w-[220px] px-3 py-2.5 text-xs text-slate-500">
@@ -227,8 +234,8 @@ function MovementCard({ m, data, onOpen, onEdit, showActions }) {
       {getMovementUnitCost(m) != null && (
         <p className="mt-2 text-xs text-slate-500">Закупочная цена: <span className="font-semibold text-slate-700">{fmtMoney(getMovementUnitCost(m))}</span></p>
       )}
-      {type === 'sale' && getSaleUnitPrice(m) != null && (
-        <p className="mt-1 text-xs text-slate-500">Продажа: <span className="font-semibold text-slate-700">{fmtMoney(getSaleUnitPrice(m))}</span></p>
+      {getDisplaySalePrice(m, product) != null && (
+        <p className="mt-1 text-xs text-slate-500">Продажа: <span className="font-semibold text-slate-700">{fmtMoney(getDisplaySalePrice(m, product))}</span></p>
       )}
       <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
         <MovementReason m={m} />
@@ -306,6 +313,7 @@ function InventoryOperationDetailModal({ movement, product, onClose, onEditRecei
       <div className="space-y-4">
         <InfoRow icon={<Package size={13} />} label="Товар" value={`${getProductName(product)} × ${movement.quantity ?? movement.Quantity}`} />
         {type !== 'writeoff' && <InfoRow icon={<BadgeDollarSign size={13} />} label="Закупочная цена" value={fmtMoney(unitCost ?? 0)} />}
+        {type === 'purchase' && getSalePrice(product) != null && <InfoRow icon={<BadgeDollarSign size={13} />} label="Цена продажи" value={fmtMoney(getSalePrice(product))} />}
         <InfoRow icon={<FileText size={13} />} label={type === 'writeoff' ? 'Комментарий' : 'Примечание'} value={cleanReason(movement)} />
         <InfoRow icon={<User2 size={13} />} label="Пользователь" value={movement.created_by_name ?? movement.CreatedByName ?? '—'} />
         <InfoRow icon={<Calendar size={13} />} label="Дата" value={fmtDate(movement.created_at ?? movement.CreatedAt)} />
