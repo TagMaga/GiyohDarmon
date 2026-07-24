@@ -542,9 +542,6 @@ func (s *Service) PatchMe(ctx context.Context, id uuid.UUID, req PatchMeRequest)
 	if req.DateOfBirth != nil {
 		u.DateOfBirth = req.DateOfBirth
 	}
-	if req.TelegramChatID != nil {
-		u.TelegramChatID = req.TelegramChatID
-	}
 
 	previousAvatarAssetID := u.AvatarMediaAssetID
 	var newAvatarAssetID *uuid.UUID

@@ -21,6 +21,10 @@ import { CardSkeleton }  from '../../../shared/components/Skeleton'
 import { fmtAmount }     from '../../../shared/orderStatusConfig'
 import useCurrentUser    from '../../../shared/hooks/useCurrentUser'
 import usePayables       from '../hooks/usePayables'
+import useMyTeam         from '../hooks/useMyTeam'
+import useTeamMembers    from '../../people/hooks/useTeamMembers'
+import useEmployeesByIds from '../../people/hooks/useEmployeesByIds'
+import { buildUserMap }  from '../../people/utils/peopleHelpers'
 import { M, MobileShell, Card, InitialsAvatar, SectionLabel } from '../../seller/components/mobileUi'
 
 function toYMD(d) {
@@ -100,8 +104,50 @@ export default function TeamLeadTeamPage() {
   const from = toYMD(new Date(now.getFullYear(), now.getMonth(), 1))
   const to   = toYMD(now)
 
-  const { data: payables, isLoading } = usePayables(userId, { from, to })
-  const members  = payables?.members ?? []
+  // Roster comes from the team hierarchy (like TeamLeadSellersPage/
+  // TeamLeadManagerPage), not from payables — payables.members only ever
+  // includes people with a financial_events row in the period, so a
+  // just-assigned manager/seller with zero orders yet would silently
+  // disappear from "Моя команда" otherwise.
+  const { team, teamId, isLoading: teamLoading } = useMyTeam()
+  const { data: hierarchyMembers = [], isLoading: membersLoading } = useTeamMembers(teamId)
+  const managerId = team?.manager_id ?? null
+  const rosterIds = useMemo(() => {
+    const ids = hierarchyMembers.map(m => m.user_id).filter(Boolean)
+    if (managerId) ids.push(managerId)
+    return [...new Set(ids)]
+  }, [hierarchyMembers, managerId])
+  const { data: employees = [], isLoading: employeesLoading } = useEmployeesByIds(rosterIds)
+  const userMap = useMemo(() => buildUserMap(employees), [employees])
+
+  // Earned/orders_count are still sourced from payables (real commission
+  // income), just merged onto the full roster instead of driving it —
+  // members without a payables row yet default to zero.
+  const { data: payables, isLoading: payablesLoading } = usePayables(userId, { from, to })
+  const payableMap = useMemo(() => {
+    const m = {}
+    for (const p of (payables?.members ?? [])) m[p.payee_id] = p
+    return m
+  }, [payables])
+
+  const members = useMemo(() => (
+    rosterIds
+      .map(id => userMap[id])
+      .filter(u => u && (u.role === 'manager' || u.role === 'seller'))
+      .map(u => {
+        const p = payableMap[u.id]
+        return {
+          payee_id:     u.id,
+          full_name:    u.full_name,
+          role:         u.role,
+          orders_count: p?.orders_count ?? 0,
+          earned:       p?.earned ?? 0,
+        }
+      })
+  ), [rosterIds, userMap, payableMap])
+
+  const isLoading = teamLoading || membersLoading || employeesLoading || (rosterIds.length > 0 && payablesLoading)
+
   const managers = members.filter(m => m.role === 'manager')
   const sellers  = members.filter(m => m.role === 'seller')
   const list     = subTab === 'manager' ? managers : subTab === 'seller' ? sellers : members

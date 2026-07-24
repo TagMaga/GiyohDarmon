@@ -102,7 +102,6 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 		CourierID            uuid.UUID  `gorm:"column:courier_id"`
 		FullName             string     `gorm:"column:full_name"`
 		Surname              *string    `gorm:"column:surname"`
-		TelegramChatID       *string    `gorm:"column:telegram_chat_id"`
 		Phone                string     `gorm:"column:phone"`
 		IsActive             bool       `gorm:"column:is_active"`
 		AssignedOrders       int        `gorm:"column:assigned_orders"`
@@ -120,7 +119,6 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 			u.id                                                             AS courier_id,
 			u.full_name,
 			u.surname,
-			u.telegram_chat_id,
 			u.phone,
 			u.is_active,
 			u.courier_order_intake_enabled                                   AS order_intake_enabled,
@@ -152,7 +150,7 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 		                   AND o.deleted_at IS NULL
 		WHERE u.role       = 'courier'
 		  AND u.deleted_at IS NULL
-		GROUP BY u.id, u.full_name, u.surname, u.telegram_chat_id, u.phone, u.is_active,
+		GROUP BY u.id, u.full_name, u.surname, u.phone, u.is_active,
 		         u.courier_order_intake_enabled, u.courier_order_intake_reason, u.courier_order_intake_updated_at
 		ORDER BY u.full_name
 	`).Scan(&rows).Error
@@ -166,7 +164,6 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 			CourierID:            row.CourierID,
 			FullName:             row.FullName,
 			Surname:              row.Surname,
-			TelegramChatID:       row.TelegramChatID,
 			Phone:                row.Phone,
 			IsActive:             row.IsActive,
 			ActiveOrders:         row.AssignedOrders + row.InDelivery + row.IssueOrders,

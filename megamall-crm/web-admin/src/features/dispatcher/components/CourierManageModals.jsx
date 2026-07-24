@@ -1,8 +1,7 @@
 /**
  * CourierManageModals — three dispatcher-only courier management modals:
  *   1. EditCourierModal        — edit the courier's service-zone cities. Name/surname/
- *                                password/phone are owned by HR (People) now; telegram_chat_id
- *                                has no editable home anywhere else in the app.
+ *                                password/phone are owned by HR (People) now.
  *   2. TariffsModal            — per-courier range-based tariff rules (normal / fast)
  *   3. ToggleOrderIntakeModal  — enable / disable a courier's ability to take new orders
  */
@@ -204,15 +203,12 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
     setLoading(true)
     try {
       await updateCourier(courier.courier_id, {
-        // full_name/surname/phone are edited via HR (People) now.
-        // telegram_chat_id has no editable home anywhere else — it's just
-        // no longer editable here either. The backend still requires
-        // full_name, phone, and telegram_chat_id on every save, so send
-        // them through unchanged rather than exposing them as fields.
-        full_name:        courier.full_name ?? '',
-        phone:            courier.phone ?? '',
-        telegram_chat_id: courier.telegram_chat_id ?? '',
-        city_ids:         selectedCityIDs,
+        // full_name/surname/phone are edited via HR (People) now, but the
+        // backend still requires them on every save, so send them through
+        // unchanged rather than exposing them as fields here.
+        full_name: courier.full_name ?? '',
+        phone:     courier.phone ?? '',
+        city_ids:  selectedCityIDs,
       })
       onSuccess?.()
       onClose()

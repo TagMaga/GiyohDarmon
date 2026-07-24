@@ -28,12 +28,11 @@ type BoardOrder struct {
 
 // UpdateCourierRequest is the dispatcher payload to edit a courier's profile.
 type UpdateCourierRequest struct {
-	FullName       string      `json:"full_name"        validate:"required,min=1"`
-	Surname        *string     `json:"surname"`
-	Phone          string      `json:"phone"            validate:"required"`
-	Password       *string     `json:"password"` // empty = keep existing
-	TelegramChatID *string     `json:"telegram_chat_id" validate:"required"`
-	CityIDs        []uuid.UUID `json:"city_ids"` // nil = unchanged; empty slice = remove all
+	FullName string      `json:"full_name" validate:"required,min=1"`
+	Surname  *string     `json:"surname"`
+	Phone    string      `json:"phone"     validate:"required"`
+	Password *string     `json:"password"` // empty = keep existing
+	CityIDs  []uuid.UUID `json:"city_ids"` // nil = unchanged; empty slice = remove all
 }
 
 // ToggleCourierActiveRequest toggles the courier's is_active flag.
@@ -43,13 +42,12 @@ type ToggleCourierActiveRequest struct {
 
 // CourierProfileResponse is returned after edit/toggle operations.
 type CourierProfileResponse struct {
-	CourierID      uuid.UUID   `json:"courier_id"`
-	FullName       string      `json:"full_name"`
-	Surname        *string     `json:"surname"`
-	Phone          string      `json:"phone"`
-	TelegramChatID *string     `json:"telegram_chat_id"`
-	IsActive       bool        `json:"is_active"`
-	CityIDs        []uuid.UUID `json:"city_ids"`
+	CourierID uuid.UUID   `json:"courier_id"`
+	FullName  string      `json:"full_name"`
+	Surname   *string     `json:"surname"`
+	Phone     string      `json:"phone"`
+	IsActive  bool        `json:"is_active"`
+	CityIDs   []uuid.UUID `json:"city_ids"`
 }
 
 // CourierOverview is a per-courier workload summary for the board sidebar.
@@ -68,7 +66,6 @@ type CourierOverview struct {
 	CourierID            uuid.UUID   `json:"courier_id"`
 	FullName             string      `json:"full_name"`
 	Surname              *string     `json:"surname,omitempty"`
-	TelegramChatID       *string     `json:"telegram_chat_id,omitempty"`
 	Phone                string      `json:"phone"`
 	IsActive             bool        `json:"is_active"`
 	ActiveOrders         int         `json:"active_orders"`   // assigned + in_delivery + issue
