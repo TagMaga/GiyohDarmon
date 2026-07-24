@@ -58,31 +58,37 @@ export function AssignSheet({ open, mode, order, onClose }) {
           const name = c.full_name ?? c.courier?.full_name ?? 'Курьер'
           const active = Number(c.active_orders ?? 0)
           const intakeEnabled = c.order_intake_enabled !== false
+          const maxOrders = c.max_active_orders != null ? Number(c.max_active_orders) : null
+          const atCapacity = maxOrders != null && active >= maxOrders
+          const canPick = intakeEnabled && !atCapacity
           const selected = pick === id
-          const loadPct = Math.min(100, Math.round((active / 6) * 100))
+          const loadPct = Math.min(100, Math.round((active / (maxOrders ?? 6)) * 100))
           return (
             <button
               key={id}
-              onClick={() => intakeEnabled && setPick(id)}
-              disabled={!intakeEnabled}
+              onClick={() => canPick && setPick(id)}
+              disabled={!canPick}
               style={{
-                textAlign: 'left', background: '#fff', borderRadius: 14, padding: '12px 13px', cursor: intakeEnabled ? 'pointer' : 'not-allowed',
+                textAlign: 'left', background: '#fff', borderRadius: 14, padding: '12px 13px', cursor: canPick ? 'pointer' : 'not-allowed',
                 fontFamily: 'inherit', border: `1px solid ${selected ? C.violet : C.border}`,
-                boxShadow: selected ? '0 0 0 1px rgba(99,102,241,0.25)' : undefined, opacity: intakeEnabled ? 1 : 0.6,
+                boxShadow: selected ? '0 0 0 1px rgba(99,102,241,0.25)' : undefined, opacity: canPick ? 1 : 0.6,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                 <div style={{ width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, flexShrink: 0, ...avatarStyle(name) }}>{initialsOf(name)}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 800 }}>{name}</div>
-                  <div style={{ fontSize: 11, color: C.text3 }}>нагрузка {active}/6{!intakeEnabled ? ' · приём выключен' : ''}</div>
+                  <div style={{ fontSize: 11, color: C.text3 }}>
+                    нагрузка {active}/{maxOrders ?? '∞'}
+                    {!intakeEnabled ? ' · приём выключен' : atCapacity ? ' · лимит заказов исчерпан' : ''}
+                  </div>
                 </div>
                 <span style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: selected ? C.violet : C.border2, color: selected ? '#fff' : C.text3 }}>
                   <Check size={13} />
                 </span>
               </div>
               <div style={{ height: 5, background: C.border2, borderRadius: 99, overflow: 'hidden', marginTop: 10 }}>
-                <div style={{ height: '100%', borderRadius: 99, width: `${loadPct}%`, background: active >= 5 ? '#EF4444' : active >= 3 ? '#F59E0B' : '#10B981' }} />
+                <div style={{ height: '100%', borderRadius: 99, width: `${loadPct}%`, background: atCapacity ? '#EF4444' : active >= Math.ceil((maxOrders ?? 6) * 0.6) ? '#F59E0B' : '#10B981' }} />
               </div>
             </button>
           )

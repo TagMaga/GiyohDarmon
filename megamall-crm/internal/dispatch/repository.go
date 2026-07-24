@@ -111,6 +111,7 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 		OrderIntakeEnabled   bool       `gorm:"column:order_intake_enabled"`
 		OrderIntakeReason    *string    `gorm:"column:order_intake_reason"`
 		OrderIntakeUpdatedAt *time.Time `gorm:"column:order_intake_updated_at"`
+		MaxActiveOrders      *int       `gorm:"column:max_active_orders"`
 	}
 
 	var rows []overviewRow
@@ -124,6 +125,7 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 			u.courier_order_intake_enabled                                   AS order_intake_enabled,
 			u.courier_order_intake_reason                                    AS order_intake_reason,
 			u.courier_order_intake_updated_at                                AS order_intake_updated_at,
+			u.courier_max_active_orders                                      AS max_active_orders,
 			COUNT(*) FILTER (WHERE o.status = 'assigned')                   AS assigned_orders,
 			COUNT(*) FILTER (WHERE o.status = 'in_delivery')                AS in_delivery,
 			COUNT(*) FILTER (WHERE o.status = 'issue')                      AS issue_orders,
@@ -151,7 +153,8 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 		WHERE u.role       = 'courier'
 		  AND u.deleted_at IS NULL
 		GROUP BY u.id, u.full_name, u.surname, u.phone, u.is_active,
-		         u.courier_order_intake_enabled, u.courier_order_intake_reason, u.courier_order_intake_updated_at
+		         u.courier_order_intake_enabled, u.courier_order_intake_reason, u.courier_order_intake_updated_at,
+		         u.courier_max_active_orders
 		ORDER BY u.full_name
 	`).Scan(&rows).Error
 	if err != nil {
@@ -174,6 +177,7 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 			OrderIntakeEnabled:   row.OrderIntakeEnabled,
 			OrderIntakeReason:    row.OrderIntakeReason,
 			OrderIntakeUpdatedAt: row.OrderIntakeUpdatedAt,
+			MaxActiveOrders:      row.MaxActiveOrders,
 			CityIDs:              []uuid.UUID{},
 			CityNames:            []string{},
 		})
@@ -773,6 +777,35 @@ func (r *Repository) CourierOrderIntakeEnabled(tx *gorm.DB, ctx context.Context,
 		return false, fmt.Errorf("check courier order intake: %w", err)
 	}
 	return enabled, nil
+}
+
+// CourierMaxActiveOrders returns the courier's configured active-order cap, or
+// nil if unlimited.
+func (r *Repository) CourierMaxActiveOrders(tx *gorm.DB, ctx context.Context, courierID uuid.UUID) (*int, error) {
+	var max *int
+	err := tx.WithContext(ctx).
+		Table("users").
+		Select("courier_max_active_orders").
+		Where("id = ? AND role = 'courier' AND deleted_at IS NULL", courierID).
+		Scan(&max).Error
+	if err != nil {
+		return nil, fmt.Errorf("check courier max active orders: %w", err)
+	}
+	return max, nil
+}
+
+// CountActiveOrdersForCourier counts orders the courier currently holds
+// (assigned/in_delivery/issue) — same definition as CourierOverview.ActiveOrders.
+func (r *Repository) CountActiveOrdersForCourier(tx *gorm.DB, ctx context.Context, courierID uuid.UUID) (int, error) {
+	var count int64
+	err := tx.WithContext(ctx).
+		Table("orders").
+		Where("courier_id = ? AND status IN ('assigned','in_delivery','issue') AND deleted_at IS NULL", courierID).
+		Count(&count).Error
+	if err != nil {
+		return 0, fmt.Errorf("count active orders for courier: %w", err)
+	}
+	return int(count), nil
 }
 
 func (r *Repository) UpdateCourierOrderIntake(ctx context.Context, courierID, actorID uuid.UUID, enabled bool, reason *string) (*CourierOverview, error) {

@@ -6,7 +6,7 @@
  *   3. ToggleOrderIntakeModal  — enable / disable a courier's ability to take new orders
  */
 import { useEffect, useRef, useState } from 'react'
-import { Pencil, Trash2, Plus, X, MapPin } from 'lucide-react'
+import { Pencil, Trash2, Plus, X, MapPin, Package } from 'lucide-react'
 import {
   updateCourier,
   updateCourierOrderIntake,
@@ -164,6 +164,11 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
   const [addingCity,   setAddingCity]   = useState(false)
   const [cityError,    setCityError]    = useState('')
 
+  // Max simultaneous active orders this courier may hold. Empty = unlimited.
+  const [maxOrders, setMaxOrders] = useState(
+    courier.max_active_orders != null ? String(courier.max_active_orders) : ''
+  )
+
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
 
@@ -200,6 +205,18 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
 
   const handleSave = async () => {
     setError('')
+
+    const trimmedMax = maxOrders.trim()
+    let maxActiveOrders = null
+    if (trimmedMax !== '') {
+      const parsed = parseInt(trimmedMax, 10)
+      if (isNaN(parsed) || parsed < 1) {
+        setError('Лимит заказов должен быть числом больше 0')
+        return
+      }
+      maxActiveOrders = parsed
+    }
+
     setLoading(true)
     try {
       await updateCourier(courier.courier_id, {
@@ -209,6 +226,7 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
         full_name: courier.full_name ?? '',
         phone:     courier.phone ?? '',
         city_ids:  selectedCityIDs,
+        max_active_orders: maxActiveOrders,
       })
       onSuccess?.()
       onClose()
@@ -293,6 +311,28 @@ export function EditCourierModal({ courier, onClose, onSuccess }) {
             </button>
           </div>
           {cityError && <div style={{ marginTop: 6, fontSize: 12, color: T.red }}>{cityError}</div>}
+        </FieldGroup>
+
+        {/* ── Max simultaneous active orders ── */}
+        <FieldGroup>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <Package size={13} style={{ color: T.violet }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: T.text2, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Лимит одновременных заказов
+            </span>
+          </div>
+          <input
+            style={{ ...field.base, maxWidth: 160 }}
+            type="number"
+            min="1"
+            step="1"
+            value={maxOrders}
+            onChange={(e) => setMaxOrders(e.target.value)}
+            placeholder="Без ограничений"
+          />
+          <div style={{ marginTop: 6, fontSize: 12, color: T.text3 }}>
+            Курьер не сможет принять новый заказ, пока не сдаст один из текущих. Оставьте пустым — без ограничений.
+          </div>
         </FieldGroup>
 
         <ErrorMsg msg={error} />

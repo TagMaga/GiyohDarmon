@@ -191,6 +191,9 @@ func (s *Service) AssignCourier(ctx context.Context, actorID uuid.UUID, orderID 
 		if !intakeEnabled {
 			return apperrors.Forbidden("Приём новых заказов отключён диспетчером")
 		}
+		if err := s.checkCourierCapacity(tx, ctx, req.CourierID); err != nil {
+			return err
+		}
 
 		// Only confirmed orders (or prepayment states) can be assigned.
 		assignableStatuses := map[orders.OrderStatus]bool{
@@ -303,6 +306,9 @@ func (s *Service) ReassignCourier(ctx context.Context, actorID uuid.UUID, orderI
 		if !intakeEnabled {
 			return apperrors.Forbidden("Приём новых заказов отключён диспетчером")
 		}
+		if err := s.checkCourierCapacity(tx, ctx, req.CourierID); err != nil {
+			return err
+		}
 
 		if o.Status != orders.StatusAssigned && o.Status != orders.StatusInDelivery {
 			return apperrors.BadRequest(fmt.Sprintf("cannot reassign courier for order in status %q", o.Status))
@@ -369,6 +375,27 @@ func (s *Service) ReassignCourier(ctx context.Context, actorID uuid.UUID, orderI
 		return nil, txErr
 	}
 	return created, nil
+}
+
+// checkCourierCapacity rejects assignment when the courier is already holding
+// their configured maximum of active orders (assigned/in_delivery/issue).
+// A nil limit means unlimited. Must run inside the caller's transaction.
+func (s *Service) checkCourierCapacity(tx *gorm.DB, ctx context.Context, courierID uuid.UUID) error {
+	maxOrders, err := s.repo.CourierMaxActiveOrders(tx, ctx, courierID)
+	if err != nil {
+		return err
+	}
+	if maxOrders == nil {
+		return nil
+	}
+	activeCount, err := s.repo.CountActiveOrdersForCourier(tx, ctx, courierID)
+	if err != nil {
+		return err
+	}
+	if activeCount >= *maxOrders {
+		return apperrors.Conflict(fmt.Sprintf("У курьера уже максимум активных заказов (%d/%d)", activeCount, *maxOrders))
+	}
+	return nil
 }
 
 // UnassignCourier pulls an order back to the confirmed pool, releasing its courier.

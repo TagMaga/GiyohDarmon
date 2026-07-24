@@ -33,6 +33,10 @@ type UpdateCourierRequest struct {
 	Phone    string      `json:"phone"     validate:"required"`
 	Password *string     `json:"password"` // empty = keep existing
 	CityIDs  []uuid.UUID `json:"city_ids"` // nil = unchanged; empty slice = remove all
+	// MaxActiveOrders caps how many orders (assigned/in_delivery/issue) this
+	// courier may hold at once. Nil = no limit. Always applied when present
+	// in the request (the edit-courier form is a full save, not a patch).
+	MaxActiveOrders *int `json:"max_active_orders" validate:"omitempty,min=1"`
 }
 
 // ToggleCourierActiveRequest toggles the courier's is_active flag.
@@ -42,12 +46,13 @@ type ToggleCourierActiveRequest struct {
 
 // CourierProfileResponse is returned after edit/toggle operations.
 type CourierProfileResponse struct {
-	CourierID uuid.UUID   `json:"courier_id"`
-	FullName  string      `json:"full_name"`
-	Surname   *string     `json:"surname"`
-	Phone     string      `json:"phone"`
-	IsActive  bool        `json:"is_active"`
-	CityIDs   []uuid.UUID `json:"city_ids"`
+	CourierID       uuid.UUID   `json:"courier_id"`
+	FullName        string      `json:"full_name"`
+	Surname         *string     `json:"surname"`
+	Phone           string      `json:"phone"`
+	IsActive        bool        `json:"is_active"`
+	CityIDs         []uuid.UUID `json:"city_ids"`
+	MaxActiveOrders *int        `json:"max_active_orders"`
 }
 
 // CourierOverview is a per-courier workload summary for the board sidebar.
@@ -60,7 +65,7 @@ type CourierProfileResponse struct {
 //	IssueOrders    = orders in status 'issue'         (held by courier, flagged)
 //	ActiveOrders   = AssignedOrders + InDelivery + IssueOrders
 //	               = every order the courier currently holds and has not yet
-//	                 delivered/returned. Used for the N/6 capacity gauge so a
+//	                 delivered/returned. Used for the N/max capacity gauge so a
 //	                 courier with held orders never shows as free.
 type CourierOverview struct {
 	CourierID            uuid.UUID   `json:"courier_id"`
@@ -76,6 +81,7 @@ type CourierOverview struct {
 	OrderIntakeEnabled   bool        `json:"order_intake_enabled"`
 	OrderIntakeReason    *string     `json:"order_intake_reason,omitempty"`
 	OrderIntakeUpdatedAt *time.Time  `json:"order_intake_updated_at,omitempty"`
+	MaxActiveOrders      *int        `json:"max_active_orders,omitempty"` // nil = no limit
 	CityIDs              []uuid.UUID `json:"city_ids"`
 	CityNames            []string    `json:"city_names"`
 }

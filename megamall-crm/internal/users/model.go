@@ -95,6 +95,9 @@ type User struct {
 	CourierOrderIntakeReason    *string
 	CourierOrderIntakeUpdatedAt *time.Time
 	CourierOrderIntakeUpdatedBy *uuid.UUID
+	// CourierMaxActiveOrders caps how many orders (status assigned/in_delivery/
+	// issue) a courier may hold at once. Nil = unlimited. See migration 00088.
+	CourierMaxActiveOrders *int `gorm:"column:courier_max_active_orders"`
 	CreatedAt                   time.Time  `gorm:"autoCreateTime"`
 	UpdatedAt                   time.Time  `gorm:"autoUpdateTime"`
 	DeletedAt                   *time.Time `gorm:"index"`
