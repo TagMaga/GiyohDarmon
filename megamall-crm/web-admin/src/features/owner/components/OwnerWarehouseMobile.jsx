@@ -9,6 +9,7 @@ import {
   fmtMoney,
   getAvailableQty,
   getId,
+  getLastPrice,
   getLowStockThreshold,
   getProductImage,
   getProductName,
@@ -167,7 +168,7 @@ function AttentionCard({ inventory, product, onOpen, onReceive }) {
   )
 }
 
-function MobileInventoryCard({ product, inv, onReceive, onWriteoff, onEdit }) {
+function MobileInventoryCard({ product, inv, movements = [], onReceive, onWriteoff, onEdit }) {
   const status = getStockStatus(inv)
   return (
     <div className="rounded-[18px] bg-white p-3.5" style={{ boxShadow: CARD_SHADOW }}>
@@ -198,7 +199,7 @@ function MobileInventoryCard({ product, inv, onReceive, onWriteoff, onEdit }) {
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-[12px] text-slate-500">
-        <span>Закупка <b className="text-slate-700">{fmtMoney(getPurchasePrice(product))}</b></span>
+        <span>Закупка <b className="text-slate-700">{fmtMoney(getLastPrice(getId(product), movements) ?? getPurchasePrice(product))}</b></span>
         <span>Продажа <b className="text-indigo-700">{fmtMoney(getSalePrice(product))}</b></span>
       </div>
       <div className="mt-3 flex gap-2">
@@ -346,7 +347,7 @@ export default function OwnerWarehouseMobile({
           ) : (
             <div className="space-y-2.5">
               {inventoryRows.map(({ product, inv }) => (
-                <MobileInventoryCard key={getId(product)} product={product} inv={inv} onReceive={onReceive} onWriteoff={onWriteoff} onEdit={onEdit} />
+                <MobileInventoryCard key={getId(product)} product={product} inv={inv} movements={data.movements} onReceive={onReceive} onWriteoff={onWriteoff} onEdit={onEdit} />
               ))}
             </div>
           )}
