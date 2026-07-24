@@ -199,11 +199,35 @@ func (s *Service) Create(ctx context.Context, req CreateUserRequest) (*User, err
 		return nil, apperrors.Internal(fmt.Errorf("hash password: %w", err))
 	}
 
+	return s.createWithHash(ctx, CreateUserWithHashRequest{
+		Phone:        req.Phone,
+		Email:        req.Email,
+		PasswordHash: string(hash),
+		FullName:     req.FullName,
+		Surname:      req.Surname,
+		Position:     req.Position,
+		Role:         req.Role,
+		HireDate:     req.HireDate,
+		DateOfBirth:  req.DateOfBirth,
+		Address:      req.Address,
+	})
+}
+
+// CreateWithPasswordHash is Create's counterpart for a caller that already
+// holds a bcrypt hash — see CreateUserWithHashRequest's doc comment.
+func (s *Service) CreateWithPasswordHash(ctx context.Context, req CreateUserWithHashRequest) (*User, error) {
+	if !req.Role.IsValid() {
+		return nil, apperrors.BadRequest(fmt.Sprintf("invalid role: %s", req.Role))
+	}
+	return s.createWithHash(ctx, req)
+}
+
+func (s *Service) createWithHash(ctx context.Context, req CreateUserWithHashRequest) (*User, error) {
 	u := &User{
 		ID:           uuid.New(),
 		Phone:        req.Phone,
 		Email:        req.Email,
-		PasswordHash: string(hash),
+		PasswordHash: req.PasswordHash,
 		FullName:     req.FullName,
 		Surname:      req.Surname,
 		Position:     req.Position,
@@ -226,6 +250,18 @@ func (s *Service) Create(ctx context.Context, req CreateUserRequest) (*User, err
 	}
 
 	return u, nil
+}
+
+// PhoneExists reports whether an active (non-deleted) user already owns
+// phone — used by internal/onboarding to reject a public application early
+// for a phone that's already a real employee, rather than only failing at
+// approval time.
+func (s *Service) PhoneExists(ctx context.Context, phone string) (bool, error) {
+	u, err := s.repo.GetByPhone(ctx, phone)
+	if err != nil {
+		return false, apperrors.Internal(err)
+	}
+	return u != nil, nil
 }
 
 func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {

@@ -1,6 +1,7 @@
 const TABS = [
   { key: 'teams',        label: 'Команды' },
   { key: 'employees',    label: 'Сотрудники' },
+  { key: 'applications', label: 'Заявки' },
   { key: 'compensation', label: 'Компенсации' },
 ]
 

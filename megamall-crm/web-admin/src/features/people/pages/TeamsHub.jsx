@@ -10,6 +10,8 @@ import EmployeeCard     from '../components/EmployeeCard'
 import EmployeeFilters  from '../components/EmployeeFilters'
 import CreateEmployeeModal from '../components/CreateEmployeeModal'
 import CreateTeamModal     from '../components/CreateTeamModal'
+import WorkerApplicationCard         from '../components/WorkerApplicationCard'
+import WorkerApplicationDetailModal  from '../components/WorkerApplicationDetailModal'
 import Button           from '../../../shared/components/Button'
 import EmptyState       from '../../../shared/components/EmptyState'
 import Alert            from '../../../shared/components/Alert'
@@ -19,11 +21,12 @@ import useEmployees  from '../hooks/useEmployees'
 import useTeams      from '../hooks/useTeams'
 import useGlobalRates   from '../hooks/useGlobalRates'
 import useActiveTariff  from '../hooks/useActiveTariff'
+import useWorkerApplications from '../hooks/useWorkerApplications'
 import { buildUserMap, buildTeamMap, fmtPct, fmtMoney, isConfigActive, COMMISSION_TYPE_LABEL } from '../utils/peopleHelpers'
 import { fetchAllConfigs, fetchTeamMembers } from '../api'
 import { KEYS } from '../../../shared/queryKeys'
 import { useQuery } from '@tanstack/react-query'
-import { Users, Users2, FileText } from 'lucide-react'
+import { Users, Users2, FileText, ClipboardList } from 'lucide-react'
 
 // ── Compensation tab ───────────────────────────────────────────────────────────
 function CompensationTab({ employees, teams }) {
@@ -113,9 +116,11 @@ export default function TeamsHub() {
   const [teamFilter,       setTeamFilter]    = useState('')
   const [showCreate,       setShowCreate]    = useState(false)   // CreateEmployeeModal
   const [showCreateTeam,   setShowCreateTeam] = useState(false)  // CreateTeamModal
+  const [selectedApplication, setSelectedApplication] = useState(null)
 
   const { data: employees = [], isLoading: empLoading, isError: empError } = useEmployees()
   const { data: teams     = [], isLoading: teamLoading }                   = useTeams()
+  const { data: applications = [], isLoading: appLoading, isError: appError } = useWorkerApplications('pending')
   const { data: allConfigs = [] } = useQuery({
     queryKey: KEYS.people.configs({}),
     queryFn:  () => fetchAllConfigs(),
@@ -187,10 +192,14 @@ export default function TeamsHub() {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-bold text-slate-900">
-            {tab === 'employees' ? 'Сотрудники' : tab === 'compensation' ? 'Компенсации' : 'Команды'}
+            {tab === 'employees' ? 'Сотрудники'
+              : tab === 'applications' ? 'Заявки'
+              : tab === 'compensation' ? 'Компенсации' : 'Команды'}
           </h1>
           <p className="text-sm text-slate-400">
-            {tab === 'employees' ? 'Управление персоналом' : 'Команды, сотрудники и компенсации'}
+            {tab === 'employees' ? 'Управление персоналом'
+              : tab === 'applications' ? 'Заявки с giyohdarmon.tj/new, ожидающие рассмотрения'
+              : 'Команды, сотрудники и компенсации'}
           </p>
         </div>
         <div className="flex gap-2">
@@ -219,7 +228,7 @@ export default function TeamsHub() {
       <PeopleTabs
         active={tab}
         onChange={handleTabChange}
-        counts={{ teams: teams.length, employees: employees.length }}
+        counts={{ teams: teams.length, employees: employees.length, applications: applications.length }}
       />
 
       {/* ── Teams tab ──────────────────────────────────────────────────── */}
@@ -259,6 +268,21 @@ export default function TeamsHub() {
         </div>
       )}
 
+      {/* ── Applications tab ─────────────────────────────────────────────── */}
+      {tab === 'applications' && (
+        <div className="space-y-2">
+          {appError && <Alert variant="error">Не удалось загрузить заявки</Alert>}
+          {appLoading
+            ? <div className="space-y-2">{[1,2,3].map(i => <CardSkeleton key={i} />)}</div>
+            : applications.length === 0
+              ? <EmptyState icon={<ClipboardList size={22} />} title="Нет новых заявок" description="Заявки с формы giyohdarmon.tj/new появятся здесь" />
+              : applications.map(a => (
+                  <WorkerApplicationCard key={a.id} application={a} onOpen={() => setSelectedApplication(a)} />
+                ))
+          }
+        </div>
+      )}
+
       {/* ── Compensation tab ───────────────────────────────────────────── */}
       {tab === 'compensation' && (
         <CompensationTab employees={employees} teams={teams} />
@@ -266,6 +290,11 @@ export default function TeamsHub() {
 
       <CreateEmployeeModal open={showCreate}     onClose={() => setShowCreate(false)} />
       <CreateTeamModal     open={showCreateTeam} onClose={() => setShowCreateTeam(false)} users={employees} />
+      <WorkerApplicationDetailModal
+        key={selectedApplication?.id ?? 'none'}
+        application={selectedApplication}
+        onClose={() => setSelectedApplication(null)}
+      />
     </div>
   )
 }

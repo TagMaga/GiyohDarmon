@@ -33,6 +33,7 @@ import (
 	logisticsmediabridge "github.com/megamall/crm/internal/logistics/mediabridge"
 	logistics_settings "github.com/megamall/crm/internal/logistics_settings"
 	"github.com/megamall/crm/internal/media"
+	"github.com/megamall/crm/internal/onboarding"
 	"github.com/megamall/crm/internal/orders"
 	ordersmediabridge "github.com/megamall/crm/internal/orders/mediabridge"
 	"github.com/megamall/crm/internal/payouts"
@@ -197,6 +198,14 @@ func main() {
 	compensationSvc := compensation.NewService(compensationRepo, activityLogger, db, loc)
 	compensationHandler := compensation.NewHandler(compensationSvc)
 
+	// ── Onboarding module (public worker applications, giyohdarmon.tj/new) ────
+	// Depends on userSvc directly (not a narrow function) — approving an
+	// application reuses users.Service's real create-user business logic
+	// (uniqueness checks, defaults), not just an existence lookup.
+	onboardingRepo := onboarding.NewRepository(db)
+	onboardingSvc := onboarding.NewService(onboardingRepo, userSvc)
+	onboardingHandler := onboarding.NewHandler(onboardingSvc)
+
 	// ── Phase 1: centralized secure media pipeline ────────────────────────────
 	// Gated behind MEDIA_PIPELINE_ENABLED (config.MediaConfig.Enabled,
 	// defaults to false). When disabled, nothing below runs at all: no
@@ -346,6 +355,12 @@ func main() {
 		teamHandler.RegisterRoutes(v1.Group("/teams"))
 		hierarchyHandler.RegisterRoutes(v1.Group("/hierarchy"))
 		compensationHandler.RegisterRoutes(v1.Group("/hr"))
+
+		// Worker onboarding: public submission (giyohdarmon.tj/new) + owner-only
+		// review. Public route is rate-limited by IP since it needs no auth at
+		// all — see internal/onboarding/routes.go.
+		onboarding.RegisterPublicRoutes(v1.Group("/public/worker-applications"), onboardingHandler, rateLimitStore)
+		onboarding.RegisterRoutes(v1.Group("/worker-applications"), onboardingHandler)
 
 		// Phase 3
 		productsHandler.RegisterRoutes(v1)
