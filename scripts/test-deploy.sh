@@ -19,7 +19,7 @@ printf 'old-frontend\n' > "$PROJECT/megamall-crm/web-admin/dist/index.html"
 cat > "$MOCK_BIN/systemctl" <<'EOF'
 #!/usr/bin/env bash
 case "${1:-}" in
-  is-active|restart|status) exit 0 ;;
+  is-active|restart|status|reload) exit 0 ;;
   *) exit 1 ;;
 esac
 EOF
@@ -37,7 +37,14 @@ cat > "$MOCK_BIN/flock" <<'EOF'
 exit 0
 EOF
 
-chmod 0755 "$MOCK_BIN/systemctl" "$MOCK_BIN/curl" "$MOCK_BIN/flock"
+cat > "$MOCK_BIN/nginx" <<'EOF'
+#!/usr/bin/env bash
+# -t (config test) always "passes" for these tests — the config content
+# itself is exercised directly via grep assertions below.
+exit 0
+EOF
+
+chmod 0755 "$MOCK_BIN/systemctl" "$MOCK_BIN/curl" "$MOCK_BIN/flock" "$MOCK_BIN/nginx"
 
 make_artifact() {
   local revision=$1
@@ -63,6 +70,7 @@ run_deploy() {
   LOCK_FILE="$TEST_ROOT/deploy.lock" \
   HEALTH_ATTEMPTS=1 \
   HEALTH_DELAY=0 \
+  NGINX_SITE_CONF="${NGINX_SITE_CONF:-$TEST_ROOT/nginx-site-conf-missing}" \
     bash "$REPOSITORY/deploy.sh" "$revision" "$artifact"
 }
 
@@ -84,3 +92,53 @@ grep -q 'healthy-backend' "$PROJECT/megamall-crm/tmp/megamall-crm"
 grep -q "frontend-$GOOD_REVISION" "$PROJECT/megamall-crm/web-admin/dist/index.html"
 
 echo "Deployment success and rollback tests passed"
+
+# ── sync_nginx_media_routes: idempotent nginx patching ──────────────────────
+# Mimics a real already-provisioned site file (location / + location /api/,
+# the shape scripts/setup_https_remote.sh's pre-fix template produced) to
+# prove deploy.sh adds the missing /media and /uploads locations exactly
+# once, without disturbing the rest of the file.
+NGINX_FIXTURE="$TEST_ROOT/nginx-site-conf"
+cat > "$NGINX_FIXTURE" <<'EOF'
+server {
+    server_name example.tj www.example.tj;
+
+    root /var/www/megamall-crm/megamall-crm/web-admin/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass         http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    listen 443 ssl; # managed by Certbot
+}
+EOF
+
+NGINX_REVISION=3333333333333333333333333333333333333333
+NGINX_ARTIFACT=$(make_artifact "$NGINX_REVISION" healthy-backend)
+NGINX_SITE_CONF="$NGINX_FIXTURE" run_deploy "$NGINX_REVISION" "$NGINX_ARTIFACT"
+
+grep -q 'location /media/ {' "$NGINX_FIXTURE"
+grep -q 'location /uploads/ {' "$NGINX_FIXTURE"
+grep -q 'listen 443 ssl; # managed by Certbot' "$NGINX_FIXTURE"
+[[ "$(grep -c 'location /api/ {' "$NGINX_FIXTURE")" -eq 1 ]]
+
+# Re-deploying must not duplicate the blocks it already added.
+NGINX_REVISION2=4444444444444444444444444444444444444444
+NGINX_ARTIFACT2=$(make_artifact "$NGINX_REVISION2" healthy-backend)
+NGINX_SITE_CONF="$NGINX_FIXTURE" run_deploy "$NGINX_REVISION2" "$NGINX_ARTIFACT2"
+
+[[ "$(grep -c 'location /media/ {' "$NGINX_FIXTURE")" -eq 1 ]]
+[[ "$(grep -c 'location /uploads/ {' "$NGINX_FIXTURE")" -eq 1 ]]
+
+echo "nginx media/uploads proxy sync tests passed"
