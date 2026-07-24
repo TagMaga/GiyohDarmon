@@ -64,6 +64,7 @@ make_artifact() {
 run_deploy() {
   local revision=$1
   local artifact=$2
+  local new_deploy_script=${3:-}
   PATH="$MOCK_BIN:$PATH" \
   TEST_PROJECT="$PROJECT" \
   PROJECT="$PROJECT" \
@@ -71,7 +72,7 @@ run_deploy() {
   HEALTH_ATTEMPTS=1 \
   HEALTH_DELAY=0 \
   NGINX_SITE_CONF="${NGINX_SITE_CONF:-$TEST_ROOT/nginx-site-conf-missing}" \
-    bash "$REPOSITORY/deploy.sh" "$revision" "$artifact"
+    bash "$REPOSITORY/deploy.sh" "$revision" "$artifact" "$new_deploy_script"
 }
 
 GOOD_REVISION=1111111111111111111111111111111111111111
@@ -142,3 +143,22 @@ NGINX_SITE_CONF="$NGINX_FIXTURE" run_deploy "$NGINX_REVISION2" "$NGINX_ARTIFACT2
 [[ "$(grep -c 'location /uploads/ {' "$NGINX_FIXTURE")" -eq 1 ]]
 
 echo "nginx media/uploads proxy sync tests passed"
+
+# ── Self-update: deploy.sh installs a newer copy of itself ──────────────────
+# Proves the $3/NEW_DEPLOY_SCRIPT handling deploy.yml relies on to ever get
+# a new deploy.sh onto the server at all (see deploy.sh's top-of-file
+# comment on why this exists): the staged copy lands at $PROJECT/deploy.sh
+# and the staged file itself is cleaned up, even though this run otherwise
+# keeps executing the original (already-loaded) script's logic throughout.
+SELFUPDATE_STAGED="$TEST_ROOT/staged-deploy.sh"
+printf '#!/usr/bin/env bash\necho "this is the new deploy.sh"\n' > "$SELFUPDATE_STAGED"
+
+SELFUPDATE_REVISION=5555555555555555555555555555555555555555
+SELFUPDATE_ARTIFACT=$(make_artifact "$SELFUPDATE_REVISION" healthy-backend)
+run_deploy "$SELFUPDATE_REVISION" "$SELFUPDATE_ARTIFACT" "$SELFUPDATE_STAGED"
+
+grep -q 'this is the new deploy.sh' "$PROJECT/deploy.sh"
+[[ -x "$PROJECT/deploy.sh" ]]
+[[ ! -e "$SELFUPDATE_STAGED" ]]
+
+echo "deploy.sh self-update test passed"
