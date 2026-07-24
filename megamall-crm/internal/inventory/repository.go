@@ -37,6 +37,18 @@ type MovementRow struct {
 	SaleUnitPrice     *float64   `gorm:"column:sale_unit_price"`
 }
 
+// ProductSalesRow is one grouped row of the sales-by-product report: total
+// quantity sold, revenue (from order_items), and COGS (from FIFO batch
+// consumptions) for a product within a date range.
+type ProductSalesRow struct {
+	ProductID    uuid.UUID `gorm:"column:product_id"`
+	ProductName  string    `gorm:"column:product_name"`
+	SKU          string    `gorm:"column:sku"`
+	QuantitySold int       `gorm:"column:quantity_sold"`
+	Revenue      float64   `gorm:"column:revenue"`
+	COGS         float64   `gorm:"column:cogs"`
+}
+
 type ReceivingEditRow struct {
 	ReceivingEdit
 	EditorName     string `gorm:"column:editor_name"`
@@ -258,6 +270,58 @@ func (r *Repository) ListMovements(ctx context.Context, f ListMovementsFilter, p
 		return nil, 0, fmt.Errorf("list movements: %w", err)
 	}
 	return rows, int(total), nil
+}
+
+// SalesByProduct aggregates 'sale' movements within the given date range,
+// grouped by product: total units sold, revenue (order_items unit price ×
+// quantity), and COGS (FIFO batch consumption cost × quantity). Mirrors the
+// same sale_price / sale_cost subqueries used by ListMovements so per-unit
+// figures stay consistent between the movement feed and this report.
+func (r *Repository) SalesByProduct(ctx context.Context, f ListProductSalesFilter) ([]ProductSalesRow, error) {
+	base := r.db.WithContext(ctx).
+		Table("inventory_movements").
+		Joins("JOIN products ON products.id = inventory_movements.product_id").
+		Joins(`LEFT JOIN (
+			SELECT order_id, product_id, SUM(total_price) / NULLIF(SUM(quantity), 0) AS unit_price
+			FROM order_items
+			GROUP BY order_id, product_id
+		) sale_price ON sale_price.order_id = inventory_movements.reference_id AND sale_price.product_id = inventory_movements.product_id`).
+		Joins(`LEFT JOIN (
+			SELECT movement_id, SUM(quantity * unit_cost) / NULLIF(SUM(quantity), 0) AS avg_unit_cost
+			FROM inventory_batch_consumptions
+			GROUP BY movement_id
+		) sale_cost ON sale_cost.movement_id = inventory_movements.id`).
+		Where("inventory_movements.movement_type = ?", MovementSale)
+
+	if f.DateFrom != "" {
+		if t, err := time.Parse("2006-01-02", f.DateFrom); err == nil {
+			base = base.Where("inventory_movements.created_at >= ?", t.UTC())
+		}
+	}
+	if f.DateTo != "" {
+		if t, err := time.Parse("2006-01-02", f.DateTo); err == nil {
+			// Include the full day by using the start of the next day as exclusive upper bound.
+			base = base.Where("inventory_movements.created_at < ?", t.AddDate(0, 0, 1).UTC())
+		}
+	}
+
+	var rows []ProductSalesRow
+	err := base.
+		Select(`
+			inventory_movements.product_id AS product_id,
+			products.name AS product_name,
+			products.sku AS sku,
+			SUM(inventory_movements.quantity)::int AS quantity_sold,
+			COALESCE(SUM(inventory_movements.quantity * sale_price.unit_price), 0) AS revenue,
+			COALESCE(SUM(inventory_movements.quantity * sale_cost.avg_unit_cost), 0) AS cogs
+		`).
+		Group("inventory_movements.product_id, products.name, products.sku").
+		Order("quantity_sold DESC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("sales by product: %w", err)
+	}
+	return rows, nil
 }
 
 // UpdateReservedQuantity sets reserved_quantity for an inventory row inside a transaction.

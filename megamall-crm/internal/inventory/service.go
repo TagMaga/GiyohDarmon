@@ -42,6 +42,10 @@ func (s *Service) ListReceivingEdits(ctx context.Context, movementID uuid.UUID) 
 	return s.repo.ListReceivingEdits(ctx, movementID)
 }
 
+func (s *Service) SalesByProduct(ctx context.Context, f ListProductSalesFilter) ([]ProductSalesRow, error) {
+	return s.repo.SalesByProduct(ctx, f)
+}
+
 // ─── Receiving ────────────────────────────────────────────────────────────────
 
 // Receive records a goods receipt: increases inventory quantity and creates a
