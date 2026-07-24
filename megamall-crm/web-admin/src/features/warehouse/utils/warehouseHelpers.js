@@ -229,6 +229,7 @@ export function getMovementType(m) {
 
 const currFmt = new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 export function fmtMoney(n) {
+  if (n === null || n === undefined) return '—'
   const num = Number(n)
   return Number.isNaN(num) ? '—' : `${currFmt.format(num)} с`
 }
