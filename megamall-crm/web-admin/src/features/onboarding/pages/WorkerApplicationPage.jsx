@@ -19,7 +19,6 @@ export default function WorkerApplicationPage() {
   const [firstName,       setFirstName]       = useState('')
   const [lastName,        setLastName]        = useState('')
   const [phone,           setPhone]           = useState('')
-  const [email,           setEmail]           = useState('')
   const [desiredPosition, setDesiredPosition] = useState('')
   const [password,        setPassword]        = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
@@ -45,7 +44,6 @@ export default function WorkerApplicationPage() {
       if (!street.trim())   throw new Error('Улица обязательна')
       return submitWorkerApplication({
         phone:            phone.trim(),
-        email:            email.trim() || null,
         password,
         full_name:        `${firstName.trim()} ${lastName.trim()}`,
         surname:          lastName.trim(),
@@ -113,10 +111,6 @@ export default function WorkerApplicationPage() {
 
           <div><label className="input-label">Номер телефона *</label>
             <PhoneInput value={phone} onChange={setPhone} className="mt-1" />
-          </div>
-
-          <div><label className="input-label">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input mt-1" placeholder="example@mail.com" />
           </div>
 
           <div><label className="input-label">Желаемая должность</label>
