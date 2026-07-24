@@ -21,7 +21,7 @@ const OWNER_BASE_TABS = [
   { label: 'Склад',    icon: Package,      path: '/owner/warehouse', end: false },
 ]
 
-const OWNER_MORE_PATHS = ['/owner/budget', '/owner/logistics', '/owner/team-directory', '/owner/hr', '/owner/profile']
+const OWNER_MORE_PATHS = ['/owner/budget', '/owner/logistics', '/owner/team-directory', '/owner/profile']
 
 const WAREHOUSE_TABS = [
   { label: 'Главная', icon: Home,        path: '/warehouse',           end: true },

@@ -31,7 +31,6 @@ const OwnerProfileInfoPage    = lazy(() => import('../features/owner/pages/Owner
 const TeamsHub              = lazy(() => import('../features/people/pages/TeamsHub'))
 const TeamProfilePage       = lazy(() => import('../features/people/pages/TeamProfilePage'))
 const TeamDirectoryPage     = lazy(() => import('../features/people/pages/TeamDirectoryPage'))
-const HrDashboard           = lazy(() => import('../features/hr/pages/HrDashboard'))
 
 // Team Lead
 const TeamLeadDashboardPage = lazy(() => import('../features/team-lead/pages/TeamLeadDashboardPage'))
@@ -122,7 +121,6 @@ const router = createBrowserRouter([
         { path: 'teams',             element: <Lazy><TeamsHub /></Lazy> },
         { path: 'teams/:teamName',   element: <Lazy><TeamProfilePage /></Lazy> },
         { path: 'team-directory',    element: <Lazy><TeamDirectoryPage /></Lazy> },
-        { path: 'hr',                element: <Lazy><HrDashboard /></Lazy> },
 
         { path: 'finance', element: <Lazy><OwnerFinancePage /></Lazy> },
         { path: 'budget',  element: <Lazy><BudgetCompanyPage /></Lazy> },

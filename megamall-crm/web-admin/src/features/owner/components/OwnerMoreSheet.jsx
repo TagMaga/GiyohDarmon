@@ -1,12 +1,11 @@
 import { Link } from 'react-router-dom'
-import { Wallet, Truck, User, Percent } from 'lucide-react'
+import { Wallet, Truck, User } from 'lucide-react'
 import Modal from '../../../shared/components/Modal'
 
 const OWNER_MORE_LINKS = [
   { label: 'Бюджет',       icon: Wallet,  path: '/owner/budget'    },
   { label: 'Логистика',    icon: Truck,   path: '/owner/logistics' },
   { label: 'Команда',      icon: User,    path: '/owner/team-directory' },
-  { label: 'HR / Комиссии', icon: Percent, path: '/owner/hr' },
   { label: 'Профиль',      icon: User,    path: '/owner/profile'   },
 ]
 
