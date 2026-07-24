@@ -20,6 +20,24 @@ type CreateUserRequest struct {
 	Address     *string    `json:"address"       validate:"omitempty,max=500"`
 }
 
+// CreateUserWithHashRequest is CreateUserRequest's counterpart for callers
+// that already have a bcrypt hash instead of a plaintext password — used by
+// internal/onboarding when promoting an approved worker_application, whose
+// applicant set their password at public submission time (only the hash was
+// ever persisted, never the plaintext). See Service.CreateWithPasswordHash.
+type CreateUserWithHashRequest struct {
+	Phone        string
+	Email        *string
+	PasswordHash string
+	FullName     string
+	Surname      *string
+	Position     *string
+	Role         Role
+	HireDate     *time.Time
+	DateOfBirth  *time.Time
+	Address      *string
+}
+
 // UpdateUserRequest is the payload for PATCH /users/:id.
 //
 // NewPassword is an owner-only administrative override — set it to reset the

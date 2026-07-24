@@ -78,6 +78,9 @@ const WarehouseProfilePage   = lazy(() => import('../features/warehouse/pages/Wa
 // Courier — web panel removed; couriers use the mobile app (see docs).
 const CourierAppNotice = lazy(() => import('../shared/components/CourierAppNotice'))
 
+// Public worker onboarding (giyohdarmon.tj/new)
+const WorkerApplicationPage = lazy(() => import('../features/onboarding/pages/WorkerApplicationPage'))
+
 // ── Suspense wrapper — used at route element level ────────────────────────────
 function Lazy({ children }) {
   return (
@@ -105,6 +108,7 @@ export const ROLE_HOME = {
 const router = createBrowserRouter([
   // ── Public ─────────────────────────────────────────────────────────────
   { path: '/login', element: <Login /> },
+  { path: '/new',   element: <Lazy><WorkerApplicationPage /></Lazy> },
 
   // ── Root redirect ───────────────────────────────────────────────────────
   { path: '/', element: <RootRedirect /> },

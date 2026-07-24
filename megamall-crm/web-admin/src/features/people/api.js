@@ -47,6 +47,27 @@ export async function updateEmployee(userId, payload) {
   return unwrap(res)
 }
 
+// ── Worker applications (public /new submissions, HR review) ──────────────────
+
+export async function fetchWorkerApplications(status = 'pending') {
+  const res = await client.get('/worker-applications', { params: status ? { status } : {} })
+  return toArray(unwrap(res))
+}
+
+export async function fetchWorkerApplication(applicationId) {
+  const res = await client.get(`/worker-applications/${applicationId}`)
+  return unwrap(res)
+}
+
+export async function approveWorkerApplication(applicationId, role) {
+  const res = await client.post(`/worker-applications/${applicationId}/approve`, { role })
+  return unwrap(res)
+}
+
+export async function rejectWorkerApplication(applicationId) {
+  await client.post(`/worker-applications/${applicationId}/reject`)
+}
+
 // ── Teams ─────────────────────────────────────────────────────────────────────
 
 export async function fetchTeams(params = {}) {

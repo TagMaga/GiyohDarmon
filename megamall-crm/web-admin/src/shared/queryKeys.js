@@ -69,6 +69,8 @@ export const KEYS = {
     // Fixed salary / compensation kind
     employeeSalary:        (userId) => ['people', 'compensation', 'salary', userId],
     employeeSalaryHistory: (userId) => ['people', 'compensation', 'salary', userId, 'history'],
+    // Worker applications (public /new submissions)
+    workerApplications:    (status) => ['people', 'applications', status ?? ''],
   },
   warehouse: {
     products:   ['warehouse', 'products'],
