@@ -41,3 +41,22 @@ type WorkerApplication struct {
 }
 
 func (WorkerApplication) TableName() string { return "worker_applications" }
+
+// WorkerApplicationDocument is a file (passport, etc.) an applicant attached
+// at submission time — always backed by the centralized media pipeline
+// (media_asset_id), never the legacy public /uploads endpoint. See
+// migration 00087 and Service.Create/Approve/Reject.
+type WorkerApplicationDocument struct {
+	ID               uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	ApplicationID    uuid.UUID  `gorm:"column:application_id;type:uuid;not null;index"`
+	MediaAssetID     *uuid.UUID `gorm:"column:media_asset_id;type:uuid"`
+	OriginalFilename string     `gorm:"column:original_filename;not null"`
+	ContentType      *string    `gorm:"column:content_type"`
+	SizeBytes        *int64     `gorm:"column:size_bytes"`
+	DocumentType     string     `gorm:"column:document_type;not null;default:'other'"`
+	Width            *int       `gorm:"column:width"`
+	Height           *int       `gorm:"column:height"`
+	CreatedAt        time.Time  `gorm:"autoCreateTime"`
+}
+
+func (WorkerApplicationDocument) TableName() string { return "worker_application_documents" }

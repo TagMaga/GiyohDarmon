@@ -48,6 +48,18 @@ export const ALL_ROLES = Object.keys(ROLE_LABEL)
 // through this form.
 export const CREATABLE_ROLES = ALL_ROLES.filter(r => r !== 'owner')
 
+// ── Document types (users.UserDocument.document_type / worker_application_documents) ──
+
+export const DOCUMENT_TYPES = [
+  { value: 'passport',    label: 'Паспорт' },
+  { value: 'contract',    label: 'Договор' },
+  { value: 'certificate', label: 'Сертификат' },
+  { value: 'diploma',     label: 'Диплом' },
+  { value: 'medical',     label: 'Медицинский документ' },
+  { value: 'other',       label: 'Другое' },
+]
+export const DOCUMENT_TYPE_LABEL = Object.fromEntries(DOCUMENT_TYPES.map(item => [item.value, item.label]))
+
 // ── Commission type labels ────────────────────────────────────────────────────
 
 export const COMMISSION_TYPE_LABEL = {

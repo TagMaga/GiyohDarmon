@@ -34,6 +34,7 @@ import (
 	logistics_settings "github.com/megamall/crm/internal/logistics_settings"
 	"github.com/megamall/crm/internal/media"
 	"github.com/megamall/crm/internal/onboarding"
+	onboardingmediabridge "github.com/megamall/crm/internal/onboarding/mediabridge"
 	"github.com/megamall/crm/internal/orders"
 	ordersmediabridge "github.com/megamall/crm/internal/orders/mediabridge"
 	"github.com/megamall/crm/internal/payouts"
@@ -234,6 +235,9 @@ func main() {
 
 		attachAvatarFn, attachUserDocumentFn, releaseUserMediaFn, signedUserMediaURLFn := usersmediabridge.Adapters(mediaSvc)
 		userSvc.SetMediaAdapters(attachAvatarFn, attachUserDocumentFn, releaseUserMediaFn, signedUserMediaURLFn)
+
+		createOnboardingMediaFn, releaseOnboardingMediaFn, signedOnboardingMediaURLFn := onboardingmediabridge.Adapters(mediaSvc)
+		onboardingSvc.SetMediaAdapters(createOnboardingMediaFn, releaseOnboardingMediaFn, signedOnboardingMediaURLFn)
 
 		// Quarantine purge: physically removes files whose retention window
 		// has elapsed (internal/media.Service.PurgeExpiredQuarantine). DB

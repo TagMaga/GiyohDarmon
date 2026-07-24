@@ -1,12 +1,24 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { ShoppingBag, AlertCircle, CheckCircle2, Loader2, ChevronDown } from 'lucide-react'
+import { ShoppingBag, AlertCircle, CheckCircle2, Loader2, ChevronDown, Upload, X, FileText } from 'lucide-react'
 import DateInput      from '../../../shared/components/DateInput'
 import PasswordInput  from '../../../shared/components/PasswordInput'
 import PhoneInput     from '../../../shared/components/PhoneInput'
-import { composeAddress, CREATABLE_ROLES, ROLE_LABEL } from '../../people/utils/peopleHelpers'
+import { composeAddress, CREATABLE_ROLES, ROLE_LABEL, DOCUMENT_TYPES } from '../../people/utils/peopleHelpers'
 import { submitWorkerApplication } from '../api'
+
+// Mirrors internal/media/validate.go's allowlist exactly — anything else is
+// rejected client-side with a clear message, before it's ever sent anywhere.
+const ALLOWED_DOCUMENT_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+// Mirrors internal/onboarding/handler.go's maxDocuments.
+const MAX_DOCUMENTS = 5
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} Б`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`
+}
 
 /**
  * WorkerApplicationPage — public, unauthenticated onboarding form at /new
@@ -29,8 +41,32 @@ export default function WorkerApplicationPage() {
   const [house,           setHouse]           = useState('')
   const [dobValid,      setDobValid]      = useState(true)
   const [detailsOpen,   setDetailsOpen]   = useState(true)
+  const [documents,     setDocuments]     = useState([]) // [{ file, documentType }]
+  const [docError,      setDocError]      = useState('')
 
   const passwordMismatch = passwordConfirm.length > 0 && password !== passwordConfirm
+
+  function handleDocumentSelect(e) {
+    const selected = Array.from(e.target.files ?? [])
+    e.target.value = ''
+    if (!selected.length) return
+
+    const invalid = selected.find(f => !ALLOWED_DOCUMENT_MIME_TYPES.includes(f.type))
+    if (invalid) {
+      setDocError(`«${invalid.name}»: разрешены только JPG, PNG, WEBP и PDF.`)
+      return
+    }
+    setDocError('')
+    setDocuments(prev => [...prev, ...selected.map(file => ({ file, documentType: 'passport' }))].slice(0, MAX_DOCUMENTS))
+  }
+
+  function updateDocumentType(index, documentType) {
+    setDocuments(prev => prev.map((d, i) => (i === index ? { ...d, documentType } : d)))
+  }
+
+  function removeDocument(index) {
+    setDocuments(prev => prev.filter((_, i) => i !== index))
+  }
 
   const { mutate, isPending, isSuccess, error } = useMutation({
     mutationFn: () => {
@@ -50,7 +86,7 @@ export default function WorkerApplicationPage() {
         desired_position: ROLE_LABEL[desiredPosition] ?? null,
         date_of_birth:    dob + 'T00:00:00Z',
         address:          composeAddress({ city, region, street, house }),
-      })
+      }, documents)
     },
   })
 
@@ -165,6 +201,56 @@ export default function WorkerApplicationPage() {
               </div>
             </div>
           )}
+
+          <div>
+            <label className="input-label">Документы</label>
+            <p className="mt-0.5 mb-2 text-[12px] text-slate-400">Паспорт и другие документы — необязательно</p>
+
+            <label className="flex items-center justify-center gap-2 w-full min-h-[52px] rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/40 transition-colors">
+              <Upload size={15} className="text-indigo-600" />
+              <span className="text-[13px] font-semibold text-slate-700">Прикрепить файлы</span>
+              <input
+                type="file"
+                multiple
+                accept={ALLOWED_DOCUMENT_MIME_TYPES.join(',')}
+                onChange={handleDocumentSelect}
+                disabled={documents.length >= MAX_DOCUMENTS}
+                className="hidden"
+              />
+            </label>
+            {docError && <p className="mt-1.5 text-xs text-red-600">{docError}</p>}
+
+            {documents.length > 0 && (
+              <div className="mt-2.5 space-y-2">
+                {documents.map((d, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                    <FileText size={14} className="text-slate-400 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12.5px] font-medium text-slate-700 truncate">{d.file.name}</p>
+                      <p className="text-[11px] text-slate-400">{formatFileSize(d.file.size)}</p>
+                    </div>
+                    <select
+                      value={d.documentType}
+                      onChange={e => updateDocumentType(i, e.target.value)}
+                      className="input py-1.5 text-[12px] w-[150px] flex-shrink-0"
+                    >
+                      {DOCUMENT_TYPES.map(t => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => removeDocument(i)}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200 hover:text-slate-600 flex-shrink-0"
+                      aria-label="Удалить файл"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <button type="submit" disabled={isPending || !canSubmit} className="btn-lg btn-primary w-full">
             {isPending
