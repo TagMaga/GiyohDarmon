@@ -180,6 +180,23 @@ export function getBatchUnitCost(m) {
   return m.batch_unit_cost ?? m.BatchUnitCost ?? null
 }
 
+export function getSaleUnitCost(m) {
+  if (!m) return null
+  return m.sale_unit_cost ?? m.SaleUnitCost ?? null
+}
+
+export function getSaleUnitPrice(m) {
+  if (!m) return null
+  return m.sale_unit_price ?? m.SaleUnitPrice ?? null
+}
+
+export function getMovementUnitCost(m) {
+  const type = getMovementType(m)
+  if (type === 'purchase') return getBatchUnitCost(m)
+  if (type === 'sale') return getSaleUnitCost(m)
+  return null
+}
+
 export function getLastMovementForProduct(productId, movements = []) {
   return movements.find((m) => {
     const pid = m.product_id ?? m.ProductID

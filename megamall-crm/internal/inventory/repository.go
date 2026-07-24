@@ -33,6 +33,8 @@ type MovementRow struct {
 	TotalAmount       *float64   `gorm:"column:total_amount"`
 	DeliveryFee       *float64   `gorm:"column:delivery_fee"`
 	TotalOrderAmount  *float64   `gorm:"column:total_order_amount"`
+	SaleUnitCost      *float64   `gorm:"column:sale_unit_cost"`
+	SaleUnitPrice     *float64   `gorm:"column:sale_unit_price"`
 }
 
 type ReceivingEditRow struct {
@@ -186,7 +188,17 @@ func (r *Repository) ListMovements(ctx context.Context, f ListMovementsFilter, p
 		Joins("LEFT JOIN orders ON orders.id = inventory_movements.reference_id AND orders.deleted_at IS NULL").
 		Joins("LEFT JOIN customers ON customers.id = orders.customer_id").
 		Joins("LEFT JOIN users seller_user ON seller_user.id = orders.seller_id AND seller_user.deleted_at IS NULL").
-		Joins("LEFT JOIN users courier_user ON courier_user.id = orders.courier_id AND courier_user.deleted_at IS NULL")
+		Joins("LEFT JOIN users courier_user ON courier_user.id = orders.courier_id AND courier_user.deleted_at IS NULL").
+		Joins(`LEFT JOIN (
+			SELECT movement_id, SUM(quantity * unit_cost) / NULLIF(SUM(quantity), 0) AS avg_unit_cost
+			FROM inventory_batch_consumptions
+			GROUP BY movement_id
+		) sale_cost ON sale_cost.movement_id = inventory_movements.id`).
+		Joins(`LEFT JOIN (
+			SELECT order_id, product_id, SUM(total_price) / NULLIF(SUM(quantity), 0) AS unit_price
+			FROM order_items
+			GROUP BY order_id, product_id
+		) sale_price ON sale_price.order_id = inventory_movements.reference_id AND sale_price.product_id = inventory_movements.product_id`)
 
 	if f.ProductID != "" {
 		base = base.Where("inventory_movements.product_id = ?", f.ProductID)
@@ -235,7 +247,9 @@ func (r *Repository) ListMovements(ctx context.Context, f ListMovementsFilter, p
 			COALESCE(seller_user.full_name, '') AS seller_name,
 			orders.total_amount AS total_amount,
 			orders.delivery_fee AS delivery_fee,
-			(orders.total_amount + orders.delivery_fee) AS total_order_amount
+			(orders.total_amount + orders.delivery_fee) AS total_order_amount,
+			sale_cost.avg_unit_cost AS sale_unit_cost,
+			sale_price.unit_price AS sale_unit_price
 		`).
 		Order("inventory_movements.created_at DESC").
 		Limit(p.Limit).Offset(p.Offset()).

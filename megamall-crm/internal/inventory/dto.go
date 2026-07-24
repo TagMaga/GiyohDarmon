@@ -225,6 +225,8 @@ type MovementResponse struct {
 	TotalAmount       *float64     `json:"total_amount,omitempty"`
 	DeliveryFee       *float64     `json:"delivery_fee,omitempty"`
 	TotalOrderAmount  *float64     `json:"total_order_amount,omitempty"`
+	SaleUnitCost      *float64     `json:"sale_unit_cost,omitempty"`
+	SaleUnitPrice     *float64     `json:"sale_unit_price,omitempty"`
 }
 
 func ToMovementResponse(row *MovementRow) MovementResponse {
@@ -256,6 +258,8 @@ func ToMovementResponse(row *MovementRow) MovementResponse {
 		TotalAmount:       row.TotalAmount,
 		DeliveryFee:       row.DeliveryFee,
 		TotalOrderAmount:  row.TotalOrderAmount,
+		SaleUnitCost:      row.SaleUnitCost,
+		SaleUnitPrice:     row.SaleUnitPrice,
 	}
 }
 
