@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { FileText } from 'lucide-react'
 import Modal   from '../../../shared/components/Modal'
 import Button  from '../../../shared/components/Button'
 import Alert   from '../../../shared/components/Alert'
 import { useToast } from '../../../shared/components/ToastProvider'
-import { approveWorkerApplication, rejectWorkerApplication } from '../api'
-import { CREATABLE_ROLES, ROLE_LABEL, fmtDate } from '../utils/peopleHelpers'
+import { approveWorkerApplication, rejectWorkerApplication, fetchWorkerApplication } from '../api'
+import { CREATABLE_ROLES, ROLE_LABEL, DOCUMENT_TYPE_LABEL, fmtDate } from '../utils/peopleHelpers'
 
 /**
  * WorkerApplicationDetailModal — review a single pending application.
@@ -22,6 +23,18 @@ export default function WorkerApplicationDetailModal({ application, onClose }) {
   const toast = useToast()
   const [role,          setRole]          = useState('seller')
   const [confirmReject, setConfirmReject] = useState(false)
+
+  // Fetches the full detail (including documents with freshly-minted signed
+  // URLs — see internal/onboarding.Service.GetDetail) — the list row alone
+  // doesn't carry documents. staleTime 0: signed URLs expire quickly
+  // (MediaConfig.SignedURLTTL), so every open should re-fetch, never reuse
+  // a cached one.
+  const { data: detail } = useQuery({
+    queryKey: ['people', 'applications', application?.id],
+    queryFn: () => fetchWorkerApplication(application.id),
+    enabled: !!application,
+    staleTime: 0,
+  })
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['people', 'applications'] })
@@ -50,7 +63,7 @@ export default function WorkerApplicationDetailModal({ application, onClose }) {
   const error = approve.error ?? reject.error
 
   if (!application) return null
-  const a = application
+  const a = detail ?? application
 
   return (
     <Modal
@@ -86,6 +99,29 @@ export default function WorkerApplicationDetailModal({ application, onClose }) {
         {a.date_of_birth && <Row label="Дата рождения">{fmtDate(a.date_of_birth)}</Row>}
         {a.address && <Row label="Адрес">{a.address}</Row>}
         <Row label="Подано">{fmtDate(a.created_at)}</Row>
+
+        {a.documents?.length > 0 && (
+          <div className="pt-1">
+            <p className="input-label mb-1.5">Документы</p>
+            <div className="space-y-1.5">
+              {a.documents.map(doc => (
+                <a
+                  key={doc.id}
+                  href={doc.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 hover:border-indigo-300 hover:bg-indigo-50/40 transition-colors"
+                >
+                  <FileText size={14} className="text-slate-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12.5px] font-medium text-slate-700 truncate">{doc.original_filename}</p>
+                    <p className="text-[11px] text-slate-400">{DOCUMENT_TYPE_LABEL[doc.document_type] ?? 'Другое'}</p>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="pt-2">
           <label className="input-label">Назначить роль *</label>

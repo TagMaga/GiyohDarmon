@@ -93,6 +93,31 @@ func (r *Repository) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// CreateDocuments inserts all of an application's document rows in one call
+// — used right after the application row itself is created (see
+// Service.Create).
+func (r *Repository) CreateDocuments(ctx context.Context, docs []WorkerApplicationDocument) error {
+	if len(docs) == 0 {
+		return nil
+	}
+	if err := r.db.WithContext(ctx).Create(&docs).Error; err != nil {
+		return fmt.Errorf("create worker application documents: %w", err)
+	}
+	return nil
+}
+
+// ListDocuments returns applicationID's attached documents, oldest first.
+func (r *Repository) ListDocuments(ctx context.Context, applicationID uuid.UUID) ([]WorkerApplicationDocument, error) {
+	var docs []WorkerApplicationDocument
+	if err := r.db.WithContext(ctx).
+		Where("application_id = ?", applicationID).
+		Order("created_at ASC").
+		Find(&docs).Error; err != nil {
+		return nil, fmt.Errorf("list worker application documents: %w", err)
+	}
+	return docs, nil
+}
+
 func isDuplicateKeyError(err error, constraint string) bool {
 	return err != nil && strings.Contains(err.Error(), constraint)
 }

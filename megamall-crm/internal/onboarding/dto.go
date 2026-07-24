@@ -27,6 +27,37 @@ type ApproveApplicationRequest struct {
 	Role users.Role `json:"role" validate:"required"`
 }
 
+// AllowedDocumentTypes mirrors internal/users' document type set exactly
+// (see users.normalizedDocumentType) so an application's documents land in
+// the same categories HR already uses on the employee detail page.
+var AllowedDocumentTypes = map[string]bool{
+	"passport": true, "contract": true, "certificate": true,
+	"diploma": true, "medical": true, "other": true,
+}
+
+// NormalizedDocumentType maps any unrecognized/empty value to "other" —
+// mirrors users.normalizedDocumentType.
+func NormalizedDocumentType(value string) string {
+	if AllowedDocumentTypes[value] {
+		return value
+	}
+	return "other"
+}
+
+// DocumentResponse is one attached document's HR-facing (owner-only)
+// representation. URL is a freshly-minted signed URL, resolved at request
+// time — never persisted, since it expires (see MediaConfig.SignedURLTTL) —
+// exactly like users.UserDocumentResponse.FileURL.
+type DocumentResponse struct {
+	ID               uuid.UUID `json:"id"`
+	DocumentType     string    `json:"document_type"`
+	OriginalFilename string    `json:"original_filename"`
+	ContentType      *string   `json:"content_type,omitempty"`
+	SizeBytes        *int64    `json:"size_bytes,omitempty"`
+	URL              string    `json:"url,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
 // SubmitResponse is returned to the (unauthenticated) applicant — only what
 // they need to know their submission was received, nothing else.
 type SubmitResponse struct {
@@ -50,6 +81,10 @@ type ApplicationResponse struct {
 	ReviewedAt      *time.Time `json:"reviewed_at,omitempty"`
 	CreatedUserID   *uuid.UUID `json:"created_user_id,omitempty"`
 	CreatedAt       time.Time  `json:"created_at"`
+	// Documents is only populated by GetByID (the owner-review detail call)
+	// — List omits it entirely so listing pending applications never mints
+	// signed URLs it doesn't need.
+	Documents []DocumentResponse `json:"documents,omitempty"`
 }
 
 func ToSubmitResponse(a *WorkerApplication) SubmitResponse {
@@ -80,4 +115,18 @@ func ToApplicationResponseList(apps []WorkerApplication) []ApplicationResponse {
 		out[i] = ToApplicationResponse(&apps[i])
 	}
 	return out
+}
+
+// toDocumentResponse converts a document row's static fields — URL is left
+// empty here and filled in by the caller (Service.GetByID), which is the
+// only place that has a signedMediaURL function to mint it with.
+func toDocumentResponse(d *WorkerApplicationDocument) DocumentResponse {
+	return DocumentResponse{
+		ID:               d.ID,
+		DocumentType:     d.DocumentType,
+		OriginalFilename: d.OriginalFilename,
+		ContentType:      d.ContentType,
+		SizeBytes:        d.SizeBytes,
+		CreatedAt:        d.CreatedAt,
+	}
 }
