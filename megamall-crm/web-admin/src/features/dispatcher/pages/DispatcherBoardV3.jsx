@@ -741,9 +741,11 @@ function CourierCard({ courier, selected, pending, hasSelectedOrder, onSelect })
   const active = Number(courier.active_orders ?? 0)
   const cash = Number(courier.cash_owed ?? 0)
   const intakeEnabled = courier.order_intake_enabled !== false
-  const loadPct = Math.min(100, Math.round((active / 6) * 100))
-  const loadTone = active >= 5 ? 'red' : active >= 3 ? 'amber' : 'green'
-  const dot = !intakeEnabled ? 'overloaded' : active >= 5 ? 'overloaded' : active > 0 ? 'busy' : 'available'
+  const maxOrders = courier.max_active_orders != null ? Number(courier.max_active_orders) : 6
+  const atCapacity = active >= maxOrders
+  const loadPct = Math.min(100, Math.round((active / maxOrders) * 100))
+  const loadTone = atCapacity ? 'red' : active >= Math.ceil(maxOrders * 0.6) ? 'amber' : 'green'
+  const dot = !intakeEnabled ? 'overloaded' : atCapacity ? 'overloaded' : active > 0 ? 'busy' : 'available'
 
   const pendingStyle = pending
     ? { outline: '2px solid var(--accent)', outlineOffset: 1, background: 'var(--accent-glow)' }
@@ -766,7 +768,7 @@ function CourierCard({ courier, selected, pending, hasSelectedOrder, onSelect })
         <span className={`dv2-status-dot ${dot}`} />
       </div>
       <div>
-        <div className="dv2-bar-label"><span>Нагрузка</span><span>{active}/6</span></div>
+        <div className="dv2-bar-label"><span>Нагрузка</span><span>{active}/{maxOrders}</span></div>
         <div className="dv2-bar-track"><div className={`dv2-bar-fill ${loadTone}`} style={{ width: `${loadPct}%` }} /></div>
       </div>
       <div className="dv2-courier-row">

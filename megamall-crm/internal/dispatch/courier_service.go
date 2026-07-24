@@ -33,6 +33,11 @@ func (s *Service) UpdateCourier(ctx context.Context, courierID uuid.UUID, req Up
 		updates["password_hash"] = string(hash)
 	}
 
+	if req.MaxActiveOrders != nil && *req.MaxActiveOrders < 1 {
+		return nil, apperrors.BadRequest("лимит заказов должен быть больше 0")
+	}
+	updates["courier_max_active_orders"] = req.MaxActiveOrders
+
 	if _, err := s.repo.UpdateCourierProfile(ctx, courierID, updates); err != nil {
 		return nil, err
 	}

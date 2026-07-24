@@ -191,7 +191,8 @@ export function FleetSheet({ open, onClose, couriers, onSelect }) {
           const id = c.courier_id ?? c.id
           const name = c.full_name ?? 'Курьер'
           const active = Number(c.active_orders ?? 0)
-          const loadPct = Math.min(100, Math.round((active / 6) * 100))
+          const maxOrders = c.max_active_orders != null ? Number(c.max_active_orders) : 6
+          const loadPct = Math.min(100, Math.round((active / maxOrders) * 100))
           const online = c.is_online || c.online
           return (
             <button key={id} onClick={() => onSelect(id)} style={{ textAlign: 'left', background: '#fff', border: `1px solid ${C.border}`, borderRadius: 14, padding: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -201,10 +202,10 @@ export function FleetSheet({ open, onClose, couriers, onSelect }) {
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: online ? '#10B981' : '#D6D3CB' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.text4, marginBottom: 5 }}>
-                <span>Нагрузка</span><span>{active}/6</span>
+                <span>Нагрузка</span><span>{active}/{maxOrders}</span>
               </div>
               <div style={{ height: 5, background: C.border, borderRadius: 99, overflow: 'hidden', marginBottom: 10 }}>
-                <div style={{ height: '100%', borderRadius: 99, width: `${loadPct}%`, background: active >= 5 ? '#EF4444' : active >= 3 ? '#F59E0B' : '#10B981' }} />
+                <div style={{ height: '100%', borderRadius: 99, width: `${loadPct}%`, background: active >= maxOrders ? '#EF4444' : active >= Math.ceil(maxOrders * 0.6) ? '#F59E0B' : '#10B981' }} />
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <a href={`tel:${c.phone}`} onClick={(e) => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, color: C.green, padding: '5px 10px', borderRadius: 9, background: C.greenBg }}>

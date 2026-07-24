@@ -81,8 +81,9 @@ function CourierCard({ courier, onOpenDetail, onChanged }) {
   const cash = Number(courier.cash_owed ?? 0)
   const online = courier.is_online || courier.online
   const intakeEnabled = courier.order_intake_enabled !== false
-  const loadPct = Math.min(100, Math.round((active / 6) * 100))
-  const loadColor = active >= 5 ? '#EF4444' : active >= 3 ? '#F59E0B' : '#10B981'
+  const maxOrders = courier.max_active_orders != null ? Number(courier.max_active_orders) : 6
+  const loadPct = Math.min(100, Math.round((active / maxOrders) * 100))
+  const loadColor = active >= maxOrders ? '#EF4444' : active >= Math.ceil(maxOrders * 0.6) ? '#F59E0B' : '#10B981'
 
   const { mutate: toggleIntake, isPending } = useMutation({
     mutationFn: () => updateCourierOrderIntake(id, { enabled: !intakeEnabled }),
@@ -109,7 +110,7 @@ function CourierCard({ courier, onOpenDetail, onChanged }) {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: C.text4, marginBottom: 5 }}>
-        <span>Нагрузка · {active}/6</span>
+        <span>Нагрузка · {active}/{maxOrders}</span>
         <span>{online ? 'Онлайн' : 'Оффлайн'}</span>
       </div>
       <div style={{ height: 6, background: C.border2, borderRadius: 99, overflow: 'hidden', marginBottom: 12 }}>
