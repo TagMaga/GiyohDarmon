@@ -60,7 +60,7 @@ export default function OwnerSettingsPage() {
         title="Ставки комиссии команд"
         description="Процент продавцов, менеджеров и тимлидов"
         action="Перейти"
-        onClick={() => navigate('/owner/teams')}
+        onClick={() => navigate('/owner/team-directory')}
       >
         <p className="text-[13px] text-slate-500 leading-relaxed">
           Структура комиссии настраивается в разделе <strong>Команды</strong> — профиль

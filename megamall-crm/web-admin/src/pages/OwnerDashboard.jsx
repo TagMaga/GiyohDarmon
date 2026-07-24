@@ -307,7 +307,7 @@ function TeamPerformanceBlock({ teams = [], loading, onNav }) {
   return (
     <Card
       title="Команды"
-      action={<LinkBtn onClick={() => onNav('/owner/teams')}>Все</LinkBtn>}
+      action={<LinkBtn onClick={() => onNav('/owner/team-directory')}>Все</LinkBtn>}
       className="min-h-[205px]"
     >
       <div className="px-5 pb-5 pt-3">
