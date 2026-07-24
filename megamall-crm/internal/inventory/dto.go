@@ -274,3 +274,34 @@ type ListMovementsFilter struct {
 	DateFrom string `form:"date_from"`
 	DateTo   string `form:"date_to"`
 }
+
+type ListProductSalesFilter struct {
+	// DateFrom / DateTo accept YYYY-MM-DD and filter on created_at (inclusive).
+	// Both empty means all-time.
+	DateFrom string `form:"date_from"`
+	DateTo   string `form:"date_to"`
+}
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+type ProductSalesReportResponse struct {
+	ProductID    uuid.UUID `json:"product_id"`
+	ProductName  string    `json:"product_name"`
+	SKU          string    `json:"sku"`
+	QuantitySold int       `json:"quantity_sold"`
+	Revenue      float64   `json:"revenue"`
+	COGS         float64   `json:"cogs"`
+	Profit       float64   `json:"profit"`
+}
+
+func ToProductSalesReportResponse(r *ProductSalesRow) ProductSalesReportResponse {
+	return ProductSalesReportResponse{
+		ProductID:    r.ProductID,
+		ProductName:  r.ProductName,
+		SKU:          r.SKU,
+		QuantitySold: r.QuantitySold,
+		Revenue:      r.Revenue,
+		COGS:         r.COGS,
+		Profit:       r.Revenue - r.COGS,
+	}
+}

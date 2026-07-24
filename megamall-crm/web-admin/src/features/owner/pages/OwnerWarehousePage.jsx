@@ -16,6 +16,7 @@ import ReceivingModal from '../../warehouse/components/ReceivingModal'
 import WriteoffModal from '../../warehouse/components/WriteoffModal'
 import useWarehouseData from '../../warehouse/hooks/useWarehouseData'
 import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'
+import SalesReportPanel from '../../warehouse/pages/WarehouseSalesReportPanel'
 import OwnerWarehouseMobile from '../components/OwnerWarehouseMobile'
 import {
   STOCK_STATUS_BADGE,
@@ -44,6 +45,7 @@ const TABS = [
   { id: 'inventory', label: 'Остатки и товары' },
   { id: 'receiving', label: 'Приёмка и списания' },
   { id: 'movements', label: 'Движение товара' },
+  { id: 'reports', label: 'Отчёты' },
 ]
 
 const MOVEMENT_TYPES = [
@@ -280,6 +282,12 @@ export default function OwnerWarehousePage() {
             <Button icon={<FilterX size={15} />} onClick={clearMovementFilters}>Сбросить</Button>
           </section>
           <MovementList rows={movementRows} data={data} />
+        </div>
+      )}
+
+      {tab === 'reports' && (
+        <div className="animate-fade-in">
+          <SalesReportPanel />
         </div>
       )}
     </div>

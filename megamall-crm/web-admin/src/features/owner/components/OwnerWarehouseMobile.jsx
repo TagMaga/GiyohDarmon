@@ -3,6 +3,7 @@ import {
 } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
 import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'
+import SalesReportPanel from '../../warehouse/pages/WarehouseSalesReportPanel'
 import {
   STOCK_STATUS_BADGE,
   STOCK_STATUS_LABEL,
@@ -32,6 +33,7 @@ const TABS = [
   { id: 'inventory', label: 'Остатки' },
   { id: 'receiving', label: 'Приёмка' },
   { id: 'movements', label: 'Движение' },
+  { id: 'reports', label: 'Отчёты' },
 ]
 
 const MOVEMENT_TYPES = [
@@ -390,6 +392,8 @@ export default function OwnerWarehouseMobile({
           <MovementList rows={movementRows} data={data} />
         </div>
       )}
+
+      {tab === 'reports' && <SalesReportPanel />}
     </div>
   )
 }

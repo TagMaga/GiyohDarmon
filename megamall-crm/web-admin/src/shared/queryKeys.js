@@ -79,6 +79,7 @@ export const KEYS = {
     movements:  ['warehouse', 'movements'],
     batchesRoot: ['warehouse', 'batches'],
     batches:    (productId) => ['warehouse', 'batches', productId ?? ''],
+    salesReport: (params) => ['warehouse', 'salesReport', params ?? {}],
   },
   settings: {
     delivery: ['settings', 'delivery'],

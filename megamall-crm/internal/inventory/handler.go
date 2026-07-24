@@ -77,6 +77,24 @@ func (h *Handler) ListMovements(c *gin.Context) {
 	response.OKWithMeta(c, out, pagination.BuildMeta(p, total))
 }
 
+func (h *Handler) SalesByProductReport(c *gin.Context) {
+	var f ListProductSalesFilter
+	if err := c.ShouldBindQuery(&f); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	rows, err := h.svc.SalesByProduct(c.Request.Context(), f)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	out := make([]ProductSalesReportResponse, 0, len(rows))
+	for i := range rows {
+		out = append(out, ToProductSalesReportResponse(&rows[i]))
+	}
+	response.OK(c, out)
+}
+
 // ─── Receiving ────────────────────────────────────────────────────────────────
 
 func (h *Handler) CreateReceiving(c *gin.Context) {
