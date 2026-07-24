@@ -1,0 +1,95 @@
+name: Build courier app
+
+# Manually-triggered EAS native build for the courier app. Unlike
+# courier-ota.yml (JS/asset-only updates gated by the fingerprint
+# runtimeVersion policy), this produces a brand new installable binary —
+# use it when an already-installed app can't be reached by an OTA update
+# (e.g. its native build fingerprint predates a JS-only fix), or after a
+# native-affecting change (new native module, Expo SDK bump, permission).
+#
+# "production"/"preview" profiles both build an internal-distribution APK
+# (see eas.json) — the job prints a direct download link, no store
+# submission involved.
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS build profile'
+        required: false
+        default: production
+        type: choice
+        options:
+          - production
+          - preview
+      platform:
+        description: 'Target platform'
+        required: false
+        default: android
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      APP_DIR: mobile/courier-app
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+    steps:
+      - name: Verify EXPO_TOKEN secret is configured
+        if: ${{ env.EXPO_TOKEN == '' }}
+        run: |
+          echo "The EXPO_TOKEN repository secret is not set. Create an access token at" >&2
+          echo "https://expo.dev/settings/access-tokens and add it as a repository secret" >&2
+          echo "named EXPO_TOKEN (Settings → Secrets and variables → Actions)." >&2
+          exit 1
+
+      - name: Check out the exact revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/courier-app/package-lock.json
+
+      - name: Install app dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Build (${{ inputs.platform }}, ${{ inputs.profile }})
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          npx --yes eas-cli build \
+            --platform "${{ inputs.platform }}" \
+            --profile "${{ inputs.profile }}" \
+            --non-interactive --wait --json \
+            > build-result.json
+          cat build-result.json
+
+      - name: Summarize download link(s)
+        working-directory: ${{ env.APP_DIR }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const parsed = JSON.parse(fs.readFileSync("build-result.json", "utf8"));
+            const builds = Array.isArray(parsed) ? parsed : [parsed];
+            const lines = ["## Courier app build results", ""];
+            for (const b of builds) {
+              lines.push(
+                "- **" + (b.platform ?? "?") + "** — status: " + (b.status ?? "?") +
+                (b.artifacts?.buildUrl ? "\n  - Download: " + b.artifacts.buildUrl : "") +
+                (b.buildDetailsPageUrl ? "\n  - EAS page: " + b.buildDetailsPageUrl : "")
+              );
+            }
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '
