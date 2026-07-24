@@ -22,19 +22,21 @@ import (
 // want the media pipeline disabled simply don't call this and pass
 // nil, nil, nil to onboardingSvc.SetMediaAdapters instead.
 func Adapters(mediaSvc *media.Service) (onboarding.CreateMediaFn, onboarding.ReleaseMediaFn, onboarding.SignedMediaURLFn) {
-	createMedia := func(ctx context.Context, originalFilename string, declaredSize int64, r io.Reader) (*onboarding.CreatedMediaAsset, error) {
-		// UploadedByUserID is uuid.Nil — there is no authenticated uploader
-		// for a public application; media.Service.Authorize still lets any
-		// owner-level caller view/manage the asset regardless (see
-		// internal/media/service.go's Authorize: owner/it_specialist always
-		// passes, independent of UploadedByUserID). OwnerEntityType/ID are
-		// left empty so the asset stays "unattached," exactly like the
-		// normal upload-then-attach flow every authenticated client uses —
-		// Service.Approve attaches it to the new user afterward via
-		// users.Service.CreateDocument.
+	createMedia := func(ctx context.Context, uploaderID uuid.UUID, originalFilename string, declaredSize int64, r io.Reader) (*onboarding.CreatedMediaAsset, error) {
+		// uploaderID is a real users.id (an existing owner — see
+		// users.Service.SystemUploaderID) standing in for "no authenticated
+		// uploader," since media_assets.uploaded_by_user_id is a hard NOT
+		// NULL REFERENCES users(id) constraint (migration 00075) — uuid.Nil
+		// violates that FK. Which real user is picked has no security
+		// effect: media.Service.Authorize lets any owner-level caller
+		// view/manage the asset regardless of who's recorded as the
+		// uploader. OwnerEntityType/ID are left empty so the asset stays
+		// "unattached," exactly like the normal upload-then-attach flow
+		// every authenticated client uses — Service.Approve attaches it to
+		// the new user afterward via users.Service.CreateDocument.
 		asset, appErr := mediaSvc.Create(ctx, media.CreateParams{
 			Category:         media.CategoryUserDocument,
-			UploadedByUserID: uuid.Nil,
+			UploadedByUserID: uploaderID,
 			OriginalFilename: originalFilename,
 			DeclaredSize:     declaredSize,
 		}, r)

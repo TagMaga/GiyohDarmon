@@ -5,7 +5,7 @@ import { ShoppingBag, AlertCircle, CheckCircle2, Loader2, ChevronDown, Upload, X
 import DateInput      from '../../../shared/components/DateInput'
 import PasswordInput  from '../../../shared/components/PasswordInput'
 import PhoneInput     from '../../../shared/components/PhoneInput'
-import { composeAddress, CREATABLE_ROLES, ROLE_LABEL, DOCUMENT_TYPES } from '../../people/utils/peopleHelpers'
+import { composeAddress, CREATABLE_ROLES, ROLE_LABEL } from '../../people/utils/peopleHelpers'
 import { submitWorkerApplication } from '../api'
 
 // Mirrors internal/media/validate.go's allowlist exactly — anything else is
@@ -58,10 +58,6 @@ export default function WorkerApplicationPage() {
     }
     setDocError('')
     setDocuments(prev => [...prev, ...selected.map(file => ({ file, documentType: 'passport' }))].slice(0, MAX_DOCUMENTS))
-  }
-
-  function updateDocumentType(index, documentType) {
-    setDocuments(prev => prev.map((d, i) => (i === index ? { ...d, documentType } : d)))
   }
 
   function removeDocument(index) {
@@ -229,15 +225,6 @@ export default function WorkerApplicationPage() {
                       <p className="text-[12.5px] font-medium text-slate-700 truncate">{d.file.name}</p>
                       <p className="text-[11px] text-slate-400">{formatFileSize(d.file.size)}</p>
                     </div>
-                    <select
-                      value={d.documentType}
-                      onChange={e => updateDocumentType(i, e.target.value)}
-                      className="input py-1.5 text-[12px] w-[150px] flex-shrink-0"
-                    >
-                      {DOCUMENT_TYPES.map(t => (
-                        <option key={t.value} value={t.value}>{t.label}</option>
-                      ))}
-                    </select>
                     <button
                       type="button"
                       onClick={() => removeDocument(i)}

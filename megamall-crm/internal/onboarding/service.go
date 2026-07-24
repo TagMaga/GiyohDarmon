@@ -35,7 +35,12 @@ type CreatedMediaAsset struct {
 // JWT to call that endpoint with. The resulting asset is later attached to
 // a real user by Service.Approve (via users.Service.CreateDocument), or
 // released/quarantined by Service.Reject if the application is discarded.
-type CreateMediaFn func(ctx context.Context, originalFilename string, declaredSize int64, r io.Reader) (*CreatedMediaAsset, error)
+//
+// uploaderID must be a real users.id — media_assets.uploaded_by_user_id is
+// a hard NOT NULL REFERENCES users(id) constraint (migration 00075), so
+// there is no "no uploader" value; Service.uploadDocuments resolves this
+// once via users.Service.SystemUploaderID before calling this function.
+type CreateMediaFn func(ctx context.Context, uploaderID uuid.UUID, originalFilename string, declaredSize int64, r io.Reader) (*CreatedMediaAsset, error)
 
 // ReleaseMediaFn quarantines a previously-created (and never attached, or
 // no-longer-needed) media asset — mirrors users.ReleaseMediaFn.
@@ -169,9 +174,14 @@ func (s *Service) uploadDocuments(ctx context.Context, docs []PendingDocument) (
 		return nil, nil
 	}
 
+	uploaderID, err := s.userSvc.SystemUploaderID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	rows := make([]WorkerApplicationDocument, 0, len(docs))
 	for _, doc := range docs {
-		asset, err := s.createMedia(ctx, doc.OriginalFilename, doc.DeclaredSize, doc.Reader)
+		asset, err := s.createMedia(ctx, uploaderID, doc.OriginalFilename, doc.DeclaredSize, doc.Reader)
 		if err != nil {
 			s.releaseDocs(ctx, rows)
 			return nil, err
