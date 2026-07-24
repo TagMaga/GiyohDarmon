@@ -5,7 +5,7 @@ import { ShoppingBag, AlertCircle, CheckCircle2, Loader2, ChevronDown } from 'lu
 import DateInput      from '../../../shared/components/DateInput'
 import PasswordInput  from '../../../shared/components/PasswordInput'
 import PhoneInput     from '../../../shared/components/PhoneInput'
-import { composeAddress } from '../../people/utils/peopleHelpers'
+import { composeAddress, CREATABLE_ROLES, ROLE_LABEL } from '../../people/utils/peopleHelpers'
 import { submitWorkerApplication } from '../api'
 
 /**
@@ -19,8 +19,7 @@ export default function WorkerApplicationPage() {
   const [firstName,       setFirstName]       = useState('')
   const [lastName,        setLastName]        = useState('')
   const [phone,           setPhone]           = useState('')
-  const [email,           setEmail]           = useState('')
-  const [desiredPosition, setDesiredPosition] = useState('')
+  const [desiredPosition, setDesiredPosition] = useState(CREATABLE_ROLES[0])
   const [password,        setPassword]        = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
   const [dob,             setDob]             = useState('')
@@ -45,11 +44,10 @@ export default function WorkerApplicationPage() {
       if (!street.trim())   throw new Error('Улица обязательна')
       return submitWorkerApplication({
         phone:            phone.trim(),
-        email:            email.trim() || null,
         password,
         full_name:        `${firstName.trim()} ${lastName.trim()}`,
         surname:          lastName.trim(),
-        desired_position: desiredPosition.trim() || null,
+        desired_position: ROLE_LABEL[desiredPosition] ?? null,
         date_of_birth:    dob + 'T00:00:00Z',
         address:          composeAddress({ city, region, street, house }),
       })
@@ -115,12 +113,12 @@ export default function WorkerApplicationPage() {
             <PhoneInput value={phone} onChange={setPhone} className="mt-1" />
           </div>
 
-          <div><label className="input-label">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="input mt-1" placeholder="example@mail.com" />
-          </div>
-
-          <div><label className="input-label">Желаемая должность</label>
-            <input value={desiredPosition} onChange={e => setDesiredPosition(e.target.value)} className="input mt-1" placeholder="Например, Продавец" />
+          <div><label className="input-label">Желаемая должность *</label>
+            <select value={desiredPosition} onChange={e => setDesiredPosition(e.target.value)} className="input mt-1">
+              {CREATABLE_ROLES.map(r => (
+                <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+              ))}
+            </select>
           </div>
 
           <div><label className="input-label">Пароль *</label>
