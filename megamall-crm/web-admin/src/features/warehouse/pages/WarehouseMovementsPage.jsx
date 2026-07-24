@@ -11,7 +11,7 @@ import { STATUS_LABELS, STATUS_BADGE } from '../../../shared/orderStatusConfig'
 import ReceivingEditModal from '../components/ReceivingEditModal'
 import useWarehouseData from '../hooks/useWarehouseData'
 import { fetchReceivingHistory } from '../api'
-import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getBatchUnitCost, getId, getMovementType, getProductImageSrcSet, getProductImageVariant, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
+import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getId, getMovementType, getMovementUnitCost, getProductImageSrcSet, getProductImageVariant, getProductName, getProductSku, getSaleUnitPrice, isUUID } from '../utils/warehouseHelpers'
 
 const TYPES = [
   { value: '', label: 'Все типы' },
@@ -90,6 +90,7 @@ export function MovementList({ rows, data, emptyTitle = 'Движения не �
               <th className="px-3 py-2.5 text-right">Было</th>
               <th className="px-3 py-2.5 text-right">Стало</th>
               <th className="px-3 py-2.5 text-right">Закупочная цена</th>
+              <th className="px-3 py-2.5 text-right">Продажа</th>
               <th className="px-3 py-2.5 text-left">Пользователь</th>
               <th className="px-3 py-2.5 text-left">Дата</th>
               <th className="px-3 py-2.5 text-left">Комментарий</th>
@@ -192,7 +193,8 @@ function MovementRow({ m, data, onOpen, onEdit, showActions }) {
       <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-950">{m.quantity ?? m.Quantity}</td>
       <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{m.previous_quantity ?? m.PreviousQuantity ?? '—'}</td>
       <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">{m.new_quantity ?? m.NewQuantity ?? '—'}</td>
-      <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{type === 'purchase' ? fmtMoney(getBatchUnitCost(m) ?? 0) : '—'}</td>
+      <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{getMovementUnitCost(m) != null ? fmtMoney(getMovementUnitCost(m)) : '—'}</td>
+      <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">{type === 'sale' && getSaleUnitPrice(m) != null ? fmtMoney(getSaleUnitPrice(m)) : '—'}</td>
       <td className="px-3 py-2.5 text-slate-500">{m.created_by_name ?? m.CreatedByName ?? '—'}</td>
       <td className="px-3 py-2.5 text-xs text-slate-400">{fmtDate(m.created_at ?? m.CreatedAt)}</td>
       <td className="max-w-[220px] px-3 py-2.5 text-xs text-slate-500">
@@ -222,8 +224,11 @@ function MovementCard({ m, data, onOpen, onEdit, showActions }) {
         <p className="text-xl font-bold tabular-nums text-slate-950">{m.quantity ?? m.Quantity}</p>
         <p className="text-right text-xs text-slate-400">{fmtDate(m.created_at ?? m.CreatedAt)}<br />{m.created_by_name ?? m.CreatedByName ?? '—'}</p>
       </div>
-      {type === 'purchase' && (
-        <p className="mt-2 text-xs text-slate-500">Закупочная цена: <span className="font-semibold text-slate-700">{fmtMoney(getBatchUnitCost(m) ?? 0)}</span></p>
+      {getMovementUnitCost(m) != null && (
+        <p className="mt-2 text-xs text-slate-500">Закупочная цена: <span className="font-semibold text-slate-700">{fmtMoney(getMovementUnitCost(m))}</span></p>
+      )}
+      {type === 'sale' && getSaleUnitPrice(m) != null && (
+        <p className="mt-1 text-xs text-slate-500">Продажа: <span className="font-semibold text-slate-700">{fmtMoney(getSaleUnitPrice(m))}</span></p>
       )}
       <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
         <MovementReason m={m} />
@@ -387,6 +392,8 @@ function MovementOrderModal({ movement, product, onClose }) {
         <InfoRow icon={<Phone size={13} />} label="Телефон" value={movement.customer_phone} />
         <InfoRow icon={<MapPin size={13} />} label="Адрес доставки" value={movement.delivery_address} />
         <InfoRow icon={<Truck size={13} />} label="Курьер" value={movement.courier_name ?? 'Не назначен'} />
+        <InfoRow icon={<BadgeDollarSign size={13} />} label="Закупочная цена" value={getMovementUnitCost(movement) != null ? fmtMoney(getMovementUnitCost(movement)) : '—'} />
+        <InfoRow icon={<BadgeDollarSign size={13} />} label="Цена продажи" value={getSaleUnitPrice(movement) != null ? fmtMoney(getSaleUnitPrice(movement)) : '—'} />
         <div className="rounded-2xl bg-indigo-50 p-4">
           <MoneyRow label="Сумма товаров" value={movement.total_amount} />
           <MoneyRow label="Доставка" value={movement.delivery_fee} />
