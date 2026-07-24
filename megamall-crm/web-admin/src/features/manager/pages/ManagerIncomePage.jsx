@@ -21,13 +21,14 @@ import useMyIncome           from '../../hr/hooks/useMyIncome'
 import useMyPayouts          from '../../../shared/hooks/useMyPayouts'
 import { fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import { M }                  from '../../seller/components/mobileUi'
+import { toLocalYMD }         from '../../../shared/utils/date'
 
 function currentMonthDefault() {
   const now   = new Date()
   const start = new Date(now.getFullYear(), now.getMonth(), 1)
   return {
-    from: start.toISOString().slice(0, 10),
-    to:   now.toISOString().slice(0, 10),
+    from: toLocalYMD(start),
+    to:   toLocalYMD(now),
   }
 }
 

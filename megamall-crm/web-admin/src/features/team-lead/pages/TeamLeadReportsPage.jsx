@@ -22,6 +22,7 @@ import useEmployeesByIds      from '../../people/hooks/useEmployeesByIds'
 import { buildUserMap }       from '../../people/utils/peopleHelpers'
 import useOwnerOrders         from '../../orders/hooks/useOwnerOrders'
 import useCurrentUser         from '../../../shared/hooks/useCurrentUser'
+import { toLocalYMD }         from '../../../shared/utils/date'
 
 // ── Section card wrapper ──────────────────────────────────────────────────────
 
@@ -208,8 +209,8 @@ export default function TeamLeadReportsPage() {
   const def = (() => {
     const now = new Date()
     return {
-      from: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10),
-      to:   now.toISOString().slice(0,10),
+      from: toLocalYMD(new Date(now.getFullYear(), now.getMonth(), 1)),
+      to:   toLocalYMD(now),
     }
   })()
 

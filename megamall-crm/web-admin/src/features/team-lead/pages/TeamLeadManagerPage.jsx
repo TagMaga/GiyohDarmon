@@ -17,6 +17,7 @@ import useEmployeesByIds from '../../people/hooks/useEmployeesByIds'
 import { buildUserMap }  from '../../people/utils/peopleHelpers'
 import useOwnerOrders    from '../../orders/hooks/useOwnerOrders'
 import useCurrentUser    from '../../../shared/hooks/useCurrentUser'
+import { toLocalYMD }    from '../../../shared/utils/date'
 
 function StatCard({ icon, label, value, accent = 'indigo' }) {
   const cls = {
@@ -49,8 +50,8 @@ export default function TeamLeadManagerPage() {
   const orderParams = useMemo(() => ({
     team_lead_id: userId,
     ...(teamId ? { team_id: teamId } : {}),
-    from:  new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10),
-    to:    now.toISOString().slice(0,10),
+    from:  toLocalYMD(new Date(now.getFullYear(), now.getMonth(), 1)),
+    to:    toLocalYMD(now),
     limit: 500,
     page:  1,
   }), [userId, teamId])

@@ -21,6 +21,7 @@ import useTeamIncome         from '../../hr/hooks/useTeamIncome'
 import useAuthStore          from '../../../shared/store/authStore'
 import { fmtMoney, EVENT_TYPE_LABEL, EVENT_TYPE_BADGE } from '../../hr/utils/hrHelpers'
 import { Users2, Wallet } from 'lucide-react'
+import { toLocalYMD } from '../../../shared/utils/date'
 
 const TABS = [
   { key: 'personal', label: 'Мой доход' },
@@ -31,8 +32,8 @@ function currentMonthDefault() {
   const now   = new Date()
   const start = new Date(now.getFullYear(), now.getMonth(), 1)
   return {
-    from: start.toISOString().slice(0, 10),
-    to:   now.toISOString().slice(0, 10),
+    from: toLocalYMD(start),
+    to:   toLocalYMD(now),
   }
 }
 

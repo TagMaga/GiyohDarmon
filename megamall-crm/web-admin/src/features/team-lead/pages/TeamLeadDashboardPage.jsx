@@ -32,15 +32,14 @@ import { buildUserMap }        from '../../people/utils/peopleHelpers'
 import useOwnerOrders          from '../../orders/hooks/useOwnerOrders'
 import useProfile              from '../../../shared/hooks/useProfile'
 import { M, MobileShell, DarkCard, Card, InitialsAvatar } from '../../seller/components/mobileUi'
+import { toLocalYMD } from '../../../shared/utils/date'
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
-function toYMD(d) { return d.toISOString().slice(0, 10) }
-
 function usePeriod() {
   const now   = new Date()
-  const today = toYMD(now)
-  const monthStart = toYMD(new Date(now.getFullYear(), now.getMonth(), 1))
+  const today = toLocalYMD(now)
+  const monthStart = toLocalYMD(new Date(now.getFullYear(), now.getMonth(), 1))
   return { today, from: monthStart, to: today }
 }
 

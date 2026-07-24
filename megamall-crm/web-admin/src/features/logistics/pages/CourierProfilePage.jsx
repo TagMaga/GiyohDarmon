@@ -17,6 +17,7 @@ import { useHandovers } from '../hooks/useHandovers'
 import CourierPerformanceChart from '../components/CourierPerformanceChart'
 import CourierOrdersTable      from '../components/CourierOrdersTable'
 import CashHandoversPage       from '../components/CashHandoversPage'
+import { toLocalYMD } from '../../../shared/utils/date'
 
 const fmtMoney = (n) =>
   Number(n ?? 0).toLocaleString('ru-RU', { maximumFractionDigits: 0 })
@@ -60,14 +61,10 @@ function addDays(d, n) {
   return r
 }
 
-function toISO(d) {
-  return d.toISOString().split('T')[0]
-}
-
 function defaultRange(days = 14) {
   const to   = new Date()
   const from = addDays(to, -days)
-  return { from: toISO(from), to: toISO(to) }
+  return { from: toLocalYMD(from), to: toLocalYMD(to) }
 }
 
 export default function CourierProfilePage() {
