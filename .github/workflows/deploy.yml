@@ -156,6 +156,13 @@ jobs:
           SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
           scp "${SSH_ARGS[@]}" "megamall-$GITHUB_SHA.tar.gz" \
             "$SERVER_USER@$SERVER_HOST:/tmp/"
+          # deploy.sh itself is never part of the release tarball deploy.sh
+          # extracts (that's backend+frontend only) — it has to land at a
+          # path the deploy account can write without sudo (same as the
+          # tarball above), so the live copy at $PROJECT/deploy.sh can
+          # self-update. See deploy.sh's NEW_DEPLOY_SCRIPT handling.
+          scp "${SSH_ARGS[@]}" "deploy.sh" \
+            "$SERVER_USER@$SERVER_HOST:/tmp/megamall-$GITHUB_SHA-deploy.sh"
 
       - name: Deploy with automatic rollback
         env:
@@ -164,7 +171,7 @@ jobs:
           set -Eeuo pipefail
           SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
           ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" \
-            "sudo --non-interactive /var/www/megamall-crm/deploy.sh '$GITHUB_SHA' '/tmp/megamall-$GITHUB_SHA.tar.gz'"
+            "sudo --non-interactive /var/www/megamall-crm/deploy.sh '$GITHUB_SHA' '/tmp/megamall-$GITHUB_SHA.tar.gz' '/tmp/megamall-$GITHUB_SHA-deploy.sh'"
 
       - name: Verify public application path
         run: |

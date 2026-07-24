@@ -28,6 +28,25 @@ NGINX_SITE_CONF=${NGINX_SITE_CONF:-/etc/nginx/sites-available/megamall-crm}
 
 REVISION=${1:-}
 ARTIFACT=${2:-}
+NEW_DEPLOY_SCRIPT=${3:-}
+
+# Self-update: deploy.yml uploads the repo's current deploy.sh to /tmp/
+# alongside the release artifact (the same unprivileged scp the tarball
+# already uses — deploy.yml never touches $PROJECT directly) and passes
+# its path here as $3. This is the only way $PROJECT/deploy.sh can ever
+# change: the deploy account's one passwordless-sudo grant is scoped to
+# the exact literal command `$PROJECT/deploy.sh <anything>`, so nothing
+# else running on the server can overwrite that file, and there's no
+# separate mechanism that syncs it. Runs first, unconditionally, using
+# the root privilege this whole script already has from that same sudo
+# call — no new grant needed. A bad self-update can't wedge the pipeline:
+# this process keeps running the old (already-loaded) code for the rest
+# of this deploy regardless of what's now on disk; only the *next*
+# invocation picks up the new file.
+if [[ -n "$NEW_DEPLOY_SCRIPT" && -f "$NEW_DEPLOY_SCRIPT" ]]; then
+  install -m 0755 "$NEW_DEPLOY_SCRIPT" "$PROJECT/deploy.sh"
+  rm -f "$NEW_DEPLOY_SCRIPT"
+fi
 
 if [[ ! "$REVISION" =~ ^[0-9a-f]{40}$ ]]; then
   echo "Deployment revision must be a full 40-character Git commit SHA" >&2
@@ -228,10 +247,6 @@ echo "7/7 - Recording successful release"
 printf '%s\n' "$REVISION" > "$RELEASES/CURRENT"
 printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$BACKUP/DEPLOYED_AT"
 rm -f "$ARTIFACT"
-
-if [[ "$0" != "$PROJECT/deploy.sh" ]]; then
-  install -m 0755 "$0" "$PROJECT/deploy.sh"
-fi
 
 DEPLOY_STARTED=0
 echo "Deployment completed successfully: $REVISION"
