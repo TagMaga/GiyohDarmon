@@ -95,6 +95,24 @@ func (h *Handler) SalesByProductReport(c *gin.Context) {
 	response.OK(c, out)
 }
 
+func (h *Handler) SlowMovingReport(c *gin.Context) {
+	var f ListSlowMovingFilter
+	if err := c.ShouldBindQuery(&f); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	rows, err := h.svc.SlowMovingStock(c.Request.Context(), f)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	out := make([]SlowMovingReportResponse, 0, len(rows))
+	for i := range rows {
+		out = append(out, ToSlowMovingReportResponse(&rows[i]))
+	}
+	response.OK(c, out)
+}
+
 // ─── Receiving ────────────────────────────────────────────────────────────────
 
 func (h *Handler) CreateReceiving(c *gin.Context) {

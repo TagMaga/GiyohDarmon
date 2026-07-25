@@ -260,6 +260,33 @@ export function fmtDate(iso) {
   try { return dateFmt.format(new Date(iso)) } catch { return iso }
 }
 
+// ── CSV export ─────────────────────────────────────────────────────────────────
+
+function csvCell(value) {
+  const s = value === null || value === undefined ? '' : String(value)
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+// Exports rows as a CSV file download. columns: [{ key, header }], where key
+// is either a property name or a function (row) => value — raw numbers, not
+// formatted strings, so the file stays spreadsheet-friendly.
+export function exportRowsToCsv(filename, columns, rows) {
+  const lines = [columns.map((c) => csvCell(c.header)).join(',')]
+  for (const row of rows) {
+    lines.push(columns.map((c) => csvCell(typeof c.key === 'function' ? c.key(row) : row[c.key])).join(','))
+  }
+  // BOM so Excel (incl. ru-RU locale) opens Cyrillic text as UTF-8 instead of guessing cp1251.
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 // ── Build lookup maps ──────────────────────────────────────────────────────────
 
 /** Build { id → product } map from products array */

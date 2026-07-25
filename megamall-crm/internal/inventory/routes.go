@@ -20,6 +20,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/product/:id", readRoles, h.GetInventoryByProduct)
 	rg.GET("/movements", readRoles, h.ListMovements)
 	rg.GET("/reports/sales-by-product", readRoles, h.SalesByProductReport)
+	rg.GET("/reports/slow-moving", readRoles, h.SlowMovingReport)
 
 	// FIFO batch reads (?product_id=&only_active=true)
 	rg.GET("/batches", readRoles, h.ListBatches)

@@ -49,6 +49,17 @@ type ProductSalesRow struct {
 	COGS         float64   `gorm:"column:cogs"`
 }
 
+// SlowMovingRow is one row of the slow-moving stock report: a product with
+// stock on hand that sold zero units within the requested date range.
+type SlowMovingRow struct {
+	ProductID   uuid.UUID  `gorm:"column:product_id"`
+	ProductName string     `gorm:"column:product_name"`
+	SKU         string     `gorm:"column:sku"`
+	StockQty    int        `gorm:"column:stock_qty"`
+	StockValue  float64    `gorm:"column:stock_value"`
+	LastSoldAt  *time.Time `gorm:"column:last_sold_at"`
+}
+
 type ReceivingEditRow struct {
 	ReceivingEdit
 	EditorName     string `gorm:"column:editor_name"`
@@ -320,6 +331,71 @@ func (r *Repository) SalesByProduct(ctx context.Context, f ListProductSalesFilte
 		Find(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("sales by product: %w", err)
+	}
+	return rows, nil
+}
+
+// SlowMovingStock returns products that still have stock on hand but sold
+// zero units within the given date range, ordered by the capital tied up
+// (FIFO remaining batch value) descending. last_sold_at is deliberately
+// all-time (not bounded by the range) so the report shows how long a
+// product has actually been sitting, not just that it missed this window.
+func (r *Repository) SlowMovingStock(ctx context.Context, f ListSlowMovingFilter) ([]SlowMovingRow, error) {
+	saleDateCond := "movement_type = ?"
+	saleArgs := []interface{}{MovementSale}
+	if f.DateFrom != "" {
+		if t, err := time.Parse("2006-01-02", f.DateFrom); err == nil {
+			saleDateCond += " AND created_at >= ?"
+			saleArgs = append(saleArgs, t.UTC())
+		}
+	}
+	if f.DateTo != "" {
+		if t, err := time.Parse("2006-01-02", f.DateTo); err == nil {
+			saleDateCond += " AND created_at < ?"
+			saleArgs = append(saleArgs, t.AddDate(0, 0, 1).UTC())
+		}
+	}
+
+	soldInRangeJoin := fmt.Sprintf(`LEFT JOIN (
+		SELECT product_id, SUM(quantity) AS qty_sold
+		FROM inventory_movements
+		WHERE %s
+		GROUP BY product_id
+	) sold_in_range ON sold_in_range.product_id = inventory.product_id`, saleDateCond)
+
+	base := r.db.WithContext(ctx).
+		Table("inventory").
+		Joins("JOIN products ON products.id = inventory.product_id AND products.deleted_at IS NULL").
+		Joins(soldInRangeJoin, saleArgs...).
+		Joins(`LEFT JOIN (
+			SELECT product_id, MAX(created_at) AS last_sold_at
+			FROM inventory_movements
+			WHERE movement_type = ?
+			GROUP BY product_id
+		) last_sale ON last_sale.product_id = inventory.product_id`, MovementSale).
+		Joins(`LEFT JOIN (
+			SELECT product_id, SUM(remaining_quantity * unit_cost) AS stock_value
+			FROM inventory_batches
+			WHERE remaining_quantity > 0
+			GROUP BY product_id
+		) stock_value ON stock_value.product_id = inventory.product_id`).
+		Where("inventory.quantity > 0").
+		Where("COALESCE(sold_in_range.qty_sold, 0) = 0")
+
+	var rows []SlowMovingRow
+	err := base.
+		Select(`
+			inventory.product_id AS product_id,
+			products.name AS product_name,
+			products.sku AS sku,
+			inventory.quantity AS stock_qty,
+			COALESCE(stock_value.stock_value, 0) AS stock_value,
+			last_sale.last_sold_at AS last_sold_at
+		`).
+		Order("stock_value DESC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("slow moving stock: %w", err)
 	}
 	return rows, nil
 }
