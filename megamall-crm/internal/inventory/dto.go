@@ -282,6 +282,13 @@ type ListProductSalesFilter struct {
 	DateTo   string `form:"date_to"`
 }
 
+type ListSlowMovingFilter struct {
+	// DateFrom / DateTo accept YYYY-MM-DD and bound the "zero sales" window.
+	// Both empty means all-time.
+	DateFrom string `form:"date_from"`
+	DateTo   string `form:"date_to"`
+}
+
 // ─── Reports ──────────────────────────────────────────────────────────────────
 
 type ProductSalesReportResponse struct {
@@ -303,5 +310,29 @@ func ToProductSalesReportResponse(r *ProductSalesRow) ProductSalesReportResponse
 		Revenue:      r.Revenue,
 		COGS:         r.COGS,
 		Profit:       r.Revenue - r.COGS,
+	}
+}
+
+// SlowMovingReportResponse is one row of the slow-moving stock report:
+// products that still have stock on hand but sold zero units within the
+// given date range. LastSoldAt is all-time (not bounded by the report
+// range) so the owner can see how long a product has actually been sitting.
+type SlowMovingReportResponse struct {
+	ProductID   uuid.UUID  `json:"product_id"`
+	ProductName string     `json:"product_name"`
+	SKU         string     `json:"sku"`
+	StockQty    int        `json:"stock_qty"`
+	StockValue  float64    `json:"stock_value"`
+	LastSoldAt  *time.Time `json:"last_sold_at"`
+}
+
+func ToSlowMovingReportResponse(r *SlowMovingRow) SlowMovingReportResponse {
+	return SlowMovingReportResponse{
+		ProductID:   r.ProductID,
+		ProductName: r.ProductName,
+		SKU:         r.SKU,
+		StockQty:    r.StockQty,
+		StockValue:  r.StockValue,
+		LastSoldAt:  r.LastSoldAt,
 	}
 }

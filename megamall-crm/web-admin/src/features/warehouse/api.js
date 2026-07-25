@@ -175,6 +175,11 @@ export async function fetchSalesByProduct(params = {}) {
   return toArray(unwrap(res))
 }
 
+export async function fetchSlowMovingStock(params = {}) {
+  const res = await client.get('/inventory/reports/slow-moving', { params: cleanParams(params) })
+  return toArray(unwrap(res))
+}
+
 // ── Batches ───────────────────────────────────────────────────────────────────
 export async function fetchBatches(params = {}) {
   const res = await client.get('/inventory/batches', { params: { only_active: 'true', ...cleanParams(params) } })
