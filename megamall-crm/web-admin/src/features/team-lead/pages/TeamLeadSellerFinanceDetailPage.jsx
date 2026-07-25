@@ -21,6 +21,7 @@ import { generateUUID } from '../../../shared/utils/uuid'
 import usePayables from '../hooks/usePayables'
 import useCreatePayouts from '../hooks/useCreatePayouts'
 import usePayeePayoutHistory from '../hooks/usePayeePayoutHistory'
+import useDeliveredTeamTotals from '../hooks/useDeliveredTeamTotals'
 import { M, MobileShell, Card, InitialsAvatar } from '../../seller/components/mobileUi'
 
 function toYMD(d) {
@@ -49,15 +50,29 @@ export default function TeamLeadSellerFinanceDetailPage() {
   const from = toYMD(new Date(now.getFullYear(), now.getMonth(), 1))
   const to   = toYMD(now)
 
-  const { data: payables, isLoading } = usePayables(userId, { from, to })
-  const member = (payables?.members ?? []).find(m => m.payee_id === payeeId)
+  const { data: payables, isLoading: payablesLoading } = usePayables(userId, { from, to })
+  const { byUser: deliveredTotals, isLoading: totalsLoading } = useDeliveredTeamTotals({ from, to })
+  const isLoading = payablesLoading || totalsLoading
+  const payableMember = (payables?.members ?? []).find(m => m.payee_id === payeeId)
+  // payables.gross_amount/orders_count count every order regardless of
+  // status; swap in delivered-only totals (see useDeliveredTeamTotals) so
+  // "Выручка за месяц" reflects actual delivered sales, matching what
+  // financial_events (member.earned) were actually computed from.
+  const d = payeeId ? (deliveredTotals[payeeId] ?? { ordersCount: 0, grossAmount: 0, courierFeeTotal: 0 }) : null
+  const member = payableMember && d
+    ? { ...payableMember, orders_count: d.ordersCount, gross_amount: d.grossAmount, courier_fee_total: d.courierFeeTotal }
+    : payableMember
   const { data: history = [], isLoading: historyLoading } = usePayeePayoutHistory(payeeId)
 
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [method, setMethod] = useState('cash')
   const createPayouts = useCreatePayouts(userId)
 
-  const commissionPct = member?.gross_amount > 0 ? (member.earned / member.gross_amount) * 100 : 0
+  // commission_base = delivered gross − courier fee (internal/orders/financial.go);
+  // the displayed % is derived from that netted base, not raw gross, so it
+  // shows the real configured rate instead of a distorted one.
+  const commissionBase = (member?.gross_amount ?? 0) - (member?.courier_fee_total ?? 0)
+  const commissionPct = commissionBase > 0 ? (member.earned / commissionBase) * 100 : 0
   const avgCheck = member?.orders_count > 0 ? member.gross_amount / member.orders_count : 0
 
   async function handlePay() {
@@ -121,12 +136,17 @@ export default function TeamLeadSellerFinanceDetailPage() {
       <div style={{ fontSize: 11.5, color: M.sub, fontWeight: 500, marginTop: 8 }}>
         {member.orders_count} заказ{member.orders_count === 1 ? '' : member.orders_count < 5 ? 'а' : 'ов'} · средний чек {fmtRu(Math.round(avgCheck))} с
       </div>
-      <div className="flex items-center justify-center gap-2" style={{ background: '#F5F4FE', borderRadius: 12, padding: '11px 12px', marginTop: 12 }}>
+      <div className="flex flex-wrap items-center justify-center gap-2" style={{ background: '#F5F4FE', borderRadius: 12, padding: '11px 12px', marginTop: 12 }}>
         <span style={{ fontSize: 16, fontWeight: 800, color: M.ink }}>{fmtRu(member.gross_amount)}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: M.muted }}>−</span>
+        <span style={{ fontSize: 16, fontWeight: 800, color: M.muted }}>{fmtRu(member.courier_fee_total)}</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: M.muted }}>×</span>
         <span style={{ fontSize: 16, fontWeight: 800, color: M.amber }}>{commissionPct.toFixed(1).replace('.', ',')}%</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: M.muted }}>=</span>
         <span style={{ fontSize: 16, fontWeight: 800, color: M.indigoDeep }}>{fmtRu(member.earned)}</span>
+      </div>
+      <div style={{ fontSize: 10, color: M.faint, fontWeight: 500, marginTop: 6, textAlign: 'center' }}>
+        Выручка − Курьерская доставка × комиссия = Доход
       </div>
     </Card>
   )
