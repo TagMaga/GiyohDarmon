@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Alert from '../../../shared/components/Alert'
 import { useSellerMe, usePatchMe, useUploadMyAvatar } from '../hooks/useSellerMe'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { translateMediaError } from '../../../shared/api/mediaErrors'
 import { withCacheBust } from '../../../shared/api/mediaUpload'
-import { Check, Upload } from 'lucide-react'
+import { Check, ChevronRight, Upload } from 'lucide-react'
 import { M, Card } from '../components/mobileUi'
 
 function initials(name = '') {
@@ -16,6 +17,7 @@ export default function SellerProfileInfoPage() {
   const patch = usePatchMe()
   const avatarUpload = useUploadMyAvatar()
   const toast = useToast()
+  const navigate = useNavigate()
   const [fullName, setFullName] = useState('')
   // Two separate refs: mobile and desktop layouts are both always mounted
   // (shown/hidden via Tailwind's lg: breakpoint classes, never
@@ -122,6 +124,21 @@ export default function SellerProfileInfoPage() {
           </Card>
         </div>
 
+        <div>
+          <SectionTitle>Безопасность</SectionTitle>
+          <Card style={{ borderRadius: 16, padding: '4px 16px' }}>
+            <button
+              type="button"
+              onClick={() => navigate('../password')}
+              className="flex items-center justify-between w-full"
+              style={{ padding: '14px 0', background: 'none', border: 'none', fontFamily: 'inherit', cursor: 'pointer' }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 600, color: M.ink }}>Изменить пароль</span>
+              <ChevronRight size={16} color={M.faint} />
+            </button>
+          </Card>
+        </div>
+
         <button
           type="button"
           onClick={handleSaveAll}
@@ -217,6 +234,21 @@ export default function SellerProfileInfoPage() {
                 <span style={{ fontSize: 12, fontWeight: 700, color: '#76766E', background: '#F0EFEA', padding: '5px 12px', borderRadius: 7 }}>{roleLabel}</span>
               </div>
             </Card>
+          </div>
+
+          <div>
+            <SectionTitle>Безопасность</SectionTitle>
+            <div style={{ background: '#fff', border: `1px solid ${M.border}`, borderRadius: 16, padding: '6px 22px' }}>
+              <button
+                type="button"
+                onClick={() => navigate('../password')}
+                className="flex items-center justify-between w-full"
+                style={{ padding: '15px 0', background: 'none', border: 'none', fontFamily: 'inherit', cursor: 'pointer' }}
+              >
+                <span style={{ fontSize: 14.5, fontWeight: 600, color: M.ink }}>Изменить пароль</span>
+                <ChevronRight size={17} color={M.faint} />
+              </button>
+            </div>
           </div>
         </div>
       </div>

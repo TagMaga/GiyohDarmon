@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Image } from 'react-native'
+import { ChevronRight } from 'lucide-react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -71,7 +72,11 @@ export default function ProfileScreen() {
         {/* Info card */}
         <View style={[s.card, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
           <Text style={[s.cardTitle, { color: T.muted }]}>ИНФОРМАЦИЯ</Text>
-          <InfoRow label="Телефон" value={user?.phone} last />
+          <InfoRow label="Телефон" value={user?.phone} />
+          <TouchableOpacity style={s.infoRow} onPress={() => router.push('/change-password')}>
+            <Text style={[s.infoLabel, { color: T.muted }]}>Изменить пароль</Text>
+            <ChevronRight size={16} color={T.muted} />
+          </TouchableOpacity>
         </View>
 
         {/* Tariff card */}

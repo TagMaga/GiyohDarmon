@@ -26,6 +26,7 @@ const OwnerSettingsPage       = lazy(() => import('../features/owner/pages/Owner
 const OwnerReportsPage        = lazy(() => import('../features/owner/pages/OwnerReportsPage'))
 const OwnerProfilePage        = lazy(() => import('../features/owner/pages/OwnerProfilePage'))
 const OwnerProfileInfoPage    = lazy(() => import('../features/owner/pages/OwnerProfileInfoPage'))
+const ChangePasswordPage      = lazy(() => import('../features/seller/pages/ChangePasswordPage'))
 
 // People / HR (owner sub-pages)
 const TeamProfilePage       = lazy(() => import('../features/people/pages/TeamProfilePage'))
@@ -73,6 +74,7 @@ const WarehouseInventoryPage = lazy(() => import('../features/warehouse/pages/Wa
 const WarehouseMovementsPage = lazy(() => import('../features/warehouse/pages/WarehouseMovementsPage'))
 const WarehouseReceivingPage = lazy(() => import('../features/warehouse/pages/WarehouseReceivingPage'))
 const WarehouseProfilePage   = lazy(() => import('../features/warehouse/pages/WarehouseProfilePage'))
+const WarehouseChangePasswordPage = lazy(() => import('../features/warehouse/pages/WarehouseChangePasswordPage'))
 
 // Courier — web panel removed; couriers use the mobile app (see docs).
 const CourierAppNotice = lazy(() => import('../shared/components/CourierAppNotice'))
@@ -177,6 +179,7 @@ const router = createBrowserRouter([
           children: [
             { index: true,  element: <Navigate to="info" replace /> },
             { path: 'info', element: <Lazy><SellerProfileInfoPage /></Lazy> },
+            { path: 'password', element: <Lazy><ChangePasswordPage /></Lazy> },
           ],
         },
         { path: '*',        element: <ComingSoon /> },
@@ -205,6 +208,7 @@ const router = createBrowserRouter([
             { index: true,  element: <Navigate to="info" replace /> },
             { path: 'info', element: <Lazy><SellerProfileInfoPage /></Lazy> },
             { path: 'team', element: <Lazy><ManagerProfileTeamPage /></Lazy> },
+            { path: 'password', element: <Lazy><ChangePasswordPage /></Lazy> },
           ],
         },
         { path: '*',                     element: <ComingSoon /> },
@@ -236,6 +240,7 @@ const router = createBrowserRouter([
             { index: true, element: <Navigate to="info" replace /> },
             { path: 'info', element: <Lazy><SellerProfileInfoPage /></Lazy> },
             { path: 'team', element: <Lazy><SellerTeamPage /></Lazy> },
+            { path: 'password', element: <Lazy><ChangePasswordPage /></Lazy> },
           ],
         },
         { path: '*',      element: <ComingSoon /> },
@@ -270,7 +275,8 @@ const router = createBrowserRouter([
         { path: 'movements',    element: <Lazy><WarehouseMovementsPage /></Lazy> },
         { path: 'receiving',    element: <Lazy><WarehouseReceivingPage /></Lazy> },
         { path: 'writeoffs',    element: <Navigate to="/warehouse/receiving" replace /> },
-        { path: 'profile',      element: <Lazy><WarehouseProfilePage /></Lazy> },
+        { path: 'profile',          element: <Lazy><WarehouseProfilePage /></Lazy> },
+        { path: 'profile/password', element: <Lazy><WarehouseChangePasswordPage /></Lazy> },
         { path: '*',            element: <Navigate to="/warehouse" replace /> },
       ],
     }],
