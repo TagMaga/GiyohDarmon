@@ -43,6 +43,15 @@ func NoContent(c *gin.Context) {
 
 // Error writes an error response from an AppError.
 func Error(c *gin.Context, err *apperrors.AppError) {
+	// AppErrors built via apperrors.Internal() carry the real underlying
+	// error (e.g. a DB error) but always return the same generic message to
+	// the client, by design. Without this, that underlying error was never
+	// logged anywhere: callers that pass an already-wrapped AppError here
+	// skip HandleError's log.Printf below, since it only fires for errors
+	// that aren't already an AppError.
+	if err.Code == apperrors.CodeInternal {
+		log.Printf("[INTERNAL ERROR] %s: %v", c.Request.URL.Path, err.Unwrap())
+	}
 	c.JSON(err.StatusCode, Envelope{
 		Success: false,
 		Error: &ErrorBody{
