@@ -1,4 +1,5 @@
-import { LogOut, Phone, Shield, User2 } from 'lucide-react'
+import { ChevronRight, LogOut, Phone, Shield, User2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import Button from '../../../shared/components/Button'
 import useProfile from '../../../shared/hooks/useProfile'
 import useAuthStore from '../../../shared/store/authStore'
@@ -6,6 +7,7 @@ import useAuthStore from '../../../shared/store/authStore'
 export default function WarehouseProfilePage() {
   const { fullName, initials, phone } = useProfile()
   const clearAuth = useAuthStore((s) => s.clearAuth)
+  const navigate = useNavigate()
 
   return (
     <div className="p-6 pb-28">
@@ -28,6 +30,17 @@ export default function WarehouseProfilePage() {
           <InfoRow icon={<Phone size={16} />} label="Телефон" value={phone ? <a className="text-indigo-600" href={`tel:${phone}`}>{phone}</a> : '—'} />
           <div className="my-3 h-px bg-slate-100" />
           <InfoRow icon={<Shield size={16} />} label="Роль" value={<span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700">Склад</span>} />
+        </section>
+
+        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
+          <button
+            type="button"
+            onClick={() => navigate('/warehouse/profile/password')}
+            className="flex w-full items-center justify-between text-left"
+          >
+            <span className="text-sm font-semibold text-slate-900">Изменить пароль</span>
+            <ChevronRight size={16} className="text-slate-400" />
+          </button>
         </section>
 
         <Button variant="danger" fullWidth icon={<LogOut size={16} />} onClick={clearAuth}>
