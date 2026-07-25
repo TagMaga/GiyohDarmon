@@ -46,6 +46,10 @@ func (s *Service) SalesByProduct(ctx context.Context, f ListProductSalesFilter) 
 	return s.repo.SalesByProduct(ctx, f)
 }
 
+func (s *Service) SlowMovingStock(ctx context.Context, f ListSlowMovingFilter) ([]SlowMovingRow, error) {
+	return s.repo.SlowMovingStock(ctx, f)
+}
+
 // ─── Receiving ────────────────────────────────────────────────────────────────
 
 // Receive records a goods receipt: increases inventory quantity and creates a

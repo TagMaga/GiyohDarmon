@@ -80,6 +80,7 @@ export const KEYS = {
     batchesRoot: ['warehouse', 'batches'],
     batches:    (productId) => ['warehouse', 'batches', productId ?? ''],
     salesReport: (params) => ['warehouse', 'salesReport', params ?? {}],
+    slowMoving:  (params) => ['warehouse', 'slowMoving', params ?? {}],
   },
   settings: {
     delivery: ['settings', 'delivery'],
