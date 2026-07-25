@@ -393,18 +393,27 @@ export default function TeamLeadDashboardPage() {
 
   // ── Mobile-only derived values (Teamlead Panel Redesign home screen) ──────
   const { fullName: profileFullName } = useProfile()
-  const todaySalesSum = useMemo(
-    () => myTodayOrders.reduce((sum, o) => sum + Number(o.total_order_amount ?? o.total_amount ?? o.amount ?? 0), 0),
+  const deliveredTodayOrders = useMemo(
+    () => myTodayOrders.filter(o => (o.status ?? o.Status) === 'delivered'),
     [myTodayOrders]
+  )
+  // "Продажи команды" = actual delivered sales, not the value of every order
+  // placed today regardless of outcome (cancelled/returned orders don't count).
+  const todaySalesSum = useMemo(
+    () => deliveredTodayOrders.reduce((sum, o) => sum + Number(o.total_order_amount ?? o.total_amount ?? o.amount ?? 0), 0),
+    [deliveredTodayOrders]
   )
   const activeSellersToday = useMemo(
     () => new Set(myTodayOrders.map(o => o.seller_id ?? o.SellerID).filter(Boolean)).size,
     [myTodayOrders]
   )
-  const deliveredToday = myTodayOrders.filter(o => (o.status ?? o.Status) === 'delivered').length
+  const deliveredToday = deliveredTodayOrders.length
+  // Top sellers ranked by delivered revenue — an order that never delivered
+  // never became actual revenue for the seller.
   const topSellers = useMemo(() => {
     const s = {}
     myPeriodOrders.forEach(o => {
+      if ((o.status ?? o.Status) !== 'delivered') return
       const id = o.seller_id ?? o.SellerID
       if (!id) return
       if (!s[id]) s[id] = { orders: 0, revenue: 0 }

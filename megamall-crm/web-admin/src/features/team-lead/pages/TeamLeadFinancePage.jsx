@@ -20,6 +20,7 @@ import useMyPayouts     from '../../../shared/hooks/useMyPayouts'
 import { generateUUID } from '../../../shared/utils/uuid'
 import usePayables       from '../hooks/usePayables'
 import useCreatePayouts  from '../hooks/useCreatePayouts'
+import useDeliveredTeamTotals from '../hooks/useDeliveredTeamTotals'
 import { M, Card, InitialsAvatar, Chip } from '../../seller/components/mobileUi'
 import Alert from '../../../shared/components/Alert'
 
@@ -399,11 +400,22 @@ function BySellerTab() {
   const [period, setPeriod] = useState('month')
   const { from, to } = useMemo(() => periodRange(period), [period])
 
-  const { data: payables, isLoading } = usePayables(userId, { from, to })
+  const { data: payables, isLoading: payablesLoading } = usePayables(userId, { from, to })
+  const { byUser: deliveredTotals, isLoading: totalsLoading } = useDeliveredTeamTotals({ from, to })
+  const isLoading = payablesLoading || totalsLoading
+
+  // gross_amount/orders_count from payables count every order regardless of
+  // status — swap in the delivered-only totals so "сумма" and "заказов"
+  // match what was actually sold (see useDeliveredTeamTotals).
   const sellers = useMemo(() => {
-    const list = (payables?.members ?? []).filter(m => m.role === 'seller')
+    const list = (payables?.members ?? [])
+      .filter(m => m.role === 'seller')
+      .map(m => {
+        const d = deliveredTotals[m.payee_id] ?? { ordersCount: 0, grossAmount: 0, courierFeeTotal: 0 }
+        return { ...m, orders_count: d.ordersCount, gross_amount: d.grossAmount, courier_fee_total: d.courierFeeTotal }
+      })
     return [...list].sort((a, b) => (b.gross_amount ?? 0) - (a.gross_amount ?? 0))
-  }, [payables])
+  }, [payables, deliveredTotals])
 
   const maxRevenue = sellers[0]?.gross_amount || 1
 
@@ -432,7 +444,8 @@ function BySellerTab() {
         </Card>
       ) : (
         sellers.map((m, i) => {
-          const commissionPct = m.gross_amount > 0 ? (m.earned / m.gross_amount) * 100 : 0
+          const commissionBase = m.gross_amount - (m.courier_fee_total ?? 0)
+          const commissionPct = commissionBase > 0 ? (m.earned / commissionBase) * 100 : 0
           return (
             <Card
               key={m.payee_id}
