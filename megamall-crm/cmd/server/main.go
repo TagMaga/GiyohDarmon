@@ -25,6 +25,7 @@ import (
 	"github.com/megamall/crm/internal/customers"
 	delivery_settings "github.com/megamall/crm/internal/delivery_settings"
 	"github.com/megamall/crm/internal/dispatch"
+	"github.com/megamall/crm/internal/dispatcher_settlements"
 	"github.com/megamall/crm/internal/finance"
 	"github.com/megamall/crm/internal/health"
 	"github.com/megamall/crm/internal/hierarchy"
@@ -403,6 +404,13 @@ func main() {
 		payoutsSvc := payouts.NewService(payoutsRepo, compensationSvc)
 		payoutsHandler := payouts.NewHandler(payoutsSvc)
 		payoutsHandler.RegisterRoutes(v1.Group("/payouts"))
+
+		// Dispatcher <-> company cash settlements (logistics cash tab KPIs +
+		// dispatcher "pay all received to company" flow).
+		dispatcherSettlementsRepo := dispatcher_settlements.NewRepository(db)
+		dispatcherSettlementsSvc := dispatcher_settlements.NewService(dispatcherSettlementsRepo)
+		dispatcherSettlementsHandler := dispatcher_settlements.NewHandler(dispatcherSettlementsSvc)
+		dispatcherSettlementsHandler.RegisterRoutes(v1.Group("/settlements"))
 
 		// Phase 1: centralized secure media pipeline (additive alongside the
 		// legacy /uploads endpoint below — domain modules migrate to this

@@ -82,3 +82,40 @@ export async function fetchHandoverHistory(id) {
   const data = unwrap(res)
   return Array.isArray(data) ? data : []
 }
+
+// ── Dispatcher <-> company settlements ────────────────────────────────────────
+// Owner view of dispatcher cash remittances: /settlements (mounted at v1 root,
+// not under /owner/logistics — see internal/dispatcher_settlements/routes.go).
+
+export async function fetchSettlementsSummary(params = {}) {
+  const clean = Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v != null && v !== '')
+  )
+  const res = await client.get('/settlements/summary', { params: clean })
+  return unwrap(res)
+}
+
+export async function fetchSettlements(params = {}) {
+  const clean = Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v != null && v !== '')
+  )
+  const res = await client.get('/settlements', { params: clean })
+  return unwrapPaginated(res)
+}
+
+export async function confirmSettlement(id) {
+  const res = await client.post(`/settlements/${id}/confirm`)
+  return unwrap(res)
+}
+
+export async function rejectSettlement(id, reason) {
+  const res = await client.post(`/settlements/${id}/reject`, { reason })
+  return unwrap(res)
+}
+
+// Dispatcher list for the settlements filter dropdown.
+export async function fetchDispatchers() {
+  const res = await client.get('/users', { params: { role: 'dispatcher', limit: 200 } })
+  const data = unwrap(res)
+  return Array.isArray(data) ? data : []
+}

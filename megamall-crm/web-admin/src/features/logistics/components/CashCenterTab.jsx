@@ -7,11 +7,13 @@
  * the richer owner-only verification flow (receipts, admin_note, delete)
  * that already exists here, since it's a superset of the dispatcher's view.
  */
-import CashHandoversPage   from './CashHandoversPage'
+import CashHandoversPage from './CashHandoversPage'
+import DispatcherSettlementsPanel from './DispatcherSettlementsPanel'
 
 export default function CashCenterTab() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      <DispatcherSettlementsPanel />
       <CashHandoversPage />
     </div>
   )

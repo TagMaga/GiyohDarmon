@@ -6,11 +6,13 @@ import { KEYS } from '../../../shared/queryKeys'
 import CashHandovers       from '../components/CashHandovers'
 import CashSettlementTab   from '../components/v2/CashSettlementTab'
 import CashTransactionsTab from '../components/v2/CashTransactionsTab'
+import CompanySettlementTab from '../components/v2/CompanySettlementTab'
 
 const TABS = [
   { key: 'settlement',   label: 'Расчёты'    },
   { key: 'handovers',    label: 'Сдачи'      },
   { key: 'transactions', label: 'Транзакции' },
+  { key: 'company',      label: 'Компания'   },
 ]
 
 export default function DispatcherCashPage() {
@@ -67,6 +69,7 @@ export default function DispatcherCashPage() {
           {tab === 'settlement'   && <CashSettlementTab />}
           {tab === 'handovers'    && <CashHandovers />}
           {tab === 'transactions' && <CashTransactionsTab />}
+          {tab === 'company'      && <CompanySettlementTab />}
         </div>
       </div>
     </div>
