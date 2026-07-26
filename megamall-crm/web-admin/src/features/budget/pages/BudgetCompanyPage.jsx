@@ -42,14 +42,23 @@ function KpiCard({ label, value, sub, valueClass = 'text-slate-900', subColor = 
 }
 
 // ── Modal (Add top-up / Add withdrawal) ────────────────────────────────────────
-function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, loading, balance, isWithdrawal }) {
+function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, loading, balance, isWithdrawal, serverError }) {
   const [amount, setAmount] = useState('')
   const [note, setNote]     = useState('')
   const [err, setErr]       = useState('')
 
   function handleSubmit() {
+    // Defense-in-depth alongside the disabled button below: a request
+    // already in flight must never be resubmitted from a rapid double-click.
+    if (loading) return
     const amt = parseFloat(amount)
-    if (isNaN(amt) || amt < 0) { setErr('Введите корректную сумму'); return }
+    // Withdrawal now requires a strictly positive amount (matches the
+    // backend's binding:"gt=0" — a 0 withdrawal is otherwise a legitimate
+    // no-op the backend now rejects rather than silently accepting).
+    if (isNaN(amt) || (isWithdrawal ? amt <= 0 : amt < 0)) {
+      setErr(isWithdrawal ? 'Введите сумму больше нуля' : 'Введите корректную сумму')
+      return
+    }
     if (isWithdrawal && amt > balance) { setErr('Недостаточно средств на балансе'); return }
     setErr('')
     onSubmit({ amount: amt, note: note.trim() })
@@ -99,7 +108,7 @@ function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, l
           className="w-full px-4 py-2.5 rounded-xl border-[1.5px] border-slate-200 focus:border-indigo-400 outline-none text-[13px] bg-slate-50 focus:bg-white mb-1 transition-colors"
         />
 
-        {err && <p className="text-red-500 text-[11px] mt-1 mb-1">{err}</p>}
+        {(err || serverError) && <p className="text-red-500 text-[11px] mt-1 mb-1">{err || serverError}</p>}
 
         <p className="text-[11px] text-slate-400 mb-5 mt-2">
           Текущий баланс: <span className="font-bold text-slate-700">{fmt(balance)}</span> с
@@ -120,7 +129,7 @@ function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, l
                             : 'bg-emerald-500 hover:bg-emerald-600 shadow-[0_4px_10px_rgba(16,185,129,.3)]'
             }`}
           >
-            <Check size={14} />Сохранить
+            <Check size={14} />{loading ? 'Сохранение…' : 'Сохранить'}
           </button>
         </div>
       </div>
@@ -349,6 +358,11 @@ export default function BudgetCompanyPage() {
 
   const incomeMut     = useMutation({ mutationFn: postBudgetIncome,     onSuccess: () => { setIncomeOpen(false); invalidate() } })
   const withdrawalMut = useMutation({ mutationFn: postBudgetWithdrawal, onSuccess: () => { setWithdrawalOpen(false); invalidate() } })
+  // Backend validation errors (e.g. a race-losing withdrawal correctly
+  // rejected as insufficient balance) must be shown, not silently swallowed —
+  // the modal only ever closes on success (onSuccess above), never on error.
+  // .error is cleared automatically by React Query on the next .mutate() call.
+  const errMessage = (err) => err?.response?.data?.error?.message ?? err?.message ?? 'Не удалось выполнить операцию'
 
   return (
     <>
@@ -584,6 +598,7 @@ export default function BudgetCompanyPage() {
         Icon={ArrowDownCircle}
         onSubmit={(data) => incomeMut.mutate(data)}
         loading={incomeMut.isPending}
+        serverError={incomeMut.error ? errMessage(incomeMut.error) : ''}
         balance={balance}
         isWithdrawal={false}
       />
@@ -599,6 +614,7 @@ export default function BudgetCompanyPage() {
         Icon={ArrowUpCircle}
         onSubmit={(data) => withdrawalMut.mutate(data)}
         loading={withdrawalMut.isPending}
+        serverError={withdrawalMut.error ? errMessage(withdrawalMut.error) : ''}
         balance={balance}
         isWithdrawal
       />

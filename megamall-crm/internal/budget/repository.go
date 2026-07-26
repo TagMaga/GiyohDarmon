@@ -3,6 +3,7 @@ package budget
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"time"
 
@@ -241,26 +242,78 @@ func (r *Repository) AddIncome(ctx context.Context, tx *gorm.DB, userID uuid.UUI
 }
 
 var ErrInsufficientBalance = errors.New("insufficient balance")
+var ErrInvalidAmount = errors.New("amount must be greater than zero")
+
+// budgetLedgerLockKey is the pg_advisory_xact_lock key that serializes every
+// AddWithdrawal against every other one. There is no single "balance row" to
+// SELECT ... FOR UPDATE — CurrentBalance is a live aggregate over
+// company_budget_transactions plus Finance's net profit (see manualNet /
+// CurrentBalance above) — so a row lock has nothing to attach to. This
+// mirrors internal/courier/repository.go's LockCourierForHandover, whose doc
+// comment explains the same problem for cash handovers: a session-scoped
+// advisory lock, held for the duration of the transaction, blocks a second
+// concurrent withdrawal until the first COMMITs, so the second withdrawal's
+// balance re-read (taken after acquiring the lock) is guaranteed to observe
+// the first one's effect under READ COMMITTED.
+const budgetLedgerLockKey = "company_budget_ledger"
 
 // AddWithdrawal inserts an owner_withdrawal row. Returns ErrInsufficientBalance
-// if amount exceeds the current (live) company balance.
+// if amount exceeds the current (live) company balance, and ErrInvalidAmount
+// if amount is not strictly positive.
+//
+// The whole check-then-insert sequence runs inside one DB transaction guarded
+// by an advisory lock, so two concurrent withdrawals can never both validate
+// against the same balance and jointly overspend it (see budgetLedgerLockKey).
+// If tx is non-nil, the lock+read+insert run against the caller's existing
+// transaction (the lock is still (re-)acquired — Postgres advisory locks are
+// reentrant/stacking within a session, so this is safe); otherwise a new
+// transaction is opened for the whole operation.
 func (r *Repository) AddWithdrawal(ctx context.Context, tx *gorm.DB, userID uuid.UUID, amount float64, note string) (float64, error) {
-	db := r.db
-	if tx != nil {
-		db = tx
+	if amount <= 0 {
+		return 0, ErrInvalidAmount
 	}
-	balance, err := r.CurrentBalance(ctx)
+
+	if tx != nil {
+		return r.addWithdrawalLocked(ctx, tx, userID, amount, note)
+	}
+
+	var newBalance float64
+	err := r.db.WithContext(ctx).Transaction(func(txn *gorm.DB) error {
+		var err error
+		newBalance, err = r.addWithdrawalLocked(ctx, txn, userID, amount, note)
+		return err
+	})
 	if err != nil {
 		return 0, err
 	}
+	return newBalance, nil
+}
+
+// addWithdrawalLocked does the actual locked check-then-insert. txn must be a
+// real transaction handle (not r.db) so the advisory lock and the insert
+// share one Postgres transaction/session and the lock is released exactly at
+// COMMIT/ROLLBACK.
+func (r *Repository) addWithdrawalLocked(ctx context.Context, txn *gorm.DB, userID uuid.UUID, amount float64, note string) (float64, error) {
+	if err := txn.WithContext(ctx).Exec("SELECT pg_advisory_xact_lock(hashtext(?))", budgetLedgerLockKey).Error; err != nil {
+		return 0, fmt.Errorf("lock company budget ledger: %w", err)
+	}
+
+	// Re-read balance only after the lock is held — any concurrent
+	// withdrawal that started before us has, by now, either committed (and
+	// its effect is visible here) or is still blocked waiting for us.
+	manual, err := manualNet(ctx, txn, nil, nil)
+	if err != nil {
+		return 0, err
+	}
+	netProfit, err := r.financeRepo.GetNetProfit(ctx, nil, nil)
+	if err != nil {
+		return 0, err
+	}
+	balance := roundMoney(manual + netProfit)
 	if amount > balance {
 		return 0, ErrInsufficientBalance
 	}
 
-	manual, err := manualNet(ctx, db, nil, nil)
-	if err != nil {
-		return 0, err
-	}
 	newManual := roundMoney(manual - amount)
 	row := Transaction{
 		ID:              uuid.New(),
@@ -270,10 +323,10 @@ func (r *Repository) AddWithdrawal(ctx context.Context, tx *gorm.DB, userID uuid
 		CreatedBy:       &userID,
 		BalanceAfter:    newManual,
 	}
-	if err := db.WithContext(ctx).Create(&row).Error; err != nil {
+	if err := txn.WithContext(ctx).Create(&row).Error; err != nil {
 		return 0, err
 	}
-	return r.CurrentBalance(ctx)
+	return roundMoney(newManual + netProfit), nil
 }
 
 var ErrTransactionNotFound = errors.New("transaction not found")

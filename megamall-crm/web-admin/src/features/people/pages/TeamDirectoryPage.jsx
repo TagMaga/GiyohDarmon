@@ -620,7 +620,9 @@ function DetailPanel({ person, teamId, teamColor, teamName, teams, employees, on
 
   function handleAvatarChange(e) {
     const file = e.target.files?.[0]
-    if (file) avatarMut.mutate(file)
+    // Guard against a second file pick landing while the first upload for
+    // this person is still in flight.
+    if (file && !avatarMut.isPending) avatarMut.mutate(file)
     e.target.value = ''
   }
 

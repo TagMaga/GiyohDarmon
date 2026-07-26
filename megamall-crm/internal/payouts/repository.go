@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -39,13 +40,68 @@ func isUniqueViolation(err error) bool {
 	return strings.Contains(msg, "23505") || strings.Contains(msg, "duplicate key")
 }
 
+// lockPayees serializes concurrent payout batches that touch the same
+// payee(s). Like internal/budget's company-budget-ledger lock and
+// internal/courier's LockCourierForHandover, there is no single "remaining
+// balance" row to SELECT ... FOR UPDATE — remaining is a live aggregate
+// (earned income minus SUM(payouts)) — so a session-scoped
+// pg_advisory_xact_lock is used instead: a second concurrent batch for the
+// same payee blocks here until the first COMMITs, so its own fresh read of
+// "already paid" (see revalidate in CreatePayouts) is guaranteed to observe
+// the first batch's effect. Locks are acquired in a fixed (sorted) order
+// across all distinct payees in the batch to avoid a deadlock between two
+// batches that both reference an overlapping set of payees in different
+// orders.
+func lockPayees(ctx context.Context, tx *gorm.DB, payeeIDs []uuid.UUID) error {
+	seen := make(map[uuid.UUID]struct{}, len(payeeIDs))
+	ids := make([]string, 0, len(payeeIDs))
+	for _, id := range payeeIDs {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id.String())
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		if err := tx.WithContext(ctx).Exec("SELECT pg_advisory_xact_lock(hashtext(?))", id).Error; err != nil {
+			return fmt.Errorf("lock payee %s: %w", id, err)
+		}
+	}
+	return nil
+}
+
 // CreateBatchIdempotent inserts a payout_batches row + all payout rows in a
 // single transaction — all-or-nothing for the bulk "Выплатить" action. If
 // (payer_id, idempotency_key) already exists, it returns ErrDuplicateBatch
 // without inserting anything, so the caller can look up and replay the
 // original result instead of creating a duplicate set of payouts.
-func (r *Repository) CreateBatchIdempotent(ctx context.Context, batch *PayoutBatch, rows []*Payout) error {
+//
+// Every distinct payee referenced by rows is advisory-locked (see
+// lockPayees) before revalidate runs, so revalidate — when non-nil — can
+// safely re-check "amount requested vs. amount actually remaining" against
+// fresh data: no other transaction touching the same payee's payouts can be
+// concurrently in flight once the lock is held. This is what closes the
+// cross-batch race that a purely pre-transaction validation (built from a
+// snapshot taken before this transaction started) cannot: two different
+// batches, each individually valid against a stale snapshot, must not both
+// be allowed to spend the same remaining balance.
+func (r *Repository) CreateBatchIdempotent(ctx context.Context, batch *PayoutBatch, rows []*Payout, revalidate func(tx *gorm.DB) error) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		payeeIDs := make([]uuid.UUID, 0, len(rows))
+		for _, row := range rows {
+			payeeIDs = append(payeeIDs, row.PayeeID)
+		}
+		if err := lockPayees(ctx, tx, payeeIDs); err != nil {
+			return err
+		}
+
+		if revalidate != nil {
+			if err := revalidate(tx); err != nil {
+				return err
+			}
+		}
+
 		if err := tx.Create(batch).Error; err != nil {
 			if isUniqueViolation(err) {
 				return ErrDuplicateBatch
@@ -60,6 +116,27 @@ func (r *Repository) CreateBatchIdempotent(ctx context.Context, batch *PayoutBat
 		}
 		return nil
 	})
+}
+
+// SumPaidForPayeeTx returns how much payerID has already paid payeeID for a
+// period overlapping [from, to], read within the given transaction handle —
+// used only after lockPayees has locked payeeID, so this sees every
+// already-committed payout and none that's still in another in-flight,
+// not-yet-committed batch (which is blocked on the lock). Mirrors
+// SumPaidGroupedByPayee's period-overlap semantics but scoped to one payee
+// and tx-aware, which SumPaidGroupedByPayee (read-only display query,
+// r.db-only) is not.
+func (r *Repository) SumPaidForPayeeTx(ctx context.Context, tx *gorm.DB, payerID, payeeID uuid.UUID, from, to time.Time) (float64, error) {
+	var total float64
+	err := tx.WithContext(ctx).
+		Table("payouts").
+		Select("COALESCE(SUM(amount), 0)").
+		Where("payer_id = ? AND payee_id = ? AND status != 'voided' AND period_start <= ? AND period_end >= ?", payerID, payeeID, to, from).
+		Scan(&total).Error
+	if err != nil {
+		return 0, fmt.Errorf("sum paid for payee (tx): %w", err)
+	}
+	return total, nil
 }
 
 // FindBatchByKey looks up an existing batch by (payer_id, idempotency_key) —

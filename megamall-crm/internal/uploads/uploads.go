@@ -10,14 +10,25 @@ package uploads
 
 import (
 	"fmt"
+	"image"
+	_ "image/jpeg" // register the JPEG decoder with image.Decode
+	_ "image/png"  // register the PNG decoder with image.Decode
 	"io"
 	"net/http"
 	"strings"
+
+	_ "golang.org/x/image/webp" // register the WebP decoder with image.Decode
 )
 
 // MaxFileSize caps upload size at 10 MiB — enough for photos and scanned
 // documents while bounding per-request disk/memory use.
 const MaxFileSize = 10 << 20
+
+// MaxImageDimension bounds width and height (independently) for any image
+// validated via DecodeBounds — a decompression-bomb guard for callers that
+// need proof the sniffed bytes are a genuine, intact, boundedly-sized image
+// (not merely bytes that pass the magic-byte check in Validate).
+const MaxImageDimension = 4096
 
 // sniffLen matches the read size http.DetectContentType itself expects.
 const sniffLen = 512
@@ -91,6 +102,28 @@ func SniffAllowed(r io.ReadSeeker) (contentType string, ok bool) {
 // browser never renders them as a page.
 func IsImage(contentType string) bool {
 	return allowed[contentType].image
+}
+
+// DecodeBounds fully decodes an image (not merely a magic-byte sniff) to
+// prove the content is a genuine, intact image, and enforces
+// MaxImageDimension on both sides. Use this after Validate + IsImage for any
+// upload path where a caller must be sure the bytes are a real, decodable
+// image — it rejects malformed/truncated files and anything a decoder can't
+// parse, even if it happened to sniff as an allowed image MIME type. r must
+// contain a full image previously validated by Validate (caller is
+// responsible for seeking back to the start afterward, since decoding
+// consumes the reader).
+func DecodeBounds(r io.Reader) (width, height int, err error) {
+	img, _, err := image.Decode(r)
+	if err != nil {
+		return 0, 0, fmt.Errorf("decode image: %w", err)
+	}
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	if w > MaxImageDimension || h > MaxImageDimension {
+		return 0, 0, fmt.Errorf("image dimension exceeds %dpx limit", MaxImageDimension)
+	}
+	return w, h, nil
 }
 
 func baseContentType(sniffed string) string {

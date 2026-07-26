@@ -201,3 +201,43 @@ func TestValidatePayoutItems_AllowsPartialAmount(t *testing.T) {
 		t.Errorf("a partial payment within remaining should be allowed, got: %v", err)
 	}
 }
+
+// TestValidatePayoutItems_DuplicatePayeeSumExceedsRemaining is the regression
+// test for the fixed bug: a payee split across two items in the same batch
+// (700 + 700 = 1400) must be validated against their COMBINED total, not each
+// item independently — 700 alone looks fine against a 1000 remaining, but
+// 1400 does not.
+func TestValidatePayoutItems_DuplicatePayeeSumExceedsRemaining(t *testing.T) {
+	payeeID := uuid.New()
+	allowed := map[uuid.UUID]PayableMember{
+		payeeID: {PayeeID: payeeID, FullName: "Seller Demo", Remaining: 1000},
+	}
+	items := []CreatePayoutItem{
+		{PayeeID: payeeID, Amount: 700},
+		{PayeeID: payeeID, Amount: 700},
+	}
+	err := validatePayoutItems(items, allowed, true)
+	if err == nil {
+		t.Fatal("expected an error — combined amount (1400) exceeds remaining (1000)")
+	}
+	if code := appErrCode(t, err); code != apperrors.CodeBadRequest {
+		t.Errorf("code = %s, want BAD_REQUEST", code)
+	}
+}
+
+// TestValidatePayoutItems_DuplicatePayeeSumWithinRemaining is the positive
+// sibling: a payee legitimately split across two items whose SUM still fits
+// within what's owed must be allowed.
+func TestValidatePayoutItems_DuplicatePayeeSumWithinRemaining(t *testing.T) {
+	payeeID := uuid.New()
+	allowed := map[uuid.UUID]PayableMember{
+		payeeID: {PayeeID: payeeID, Remaining: 1000},
+	}
+	items := []CreatePayoutItem{
+		{PayeeID: payeeID, Amount: 400},
+		{PayeeID: payeeID, Amount: 400},
+	}
+	if err := validatePayoutItems(items, allowed, true); err != nil {
+		t.Errorf("combined amount (800) fits within remaining (1000), should be allowed, got: %v", err)
+	}
+}

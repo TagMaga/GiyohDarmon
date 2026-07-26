@@ -30,6 +30,10 @@ export default function SellerProfileInfoPage() {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
+    // Guard against a second file pick landing while the first upload is
+    // still in flight (the picker isn't disabled while the OS file dialog
+    // is open, so this is the actual guard, not just the spinner below).
+    if (avatarUpload.isPending) return
     avatarUpload.mutate(file, {
       onError: (err) => toast.error(translateMediaError(err)),
     })

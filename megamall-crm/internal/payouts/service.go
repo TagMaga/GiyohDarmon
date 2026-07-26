@@ -10,6 +10,7 @@ import (
 	"github.com/megamall/crm/internal/compensation"
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/rbac"
+	"gorm.io/gorm"
 )
 
 // Service holds payout business logic. It depends on compensation.Service for
@@ -164,25 +165,45 @@ func computeRemaining(earned, paid float64) float64 {
 	return r
 }
 
+// aggregatePayoutAmounts sums the requested amount per payee across every
+// item in a batch. A payee may legitimately appear more than once in one
+// batch (e.g. split across a note/method change), so the ceiling check below
+// must be against this per-payee total — never against each item in
+// isolation, which is exactly the bug this replaces: two items of 700 each
+// against a single payee with 1000 remaining used to each pass independently
+// (700 <= 1000) even though their sum (1400) does not fit.
+func aggregatePayoutAmounts(items []CreatePayoutItem) map[uuid.UUID]float64 {
+	sums := make(map[uuid.UUID]float64, len(items))
+	for _, item := range items {
+		sums[item.PayeeID] += item.Amount
+	}
+	return sums
+}
+
 // validatePayoutItems is the pure guard behind CreatePayouts: every payee
 // must be in the caller's own payables list (when restricted — i.e. the
-// caller is a team lead, not owner), and no item's amount may exceed what's
-// actually owed. This is the amount ceiling that was previously missing
-// entirely — a team lead could submit any amount for a valid payee.
+// caller is a team lead, not owner), and the TOTAL amount requested for that
+// payee across the whole batch may not exceed what's actually owed. This is
+// checked against the payables snapshot taken before the transaction opens —
+// good enough to fail fast with a clear message for a single well-formed
+// request, but not sufficient on its own to stop two concurrent batches from
+// both passing against the same stale snapshot; see CreatePayouts'
+// in-transaction revalidate closure (using fresh, lock-protected data) for
+// that half of the fix.
 func validatePayoutItems(items []CreatePayoutItem, allowed map[uuid.UUID]PayableMember, restricted bool) error {
+	if !restricted {
+		return nil // owner: unrestricted, no "remaining" ceiling to check against
+	}
 	const epsilon = 0.01 // float rounding tolerance
-	for _, item := range items {
-		if !restricted {
-			continue // owner: unrestricted, no "remaining" ceiling to check against
-		}
-		m, ok := allowed[item.PayeeID]
+	for payeeID, total := range aggregatePayoutAmounts(items) {
+		m, ok := allowed[payeeID]
 		if !ok {
-			return apperrors.Forbidden(fmt.Sprintf("payee %s is not a member of your team for this period", item.PayeeID))
+			return apperrors.Forbidden(fmt.Sprintf("payee %s is not a member of your team for this period", payeeID))
 		}
-		if item.Amount > m.Remaining+epsilon {
+		if total > m.Remaining+epsilon {
 			return apperrors.BadRequest(fmt.Sprintf(
-				"amount %.2f for %s exceeds remaining %.2f — cannot pay more than what's owed",
-				item.Amount, m.FullName, m.Remaining,
+				"total amount %.2f requested for %s exceeds remaining %.2f — cannot pay more than what's owed",
+				total, m.FullName, m.Remaining,
 			))
 		}
 	}
@@ -291,8 +312,36 @@ func (s *Service) CreatePayouts(ctx context.Context, actorID uuid.UUID, actorRol
 		})
 	}
 
+	// Only the restricted (team-lead) path has a remaining-balance ceiling to
+	// protect against a concurrent second batch — owner payouts are
+	// unrestricted (see validatePayoutItems), so there is nothing for a
+	// second batch to overspend and no revalidation is needed there.
+	var revalidate func(tx *gorm.DB) error
+	if restricted {
+		periodStartCopy, periodEndCopy := periodStart, periodEnd
+		itemsCopy, allowedCopy, payerID := req.Items, allowed, actorID
+		revalidate = func(tx *gorm.DB) error {
+			const epsilon = 0.01
+			for payeeID, total := range aggregatePayoutAmounts(itemsCopy) {
+				m := allowedCopy[payeeID] // presence already checked by validatePayoutItems
+				paid, err := s.repo.SumPaidForPayeeTx(ctx, tx, payerID, payeeID, periodStartCopy, periodEndCopy)
+				if err != nil {
+					return apperrors.Internal(err)
+				}
+				remaining := computeRemaining(m.Earned, paid)
+				if total > remaining+epsilon {
+					return apperrors.BadRequest(fmt.Sprintf(
+						"total amount %.2f requested for %s exceeds remaining %.2f — cannot pay more than what's owed",
+						total, m.FullName, remaining,
+					))
+				}
+			}
+			return nil
+		}
+	}
+
 	batch := &PayoutBatch{ID: uuid.New(), PayerID: actorID, IdempotencyKey: req.IdempotencyKey}
-	err = s.repo.CreateBatchIdempotent(ctx, batch, rows)
+	err = s.repo.CreateBatchIdempotent(ctx, batch, rows, revalidate)
 	if errors.Is(err, ErrDuplicateBatch) {
 		existing, ferr := s.repo.FindBatchByKey(ctx, actorID, req.IdempotencyKey)
 		if ferr != nil {
@@ -309,6 +358,12 @@ func (s *Service) CreatePayouts(ctx context.Context, actorID uuid.UUID, actorRol
 		return out, nil
 	}
 	if err != nil {
+		// revalidate returns a *apperrors.AppError (BAD_REQUEST/etc) directly
+		// through the transaction — surface it as-is instead of masking a
+		// legitimate validation rejection as a 500.
+		if appErr, ok := apperrors.AsAppError(err); ok {
+			return nil, appErr
+		}
 		return nil, apperrors.Internal(err)
 	}
 

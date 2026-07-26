@@ -2,13 +2,14 @@ package users
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/megamall/crm/internal/uploads"
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/middleware"
 	"github.com/megamall/crm/pkg/pagination"
@@ -318,40 +319,70 @@ func (h *Handler) UpdateDocumentStatus(c *gin.Context) {
 	response.OK(c, ToDocumentResponse(doc))
 }
 
+// uploadAvatar validates and stores an avatar exactly like the generic
+// POST /uploads pipeline (internal/uploads) — never trusting the client's
+// Content-Type header or filename/extension, which the previous
+// implementation did (a stored-XSS risk: e.g. an .svg with an inline
+// <script>, uploaded with a spoofed image/* Content-Type, would have been
+// saved and — if ever served from a static mount — executed in the
+// viewer's browser). Content is sniffed via magic bytes (uploads.Validate),
+// restricted to actual image types (uploads.IsImage — excludes the PDF type
+// the generic pipeline otherwise allows), and fully decoded
+// (uploads.DecodeBounds) to prove it's a genuine, intact, boundedly-sized
+// image rather than bytes that merely sniff as one. The stored filename is
+// always server-generated (uuid + the sniffed extension), so the client's
+// filename never reaches the filesystem — no path traversal, no extension
+// spoofing. Files are saved into the same ./uploads/ directory the generic
+// pipeline uses, so they're served by the existing, already-hardened
+// GET /uploads/:filename route (re-sniffs on every request, sets
+// X-Content-Type-Options: nosniff, forces attachment for non-images) instead
+// of a bespoke, unserved ./uploads/avatars/ path.
 func (h *Handler) uploadAvatar(c *gin.Context, id uuid.UUID, actorID uuid.UUID) {
-	file, err := c.FormFile("avatar")
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, uploads.MaxFileSize+64<<10)
+
+	file, header, err := c.Request.FormFile("avatar")
 	if err != nil {
 		response.Error(c, apperrors.BadRequest("avatar file is required"))
 		return
 	}
+	defer file.Close()
 
-	// Validate content-type
-	ct := file.Header.Get("Content-Type")
-	if !strings.HasPrefix(ct, "image/") {
-		response.Error(c, apperrors.BadRequest("file must be an image"))
+	ext, contentType, err := uploads.Validate(file, header.Size)
+	if err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	if !uploads.IsImage(contentType) {
+		response.Error(c, apperrors.BadRequest("avatar must be an image"))
+		return
+	}
+	if _, _, err := uploads.DecodeBounds(file); err != nil {
+		response.Error(c, apperrors.BadRequest("invalid or unsupported image: "+err.Error()))
+		return
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		response.Error(c, apperrors.Internal(fmt.Errorf("seek avatar file: %w", err)))
 		return
 	}
 
-	ext := strings.ToLower(filepath.Ext(file.Filename))
-	if ext == "" {
-		ext = ".jpg"
-	}
-
-	dir := "./uploads/avatars"
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		response.Error(c, apperrors.Internal(fmt.Errorf("create avatars dir: %w", err)))
+	if err := os.MkdirAll("./uploads", 0755); err != nil {
+		response.Error(c, apperrors.Internal(fmt.Errorf("create uploads dir: %w", err)))
 		return
 	}
 
-	filename := fmt.Sprintf("%s%s", id.String(), ext)
-	dst := filepath.Join(dir, filename)
-
-	if err := c.SaveUploadedFile(file, dst); err != nil {
+	filename := uuid.New().String() + ext
+	dst, err := os.Create(filepath.Join("./uploads", filename))
+	if err != nil {
 		response.Error(c, apperrors.Internal(fmt.Errorf("save avatar: %w", err)))
 		return
 	}
+	defer dst.Close()
+	if _, err := io.Copy(dst, file); err != nil {
+		response.Error(c, apperrors.Internal(fmt.Errorf("write avatar: %w", err)))
+		return
+	}
 
-	avatarURL := "/uploads/avatars/" + filename
+	avatarURL := "/uploads/" + filename
 	u, err := h.svc.Update(c.Request.Context(), id, UpdateUserRequest{AvatarURL: &avatarURL}, actorID)
 	if err != nil {
 		response.HandleError(c, err)

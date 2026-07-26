@@ -116,7 +116,7 @@ func (h *Handler) AddIncome(c *gin.Context) {
 }
 
 type withdrawalRequest struct {
-	Amount float64 `json:"amount" binding:"gte=0"`
+	Amount float64 `json:"amount" binding:"gt=0"`
 	Note   string  `json:"note"`
 }
 
@@ -136,6 +136,10 @@ func (h *Handler) AddWithdrawal(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, ErrInsufficientBalance) {
 			response.Error(c, apperrors.Unprocessable("insufficient balance"))
+			return
+		}
+		if errors.Is(err, ErrInvalidAmount) {
+			response.Error(c, apperrors.BadRequest("amount must be greater than zero"))
 			return
 		}
 		response.Error(c, apperrors.Internal(err))
