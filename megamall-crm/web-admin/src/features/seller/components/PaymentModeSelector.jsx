@@ -149,7 +149,6 @@ export default function PaymentModeSelector({
                 <input
                   type="file"
                   accept="image/*,application/pdf"
-                  capture="environment"
                   className="hidden"
                   onChange={(e) => onFileChange?.(e.target.files?.[0] ?? null)}
                 />
