@@ -19,6 +19,7 @@ import useLogisticsCouriers from '../hooks/useLogisticsCouriers'
 import Badge   from '../../../shared/components/Badge'
 import Modal   from '../../../shared/components/Modal'
 import PeriodRangeFilter from '../../../shared/components/PeriodRangeFilter'
+import { useToast } from '../../../shared/components/ToastProvider'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -661,6 +662,7 @@ export default function CashHandoversPage({ courierId } = {}) {
 
   const { data, isLoading } = useHandovers(params)
   const items = data?.items ?? []
+  const toast = useToast()
 
   const { mutate: updateHandover, isPending: updating } = useUpdateHandover()
   const { mutate: deleteHandover, isPending: deleting } = useDeleteHandover()
@@ -676,15 +678,28 @@ export default function CashHandoversPage({ courierId } = {}) {
     setVerifyRow(row)
   }
 
+  // notifyHandoverError surfaces a mutation failure visibly — in particular
+  // a 409 ("this handover has already been processed or changed") when a
+  // concurrent dispatcher/owner action won the race on the same handover.
+  // The underlying list is already refreshed by the hooks' onError (see
+  // useHandovers.js); this just makes the rejection visible to the user
+  // instead of the action silently appearing to do nothing.
+  function notifyHandoverError(err) {
+    const msg = err?.response?.data?.error?.message ?? err?.message ?? 'Не удалось выполнить действие'
+    toast.error(msg)
+  }
+
   function handleVerifyConfirm({ id, status, actual_returned }) {
     updateHandover({ id, status, actual_returned }, {
       onSuccess: () => setVerifyRow(null),
+      onError: notifyHandoverError,
     })
   }
 
   function handleVerifyReject({ id, status, admin_note }) {
     updateHandover({ id, status, admin_note }, {
       onSuccess: () => setVerifyRow(null),
+      onError: notifyHandoverError,
     })
   }
 
@@ -695,17 +710,18 @@ export default function CashHandoversPage({ courierId } = {}) {
     // VerifyModal's handleEditSave.
     editHandover(body, {
       onSuccess: () => onSaved?.(),
+      onError: notifyHandoverError,
     })
   }
 
   function handleVerifyDelete(id) {
-    deleteHandover(id, { onSuccess: () => setVerifyRow(null) })
+    deleteHandover(id, { onSuccess: () => setVerifyRow(null), onError: notifyHandoverError })
   }
 
   function handleQuickReject(row) {
     const reason = prompt('Укажите причину отклонения:')
     if (!reason?.trim()) return
-    updateHandover({ id: row.id, status: 'rejected', admin_note: reason })
+    updateHandover({ id: row.id, status: 'rejected', admin_note: reason }, { onError: notifyHandoverError })
   }
 
   function handleQuickConfirm(row) {
@@ -713,12 +729,12 @@ export default function CashHandoversPage({ courierId } = {}) {
     if (input == null) return
     const amt = parseFloat(input)
     if (isNaN(amt)) return
-    updateHandover({ id: row.id, status: 'confirmed', actual_returned: amt })
+    updateHandover({ id: row.id, status: 'confirmed', actual_returned: amt }, { onError: notifyHandoverError })
   }
 
   function handleDeleteConfirm() {
     if (!deleteTarget) return
-    deleteHandover(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) })
+    deleteHandover(deleteTarget.id, { onSuccess: () => setDeleteTarget(null), onError: notifyHandoverError })
   }
 
   const meta = data?.meta

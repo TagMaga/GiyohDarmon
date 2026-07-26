@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/megamall/crm/internal/finance"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const maxSearchLen = 100
@@ -331,16 +332,66 @@ func (r *Repository) addWithdrawalLocked(ctx context.Context, txn *gorm.DB, user
 
 var ErrTransactionNotFound = errors.New("transaction not found")
 
-// UpdateTransaction updates amount/note on a top-up or withdrawal row, writes an
-// audit entry, and recalculates balance_after. Only amount and note are editable.
+// signedEffect returns a transaction's signed contribution to the manual
+// (top-up/withdrawal) running total: positive for a top-up, negative for a
+// withdrawal. Used to compute the net effect of an amount edit without
+// re-deriving the whole ledger.
+func signedEffect(t TransactionType, amount float64) float64 {
+	if t == TypeOwnerWithdrawal {
+		return -amount
+	}
+	return amount
+}
+
+// UpdateTransaction updates amount/note on a top-up or withdrawal row, writes
+// an audit entry, and recalculates every balance_after snapshot. Only
+// manual_income/owner_withdrawal rows are editable — legacy manual_expense/
+// finance_profit rows (system-generated, pre-dating the Finance/Budget
+// split) are excluded by the WHERE clause below and return
+// ErrTransactionNotFound, exactly like a missing row; there is no supported
+// way to edit them and none is added here.
+//
+// The whole read-validate-write sequence runs inside one transaction guarded
+// by the same budgetLedgerLockKey advisory lock AddWithdrawal uses, so this
+// can never race against a concurrent AddWithdrawal/AddIncome/another edit to
+// jointly produce a negative balance — see budgetLedgerLockKey's doc comment.
+// The edit is rejected outright (no partial effect, no clamping) if the
+// resulting company balance would be negative.
 func (r *Repository) UpdateTransaction(ctx context.Context, id uuid.UUID, editorID uuid.UUID, newAmount float64, newNote string) error {
+	if newAmount <= 0 || math.IsNaN(newAmount) || math.IsInf(newAmount, 0) {
+		return ErrInvalidAmount
+	}
+
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(ctx).Exec("SELECT pg_advisory_xact_lock(hashtext(?))", budgetLedgerLockKey).Error; err != nil {
+			return fmt.Errorf("lock company budget ledger: %w", err)
+		}
+
 		var row Transaction
-		if err := tx.Where("id = ? AND transaction_type IN ('manual_income','owner_withdrawal')", id).First(&row).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ? AND transaction_type IN ('manual_income','owner_withdrawal')", id).
+			First(&row).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return ErrTransactionNotFound
 			}
 			return err
+		}
+
+		// Re-read the ledger only after the lock is held (see AddWithdrawal),
+		// then compute the resulting balance as if this one row's amount were
+		// newAmount instead of its current value — no other row changes.
+		manual, err := manualNet(ctx, tx, nil, nil)
+		if err != nil {
+			return err
+		}
+		netProfit, err := r.financeRepo.GetNetProfit(ctx, nil, nil)
+		if err != nil {
+			return err
+		}
+		adjustedManual := manual - signedEffect(row.TransactionType, row.Amount) + signedEffect(row.TransactionType, newAmount)
+		resultingBalance := roundMoney(adjustedManual + netProfit)
+		if resultingBalance < 0 {
+			return ErrInsufficientBalance
 		}
 
 		if err := tx.Exec(

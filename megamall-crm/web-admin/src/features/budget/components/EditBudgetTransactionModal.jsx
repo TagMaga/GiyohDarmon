@@ -86,11 +86,24 @@ export default function EditBudgetTransactionModal({ transaction, onClose, onSuc
       onSuccess?.()
       onClose()
     },
+    onError: () => {
+      // A rejection here (e.g. "would make the balance negative", or a 409
+      // if the row changed underneath us) means the screen behind this
+      // modal may be showing a stale balance/history — refresh it even
+      // though the modal itself stays open for the user to adjust and retry.
+      qc.invalidateQueries({ queryKey: ['budget'] })
+      qc.invalidateQueries({ queryKey: ['budget-transaction-history', transaction?.id] })
+    },
   })
 
   function handleSubmit() {
+    // Defense-in-depth alongside the disabled button below: a request
+    // already in flight must never be resubmitted from a rapid double-click.
+    if (mut.isPending) return
     const parsed = parseFloat(amount)
-    if (isNaN(parsed) || parsed < 0) { setLocalErr('Введите корректную сумму'); return }
+    // Matches the backend's binding:"gt=0" — an edit to 0 is rejected there,
+    // not silently clamped.
+    if (isNaN(parsed) || parsed <= 0) { setLocalErr('Введите сумму больше нуля'); return }
     setLocalErr('')
     mut.mutate({ id: transaction.id, amount: parsed, note: note.trim() })
   }
@@ -171,7 +184,7 @@ export default function EditBudgetTransactionModal({ transaction, onClose, onSuc
               disabled={mut.isPending}
               className="flex flex-1 items-center justify-center gap-1.5 py-2.5 rounded-full bg-indigo-600 text-[12.5px] font-semibold text-white shadow-[0_4px_10px_rgba(99,102,241,.3)] hover:bg-indigo-700 disabled:opacity-60 transition-colors"
             >
-              <Check size={13} /> Сохранить
+              <Check size={13} /> {mut.isPending ? 'Сохранение…' : 'Сохранить'}
             </button>
           </div>
         </div>

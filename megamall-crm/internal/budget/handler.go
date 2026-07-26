@@ -149,7 +149,7 @@ func (h *Handler) AddWithdrawal(c *gin.Context) {
 }
 
 type transactionUpdateRequest struct {
-	Amount float64 `json:"amount" binding:"gte=0"`
+	Amount float64 `json:"amount" binding:"gt=0"`
 	Note   string  `json:"note"`
 }
 
@@ -173,6 +173,14 @@ func (h *Handler) UpdateTransaction(c *gin.Context) {
 	if err := h.repo.UpdateTransaction(c.Request.Context(), id, claims.UserID, req.Amount, req.Note); err != nil {
 		if errors.Is(err, ErrTransactionNotFound) {
 			response.Error(c, apperrors.NotFound("transaction not found"))
+			return
+		}
+		if errors.Is(err, ErrInvalidAmount) {
+			response.Error(c, apperrors.BadRequest("amount must be greater than zero"))
+			return
+		}
+		if errors.Is(err, ErrInsufficientBalance) {
+			response.Error(c, apperrors.Unprocessable("this edit would make the company balance negative"))
 			return
 		}
 		response.Error(c, apperrors.Internal(err))

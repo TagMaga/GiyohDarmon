@@ -18,14 +18,21 @@ export function useCreateHandover() {
   })
 }
 
+// invalidateHandoverQueries refreshes every screen backed by handover data —
+// used on success AND on error: a rejection (e.g. a 409 because another
+// dispatcher/owner action already changed this same handover) means the
+// list behind the modal may be showing an outcome that no longer applies.
+function invalidateHandoverQueries(qc, extra = []) {
+  qc.invalidateQueries({ queryKey: ['logistics', 'handovers'] })
+  for (const key of extra) qc.invalidateQueries({ queryKey: key })
+}
+
 export function useUpdateHandover() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, ...body }) => updateHandover(id, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['logistics', 'handovers'] })
-      qc.invalidateQueries({ queryKey: ['logistics', 'dashboard'] })
-    },
+    onSuccess: () => invalidateHandoverQueries(qc, [['logistics', 'dashboard']]),
+    onError: () => invalidateHandoverQueries(qc, [['logistics', 'dashboard']]),
   })
 }
 
@@ -33,7 +40,8 @@ export function useDeleteHandover() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id) => deleteHandover(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['logistics', 'handovers'] }),
+    onSuccess: () => invalidateHandoverQueries(qc),
+    onError: () => invalidateHandoverQueries(qc),
   })
 }
 
@@ -41,11 +49,8 @@ export function useEditHandover() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, ...body }) => editHandover(id, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['logistics', 'handovers'] })
-      qc.invalidateQueries({ queryKey: ['logistics', 'dashboard'] })
-      qc.invalidateQueries({ queryKey: ['logistics', 'couriers'] })
-    },
+    onSuccess: () => invalidateHandoverQueries(qc, [['logistics', 'dashboard'], ['logistics', 'couriers']]),
+    onError: () => invalidateHandoverQueries(qc, [['logistics', 'dashboard'], ['logistics', 'couriers']]),
   })
 }
 

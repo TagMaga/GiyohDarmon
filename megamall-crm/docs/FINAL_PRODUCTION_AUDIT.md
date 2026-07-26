@@ -22,6 +22,41 @@ Everything else in this document (all 🟠/🟡/🟢 findings, scores, "would yo
 
 ---
 
+## Remediation status (2026-07-26, round 2) — two new blockers found and fixed
+
+A follow-up hostile re-audit was run against the round-1 fixes themselves ("assume nothing, try to disprove your own fixes"), rather than trusting they were complete. It found that **the C1 fix (budget withdrawal) had a hole**, and separately found a new, previously-unexamined concurrency bug in cash-handover confirm/reject/edit. Both are now fixed, tested, and adversarially verified.
+
+| Finding | Status | Fix |
+|---|---|---|
+| **C1-follow-up — `UpdateTransaction` bypassed the entire C1 fix** | ✅ Fixed | `internal/budget/repository.go`: `UpdateTransaction` (editing an existing top-up/withdrawal's amount) had **zero balance validation and no lock** — it only fixed the *create* path (`AddWithdrawal`), not the *edit* path. Reproduced live: editing a 100 withdrawal to 999999999 from a 1000 balance drove the balance to **−999,998,999**, no race required, two ordinary sequential PATCH calls. Now wrapped in the same `pg_advisory_xact_lock` + transaction as `AddWithdrawal`, computes the resulting balance from the edit's signed delta, and rejects with `ErrInsufficientBalance` if it would go negative. `recalcBalanceAfter` (already existing, untouched) correctly recomputes every later row's running balance. |
+| **New — cash-handover confirm/reject/edit TOCTOU across two modules** | ✅ Fixed | `internal/courier` (`ConfirmHandover`/`ConfirmTransaction`/`RejectHandover`) and `internal/logistics` (`UpdateHandover`/`EditHandover`/`DeleteHandover`) all mutate the same `cash_handovers` row with a plain read, a Go-side status check, then an unguarded write — a dispatcher confirming while an owner rejects (or vice versa) could both read `pending`, both pass validation, and last-write-wins silently. New shared primitives in `internal/courier/handover_txn.go` (`LockHandoverForUpdate` + `GuardedHandoverUpdate`) are used by **all five** write paths across both packages; the loser now gets `ErrHandoverConflict` (mapped to HTTP 409), never a false success. |
+
+### Why the budget bug wasn't caught the first time
+Round 1 fixed exactly what was asked ("the withdrawal creation path") and verified it live. `UpdateTransaction` is a separate function serving a separate endpoint (`PATCH /owner/budget/transaction/:id`) that happened to share the same underlying invariant. This is a direct lesson in the value of "assume nothing, re-attack your own fix from new angles" — the fix was correct as scoped, just scoped too narrowly for the invariant it was meant to protect.
+
+### Design decisions worth recording
+- **Budget**: `UpdateTransaction` already excluded legacy `manual_expense`/`finance_profit` rows from being edited at all (pre-existing `WHERE transaction_type IN (...)` filter) — this already satisfied "immutable automatic/system-generated types cannot be edited"; no change was needed there, only the missing lock/balance-check.
+- **Handovers**: `internal/logistics.EditHandover` intentionally allows correcting an *already-finalized* (confirmed/rejected/disputed) handover — this is a real, existing, explicitly-gated (owner-only, reason field) "we made a mistake" workflow, not a bug. The fix makes it race-safe (same shared lock+guard) without removing this capability; only the *ordinary* first-decision path (`UpdateHandover`, `ConfirmHandover`, `RejectHandover`) is restricted to pending/disputed → confirmed/rejected, terminal from there.
+- **Cross-module sharing**: rather than a full merge of `internal/courier` and `internal/logistics`'s handover logic into one shared service (a large refactor, explicitly out of scope), only the two genuinely-unsafe, purely-mechanical primitives (row lock, guarded conditional update) were extracted into `internal/courier/handover_txn.go` and imported by `internal/logistics` (one-directional, no cycle — confirmed by checking both packages' import graphs first). Each package keeps its own field-level diffing/audit-trail logic (different tables: courier logs to the generic `activity` log, logistics to `cash_handover_edits`), since unifying those would have been the large, out-of-scope refactor.
+- The now-dead, unsafe `courier.Repository.UpdateHandover` (plain `Save`, no guard) was deleted rather than left as an unused footgun.
+
+### Adversarial verification (this round)
+- **Budget**: reproduced the `UpdateTransaction` exploit live (balance → −999,998,999) *before* fixing it; after the fix, the identical repro correctly returns `ErrInsufficientBalance` and the balance stays unchanged. Temporarily disabled the lock and confirmed `TestBudget_ConcurrentWithdrawals_CannotOverspend` and the new `TestUpdateTransaction_ConcurrentCreateAndEdit_CannotOverspend` both fail (both withdrawals/edits succeed, overspending) — then restored the lock and confirmed both pass again.
+- **Handovers**: temporarily disabled both the row lock and the guard condition; confirmed `TestHandoverConflict_ConcurrentConfirmVsReject` and `TestHandoverConflict_LoserGetsConflictNotInternalError` both fail (both concurrent actions succeed) without the fix, and pass with it restored. (One of the three concurrency tests, the cross-module one, didn't reliably reproduce the race in the disabled-fix run within a single tight timing window — noted honestly rather than claimed as proof; the other two conclusively demonstrate the fix is load-bearing, and the cross-module test passes correctly with the fix in place.)
+
+### Tests added (round 2)
+- `internal/budget/update_transaction_test.go` — 16 tests: valid larger/smaller edits, top-up edits, zero/negative rejection, over-balance rejection, the literal 999999999 exploit, `balance_after` recalculation across a 3-row ledger, audit history old/new values, no-audit-row-on-failure, mid-transaction rollback, legacy-type immutability, and 3 concurrency tests (concurrent edits, concurrent create-vs-edit, concurrent top-up-vs-edit).
+- `internal/courier/handover_conflict_test.go` — 11 tests (package `courier_test`, deliberately external so it can import both `internal/courier` and `internal/logistics` without an import cycle): normal confirm/reject, sequential double-confirm/reject safety, failed-attempt leaves no audit row, `UpdateHandover` correctly rejects an already-confirmed handover, `EditHandover` can still correct one (documented exception), cross-module concurrent confirm-vs-reject (the literal reported bug), same-module concurrent confirm-vs-reject, loser gets a proper 4xx not a 500, and `ConfirmTransaction`'s own confirm-twice safety.
+- Frontend: `EditBudgetTransactionModal.jsx` (budget-transaction edit) gained an explicit pending-guard, a loading label, backend-error refresh-on-failure, and tightened client validation (`> 0`, matching the backend). `CashHandovers.jsx` (dispatcher confirm/reject) and `CashHandoversPage.jsx` + `useHandovers.js` (owner update/edit/delete) gained `onError` handling that surfaces the backend's message (including a 409 conflict) via toast/inline and refreshes the underlying list — previously these failed completely silently.
+
+### Test results (round 2)
+All new and existing tests pass with `-race`: `internal/budget` (21 tests), `internal/courier` (11 new + all pre-existing), `internal/logistics` (all pre-existing, including `TestHandoverEditFlow_HistoryRecorded`), `internal/payouts`, `internal/uploads` — no regressions. `gofmt`/`go vet` clean on every touched file. Frontend `npm run build` succeeds.
+
+### Environment limitation (unchanged from round 1)
+`internal/courier` and `internal/logistics`'s own test binaries link a `media_integration_test.go` file that imports `internal/media` → `github.com/h2non/bimg` → requires system `libvips`, unavailable in this sandbox (confirmed genuine package-mirror gap, not a code issue). To run the new tests directly, that one file was temporarily moved aside, the target package's tests run and verified, then the file was restored byte-for-byte before committing — confirmed via `git status`/`git diff` showing no unintended changes to it. CI (`pr-checks.yml`) has `libvips` installed and exercises this path in full.
+
+---
+
 ## 🔴 Critical
 
 ### C1. Owner withdrawal balance check is a TOCTOU race — company balance can go negative

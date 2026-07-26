@@ -609,33 +609,70 @@ func (s *Service) SubmitHandover(ctx context.Context, courierID uuid.UUID, req S
 	return created, nil
 }
 
-// ConfirmHandover confirms a pending handover.
+// confirmableStatuses / rejectableStatuses define the ordinary (non-admin)
+// decision flow centrally: a handover freshly submitted by a courier
+// (pending), or already flagged as a mismatch (disputed), can be confirmed
+// or rejected exactly once through this path. Once confirmed or rejected,
+// it is terminal here — any further correction goes through the separate,
+// explicitly-gated logistics.EditHandover admin-override workflow, not
+// through these functions again.
+var confirmableStatuses = []string{string(HandoverStatusPending), string(HandoverStatusDisputed)}
+var rejectableStatuses = []string{string(HandoverStatusPending), string(HandoverStatusDisputed)}
+
+// ErrHandoverConflict is re-exported at the package level (see
+// handover_txn.go) — HTTP layers map it to 409 Conflict.
+
+// ConfirmHandover confirms a pending (or disputed) handover.
 // If actual_returned != total_to_return the status is set to disputed.
+//
+// The whole read-validate-write sequence runs inside one transaction guarded
+// by LockHandoverForUpdate + GuardedHandoverUpdate (see handover_txn.go), so
+// a concurrent confirm/reject/admin-edit on the same handover — from this
+// package OR from internal/logistics, which mutates the same cash_handovers
+// row — can never both succeed silently. The loser gets ErrHandoverConflict,
+// never a false success.
 func (s *Service) ConfirmHandover(ctx context.Context, dispatcherID uuid.UUID, handoverID uuid.UUID, req ConfirmHandoverRequest) (*CashHandover, error) {
-	h, err := s.repo.GetHandoverByID(ctx, handoverID)
+	var result *CashHandover
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		h, err := LockHandoverForUpdate(tx, ctx, handoverID)
+		if err != nil {
+			return err
+		}
+		if h.Status != HandoverStatusPending && h.Status != HandoverStatusDisputed {
+			return apperrors.BadRequest(fmt.Sprintf("handover cannot be confirmed from status %q", h.Status))
+		}
+
+		now := time.Now().UTC()
+		h.DispatcherID = &dispatcherID
+		h.ActualReturned = &req.ActualReturned
+		h.ConfirmedAt = &now
+		h.Comment = req.Comment
+
+		// Disputed if amounts don't match (within floating point tolerance).
+		diff := req.ActualReturned - h.TotalToReturn
+		if diff < -0.01 || diff > 0.01 {
+			h.Status = HandoverStatusDisputed
+		} else {
+			h.Status = HandoverStatusConfirmed
+		}
+
+		if err := GuardedHandoverUpdate(tx, ctx, handoverID, confirmableStatuses, map[string]interface{}{
+			"dispatcher_id":   dispatcherID,
+			"actual_returned": req.ActualReturned,
+			"confirmed_at":    now,
+			"comment":         req.Comment,
+			"status":          h.Status,
+		}); err != nil {
+			return fmt.Errorf("confirm handover: %w", err)
+		}
+		result = h
+		return nil
+	})
+	if errors.Is(err, ErrHandoverConflict) {
+		return nil, apperrors.Conflict("this handover has already been processed or changed")
+	}
 	if err != nil {
 		return nil, err
-	}
-	if h.Status != HandoverStatusPending && h.Status != HandoverStatusDisputed {
-		return nil, apperrors.BadRequest(fmt.Sprintf("handover cannot be confirmed from status %q", h.Status))
-	}
-
-	now := time.Now().UTC()
-	h.DispatcherID = &dispatcherID
-	h.ActualReturned = &req.ActualReturned
-	h.ConfirmedAt = &now
-	h.Comment = req.Comment
-
-	// Disputed if amounts don't match (within floating point tolerance).
-	diff := req.ActualReturned - h.TotalToReturn
-	if diff < -0.01 || diff > 0.01 {
-		h.Status = HandoverStatusDisputed
-	} else {
-		h.Status = HandoverStatusConfirmed
-	}
-
-	if err := s.repo.UpdateHandover(ctx, h); err != nil {
-		return nil, fmt.Errorf("confirm handover: %w", err)
 	}
 
 	s.logger.LogAsync(activity.Entry{
@@ -644,37 +681,55 @@ func (s *Service) ConfirmHandover(ctx context.Context, dispatcherID uuid.UUID, h
 		EntityType: "cash_handover",
 		EntityID:   &handoverID,
 		AfterState: map[string]interface{}{
-			"status":          h.Status,
+			"status":          result.Status,
 			"actual_returned": req.ActualReturned,
 		},
 	})
-	return h, nil
+	return result, nil
 }
 
 // ConfirmTransaction finalizes a courier-submitted handover from the dispatcher
 // cash transactions tab. The dispatcher does not edit the amount here; the
 // stored submitted amount wins, falling back to the calculated return amount.
+// Same lock+guard pattern as ConfirmHandover — see its doc comment.
 func (s *Service) ConfirmTransaction(ctx context.Context, dispatcherID uuid.UUID, handoverID uuid.UUID) (*CashHandover, error) {
-	h, err := s.repo.GetHandoverByID(ctx, handoverID)
+	var result *CashHandover
+	var amount float64
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		h, err := LockHandoverForUpdate(tx, ctx, handoverID)
+		if err != nil {
+			return err
+		}
+		if h.Status != HandoverStatusPending {
+			return apperrors.BadRequest(fmt.Sprintf("handover cannot be confirmed from status %q", h.Status))
+		}
+
+		amount = h.TotalToReturn
+		if h.ActualReturned != nil {
+			amount = *h.ActualReturned
+		}
+		now := time.Now().UTC()
+		h.DispatcherID = &dispatcherID
+		h.ActualReturned = &amount
+		h.ConfirmedAt = &now
+		h.Status = HandoverStatusConfirmed
+
+		if err := GuardedHandoverUpdate(tx, ctx, handoverID, []string{string(HandoverStatusPending)}, map[string]interface{}{
+			"dispatcher_id":   dispatcherID,
+			"actual_returned": amount,
+			"confirmed_at":    now,
+			"status":          string(HandoverStatusConfirmed),
+		}); err != nil {
+			return fmt.Errorf("confirm cash transaction: %w", err)
+		}
+		result = h
+		return nil
+	})
+	if errors.Is(err, ErrHandoverConflict) {
+		return nil, apperrors.Conflict("this handover has already been processed or changed")
+	}
 	if err != nil {
 		return nil, err
-	}
-	if h.Status != HandoverStatusPending {
-		return nil, apperrors.BadRequest(fmt.Sprintf("handover cannot be confirmed from status %q", h.Status))
-	}
-
-	amount := h.TotalToReturn
-	if h.ActualReturned != nil {
-		amount = *h.ActualReturned
-	}
-	now := time.Now().UTC()
-	h.DispatcherID = &dispatcherID
-	h.ActualReturned = &amount
-	h.ConfirmedAt = &now
-	h.Status = HandoverStatusConfirmed
-
-	if err := s.repo.UpdateHandover(ctx, h); err != nil {
-		return nil, fmt.Errorf("confirm cash transaction: %w", err)
 	}
 
 	s.logger.LogAsync(activity.Entry{
@@ -687,31 +742,48 @@ func (s *Service) ConfirmTransaction(ctx context.Context, dispatcherID uuid.UUID
 			"actual_returned": amount,
 		},
 	})
-	return h, nil
+	return result, nil
 }
 
-// RejectHandover rejects a pending or disputed handover.
+// RejectHandover rejects a pending or disputed handover. Same lock+guard
+// pattern as ConfirmHandover — see its doc comment.
 func (s *Service) RejectHandover(ctx context.Context, dispatcherID uuid.UUID, handoverID uuid.UUID, req RejectHandoverRequest) (*CashHandover, error) {
-	h, err := s.repo.GetHandoverByID(ctx, handoverID)
+	var result *CashHandover
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		h, err := LockHandoverForUpdate(tx, ctx, handoverID)
+		if err != nil {
+			return err
+		}
+		if h.Status != HandoverStatusPending && h.Status != HandoverStatusDisputed {
+			return apperrors.BadRequest(fmt.Sprintf("handover cannot be rejected from status %q", h.Status))
+		}
+
+		comment := req.Comment
+		h.DispatcherID = &dispatcherID
+		h.Status = HandoverStatusRejected
+		h.Comment = &comment
+		if req.AdminNote != nil {
+			h.AdminNote = req.AdminNote
+		} else {
+			h.AdminNote = &comment
+		}
+
+		if err := GuardedHandoverUpdate(tx, ctx, handoverID, rejectableStatuses, map[string]interface{}{
+			"dispatcher_id": dispatcherID,
+			"status":        string(HandoverStatusRejected),
+			"comment":       h.Comment,
+			"admin_note":    h.AdminNote,
+		}); err != nil {
+			return fmt.Errorf("reject handover: %w", err)
+		}
+		result = h
+		return nil
+	})
+	if errors.Is(err, ErrHandoverConflict) {
+		return nil, apperrors.Conflict("this handover has already been processed or changed")
+	}
 	if err != nil {
 		return nil, err
-	}
-	if h.Status != HandoverStatusPending && h.Status != HandoverStatusDisputed {
-		return nil, apperrors.BadRequest(fmt.Sprintf("handover cannot be rejected from status %q", h.Status))
-	}
-
-	comment := req.Comment
-	h.DispatcherID = &dispatcherID
-	h.Status = HandoverStatusRejected
-	h.Comment = &comment
-	if req.AdminNote != nil {
-		h.AdminNote = req.AdminNote
-	} else {
-		h.AdminNote = &comment
-	}
-
-	if err := s.repo.UpdateHandover(ctx, h); err != nil {
-		return nil, fmt.Errorf("reject handover: %w", err)
 	}
 
 	s.logger.LogAsync(activity.Entry{
@@ -721,7 +793,7 @@ func (s *Service) RejectHandover(ctx context.Context, dispatcherID uuid.UUID, ha
 		EntityID:   &handoverID,
 		AfterState: map[string]interface{}{"status": string(HandoverStatusRejected)},
 	})
-	return h, nil
+	return result, nil
 }
 
 func (s *Service) MyCashSummary(ctx context.Context, courierID uuid.UUID) (*CashSummaryResponse, error) {

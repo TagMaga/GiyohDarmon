@@ -2,13 +2,16 @@ package logistics
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/megamall/crm/internal/courier"
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/pagination"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Repository struct {
@@ -959,13 +962,60 @@ func (r *Repository) CreateHandover(ctx context.Context, req CreateHandoverReq) 
 	return r.getHandoverByID(ctx, id)
 }
 
+// handoverUpdatableStatuses / handoverEditableStatuses define, centrally,
+// which statuses each write path may start from — UpdateHandover is the
+// ordinary first-decision flow (mirrors courier.confirmableStatuses/
+// rejectableStatuses); EditHandover is the separate, explicitly-gated
+// "correct a mistake" override for an already-finalized handover.
+var handoverUpdatableStatuses = []string{"pending", "disputed"}
+var handoverEditableStatuses = []string{"confirmed", "rejected", "disputed"}
+
+// lockHandoverMutable reads only the fields that can change on a handover
+// (status, actual_returned, admin_note, comment, confirmed_at) with
+// SELECT ... FOR UPDATE inside tx — this is the same locking discipline as
+// courier.LockHandoverForUpdate (see its doc comment), applied here with
+// logistics' own lighter projection since HandoverListRow additionally
+// carries joined, immutable display fields (courier name/phone) that don't
+// need to participate in the lock.
+type handoverMutable struct {
+	Status         string     `gorm:"column:status"`
+	ActualReturned *float64   `gorm:"column:actual_returned"`
+	AdminNote      *string    `gorm:"column:admin_note"`
+	Comment        *string    `gorm:"column:comment"`
+	ConfirmedAt    *time.Time `gorm:"column:confirmed_at"`
+}
+
+func lockHandoverMutable(tx *gorm.DB, ctx context.Context, id uuid.UUID) (*handoverMutable, error) {
+	var f handoverMutable
+	err := tx.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Table("cash_handovers").
+		Select("status, actual_returned, admin_note, comment, confirmed_at").
+		Where("id = ?", id).
+		Scan(&f).Error
+	if err != nil {
+		return nil, fmt.Errorf("lock handover: %w", err)
+	}
+	if f.Status == "" {
+		return nil, apperrors.NotFound("handover")
+	}
+	return &f, nil
+}
+
+// UpdateHandover is the ordinary first-decision flow (dispatcher/owner
+// confirms or rejects a courier's submitted handover, or edits a
+// still-pending/disputed one's fields without changing its status).
+//
+// The whole read-validate-write sequence runs inside one transaction guarded
+// by lockHandoverMutable + courier.GuardedHandoverUpdate — the exact same
+// shared primitives internal/courier's ConfirmHandover/ConfirmTransaction/
+// RejectHandover use on this same cash_handovers table — so a concurrent
+// action from EITHER package can never both succeed silently. The loser
+// gets a Conflict (409), never a false success.
 func (r *Repository) UpdateHandover(ctx context.Context, id uuid.UUID, editorID uuid.UUID, req UpdateHandoverReq) (*HandoverListRow, error) {
 	existing, err := r.getHandoverByID(ctx, id)
 	if err != nil {
 		return nil, err
-	}
-	if existing.Status != "pending" && existing.Status != "disputed" {
-		return nil, apperrors.BadRequest("only pending or disputed handovers can be updated")
 	}
 	if req.Status != nil && (*req.Status == "rejected" || *req.Status == "cancelled") {
 		if req.AdminNote == nil || *req.AdminNote == "" {
@@ -973,43 +1023,64 @@ func (r *Repository) UpdateHandover(ctx context.Context, id uuid.UUID, editorID 
 		}
 	}
 
-	after := *existing
-	updates := map[string]interface{}{}
-	if req.Comment != nil {
-		updates["comment"] = *req.Comment
-		after.Comment = req.Comment
-	}
-	if req.AdminNote != nil {
-		updates["admin_note"] = *req.AdminNote
-		after.AdminNote = req.AdminNote
-	}
-	if req.ActualReturned != nil {
-		updates["actual_returned"] = *req.ActualReturned
-		after.ActualReturned = req.ActualReturned
-	}
-	action := "update"
-	if req.Status != nil {
-		updates["status"] = *req.Status
-		after.Status = *req.Status
-		switch *req.Status {
-		case "confirmed":
-			now := time.Now().UTC()
-			updates["confirmed_at"] = now
-			action = "confirm"
-		case "rejected":
-			action = "reject"
+	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		locked, lerr := lockHandoverMutable(tx, ctx, id)
+		if lerr != nil {
+			return lerr
 		}
-	}
-	if len(updates) > 0 {
-		err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-			if err := tx.Table("cash_handovers").Where("id = ?", id).Updates(updates).Error; err != nil {
-				return fmt.Errorf("update handover: %w", err)
+		if locked.Status != "pending" && locked.Status != "disputed" {
+			return apperrors.BadRequest(fmt.Sprintf("only pending or disputed handovers can be updated (current status: %s)", locked.Status))
+		}
+		// Refresh existing's mutable fields to what the lock just observed
+		// (not the possibly-stale unlocked read above), so the before/after
+		// diff recorded below reflects the true current state.
+		existing.Status = locked.Status
+		existing.ActualReturned = locked.ActualReturned
+		existing.AdminNote = locked.AdminNote
+		existing.Comment = locked.Comment
+		existing.ConfirmedAt = locked.ConfirmedAt
+
+		after := *existing
+		updates := map[string]interface{}{}
+		if req.Comment != nil {
+			updates["comment"] = *req.Comment
+			after.Comment = req.Comment
+		}
+		if req.AdminNote != nil {
+			updates["admin_note"] = *req.AdminNote
+			after.AdminNote = req.AdminNote
+		}
+		if req.ActualReturned != nil {
+			updates["actual_returned"] = *req.ActualReturned
+			after.ActualReturned = req.ActualReturned
+		}
+		action := "update"
+		if req.Status != nil {
+			updates["status"] = *req.Status
+			after.Status = *req.Status
+			switch *req.Status {
+			case "confirmed":
+				now := time.Now().UTC()
+				updates["confirmed_at"] = now
+				after.ConfirmedAt = &now
+				action = "confirm"
+			case "rejected":
+				action = "reject"
 			}
-			return recordHandoverEdit(tx, ctx, id, &editorID, action, existing, &after, nil)
-		})
-		if err != nil {
-			return nil, err
 		}
+		if len(updates) == 0 {
+			return nil
+		}
+		if err := courier.GuardedHandoverUpdate(tx, ctx, id, handoverUpdatableStatuses, updates); err != nil {
+			return err
+		}
+		return recordHandoverEdit(tx, ctx, id, &editorID, action, existing, &after, nil)
+	})
+	if errors.Is(err, courier.ErrHandoverConflict) {
+		return nil, apperrors.Conflict("this handover has already been processed or changed")
+	}
+	if err != nil {
+		return nil, err
 	}
 	return r.getHandoverByID(ctx, id)
 }
@@ -1025,63 +1096,76 @@ func (r *Repository) EditHandover(ctx context.Context, id uuid.UUID, editorID uu
 	if err != nil {
 		return nil, err
 	}
-	switch existing.Status {
-	case "confirmed", "rejected", "disputed":
-		// finalized — editable here
-	default:
-		return nil, apperrors.BadRequest("only confirmed, rejected or disputed handovers can be edited; use the regular update for pending ones")
-	}
-
-	newStatus := existing.Status
-	if req.Status != nil {
-		newStatus = *req.Status
-	}
-	newAdminNote := existing.AdminNote
-	if req.AdminNote != nil {
-		newAdminNote = req.AdminNote
-	}
-	if newStatus == "rejected" && (newAdminNote == nil || *newAdminNote == "") {
-		return nil, apperrors.BadRequest("admin_note (rejection reason) is required when rejecting")
-	}
-
-	after := *existing
-	updates := map[string]interface{}{}
-	if req.Status != nil && *req.Status != existing.Status {
-		updates["status"] = *req.Status
-		after.Status = *req.Status
-		if *req.Status == "confirmed" {
-			now := time.Now().UTC()
-			updates["confirmed_at"] = now
-			after.ConfirmedAt = &now
-		} else {
-			// No longer confirmed — the confirmation timestamp no longer
-			// describes the row's state.
-			updates["confirmed_at"] = gorm.Expr("NULL")
-			after.ConfirmedAt = nil
-		}
-	}
-	if req.ActualReturned != nil && (existing.ActualReturned == nil || *existing.ActualReturned != *req.ActualReturned) {
-		updates["actual_returned"] = *req.ActualReturned
-		after.ActualReturned = req.ActualReturned
-	}
-	if req.AdminNote != nil && !strPtrEqual(existing.AdminNote, req.AdminNote) {
-		updates["admin_note"] = *req.AdminNote
-		after.AdminNote = req.AdminNote
-	}
-	if req.Comment != nil && !strPtrEqual(existing.Comment, req.Comment) {
-		updates["comment"] = *req.Comment
-		after.Comment = req.Comment
-	}
-	if len(updates) == 0 {
-		return nil, apperrors.BadRequest("nothing to change")
-	}
 
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Table("cash_handovers").Where("id = ?", id).Updates(updates).Error; err != nil {
-			return fmt.Errorf("edit handover: %w", err)
+		locked, lerr := lockHandoverMutable(tx, ctx, id)
+		if lerr != nil {
+			return lerr
+		}
+		switch locked.Status {
+		case "confirmed", "rejected", "disputed":
+			// finalized — editable here
+		default:
+			return apperrors.BadRequest("only confirmed, rejected or disputed handovers can be edited; use the regular update for pending ones")
+		}
+		existing.Status = locked.Status
+		existing.ActualReturned = locked.ActualReturned
+		existing.AdminNote = locked.AdminNote
+		existing.Comment = locked.Comment
+		existing.ConfirmedAt = locked.ConfirmedAt
+
+		newStatus := existing.Status
+		if req.Status != nil {
+			newStatus = *req.Status
+		}
+		newAdminNote := existing.AdminNote
+		if req.AdminNote != nil {
+			newAdminNote = req.AdminNote
+		}
+		if newStatus == "rejected" && (newAdminNote == nil || *newAdminNote == "") {
+			return apperrors.BadRequest("admin_note (rejection reason) is required when rejecting")
+		}
+
+		after := *existing
+		updates := map[string]interface{}{}
+		if req.Status != nil && *req.Status != existing.Status {
+			updates["status"] = *req.Status
+			after.Status = *req.Status
+			if *req.Status == "confirmed" {
+				now := time.Now().UTC()
+				updates["confirmed_at"] = now
+				after.ConfirmedAt = &now
+			} else {
+				// No longer confirmed — the confirmation timestamp no longer
+				// describes the row's state.
+				updates["confirmed_at"] = gorm.Expr("NULL")
+				after.ConfirmedAt = nil
+			}
+		}
+		if req.ActualReturned != nil && (existing.ActualReturned == nil || *existing.ActualReturned != *req.ActualReturned) {
+			updates["actual_returned"] = *req.ActualReturned
+			after.ActualReturned = req.ActualReturned
+		}
+		if req.AdminNote != nil && !strPtrEqual(existing.AdminNote, req.AdminNote) {
+			updates["admin_note"] = *req.AdminNote
+			after.AdminNote = req.AdminNote
+		}
+		if req.Comment != nil && !strPtrEqual(existing.Comment, req.Comment) {
+			updates["comment"] = *req.Comment
+			after.Comment = req.Comment
+		}
+		if len(updates) == 0 {
+			return apperrors.BadRequest("nothing to change")
+		}
+
+		if err := courier.GuardedHandoverUpdate(tx, ctx, id, handoverEditableStatuses, updates); err != nil {
+			return err
 		}
 		return recordHandoverEdit(tx, ctx, id, &editorID, "edit", existing, &after, req.Reason)
 	})
+	if errors.Is(err, courier.ErrHandoverConflict) {
+		return nil, apperrors.Conflict("this handover has already been processed or changed")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1156,15 +1240,24 @@ func strPtrEqual(a, b *string) bool {
 	return *a == *b
 }
 
+// DeleteHandover removes a still-pending handover (the only kind never
+// referenced by a confirm/reject/edit audit trail). Guarded the same way as
+// UpdateHandover/EditHandover: a concurrent confirm/reject that wins the
+// race first changes the row's status away from "pending", so this delete's
+// own WHERE clause then affects zero rows and reports a clear conflict
+// instead of deleting a handover another request just finalized.
 func (r *Repository) DeleteHandover(ctx context.Context, id uuid.UUID) error {
-	existing, err := r.getHandoverByID(ctx, id)
-	if err != nil {
+	if _, err := r.getHandoverByID(ctx, id); err != nil {
 		return err
 	}
-	if existing.Status != "pending" {
-		return apperrors.BadRequest("only pending handovers can be deleted")
+	res := r.db.WithContext(ctx).Exec("DELETE FROM cash_handovers WHERE id = ? AND status = 'pending'", id)
+	if res.Error != nil {
+		return fmt.Errorf("delete handover: %w", res.Error)
 	}
-	return r.db.WithContext(ctx).Exec("DELETE FROM cash_handovers WHERE id = ?", id).Error
+	if res.RowsAffected == 0 {
+		return apperrors.Conflict("this handover is no longer pending and can no longer be deleted")
+	}
+	return nil
 }
 
 func (r *Repository) getHandoverByID(ctx context.Context, id uuid.UUID) (*HandoverListRow, error) {

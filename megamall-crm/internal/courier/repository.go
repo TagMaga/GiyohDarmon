@@ -890,10 +890,6 @@ func getHandoverByID(db *gorm.DB, ctx context.Context, id uuid.UUID) (*CashHando
 	return &h, nil
 }
 
-func (r *Repository) UpdateHandover(ctx context.Context, h *CashHandover) error {
-	return r.db.WithContext(ctx).Save(h).Error
-}
-
 func (r *Repository) ListHandoversByCourier(ctx context.Context, courierID uuid.UUID, p pagination.Params) ([]CashHandover, int, error) {
 	var rows []CashHandover
 	var total int64

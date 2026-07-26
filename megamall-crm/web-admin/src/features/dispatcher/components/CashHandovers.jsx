@@ -154,6 +154,12 @@ function ConfirmHandoverModal({ open, onClose, handover }) {
       toast.success('Сдача принята')
       handleClose()
     },
+    onError: () => {
+      // A rejection here can be a 409 (another dispatcher/owner action won
+      // the race on this same handover) — refresh the list behind the modal
+      // so it stops showing an outcome that no longer applies.
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.handovers })
+    },
   })
 
   function handleClose() { reset(); setActual(''); onClose() }
@@ -220,6 +226,9 @@ function RejectHandoverModal({ open, onClose, handover }) {
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.handovers })
       toast.success('Сдача отклонена')
       handleClose()
+    },
+    onError: () => {
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.handovers })
     },
   })
 
