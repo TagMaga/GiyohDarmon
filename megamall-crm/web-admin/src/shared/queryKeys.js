@@ -12,6 +12,8 @@ export const KEYS = {
     cashTransactions: (params) => ['dispatcher', 'cashTransactions', params ?? {}],
     orderHistory: (params) => ['dispatcher', 'orderHistory', params ?? {}],
     comments:    (orderId) => ['dispatcher', 'comments', orderId],
+    settlementsSummary: (params) => ['dispatcher', 'settlements', 'summary', params ?? {}],
+    settlements: (params) => ['dispatcher', 'settlements', 'list', params ?? {}],
     issues:      ['dispatcher', 'issues'],
     returns:     ['dispatcher', 'returns'],
     delivered:   ['dispatcher', 'delivered'],
@@ -108,6 +110,9 @@ export const KEYS = {
     performance: (id, params)   => ['logistics', 'couriers', id, 'performance', params ?? {}],
     handovers:   (params) => ['logistics', 'handovers', params ?? {}],
     handoverHistory: (id)  => ['logistics', 'handovers', 'history', id],
+    settlementsSummary: (params) => ['logistics', 'settlements', 'summary', params ?? {}],
+    settlements: (params) => ['logistics', 'settlements', 'list', params ?? {}],
+    dispatchers: ['logistics', 'dispatchers'],
   },
   // ── Generalized payouts ledger (Team Lead / Manager / Seller) ─────────────
   payouts: {

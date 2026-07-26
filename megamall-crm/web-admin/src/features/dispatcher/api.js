@@ -251,6 +251,27 @@ export async function rejectCashTransaction(id, { reason }) {
   return unwrap(res)
 }
 
+// ── Company settlements (pay all received cash to the company) ──────────────
+// Mounted at v1 root, not under /dispatch — see internal/dispatcher_settlements/routes.go.
+
+/** GET /settlements/mine/summary — this dispatcher's received/paid/debt KPIs */
+export async function fetchMySettlementsSummary(params = {}) {
+  const res = await client.get('/settlements/mine/summary', { params })
+  return unwrap(res)
+}
+
+/** GET /settlements/mine — this dispatcher's own submission history */
+export async function fetchMySettlements(params = {}) {
+  const res = await client.get('/settlements/mine', { params })
+  return { data: res.data.data, meta: res.data.meta }
+}
+
+/** POST /settlements/mine — submit the current outstanding balance to the owner */
+export async function submitSettlement(comment) {
+  const res = await client.post('/settlements/mine', comment ? { comment } : {})
+  return unwrap(res)
+}
+
 // ── Cities ───────────────────────────────────────────────────────────────────
 /** GET /cities — active delivery cities */
 export async function fetchCities() {
