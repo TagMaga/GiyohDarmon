@@ -266,9 +266,14 @@ export async function fetchMySettlements(params = {}) {
   return { data: res.data.data, meta: res.data.meta }
 }
 
-/** POST /settlements/mine — submit the current outstanding balance to the owner */
-export async function submitSettlement(comment) {
-  const res = await client.post('/settlements/mine', comment ? { comment } : {})
+/** POST /settlements/mine — submit the current outstanding balance to the
+ * owner, optionally attaching a previously-uploaded (POST /media, category
+ * cash_handover_proof) receipt photo by its asset id. */
+export async function submitSettlement({ comment, proofAssetId } = {}) {
+  const body = {}
+  if (comment) body.comment = comment
+  if (proofAssetId) body.proof_asset_id = proofAssetId
+  const res = await client.post('/settlements/mine', body)
   return unwrap(res)
 }
 

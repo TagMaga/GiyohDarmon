@@ -17,6 +17,8 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("", auth, ownerOnly, h.listOwnerSettlements)
 	rg.POST("/:id/confirm", auth, ownerOnly, h.confirmSettlement)
 	rg.POST("/:id/reject", auth, ownerOnly, h.rejectSettlement)
+	rg.POST("/:id/edit", auth, ownerOnly, h.editSettlement)
+	rg.GET("/:id/history", auth, ownerOnly, h.listSettlementHistory)
 
 	// Dispatcher: own KPIs + own history + submit.
 	rg.GET("/mine/summary", auth, dispatcherOnly, h.getMySummary)

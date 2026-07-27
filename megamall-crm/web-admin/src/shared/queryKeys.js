@@ -112,6 +112,7 @@ export const KEYS = {
     handoverHistory: (id)  => ['logistics', 'handovers', 'history', id],
     settlementsSummary: (params) => ['logistics', 'settlements', 'summary', params ?? {}],
     settlements: (params) => ['logistics', 'settlements', 'list', params ?? {}],
+    settlementHistory: (id) => ['logistics', 'settlements', 'history', id],
     dispatchers: ['logistics', 'dispatchers'],
   },
   // ── Generalized payouts ledger (Team Lead / Manager / Seller) ─────────────

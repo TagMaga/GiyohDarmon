@@ -8,14 +8,16 @@
  * owner can confirm/reject it (see DispatcherSettlementsPanel on the owner
  * side) — here it's read-only history.
  */
-import { useState } from 'react'
-import { Wallet, Coins, Landmark, AlertTriangle } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Wallet, Coins, Landmark, AlertTriangle, Camera, X } from 'lucide-react'
 import KpiCard from '../../../../shared/components/KpiCard'
 import Badge from '../../../../shared/components/Badge'
 import Button from '../../../../shared/components/Button'
 import Skeleton from '../../../../shared/components/Skeleton'
 import EmptyState from '../../../../shared/components/EmptyState'
 import { useToast } from '../../../../shared/components/ToastProvider'
+import { uploadToMedia } from '../../../../shared/api/mediaUpload'
+import { translateMediaError } from '../../../../shared/api/mediaErrors'
 import { useMySettlementsSummary, useMySettlements, useSubmitSettlement } from '../../hooks/useCompanySettlement'
 
 const fmt = (n) => Number(n ?? 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 })
@@ -36,6 +38,10 @@ const fmtDate = (iso) => {
 export default function CompanySettlementTab() {
   const toast = useToast()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [proofFile, setProofFile] = useState(null)
+  const [proofPreview, setProofPreview] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef(null)
 
   const { data: summary, isLoading: summaryLoading } = useMySettlementsSummary()
   const { data: listData, isLoading: listLoading } = useMySettlements()
@@ -45,14 +51,43 @@ export default function CompanySettlementTab() {
 
   const canPay = (summary?.dispatcher_debt ?? 0) > 0.009
 
-  const handleSubmit = () => {
-    submitMutation.mutate(undefined, {
-      onSuccess: () => {
-        toast.success('Заявка отправлена владельцу на подтверждение')
-        setConfirmOpen(false)
-      },
-      onError: (err) => toast.error(err?.response?.data?.error?.message ?? 'Ошибка'),
-    })
+  function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setProofFile(file)
+    setProofPreview(URL.createObjectURL(file))
+  }
+
+  function clearProof() {
+    setProofFile(null)
+    setProofPreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleSubmit = async () => {
+    try {
+      let proofAssetId
+      if (proofFile) {
+        setUploading(true)
+        // 'cash_handover_proof' — same category as courier/dispatcher cash
+        // handover receipts, dispatchers are already an allowed uploader
+        // role for it (see internal/media/rbac.go).
+        const asset = await uploadToMedia(proofFile, 'cash_handover_proof')
+        proofAssetId = asset.id
+      }
+      submitMutation.mutate({ proofAssetId }, {
+        onSuccess: () => {
+          toast.success('Заявка отправлена владельцу на подтверждение')
+          setConfirmOpen(false)
+          clearProof()
+        },
+        onError: (err) => toast.error(err?.response?.data?.error?.message ?? 'Ошибка'),
+      })
+    } catch (err) {
+      toast.error(translateMediaError(err))
+    } finally {
+      setUploading(false)
+    }
   }
 
   return (
@@ -135,9 +170,29 @@ export default function CompanySettlementTab() {
               <span className="font-semibold text-slate-800">{fmt(summary?.dispatcher_debt)} с.</span>{' '}
               — владелец подтвердит или отклонит её.
             </p>
+
+            <div>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" id="settlement-proof-input" />
+              {proofPreview ? (
+                <div className="relative w-full h-32 rounded-xl overflow-hidden border border-slate-200">
+                  <img src={proofPreview} alt="Квитанция" className="w-full h-full object-cover" />
+                  <button
+                    type="button" onClick={clearProof}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <label htmlFor="settlement-proof-input" className="flex items-center justify-center gap-2 w-full h-16 rounded-xl border-2 border-dashed border-slate-200 text-slate-400 text-sm cursor-pointer hover:border-indigo-300 hover:text-indigo-500 transition-colors">
+                  <Camera size={16} /> Прикрепить фото (необязательно)
+                </label>
+              )}
+            </div>
+
             <div className="flex gap-2">
-              <Button variant="secondary" fullWidth onClick={() => setConfirmOpen(false)}>Отмена</Button>
-              <Button variant="primary" fullWidth onClick={handleSubmit} loading={submitMutation.isPending}>
+              <Button variant="secondary" fullWidth onClick={() => { setConfirmOpen(false); clearProof() }}>Отмена</Button>
+              <Button variant="primary" fullWidth onClick={handleSubmit} loading={submitMutation.isPending || uploading}>
                 Отправить
               </Button>
             </div>

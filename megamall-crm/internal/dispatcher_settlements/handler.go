@@ -105,8 +105,17 @@ func (h *Handler) confirmSettlement(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
+	var req ConfirmRequest
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
+		response.HandleError(c, apperrors.BadRequest("invalid request body"))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.HandleError(c, appErr)
+		return
+	}
 	claims := middleware.ClaimsFromContext(c)
-	settlement, svcErr := h.svc.Confirm(c.Request.Context(), claims.UserID, id)
+	settlement, svcErr := h.svc.Confirm(c.Request.Context(), claims.UserID, id, req.ActualReceived, req.AdminNote)
 	if svcErr != nil {
 		response.HandleError(c, svcErr)
 		return
@@ -136,6 +145,46 @@ func (h *Handler) rejectSettlement(c *gin.Context) {
 		return
 	}
 	response.OK(c, settlement)
+}
+
+// editSettlement corrects an already-finalized (confirmed/rejected)
+// settlement — mirrors logistics' post-decision "Изменить" flow.
+func (h *Handler) editSettlement(c *gin.Context) {
+	id, err := parseSettlementID(c)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	var req EditRequest
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
+		response.HandleError(c, apperrors.BadRequest("invalid request body"))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.HandleError(c, appErr)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	settlement, svcErr := h.svc.Edit(c.Request.Context(), claims.UserID, id, req)
+	if svcErr != nil {
+		response.HandleError(c, svcErr)
+		return
+	}
+	response.OK(c, settlement)
+}
+
+func (h *Handler) listSettlementHistory(c *gin.Context) {
+	id, err := parseSettlementID(c)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	edits, svcErr := h.svc.ListEdits(c.Request.Context(), id)
+	if svcErr != nil {
+		response.HandleError(c, svcErr)
+		return
+	}
+	response.OK(c, edits)
 }
 
 // ─── Dispatcher ───────────────────────────────────────────────────────────────

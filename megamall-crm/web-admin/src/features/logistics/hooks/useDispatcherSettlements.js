@@ -2,7 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { KEYS } from '../../../shared/queryKeys'
 import {
   fetchSettlementsSummary, fetchSettlements,
-  confirmSettlement, rejectSettlement, fetchDispatchers,
+  confirmSettlement, rejectSettlement, editSettlement, fetchSettlementHistory,
+  fetchDispatchers,
 } from '../api'
 
 export function useDispatchers() {
@@ -32,7 +33,7 @@ export function useSettlements(params = {}) {
 export function useConfirmSettlement() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id) => confirmSettlement(id),
+    mutationFn: ({ id, actualReceived, adminNote }) => confirmSettlement(id, { actualReceived, adminNote }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['logistics', 'settlements'] })
     },
@@ -46,5 +47,25 @@ export function useRejectSettlement() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['logistics', 'settlements'] })
     },
+  })
+}
+
+export function useEditSettlement() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...body }) => editSettlement(id, body),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: ['logistics', 'settlements'] })
+      qc.invalidateQueries({ queryKey: KEYS.logistics.settlementHistory(id) })
+    },
+  })
+}
+
+export function useSettlementHistory(id, enabled = true) {
+  return useQuery({
+    queryKey: KEYS.logistics.settlementHistory(id),
+    queryFn:  () => fetchSettlementHistory(id),
+    enabled:  !!id && enabled,
+    staleTime: 0,
   })
 }
