@@ -839,7 +839,11 @@ func (s *Service) DecideLostReport(ctx context.Context, actorID uuid.UUID, repor
 			if err := s.repo.UpdateCourierInventory(tx, ctx, ci.ID, ci.Quantity, ci.ReservedQuantity, newBlocked); err != nil {
 				return err
 			}
-			return s.repo.UpdateLostReportStatus(tx, ctx, r.ID, LostReportRejected, actorID)
+			if err := s.repo.UpdateLostReportStatus(tx, ctx, r.ID, LostReportRejected, actorID); err != nil {
+				return err
+			}
+			rep.Status = LostReportRejected
+			return nil
 		}
 
 		newQty := ci.Quantity - r.Quantity
@@ -859,7 +863,11 @@ func (s *Service) DecideLostReport(ctx context.Context, actorID uuid.UUID, repor
 		if err := s.repo.InsertCourierMovement(tx, ctx, mv); err != nil {
 			return err
 		}
-		return s.repo.UpdateLostReportStatus(tx, ctx, r.ID, LostReportApproved, actorID)
+		if err := s.repo.UpdateLostReportStatus(tx, ctx, r.ID, LostReportApproved, actorID); err != nil {
+			return err
+		}
+		rep.Status = LostReportApproved
+		return nil
 	})
 	if txErr != nil {
 		return nil, txErr
