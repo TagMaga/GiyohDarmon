@@ -21,6 +21,7 @@ import { CardSkeleton }  from '../../../shared/components/Skeleton'
 import { fmtAmount }     from '../../../shared/orderStatusConfig'
 import useCurrentUser    from '../../../shared/hooks/useCurrentUser'
 import usePayables       from '../hooks/usePayables'
+import useDeliveredTeamTotals from '../hooks/useDeliveredTeamTotals'
 import useMyTeam         from '../hooks/useMyTeam'
 import useTeamMembers    from '../../people/hooks/useTeamMembers'
 import useEmployeesByIds from '../../people/hooks/useEmployeesByIds'
@@ -130,23 +131,29 @@ export default function TeamLeadTeamPage() {
     return m
   }, [payables])
 
+  // payables.orders_count counts every order regardless of status — same bug
+  // already fixed on the Финансы screens (see useDeliveredTeamTotals); swap
+  // it in here too so the ranking's "X заказов" matches delivered orders.
+  const { byUser: deliveredTotals, isLoading: totalsLoading } = useDeliveredTeamTotals({ from, to })
+
   const members = useMemo(() => (
     rosterIds
       .map(id => userMap[id])
       .filter(u => u && (u.role === 'manager' || u.role === 'seller'))
       .map(u => {
         const p = payableMap[u.id]
+        const d = deliveredTotals[u.id]
         return {
           payee_id:     u.id,
           full_name:    u.full_name,
           role:         u.role,
-          orders_count: p?.orders_count ?? 0,
+          orders_count: d?.ordersCount ?? 0,
           earned:       p?.earned ?? 0,
         }
       })
-  ), [rosterIds, userMap, payableMap])
+  ), [rosterIds, userMap, payableMap, deliveredTotals])
 
-  const isLoading = teamLoading || membersLoading || employeesLoading || (rosterIds.length > 0 && payablesLoading)
+  const isLoading = teamLoading || membersLoading || employeesLoading || totalsLoading || (rosterIds.length > 0 && payablesLoading)
 
   const managers = members.filter(m => m.role === 'manager')
   const sellers  = members.filter(m => m.role === 'seller')
