@@ -19,6 +19,7 @@ import useProfile from '../../../shared/hooks/useProfile'
 import useAuthStore from '../../../shared/store/authStore'
 import useMyTeam from '../hooks/useMyTeam'
 import usePayables from '../hooks/usePayables'
+import useDeliveredTeamTotals from '../hooks/useDeliveredTeamTotals'
 import { M, MobileShell, Card, SectionLabel } from '../../seller/components/mobileUi'
 
 function toYMD(d) {
@@ -51,7 +52,11 @@ export default function TeamLeadProfilePage() {
   const { data: payables } = usePayables(userId, { from, to })
   const members = payables?.members ?? []
   const sellerCount = members.filter(m => m.role === 'seller').length
-  const periodOrders = members.reduce((sum, m) => sum + (m.orders_count ?? 0), 0)
+  // payables.orders_count counts every order regardless of status — use
+  // delivered-only totals for the "Заказов" stat tile (see
+  // useDeliveredTeamTotals), same fix as the Финансы/Команда screens.
+  const { byUser: deliveredTotals } = useDeliveredTeamTotals({ from, to })
+  const periodOrders = Object.values(deliveredTotals).reduce((sum, d) => sum + d.ordersCount, 0)
 
   const tenure = monthsOnline(employee?.hire_date ?? employee?.created_at)
 
