@@ -271,7 +271,8 @@ export default function EditOrder() {
     if (!form) return false
     if (isTerminal) return false
     if (cartItems.length === 0) return false
-    if (cartItems.some((i) => calcPayloadUnitPrice(i) <= 0)) return false
+    if (cartItems.some((i) => calcPayloadUnitPrice(i) < 0)) return false
+    if (productTotal < 1) return false
     return true
   })()
 

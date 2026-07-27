@@ -47,10 +47,13 @@ function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, l
   const [note, setNote]     = useState('')
   const [err, setErr]       = useState('')
 
+  const parsedAmount = parseFloat(amount)
+  const overBudget = isWithdrawal && !isNaN(parsedAmount) && parsedAmount > balance
+  const resultingBalance = overBudget ? balance - parsedAmount : null
+
   function handleSubmit() {
     const amt = parseFloat(amount)
     if (isNaN(amt) || amt < 0) { setErr('Введите корректную сумму'); return }
-    if (isWithdrawal && amt > balance) { setErr('Недостаточно средств на балансе'); return }
     setErr('')
     onSubmit({ amount: amt, note: note.trim() })
   }
@@ -100,6 +103,11 @@ function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, l
         />
 
         {err && <p className="text-red-500 text-[11px] mt-1 mb-1">{err}</p>}
+        {!err && overBudget && (
+          <p className="text-amber-600 text-[11px] mt-1 mb-1 font-semibold">
+            Внимание: сумма превышает баланс. Баланс компании станет отрицательным ({fmt(resultingBalance)} с).
+          </p>
+        )}
 
         <p className="text-[11px] text-slate-400 mb-5 mt-2">
           Текущий баланс: <span className="font-bold text-slate-700">{fmt(balance)}</span> с

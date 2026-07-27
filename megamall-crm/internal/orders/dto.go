@@ -11,7 +11,7 @@ import (
 type OrderItemRequest struct {
 	ProductID uuid.UUID `json:"product_id" validate:"required"`
 	Quantity  int       `json:"quantity"   validate:"required,min=1"`
-	UnitPrice float64   `json:"unit_price"  validate:"required,min=0"`
+	UnitPrice float64   `json:"unit_price"  validate:"min=0"`
 }
 
 type OrderItemResponse struct {

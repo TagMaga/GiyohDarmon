@@ -429,7 +429,8 @@ export default function CreateOrder() {
     if (!form.customerId && !isValidPhone(form.phone)) return false
     if (!form.cityId) return false
     if (cartItems.length === 0) return false
-    if (cartItems.some((i) => calcPayloadUnitPrice(i) <= 0)) return false
+    if (cartItems.some((i) => calcPayloadUnitPrice(i) < 0)) return false
+    if (productTotal < 1) return false
     if (form.payMode === 'prepayment') {
       if (prepayAmt <= 0) return false
       if (prepayAmt > totalOrderAmount) return false
@@ -668,6 +669,11 @@ export default function CreateOrder() {
               <AlertCircle size={11} /> Добавьте хотя бы один товар
             </p>
           )}
+          {!canSubmit && cartItems.length > 0 && productTotal < 1 && (
+            <p className="flex items-center gap-1" style={{ fontSize: 11, color: '#BE123C', marginBottom: 8 }}>
+              <AlertCircle size={11} /> Сумма заказа должна быть не менее 1 с
+            </p>
+          )}
           {!canSubmit && cartItems.length > 0 && form.payMode === 'prepayment' && prepayAmt > totalOrderAmount && (
             <p className="flex items-center gap-1" style={{ fontSize: 11, color: '#BE123C', marginBottom: 8 }}>
               <AlertCircle size={11} /> Предоплата не может быть больше итога заказа
@@ -883,6 +889,11 @@ export default function CreateOrder() {
             {!canSubmit && cartItems.length === 0 && (
               <p className="flex items-center gap-1" style={{ fontSize: 11.5, color: M.muted, marginBottom: 10 }}>
                 <AlertCircle size={12} /> Добавьте хотя бы один товар
+              </p>
+            )}
+            {!canSubmit && cartItems.length > 0 && productTotal < 1 && (
+              <p className="flex items-center gap-1" style={{ fontSize: 11.5, color: '#BE123C', marginBottom: 10 }}>
+                <AlertCircle size={12} /> Сумма заказа должна быть не менее 1 с
               </p>
             )}
             {!canSubmit && cartItems.length > 0 && form.payMode === 'prepayment' && prepayAmt > totalOrderAmount && (
