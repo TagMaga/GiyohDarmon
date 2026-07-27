@@ -74,9 +74,18 @@ function OverviewTab() {
   const from = toYMD(new Date(now.getFullYear(), now.getMonth(), 1))
   const to   = toYMD(now)
 
-  const { data: payables, isLoading, isError, error, refetch } = usePayables(userId, { from, to })
+  const { data: payables, isLoading: payablesLoading, isError, error, refetch } = usePayables(userId, { from, to })
+  const { byUser: deliveredTotals, isLoading: totalsLoading } = useDeliveredTeamTotals({ from, to })
+  const isLoading = payablesLoading || totalsLoading
   const { data: payoutHistory = [], isLoading: historyLoading } = useMyPayouts()
-  const members = payables?.members ?? []
+  // gross_amount/orders_count from payables count every order regardless of
+  // status — swap in delivered-only totals (see useDeliveredTeamTotals) so
+  // "сумма" and "заказов" here match what was actually sold, same as the
+  // "По продавцам" tab and the seller detail page.
+  const members = useMemo(() => (payables?.members ?? []).map(m => {
+    const d = deliveredTotals[m.payee_id] ?? { ordersCount: 0, grossAmount: 0, courierFeeTotal: 0 }
+    return { ...m, orders_count: d.ordersCount, gross_amount: d.grossAmount, courier_fee_total: d.courierFeeTotal }
+  }), [payables, deliveredTotals])
 
   const [selected, setSelected] = useState(() => new Set())
   const [amounts, setAmounts]   = useState({})
