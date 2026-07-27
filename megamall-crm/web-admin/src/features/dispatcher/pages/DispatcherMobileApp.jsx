@@ -20,7 +20,6 @@ import './../mobile/DispatcherMobile.css'
 
 import DispatchTab from '../mobile/DispatchTab'
 import CouriersTab from '../mobile/CouriersTab'
-import CashTab from '../mobile/CashTab'
 import HistoryTab from '../mobile/HistoryTab'
 import CompanySettlementTab from '../components/v2/CompanySettlementTab'
 import OrderDetailSheet from '../mobile/OrderDetailSheet'
@@ -35,7 +34,6 @@ const TAB_TITLES = {
   dispatch: 'Диспетчер',
   couriers: 'Курьеры',
   cash: 'Касса',
-  company: 'Компания',
   history: 'История',
 }
 
@@ -247,8 +245,7 @@ export default function DispatcherMobileApp() {
             onCouriersChanged={() => qc.invalidateQueries({ queryKey: KEYS.dispatcher.couriers })}
           />
         )}
-        {tab === 'cash' && <CashTab couriers={courierList} cashOwed={cashOwed} />}
-        {tab === 'company' && (
+        {tab === 'cash' && (
           <div style={{ padding: '14px 16px' }}>
             <CompanySettlementTab />
           </div>
@@ -333,7 +330,6 @@ const NAV_ITEMS = [
   { key: 'dispatch', label: 'Доска' },
   { key: 'couriers', label: 'Курьеры' },
   { key: 'cash', label: 'Касса' },
-  { key: 'company', label: 'Компания' },
   { key: 'history', label: 'История' },
 ]
 
@@ -373,6 +369,5 @@ function NavIcon({ k, active }) {
   if (k === 'dispatch') return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></svg>
   if (k === 'couriers') return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"><path d="M10 17h4V5H2v12h3" /><path d="M20 17h2v-3.34a4 4 0 0 0-1.17-2.83L19 9h-5v8h1" /><circle cx="7.5" cy="17.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /></svg>
   if (k === 'cash') return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 6v12M18 6v12" /></svg>
-  if (k === 'company') return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"><path d="M3 21v-9a2 2 0 0 1 2-2h1" /><path d="M22 10V6a2 2 0 0 0-2-2h-2" /><path d="M8 21h12a2 2 0 0 0 2-2v-3.5a2.5 2.5 0 0 0-2.5-2.5v0a2.5 2.5 0 0 0-2.5 2.5V17" /><path d="M8 21V10a2 2 0 0 1 2-2h4" /></svg>
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v5h5" /><path d="M3.05 13a9 9 0 1 0 2.36-6.87L3 8" /><path d="M12 7v5l4 2" /></svg>
 }
