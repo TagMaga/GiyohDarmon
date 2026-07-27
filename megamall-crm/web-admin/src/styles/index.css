@@ -269,3 +269,16 @@
   from { opacity: 0; transform: scale(0.5); }
   to   { opacity: 1; transform: scale(1); }
 }
+
+/*
+ * iOS Safari (and some Android browsers) auto-zoom the viewport on focus
+ * whenever a form field's font-size is below 16px. Several panels set
+ * font-size below that via Tailwind utility classes (text-sm/text-xs) or
+ * inline style={{ fontSize }}, which triggers it. !important is required
+ * here because inline styles otherwise always win over stylesheet rules.
+ */
+@media (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
