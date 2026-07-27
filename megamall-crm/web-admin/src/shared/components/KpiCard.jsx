@@ -43,13 +43,15 @@ const colorMap = {
   },
 }
 
-export default function KpiCard({ label, value = '—', icon, color = 'indigo', trend, loading = false }) {
+export default function KpiCard({ label, value = '—', icon, color = 'indigo', trend, loading = false, compact = false }) {
   const c = colorMap[color] ?? colorMap.indigo
+  const topGap = compact ? 'mb-2' : 'mb-5'
+  const cardStyle = compact ? { padding: 16 } : undefined
 
   if (loading) {
     return (
-      <div className="kpi-card" style={{ background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)' }}>
-        <div className="flex items-start justify-between mb-5">
+      <div className="kpi-card" style={{ background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)', ...cardStyle }}>
+        <div className={`flex items-start justify-between ${topGap}`}>
           <div className="skeleton w-11 h-11 rounded-2xl" />
           <div className="skeleton w-16 h-5 rounded-full" />
         </div>
@@ -60,9 +62,9 @@ export default function KpiCard({ label, value = '—', icon, color = 'indigo', 
   }
 
   return (
-    <div className="kpi-card group overflow-hidden relative" style={{ background: c.bg }}>
+    <div className="kpi-card group overflow-hidden relative" style={{ background: c.bg, ...cardStyle }}>
       {/* Top row: icon + trend badge */}
-      <div className="flex items-start justify-between mb-5">
+      <div className={`flex items-start justify-between ${topGap}`}>
         <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${c.iconBg} ${c.icon}
                          transition-transform duration-200 group-hover:scale-105`}>
           {icon}
@@ -75,7 +77,7 @@ export default function KpiCard({ label, value = '—', icon, color = 'indigo', 
       </div>
 
       {/* Hero value */}
-      <p className={`text-[32px] font-bold leading-tight tracking-tight mb-1.5 ${c.value}`}>
+      <p className={`${compact ? 'text-[24px]' : 'text-[32px]'} font-bold leading-tight tracking-tight mb-1.5 ${c.value}`}>
         {value}
       </p>
 
