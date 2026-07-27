@@ -9,6 +9,11 @@ import (
 // Expected to be called with v1.Group("/owner/logistics").
 func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	ownerOnly := middleware.RequireRoles("owner")
+	// Read-only: the dispatcher panel's cash ledger reuses this same
+	// enriched projection (dispatcher_name, courier_debt_after, media) —
+	// see web-admin's features/dispatcher/hooks/useCashLedger.js. Every
+	// write route below stays owner-only.
+	ownerOrDispatcher := middleware.RequireRoles("owner", "dispatcher")
 	auth := middleware.RequireAuth()
 
 	// Dashboard
@@ -21,7 +26,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/couriers/:id/performance", auth, ownerOnly, h.getCourierPerformance)
 
 	// Cash handovers
-	rg.GET("/cash-handovers", auth, ownerOnly, h.listHandovers)
+	rg.GET("/cash-handovers", auth, ownerOrDispatcher, h.listHandovers)
 	rg.POST("/cash-handovers", auth, ownerOnly, h.createHandover)
 	rg.PATCH("/cash-handovers/:id", auth, ownerOnly, h.updateHandover)
 	rg.DELETE("/cash-handovers/:id", auth, ownerOnly, h.deleteHandover)

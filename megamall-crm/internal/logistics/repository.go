@@ -851,6 +851,8 @@ func (r *Repository) ListHandovers(ctx context.Context, p pagination.Params, cou
 			ch.courier_id,
 			u.full_name AS courier_name,
 			u.phone     AS courier_phone,
+			ch.dispatcher_id,
+			du.full_name AS dispatcher_name,
 			ch.total_collected,
 			ch.total_delivery_fees,
 			ch.total_to_return,
@@ -865,6 +867,7 @@ func (r *Repository) ListHandovers(ctx context.Context, p pagination.Params, cou
 			GREATEST(0, rd.debt_after) AS courier_debt_after
 		`).
 		Joins("JOIN users u ON u.id = ch.courier_id").
+		Joins("LEFT JOIN users du ON du.id = ch.dispatcher_id").
 		// rd computes each handover's running courier balance over the
 		// courier's ENTIRE history (unfiltered by this query's own
 		// courier/status/date-range params), so debt_after is correct even

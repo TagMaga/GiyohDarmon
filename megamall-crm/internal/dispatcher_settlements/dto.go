@@ -42,9 +42,13 @@ type ListFilter struct {
 
 // Row is one settlement history entry.
 type Row struct {
-	ID              uuid.UUID  `json:"id"`
-	DispatcherID    uuid.UUID  `json:"dispatcher_id"`
-	DispatcherName  string     `json:"dispatcher_name"`
+	ID             uuid.UUID `json:"id"`
+	DispatcherID   uuid.UUID `json:"dispatcher_id"`
+	DispatcherName string    `json:"dispatcher_name"`
+	// OwnerName is always the destination account's name — set on every
+	// row regardless of review status, since the money is always headed to
+	// the same (single) owner account. See Repository.PrimaryOwnerName.
+	OwnerName       string     `json:"owner_name"`
 	Amount          float64    `json:"amount"`
 	ActualReceived  *float64   `json:"actual_received"`
 	Status          string     `json:"status"`

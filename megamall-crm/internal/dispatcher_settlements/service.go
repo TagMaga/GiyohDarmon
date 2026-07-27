@@ -141,6 +141,9 @@ func (s *Service) ListForOwner(ctx context.Context, f ListFilter, p pagination.P
 	if err != nil {
 		return nil, 0, err
 	}
+	if err := s.attachOwnerName(ctx, rows); err != nil {
+		return nil, 0, err
+	}
 	for i := range rows {
 		rows[i].MediaAssets = s.resolveMediaAssets(ctx, rows[i].ID)
 	}
@@ -153,10 +156,29 @@ func (s *Service) ListForDispatcher(ctx context.Context, dispatcherID uuid.UUID,
 	if err != nil {
 		return nil, 0, err
 	}
+	if err := s.attachOwnerName(ctx, rows); err != nil {
+		return nil, 0, err
+	}
 	for i := range rows {
 		rows[i].MediaAssets = s.resolveMediaAssets(ctx, rows[i].ID)
 	}
 	return rows, total, nil
+}
+
+// attachOwnerName fills in every row's OwnerName with a single lookup,
+// rather than once per row.
+func (s *Service) attachOwnerName(ctx context.Context, rows []Row) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	name, err := s.repo.PrimaryOwnerName(ctx)
+	if err != nil {
+		return apperrors.Internal(err)
+	}
+	for i := range rows {
+		rows[i].OwnerName = name
+	}
+	return nil
 }
 
 // Submit creates a pending settlement for the dispatcher's full current
