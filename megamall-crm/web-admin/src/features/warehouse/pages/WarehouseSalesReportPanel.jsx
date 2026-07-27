@@ -3,6 +3,8 @@ import { BarChart2, CalendarDays, ChevronDown, Download, Package, PackageX, Sear
 import EmptyState from '../../../shared/components/EmptyState'
 import Alert from '../../../shared/components/Alert'
 import Button from '../../../shared/components/Button'
+import BottomSheet from '../../../shared/components/BottomSheet'
+import useIsMobile from '../../../shared/hooks/useIsMobile'
 import useSalesReport from '../hooks/useSalesReport'
 import useSlowMovingStock from '../hooks/useSlowMovingStock'
 import useProducts from '../hooks/useProducts'
@@ -146,14 +148,14 @@ function SalesView({ params, productIds }) {
 
       {!error && rows.length > 0 && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="grid flex-1 grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] sm:grid-cols-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] sm:flex-1 sm:grid-cols-4">
               <TotalTile label="Товаров продано" value={totals.quantity.toLocaleString('ru-RU')} />
               <TotalTile label="Выручка" value={fmtMoney(totals.revenue)} />
               <TotalTile label="Себестоимость" value={fmtMoney(totals.cogs)} />
               <TotalTile label="Прибыль" value={fmtMoney(totals.profit)} tone="emerald" />
             </div>
-            <Button size="sm" icon={<Download size={14} />} onClick={exportCsv}>CSV</Button>
+            <Button size="sm" icon={<Download size={14} />} onClick={exportCsv} className="w-full sm:w-auto">CSV</Button>
           </div>
 
           <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] lg:block">
@@ -226,13 +228,13 @@ function SlowMovingView({ params, productIds }) {
 
       {!error && rows.length > 0 && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="grid flex-1 grid-cols-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] sm:grid-cols-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] sm:flex-1 sm:grid-cols-3">
               <TotalTile label="Товаров без продаж" value={totals.count.toLocaleString('ru-RU')} tone="amber" />
               <TotalTile label="Остаток, шт." value={totals.stockQty.toLocaleString('ru-RU')} />
               <TotalTile label="Стоимость остатка" value={fmtMoney(totals.stockValue)} tone="amber" />
             </div>
-            <Button size="sm" icon={<Download size={14} />} onClick={exportCsv}>CSV</Button>
+            <Button size="sm" icon={<Download size={14} />} onClick={exportCsv} className="w-full sm:w-auto">CSV</Button>
           </div>
 
           <div className="hidden overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] lg:block">
@@ -307,7 +309,55 @@ function DropdownTrigger({ icon, active, open, onClick, onClear, children }) {
   )
 }
 
+function PeriodFilterBody({ preset, draftFrom, draftTo, onDraftFrom, onDraftTo, onPreset, onApply }) {
+  return (
+    <>
+      <div className="flex flex-col gap-0.5">
+        {PRESETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onPreset(p)}
+            className={[
+              'flex min-h-[34px] items-center rounded-lg px-2.5 text-left text-xs font-semibold transition-colors',
+              preset === p.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50',
+            ].join(' ')}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
+        <input
+          type="date"
+          value={draftFrom}
+          max={draftTo || undefined}
+          onChange={(e) => onDraftFrom(e.target.value)}
+          className="input h-8 min-w-0 flex-1 px-2 text-xs"
+        />
+        <span className="text-xs text-slate-400">—</span>
+        <input
+          type="date"
+          value={draftTo}
+          min={draftFrom || undefined}
+          onChange={(e) => onDraftTo(e.target.value)}
+          className="input h-8 min-w-0 flex-1 px-2 text-xs"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={onApply}
+        disabled={!draftFrom || !draftTo}
+        className="mt-3 h-9 w-full rounded-full bg-indigo-600 text-xs font-bold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Применить
+      </button>
+    </>
+  )
+}
+
 function PeriodFilter({ preset, dateFrom, dateTo, onPreset, onCustom }) {
+  const isMobile = useIsMobile(768)
   const [open, setOpen] = useState(false)
   const [draftFrom, setDraftFrom] = useState(dateFrom)
   const [draftTo, setDraftTo] = useState(dateTo)
@@ -318,6 +368,9 @@ function PeriodFilter({ preset, dateFrom, dateTo, onPreset, onCustom }) {
     if (!open) { setDraftFrom(dateFrom); setDraftTo(dateTo) }
     setOpen((o) => !o)
   }
+
+  function pickPreset(p) { onPreset(p); setOpen(false) }
+  function applyCustom() { onCustom(draftFrom, draftTo); setOpen(false) }
 
   const activePreset = PRESETS.find((p) => p.id === preset)
   const label = activePreset
@@ -335,49 +388,33 @@ function PeriodFilter({ preset, dateFrom, dateTo, onPreset, onCustom }) {
       >
         {label}
       </DropdownTrigger>
-      {open && (
+
+      {open && !isMobile && (
         <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[300px] rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xl">
-          <div className="flex flex-col gap-0.5">
-            {PRESETS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => { onPreset(p); setOpen(false) }}
-                className={[
-                  'flex min-h-[34px] items-center rounded-lg px-2.5 text-left text-xs font-semibold transition-colors',
-                  preset === p.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50',
-                ].join(' ')}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
-            <input
-              type="date"
-              value={draftFrom}
-              max={draftTo || undefined}
-              onChange={(e) => setDraftFrom(e.target.value)}
-              className="input h-8 min-w-0 flex-1 px-2 text-xs"
-            />
-            <span className="text-xs text-slate-400">—</span>
-            <input
-              type="date"
-              value={draftTo}
-              min={draftFrom || undefined}
-              onChange={(e) => setDraftTo(e.target.value)}
-              className="input h-8 min-w-0 flex-1 px-2 text-xs"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => { onCustom(draftFrom, draftTo); setOpen(false) }}
-            disabled={!draftFrom || !draftTo}
-            className="mt-3 h-9 w-full rounded-full bg-indigo-600 text-xs font-bold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Применить
-          </button>
+          <PeriodFilterBody
+            preset={preset}
+            draftFrom={draftFrom}
+            draftTo={draftTo}
+            onDraftFrom={setDraftFrom}
+            onDraftTo={setDraftTo}
+            onPreset={pickPreset}
+            onApply={applyCustom}
+          />
         </div>
+      )}
+
+      {isMobile && (
+        <BottomSheet open={open} onClose={() => setOpen(false)} title="Период">
+          <PeriodFilterBody
+            preset={preset}
+            draftFrom={draftFrom}
+            draftTo={draftTo}
+            onDraftFrom={setDraftFrom}
+            onDraftTo={setDraftTo}
+            onPreset={pickPreset}
+            onApply={applyCustom}
+          />
+        </BottomSheet>
       )}
     </div>
   )
@@ -404,7 +441,58 @@ function ProductThumb({ product }) {
   )
 }
 
+function ProductFilterBody({ q, onQ, matches, selected, onToggleProduct, onReset }) {
+  return (
+    <>
+      <div className="relative mb-2">
+        <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => onQ(e.target.value)}
+          placeholder="Поиск товара…"
+          className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-indigo-300 focus:bg-white"
+        />
+      </div>
+      <div className="max-h-[320px] overflow-y-auto">
+        {matches.map((p) => {
+          const id = getId(p)
+          const isSelected = selected.includes(id)
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onToggleProduct(id)}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors ${isSelected ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
+            >
+              <span className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border-[1.5px] ${isSelected ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300'}`}>
+                {isSelected && <span className="h-1.5 w-1.5 rounded-sm bg-white" />}
+              </span>
+              <ProductThumb product={p} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[12.5px] font-semibold text-slate-900">{getProductName(p)}</span>
+                <span className="block truncate font-mono text-[10.5px] text-slate-400">{getProductSku(p)}</span>
+              </span>
+            </button>
+          )
+        })}
+        {matches.length === 0 && <p className="my-3 text-center text-[12px] text-slate-400">Ничего не найдено</p>}
+      </div>
+      {selected.length > 0 && (
+        <button
+          type="button"
+          onClick={onReset}
+          className="mt-2 h-8 w-full rounded-lg text-[11px] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+        >
+          Сбросить выбор
+        </button>
+      )}
+    </>
+  )
+}
+
 function ProductFilter({ products, selected, onChange }) {
+  const isMobile = useIsMobile(768)
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
   const rootRef = useRef(null)
@@ -441,52 +529,17 @@ function ProductFilter({ products, selected, onChange }) {
       >
         {label}
       </DropdownTrigger>
-      {open && (
+
+      {open && !isMobile && (
         <div className="absolute left-0 top-[calc(100%+8px)] z-50 w-[320px] rounded-2xl border border-slate-200 bg-white p-2.5 shadow-2xl">
-          <div className="relative mb-2">
-            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Поиск товара…"
-              className="h-9 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs text-slate-900 outline-none focus:border-indigo-300 focus:bg-white"
-            />
-          </div>
-          <div className="max-h-[320px] overflow-y-auto">
-            {matches.map((p) => {
-              const id = getId(p)
-              const isSelected = selected.includes(id)
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => toggleProduct(id)}
-                  className={`flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors ${isSelected ? 'bg-indigo-50' : 'hover:bg-slate-50'}`}
-                >
-                  <span className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border-[1.5px] ${isSelected ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300'}`}>
-                    {isSelected && <span className="h-1.5 w-1.5 rounded-sm bg-white" />}
-                  </span>
-                  <ProductThumb product={p} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12.5px] font-semibold text-slate-900">{getProductName(p)}</span>
-                    <span className="block truncate font-mono text-[10.5px] text-slate-400">{getProductSku(p)}</span>
-                  </span>
-                </button>
-              )
-            })}
-            {matches.length === 0 && <p className="my-3 text-center text-[12px] text-slate-400">Ничего не найдено</p>}
-          </div>
-          {selected.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onChange([])}
-              className="mt-2 h-8 w-full rounded-lg text-[11px] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-            >
-              Сбросить выбор
-            </button>
-          )}
+          <ProductFilterBody q={q} onQ={setQ} matches={matches} selected={selected} onToggleProduct={toggleProduct} onReset={() => onChange([])} />
         </div>
+      )}
+
+      {isMobile && (
+        <BottomSheet open={open} onClose={() => setOpen(false)} title="Товар">
+          <ProductFilterBody q={q} onQ={setQ} matches={matches} selected={selected} onToggleProduct={toggleProduct} onReset={() => onChange([])} />
+        </BottomSheet>
       )}
     </div>
   )
