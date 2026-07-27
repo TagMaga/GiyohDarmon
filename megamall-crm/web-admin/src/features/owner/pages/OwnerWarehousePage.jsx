@@ -7,6 +7,7 @@ import {
   RefreshCw,
   Search,
   Trash2,
+  Truck,
 } from 'lucide-react'
 import Alert from '../../../shared/components/Alert'
 import Badge from '../../../shared/components/Badge'
@@ -14,7 +15,15 @@ import Button from '../../../shared/components/Button'
 import ProductModal from '../../warehouse/components/ProductModal'
 import ReceivingModal from '../../warehouse/components/ReceivingModal'
 import WriteoffModal from '../../warehouse/components/WriteoffModal'
+import {
+  LostReportsPanel,
+  NewTransferModal,
+  PendingReturnsPanel,
+  TRANSFER_STATUS_FILTERS,
+  TransferList,
+} from '../../warehouse/components/TransferComponents'
 import useWarehouseData from '../../warehouse/hooks/useWarehouseData'
+import { useInventorySummary, useTransfers } from '../../warehouse/hooks/useTransfers'
 import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'
 import SalesReportPanel from '../../warehouse/pages/WarehouseSalesReportPanel'
 import OwnerWarehouseMobile from '../components/OwnerWarehouseMobile'
@@ -67,7 +76,11 @@ export default function OwnerWarehousePage() {
   const [editingProduct, setEditingProduct] = useState(null)
   const [receiveProduct, setReceiveProduct] = useState(undefined)
   const [writeoffProduct, setWriteoffProduct] = useState(undefined)
+  const [showNewTransfer, setShowNewTransfer] = useState(false)
+  const [transferStatus, setTransferStatus] = useState('')
   const data = useWarehouseData()
+  const { data: transfers = [], isLoading: transfersLoading } = useTransfers({ status: transferStatus })
+  const { data: invSummary } = useInventorySummary()
 
   const inventoryByProduct = useMemo(
     () => new Map(data.inventory.map((inv) => [inv.product_id ?? inv.ProductID, inv])),
@@ -208,6 +221,7 @@ export default function OwnerWarehousePage() {
             onProduct={() => setShowProduct(true)}
           />
           <MetricsStrip products={data.products} inventory={data.inventory} movements={data.movements} batches={data.batches} loading={data.loading} />
+          <CourierWarehouseSummary summary={invSummary} />
           <AttentionPanel
             alerts={stockAlerts}
             data={data}
@@ -240,6 +254,7 @@ export default function OwnerWarehousePage() {
               />
             </label>
           </div>
+          <CourierWarehouseSummary summary={invSummary} detailed />
           <InventoryTable
             rows={inventoryRows}
             data={data}
@@ -257,11 +272,29 @@ export default function OwnerWarehousePage() {
             <Button variant="danger" icon={<Trash2 size={15} />} onClick={() => setWriteoffProduct(null)}>Новое списание</Button>
           </div>
           <MovementList rows={receivingRows} data={data} emptyTitle="Операций пока нет" showEntryActions />
+          <PendingReturnsPanel />
+          <LostReportsPanel />
         </div>
       )}
 
       {tab === 'movements' && (
-        <div className="animate-fade-in space-y-4">
+        <div className="animate-fade-in space-y-5">
+          <section>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-slate-950">Передачи курьерам</h2>
+                <p className="mt-1 text-xs text-slate-400">Выдача товара курьеру со склада, история и статусы.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <select className="input py-2" value={transferStatus} onChange={(e) => setTransferStatus(e.target.value)}>
+                  {TRANSFER_STATUS_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                </select>
+                <Button variant="primary" icon={<Truck size={15} />} onClick={() => setShowNewTransfer(true)}>Новая передача</Button>
+              </div>
+            </div>
+            <TransferList transfers={transfers} loading={transfersLoading} />
+          </section>
+
           <section className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] lg:grid-cols-[minmax(0,1fr)_160px_210px_auto]">
             <label className="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
               <Search size={17} className="text-slate-400" />
@@ -296,6 +329,7 @@ export default function OwnerWarehousePage() {
       <ProductModal open={Boolean(editingProduct)} onClose={() => setEditingProduct(null)} product={editingProduct} suppliers={data.suppliers} />
       <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={data.products} inventory={data.inventory} />
       <WriteoffModal open={writeoffProduct !== undefined} onClose={() => setWriteoffProduct(undefined)} products={writeoffProduct ? [writeoffProduct] : data.products} inventory={data.inventory} />
+      <NewTransferModal open={showNewTransfer} onClose={() => setShowNewTransfer(false)} products={data.products} />
     </>
   )
 }
@@ -362,6 +396,38 @@ function MetricsStrip({ products = [], inventory = [], movements = [], batches =
           <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{item.label}</p>
           <p className={`mt-1 truncate text-base font-bold tabular-nums ${item.tone === 'amber' ? 'text-amber-700' : item.tone === 'rose' ? 'text-rose-700' : 'text-slate-950'}`}>
             {loading ? '—' : item.value}
+          </p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CourierWarehouseSummary({ summary, detailed = false }) {
+  if (!summary) return null
+  const totalPhysical = (summary.main_quantity ?? 0) + (summary.courier_quantity ?? 0)
+  const totalReserved = (summary.main_reserved ?? 0) + (summary.courier_reserved ?? 0)
+  const items = [
+    { label: 'Всего товара', value: totalPhysical },
+    { label: 'Резерв (заказы)', value: totalReserved, tone: 'amber' },
+    { label: 'У курьеров', value: summary.courier_quantity ?? 0, tone: 'indigo' },
+    { label: 'В передачах', value: summary.pending_transfers ?? 0, tone: summary.pending_transfers ? 'amber' : 'slate' },
+  ]
+  if (detailed) {
+    items.push(
+      { label: 'На главном складе', value: summary.main_quantity ?? 0 },
+      { label: 'Заблокировано (передачи)', value: summary.main_blocked ?? 0, tone: summary.main_blocked ? 'amber' : 'slate' },
+      { label: 'Возвраты на рассмотрении', value: summary.pending_returns ?? 0, tone: summary.pending_returns ? 'amber' : 'slate' },
+      { label: 'Заявки об утере', value: summary.pending_lost_reports ?? 0, tone: summary.pending_lost_reports ? 'rose' : 'slate' },
+    )
+  }
+  return (
+    <div className={`grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] sm:grid-cols-4 ${detailed ? 'lg:grid-cols-8' : ''}`}>
+      {items.map((item) => (
+        <div key={item.label} className="border-b border-r border-slate-100 px-3 py-3 last:border-r-0 sm:[&:nth-child(4n)]:border-r-0">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{item.label}</p>
+          <p className={`mt-1 truncate text-base font-bold tabular-nums ${item.tone === 'amber' ? 'text-amber-700' : item.tone === 'rose' ? 'text-rose-700' : item.tone === 'indigo' ? 'text-indigo-700' : 'text-slate-950'}`}>
+            {item.value.toLocaleString('ru-RU')}
           </p>
         </div>
       ))}

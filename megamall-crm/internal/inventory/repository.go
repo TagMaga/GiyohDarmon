@@ -414,6 +414,21 @@ func (r *Repository) UpdateReservedQuantity(tx *gorm.DB, ctx context.Context, id
 	return nil
 }
 
+// UpdateBlockedQuantity sets blocked_quantity for an inventory row inside a
+// transaction. Must be called after GetOrCreateForUpdate to ensure the row is
+// locked. Used by internal/warehouses to hold stock during an in-flight
+// courier transfer.
+func (r *Repository) UpdateBlockedQuantity(tx *gorm.DB, ctx context.Context, id uuid.UUID, newBlocked int) error {
+	result := tx.WithContext(ctx).
+		Model(&Inventory{}).
+		Where("id = ?", id).
+		UpdateColumn("blocked_quantity", newBlocked)
+	if result.Error != nil {
+		return fmt.Errorf("update blocked quantity: %w", result.Error)
+	}
+	return nil
+}
+
 // DB exposes the underlying *gorm.DB so the service can open transactions.
 func (r *Repository) DB() *gorm.DB {
 	return r.db
