@@ -118,10 +118,16 @@ type PerformancePoint struct {
 // ─── Cash handovers ───────────────────────────────────────────────────────────
 
 type HandoverListRow struct {
-	ID                uuid.UUID  `json:"id"`
-	CourierID         uuid.UUID  `json:"courier_id"`
-	CourierName       string     `json:"courier_name"`
-	CourierPhone      string     `json:"courier_phone"`
+	ID           uuid.UUID `json:"id"`
+	CourierID    uuid.UUID `json:"courier_id"`
+	CourierName  string    `json:"courier_name"`
+	CourierPhone string    `json:"courier_phone"`
+	// DispatcherID/DispatcherName identify who confirmed the handover — nil
+	// until a dispatcher (or the owner) actually decides it (cash_handovers.
+	// dispatcher_id is nullable, set on confirm/reject). Used by the owner
+	// cash ledger's merged list to show "Получатель" for courier rows.
+	DispatcherID      *uuid.UUID `json:"dispatcher_id"`
+	DispatcherName    *string    `json:"dispatcher_name"`
 	TotalCollected    float64    `json:"total_collected"`
 	TotalDeliveryFees float64    `json:"total_delivery_fees"`
 	TotalToReturn     float64    `json:"total_to_return"`

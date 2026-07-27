@@ -24,6 +24,25 @@ func NewRepository(db *gorm.DB) *Repository {
 	return &Repository{db: db}
 }
 
+// PrimaryOwnerName returns the name of the account settlements are remitted
+// to, for display next to every settlement row's "Получатель" — this app
+// has a single owner account by design (see CLAUDE.md's RBAC role list),
+// so the earliest-created owner is always the destination, regardless of
+// which owner user eventually reviews a given settlement.
+func (r *Repository) PrimaryOwnerName(ctx context.Context) (string, error) {
+	var name string
+	err := r.db.WithContext(ctx).Table("users").
+		Select("full_name").
+		Where("role = 'owner' AND deleted_at IS NULL").
+		Order("created_at ASC").
+		Limit(1).
+		Scan(&name).Error
+	if err != nil {
+		return "", fmt.Errorf("primary owner name: %w", err)
+	}
+	return name, nil
+}
+
 // sumReceived totals confirmed cash_handovers.actual_returned — cash
 // dispatchers have collected from couriers — optionally scoped to one
 // dispatcher and a date range (on cash_handovers.created_at, matching

@@ -1,39 +1,29 @@
 /**
  * CompanySettlementTab — Dispatcher Касса → "Компания" tab.
  *
- * Same four KPI boxes as the owner logistics cash tab, scoped to the current
- * dispatcher only (no dispatcher filter — there's nothing to filter, it's
- * always "me"). "Передать всё компании" submits the current outstanding
- * balance (received - already-confirmed-paid) for owner review; only the
- * owner can confirm/reject it (see DispatcherSettlementsPanel on the owner
- * side) — here it's read-only history.
+ * Same merged ledger, KPI boxes, and filters as the owner logistics cash
+ * tab (see features/logistics/components/CashLedgerPanel) — the one real
+ * difference is the "Сдать компании" button, which submits the dispatcher's
+ * current outstanding balance for owner review, and the fact that a
+ * dispatcher has no confirm/reject/edit controls here at all: only the
+ * owner decides pending requests (CashLedgerPanel on the owner side).
  */
 import { useRef, useState } from 'react'
-import { Wallet, Coins, Landmark, AlertTriangle, Camera, X } from 'lucide-react'
+import { Wallet, Coins, Landmark, AlertTriangle, Camera, X, Send } from 'lucide-react'
 import KpiCard from '../../../../shared/components/KpiCard'
 import Badge from '../../../../shared/components/Badge'
 import Button from '../../../../shared/components/Button'
 import Skeleton from '../../../../shared/components/Skeleton'
 import EmptyState from '../../../../shared/components/EmptyState'
+import CashLedgerFilterBar from '../../../../shared/components/CashLedgerFilterBar'
+import {
+  fmt, fmtDate, STATUS_CFG, PersonCell, DiffCell, DebtCell, ReceiptThumb, LEDGER_TABLE_HEADERS,
+} from '../../../../shared/components/cashLedgerCells'
 import { useToast } from '../../../../shared/components/ToastProvider'
 import { uploadToMedia } from '../../../../shared/api/mediaUpload'
 import { translateMediaError } from '../../../../shared/api/mediaErrors'
-import { useMySettlementsSummary, useMySettlements, useSubmitSettlement } from '../../hooks/useCompanySettlement'
-
-const fmt = (n) => Number(n ?? 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 })
-
-const STATUS_CFG = {
-  pending:   { label: 'Ожидает',   variant: 'amber'   },
-  confirmed: { label: 'Принято',   variant: 'emerald' },
-  rejected:  { label: 'Отклонено', variant: 'rose'    },
-}
-
-const fmtDate = (iso) => {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('ru-RU', {
-    day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit',
-  })
-}
+import { useMySettlementsSummary, useSubmitSettlement } from '../../hooks/useCompanySettlement'
+import { useCashLedger } from '../../hooks/useCashLedger'
 
 export default function CompanySettlementTab() {
   const toast = useToast()
@@ -43,12 +33,26 @@ export default function CompanySettlementTab() {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
 
-  const { data: summary, isLoading: summaryLoading } = useMySettlementsSummary()
-  const { data: listData, isLoading: listLoading } = useMySettlements()
-  const rows = listData?.data ?? []
+  const [range, setRange] = useState({ from: '', to: '' })
+  const [sender, setSender] = useState('')
+  const [receiver, setReceiver] = useState('')
+  const [status, setStatus] = useState('')
+  const [amount, setAmount] = useState({ min: '', max: '' })
+
+  const { data: summary, isLoading: summaryLoading } = useMySettlementsSummary({
+    from: range.from || undefined, to: range.to || undefined,
+  })
+  const { rows, isLoading } = useCashLedger({
+    from: range.from || undefined,
+    to: range.to || undefined,
+    status: status || undefined,
+    senderQuery: sender,
+    receiverQuery: receiver,
+    amountMin: amount.min,
+    amountMax: amount.max,
+  })
 
   const submitMutation = useSubmitSettlement()
-
   const canPay = (summary?.dispatcher_debt ?? 0) > 0.009
 
   function handleFileChange(e) {
@@ -94,70 +98,103 @@ export default function CompanySettlementTab() {
     <div className="space-y-4">
       {/* KPI boxes */}
       <div className="grid grid-cols-2 gap-3">
-        <KpiCard
-          label="Долг курьеров"
-          value={`${fmt(summary?.courier_debt)} с.`}
-          icon={<AlertTriangle size={20} />}
-          color="rose"
-          loading={summaryLoading}
-        />
-        <KpiCard
-          label="Я получил"
-          value={`${fmt(summary?.received)} с.`}
-          icon={<Coins size={20} />}
-          color="sky"
-          loading={summaryLoading}
-        />
-        <KpiCard
-          label="Я сдал компании"
-          value={`${fmt(summary?.paid)} с.`}
-          icon={<Landmark size={20} />}
-          color="emerald"
-          loading={summaryLoading}
-        />
-        <KpiCard
-          label="Мой долг компании"
-          value={`${fmt(summary?.dispatcher_debt)} с.`}
-          icon={<Wallet size={20} />}
-          color="amber"
-          loading={summaryLoading}
-        />
+        <KpiCard label="Долг курьеров" value={`${fmt(summary?.courier_debt)} с.`} icon={<AlertTriangle size={20} />} color="rose" loading={summaryLoading} />
+        <KpiCard label="Я получил" value={`${fmt(summary?.received)} с.`} icon={<Coins size={20} />} color="sky" loading={summaryLoading} />
+        <KpiCard label="Я сдал компании" value={`${fmt(summary?.paid)} с.`} icon={<Landmark size={20} />} color="emerald" loading={summaryLoading} />
+        <KpiCard label="Мой долг компании" value={`${fmt(summary?.dispatcher_debt)} с.`} icon={<Wallet size={20} />} color="amber" loading={summaryLoading} />
       </div>
 
-      <Button
-        variant="primary"
-        fullWidth
-        disabled={!canPay}
-        onClick={() => setConfirmOpen(true)}
-      >
-        Передать всё компании
+      {/* The one real difference from the owner view: this button. */}
+      <Button variant="primary" fullWidth icon={<Send size={16} />} disabled={!canPay} onClick={() => setConfirmOpen(true)}>
+        Сдать {fmt(summary?.dispatcher_debt)} с. компании
       </Button>
 
-      {/* Own history */}
-      {listLoading ? (
+      <CashLedgerFilterBar
+        from={range.from} to={range.to} onDateChange={setRange}
+        sender={sender} onSenderChange={setSender}
+        receiver={receiver} onReceiverChange={setReceiver}
+        status={status} onStatusChange={setStatus}
+        amountMin={amount.min} amountMax={amount.max} onAmountChange={setAmount}
+      />
+
+      {/* Ledger — read-only here; only the owner can confirm/reject/edit. */}
+      {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
         </div>
       ) : rows.length === 0 ? (
-        <EmptyState title="Нет заявок" description="Заявки на передачу денег компании появятся здесь" />
+        <EmptyState title="Нет передач" description="Передачи наличных появятся здесь" />
       ) : (
-        <div className="space-y-3">
-          {rows.map((row) => {
-            const st = STATUS_CFG[row.status] ?? STATUS_CFG.pending
-            return (
-              <div key={row.id} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-[11px] text-slate-400">{fmtDate(row.created_at)}</p>
-                  <Badge variant={st.variant} dot>{st.label}</Badge>
+        <>
+          <div className="hidden lg:block overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[900px]">
+                <thead>
+                  <tr className="bg-slate-50/70 border-b border-slate-100">
+                    {LEDGER_TABLE_HEADERS.map((h) => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => {
+                    const st = STATUS_CFG[row.status] ?? STATUS_CFG.pending
+                    return (
+                      <tr key={`${row.source}-${row.id}`} className="border-b border-slate-50">
+                        <td className="px-4 py-3 text-[11px] text-slate-400 whitespace-nowrap">{fmtDate(row.date)}</td>
+                        <td className="px-4 py-3"><PersonCell name={row.senderName} role={row.senderRole} /></td>
+                        <td className="px-4 py-3"><PersonCell name={row.receiverName} role={row.receiverRole} /></td>
+                        <td className="px-4 py-3 text-xs font-semibold tabular-nums">{fmt(row.expected)}</td>
+                        <td className={`px-4 py-3 text-xs font-semibold tabular-nums ${row.sent != null ? 'text-indigo-700' : 'text-slate-300'}`}>
+                          {row.sent != null ? fmt(row.sent) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-xs"><DiffCell expected={row.expected} actual={row.sent} /></td>
+                        <td className="px-4 py-3"><DebtCell amount={row.currentDebt} /></td>
+                        <td className="px-4 py-3"><ReceiptThumb mediaAssets={row.mediaAssets} /></td>
+                        <td className="px-4 py-3"><Badge variant={st.badge} dot>{st.label}</Badge></td>
+                        <td className="px-4 py-3">
+                          {row.status === 'pending' ? (
+                            <span className="text-[11px] font-semibold italic text-amber-600">⏳ Ждём владельца</span>
+                          ) : (
+                            <span className="text-slate-300 text-xs">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="lg:hidden space-y-3">
+            {rows.map((row) => {
+              const st = STATUS_CFG[row.status] ?? STATUS_CFG.pending
+              return (
+                <div key={`${row.source}-${row.id}`} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{row.senderName} → {row.receiverName ?? '—'}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">{fmtDate(row.date)}</p>
+                    </div>
+                    <Badge variant={st.badge} dot>{st.label}</Badge>
+                  </div>
+                  <div className="flex items-center gap-4 flex-wrap text-xs">
+                    <span className="text-slate-500">Ожидалось: <strong className="text-slate-800">{fmt(row.expected)} c</strong></span>
+                    {row.sent != null && <span className="text-indigo-700">Отправил: <strong>{fmt(row.sent)} c</strong></span>}
+                    <DebtCell amount={row.currentDebt} />
+                  </div>
+                  {row.status === 'rejected' && row.rejectionReason && (
+                    <p className="text-xs text-rose-600">{row.rejectionReason}</p>
+                  )}
+                  {row.status === 'pending' && (
+                    <span className="text-[11px] font-semibold italic text-amber-600">⏳ Ждём владельца</span>
+                  )}
                 </div>
-                <p className="text-base font-bold text-slate-800">{fmt(row.amount)} с.</p>
-                {row.status === 'rejected' && row.rejection_reason && (
-                  <p className="text-xs text-rose-600">{row.rejection_reason}</p>
-                )}
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        </>
       )}
 
       {/* Confirm submit sheet */}
