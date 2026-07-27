@@ -98,16 +98,11 @@ export default function CompanySettlementTab() {
     <div className="space-y-4">
       {/* KPI boxes */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard label="Долг курьеров" value={`${fmt(summary?.courier_debt)} с.`} icon={<AlertTriangle size={20} />} color="rose" loading={summaryLoading} />
-        <KpiCard label="Я получил" value={`${fmt(summary?.received)} с.`} icon={<Coins size={20} />} color="sky" loading={summaryLoading} />
-        <KpiCard label="Я сдал компании" value={`${fmt(summary?.paid)} с.`} icon={<Landmark size={20} />} color="emerald" loading={summaryLoading} />
-        <KpiCard label="Мой долг компании" value={`${fmt(summary?.dispatcher_debt)} с.`} icon={<Wallet size={20} />} color="amber" loading={summaryLoading} />
+        <KpiCard compact label="Долг курьеров" value={`${fmt(summary?.courier_debt)} с.`} icon={<AlertTriangle size={20} />} color="rose" loading={summaryLoading} />
+        <KpiCard compact label="Я получил" value={`${fmt(summary?.received)} с.`} icon={<Coins size={20} />} color="sky" loading={summaryLoading} />
+        <KpiCard compact label="Я сдал компании" value={`${fmt(summary?.paid)} с.`} icon={<Landmark size={20} />} color="emerald" loading={summaryLoading} />
+        <KpiCard compact label="Мой долг компании" value={`${fmt(summary?.dispatcher_debt)} с.`} icon={<Wallet size={20} />} color="amber" loading={summaryLoading} />
       </div>
-
-      {/* The one real difference from the owner view: this button. */}
-      <Button variant="primary" fullWidth icon={<Send size={16} />} disabled={!canPay} onClick={() => setConfirmOpen(true)}>
-        Сдать {fmt(summary?.dispatcher_debt)} с. компании
-      </Button>
 
       <CashLedgerFilterBar
         from={range.from} to={range.to} onDateChange={setRange}
@@ -115,6 +110,16 @@ export default function CompanySettlementTab() {
         receiver={receiver} onReceiverChange={setReceiver}
         status={status} onStatusChange={setStatus}
         amountMin={amount.min} amountMax={amount.max} onAmountChange={setAmount}
+        trailing={(
+          // The one real difference from the owner view: this button, inline with the filter row.
+          <Button
+            variant="primary" size="sm" icon={<Send size={14} />}
+            disabled={!canPay} onClick={() => setConfirmOpen(true)}
+            className="flex-shrink-0 whitespace-nowrap"
+          >
+            Сдать {fmt(summary?.dispatcher_debt)} с. компании
+          </Button>
+        )}
       />
 
       {/* Ledger — read-only here; only the owner can confirm/reject/edit. */}

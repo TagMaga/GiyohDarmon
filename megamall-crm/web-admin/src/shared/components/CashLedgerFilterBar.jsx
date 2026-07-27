@@ -50,6 +50,7 @@ export default function CashLedgerFilterBar({
   receiver, onReceiverChange,
   status, onStatusChange,
   amountMin, amountMax, onAmountChange,
+  trailing,
 }) {
   const statusLabel = { '': 'Статус', pending: 'Ожидает', confirmed: 'Принято', rejected: 'Отклонено' }[status] ?? 'Статус'
   const senderLabel = sender ? `Отправитель: ${sender}` : 'Отправитель'
@@ -108,6 +109,7 @@ export default function CashLedgerFilterBar({
               </div>
             )}
           </FilterChip>
+          {trailing}
         </div>
       </div>
 
@@ -160,6 +162,7 @@ export default function CashLedgerFilterBar({
             </div>
           )}
         </FilterChip>
+        {trailing && <div className="ml-auto">{trailing}</div>}
       </div>
     </div>
   )
