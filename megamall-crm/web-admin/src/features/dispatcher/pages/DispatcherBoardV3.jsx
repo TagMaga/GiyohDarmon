@@ -37,6 +37,7 @@ import { resolveCustomer, resolveAddress, resolveCity } from '../utils/resolveCu
 import { fmt, fmtDate, isOverdue, isToday, isTomorrow, orderAge, orderAgeMinutes } from '../statusConfig'
 import useIsMobile from '../../../shared/hooks/useIsMobile'
 import DispatcherMobileApp from './DispatcherMobileApp'
+import CompanySettlementTab from '../components/v2/CompanySettlementTab'
 import './DispatcherBoardV2.css'
 
 const arr = (d) => Array.isArray(d) ? d : (d?.orders ?? d?.data ?? d?.items ?? d?.handovers ?? [])
@@ -485,6 +486,10 @@ function DispatcherBoardDesktop() {
             onReject={(id, reason) => doRejectTransaction({ id, reason })}
             onPreview={setPhotoPreview}
           />
+        ) : filters.tab === 'company' ? (
+          <section className="dv2-board-wrap" style={{ padding: '16px 20px', overflowY: 'auto' }}>
+            <CompanySettlementTab />
+          </section>
         ) : filters.tab === 'history' ? (
           <OrderHistoryView
             rows={arr(orderHistory.data)}
@@ -694,6 +699,7 @@ function TabBar({ tab, date, counts, onTab, onDate }) {
       <button className={`dv2-tab ${tab === 'dispatch' ? 'active' : ''}`} onClick={() => onTab('dispatch')}><ClipboardList size={15} /> Операционная доска</button>
       <button className={`dv2-tab ${tab === 'cash' ? 'active' : ''}`} onClick={() => onTab('cash')}><Wallet size={15} /> Курьеры</button>
       <button className={`dv2-tab ${tab === 'cashRegister' ? 'active' : ''}`} onClick={() => onTab('cashRegister')}><Banknote size={15} /> 💵 Касса</button>
+      <button className={`dv2-tab ${tab === 'company' ? 'active' : ''}`} onClick={() => onTab('company')}><DollarSign size={15} /> Компания</button>
       <button className={`dv2-tab ${tab === 'history' ? 'active' : ''}`} onClick={() => onTab('history')}><ClipboardList size={15} /> 📋 История</button>
       <div className="dv2-spacer" />
       <div className={`dv2-date-tabs ${tab !== 'dispatch' ? 'hidden' : ''}`}>
@@ -1628,6 +1634,7 @@ function BottomNav({ tab, counts, onTab }) {
       <button className={`dv2-bn-item ${tab === 'dispatch' ? 'active' : ''}`} onClick={() => onTab('dispatch')}><span className="dv2-bn-icon"><ClipboardList size={20} /></span><span className="dv2-bn-label">Доска</span></button>
       <button className={`dv2-bn-item ${tab === 'cash' ? 'active' : ''}`} onClick={() => onTab('cash')}><span className="dv2-bn-icon"><Wallet size={20} /></span><span className="dv2-bn-label">Расчёт</span></button>
       <button className={`dv2-bn-item ${tab === 'cashRegister' ? 'active' : ''}`} onClick={() => onTab('cashRegister')}><span className="dv2-bn-icon"><Banknote size={20} /></span><span className="dv2-bn-label">Касса</span></button>
+      <button className={`dv2-bn-item ${tab === 'company' ? 'active' : ''}`} onClick={() => onTab('company')}><span className="dv2-bn-icon"><DollarSign size={20} /></span><span className="dv2-bn-label">Компания</span></button>
       <button className={`dv2-bn-item ${tab === 'history' ? 'active' : ''}`} onClick={() => onTab('history')}><span className="dv2-bn-icon"><ClipboardList size={20} /></span><span className="dv2-bn-label">История</span></button>
     </nav>
   )
