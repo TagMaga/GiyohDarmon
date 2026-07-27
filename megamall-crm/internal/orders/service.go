@@ -525,6 +525,9 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 				TotalPrice: total,
 			})
 		}
+		if subtotal < 1 {
+			return apperrors.BadRequest("order total must be at least 1")
+		}
 
 		// Correction 2: total_amount = subtotal (delivery fee NOT added on top)
 		totalAmount := subtotal
@@ -938,6 +941,7 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 
 		// ── Items: full replacement ───────────────────────────────────────────
 		if req.Items != nil {
+			itemsSubtotal := 0.0
 			for _, it := range req.Items {
 				if it.Quantity <= 0 {
 					return apperrors.BadRequest("item quantity must be > 0")
@@ -945,6 +949,10 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 				if it.UnitPrice < 0 {
 					return apperrors.BadRequest("item unit_price must be >= 0")
 				}
+				itemsSubtotal += float64(it.Quantity) * it.UnitPrice
+			}
+			if itemsSubtotal < 1 {
+				return apperrors.BadRequest("order total must be at least 1")
 			}
 
 			// 1. Release old inventory reservations.

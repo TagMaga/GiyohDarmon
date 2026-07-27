@@ -242,19 +242,13 @@ func (r *Repository) AddIncome(ctx context.Context, tx *gorm.DB, userID uuid.UUI
 
 var ErrInsufficientBalance = errors.New("insufficient balance")
 
-// AddWithdrawal inserts an owner_withdrawal row. Returns ErrInsufficientBalance
-// if amount exceeds the current (live) company balance.
+// AddWithdrawal inserts an owner_withdrawal row. A withdrawal larger than the
+// current (live) company balance is allowed — the caller is warned client-side
+// — and simply drives the balance negative rather than being rejected.
 func (r *Repository) AddWithdrawal(ctx context.Context, tx *gorm.DB, userID uuid.UUID, amount float64, note string) (float64, error) {
 	db := r.db
 	if tx != nil {
 		db = tx
-	}
-	balance, err := r.CurrentBalance(ctx)
-	if err != nil {
-		return 0, err
-	}
-	if amount > balance {
-		return 0, ErrInsufficientBalance
 	}
 
 	manual, err := manualNet(ctx, db, nil, nil)
