@@ -21,7 +21,7 @@ export function useMySettlements(params = {}) {
 export function useSubmitSettlement() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (comment) => submitSettlement(comment),
+    mutationFn: (payload) => submitSettlement(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['dispatcher', 'settlements'] })
     },

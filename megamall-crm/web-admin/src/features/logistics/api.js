@@ -103,14 +103,30 @@ export async function fetchSettlements(params = {}) {
   return unwrapPaginated(res)
 }
 
-export async function confirmSettlement(id) {
-  const res = await client.post(`/settlements/${id}/confirm`)
+export async function confirmSettlement(id, { actualReceived, adminNote }) {
+  const res = await client.post(`/settlements/${id}/confirm`, {
+    actual_received: actualReceived,
+    admin_note: adminNote || undefined,
+  })
   return unwrap(res)
 }
 
 export async function rejectSettlement(id, reason) {
   const res = await client.post(`/settlements/${id}/reject`, { reason })
   return unwrap(res)
+}
+
+// Post-decision correction of a confirmed/rejected settlement — distinct
+// from confirm/reject (the pending decision flow) on the backend too.
+export async function editSettlement(id, body) {
+  const res = await client.post(`/settlements/${id}/edit`, body)
+  return unwrap(res)
+}
+
+export async function fetchSettlementHistory(id) {
+  const res = await client.get(`/settlements/${id}/history`)
+  const data = unwrap(res)
+  return Array.isArray(data) ? data : []
 }
 
 // Dispatcher list for the settlements filter dropdown.

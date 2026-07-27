@@ -26,6 +26,7 @@ import (
 	delivery_settings "github.com/megamall/crm/internal/delivery_settings"
 	"github.com/megamall/crm/internal/dispatch"
 	"github.com/megamall/crm/internal/dispatcher_settlements"
+	dispatchersettlementsmediabridge "github.com/megamall/crm/internal/dispatcher_settlements/mediabridge"
 	"github.com/megamall/crm/internal/finance"
 	"github.com/megamall/crm/internal/health"
 	"github.com/megamall/crm/internal/hierarchy"
@@ -409,6 +410,10 @@ func main() {
 		// dispatcher "pay all received to company" flow).
 		dispatcherSettlementsRepo := dispatcher_settlements.NewRepository(db)
 		dispatcherSettlementsSvc := dispatcher_settlements.NewService(dispatcherSettlementsRepo)
+		if cfg.Media.Enabled {
+			attachSettlementProofFn, listSettlementProofsFn, releaseSettlementMediaFn, signedSettlementMediaURLFn := dispatchersettlementsmediabridge.Adapters(mediaSvc)
+			dispatcherSettlementsSvc.SetMediaAdapters(attachSettlementProofFn, listSettlementProofsFn, releaseSettlementMediaFn, signedSettlementMediaURLFn)
+		}
 		dispatcherSettlementsHandler := dispatcher_settlements.NewHandler(dispatcherSettlementsSvc)
 		dispatcherSettlementsHandler.RegisterRoutes(v1.Group("/settlements"))
 
