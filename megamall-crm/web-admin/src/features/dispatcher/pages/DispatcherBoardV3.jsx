@@ -463,7 +463,7 @@ function DispatcherBoardDesktop() {
             }}
           />
         ) : filters.tab === 'cashRegister' ? (
-          <section className="dv2-board-wrap" style={{ padding: '16px 20px', overflowY: 'auto' }}>
+          <section className="dv2-board-wrap" style={{ padding: '16px 0', overflowY: 'auto' }}>
             <CompanySettlementTab />
           </section>
         ) : filters.tab === 'history' ? (
