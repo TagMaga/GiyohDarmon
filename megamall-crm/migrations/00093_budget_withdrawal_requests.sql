@@ -1,4 +1,4 @@
--- 00092_budget_withdrawal_requests.sql
+-- 00093_budget_withdrawal_requests.sql
 -- Owner budget withdrawals are held pending Telegram approval (internal/telegram,
 -- internal/budget) before the actual company_budget_transactions ledger row is
 -- created. This table tracks the pending/approved/rejected/expired lifecycle of
