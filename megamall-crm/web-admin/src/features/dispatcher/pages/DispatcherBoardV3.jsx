@@ -34,7 +34,7 @@ import {
 } from '../api'
 import { getOrderId, getCourierId, buildCourierMap, resolveCourier, resolveCourierDisplay, formatOrderLabel } from '../utils/orderHelpers'
 import { resolveCustomer, resolveAddress, resolveCity } from '../utils/resolveCustomer'
-import { fmt, fmtDate, isOverdue, isToday, isTomorrow, orderAge, orderAgeMinutes } from '../statusConfig'
+import { fmt, fmtDate, isOverdue, isToday, isTomorrow, orderAge, orderAgeMinutes, STATUS_LABELS } from '../statusConfig'
 import useIsMobile from '../../../shared/hooks/useIsMobile'
 import DispatcherMobileApp from './DispatcherMobileApp'
 import CompanySettlementTab from '../components/v2/CompanySettlementTab'
@@ -214,6 +214,16 @@ function DispatcherBoardDesktop() {
     if (!selectedOrder) setPendingCourierId(null)
   }, [selectedOrder])
 
+  // Keep the open drawer's order in sync with fresh query data (e.g. after
+  // assigning/reassigning a courier) instead of showing the stale snapshot
+  // captured at selection time.
+  useEffect(() => {
+    if (!selectedOrder) return
+    const id = getOrderId(selectedOrder)
+    const fresh = allOrders.find((o) => getOrderId(o) === id)
+    if (fresh && fresh !== selectedOrder) setSelectedOrder(fresh)
+  }, [allOrders, selectedOrder])
+
   const filteredOrders = useMemo(() => {
     return allOrders.filter((order) => {
       if (filters.courier === 'unassigned') {
@@ -255,12 +265,20 @@ function DispatcherBoardDesktop() {
 
   const { mutate: doConfirm, isPending: isConfirming } = useMutation({
     mutationFn: (order) => confirmOrder(requiredOrderId(order)),
-    onSuccess: () => { invalidate(); toast.success('Заказ подтверждён') },
+    onSuccess: (_, order) => {
+      invalidate()
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(requiredOrderId(order)) })
+      toast.success('Заказ подтверждён')
+    },
     onError: onErr,
   })
   const { mutate: doReturn } = useMutation({
     mutationFn: (order) => markReturn(requiredOrderId(order)),
-    onSuccess: () => { invalidate(); toast.success('Заказ переведён в возврат') },
+    onSuccess: (_, order) => {
+      invalidate()
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(requiredOrderId(order)) })
+      toast.success('Заказ переведён в возврат')
+    },
     onError: onErr,
   })
   const { mutate: doVerifyPrepayment, isPending: isVerifyingPrepayment } = useMutation({
@@ -823,7 +841,7 @@ function StickyActionBar({ order, pendingCourierId, pendingCourierName, isMutati
       padding: '10px 16px',
     }}>
       <div style={{ flex: 1, fontSize: 12, color: 'var(--text3)' }}>
-        #{formatOrderLabel(order)} · <span style={{ color: 'var(--text2)' }}>{order.status}</span>
+        #{formatOrderLabel(order)} · <span style={{ color: 'var(--text2)' }}>{STATUS_LABELS[order.status] ?? order.status}</span>
         <span style={{ marginLeft: 8, fontSize: 10, color: 'var(--text3)' }}>← клик на курьера для назначения</span>
       </div>
       <button
@@ -1270,7 +1288,7 @@ function OrderHistoryView({ rows, pageMeta, couriers, range, filters, loading, e
               return <option key={id} value={id}>{courier.full_name ?? courier.courier_name ?? 'Курьер'}</option>
             })}
           </select>
-          <label className="dv2-search-field"><Search size={14} /><input value={filters.seller} onChange={(e) => onFilters({ seller: e.target.value })} placeholder="Seller" aria-label="Seller" /></label>
+          <label className="dv2-search-field"><Search size={14} /><input value={filters.seller} onChange={(e) => onFilters({ seller: e.target.value })} placeholder="Продавец" aria-label="Продавец" /></label>
           <label className="dv2-search-field"><Search size={14} /><input value={filters.product} onChange={(e) => onFilters({ product: e.target.value })} placeholder="Товар" aria-label="Товар" /></label>
         </div>
       </div>
@@ -1279,7 +1297,7 @@ function OrderHistoryView({ rows, pageMeta, couriers, range, filters, loading, e
         <table className="dv2-cash-table dv2-data-table dv2-history-table">
           <thead>
             <tr>
-              <th>#</th><th>Дата</th><th>Статус</th><th>Товар</th><th>Курьер</th><th>Seller</th><th>Сумма</th><th>Тариф</th><th>Доставлен</th><th>Ср. время</th><th>Причина отмены</th>
+              <th>#</th><th>Дата</th><th>Статус</th><th>Товар</th><th>Курьер</th><th>Продавец</th><th>Сумма</th><th>Тариф</th><th>Доставлен</th><th>Ср. время</th><th>Причина отмены</th>
             </tr>
           </thead>
           <tbody>
@@ -1581,7 +1599,7 @@ function CourierCell({ row }) {
         <div className="dv2-cash-courier-name">{row.courier_name || 'Курьер'}</div>
         <div className="dv2-cash-courier-phone">{row.courier_phone || '—'}</div>
       </div>
-      <span className={`dv2-cash-online ${row.is_online ? 'online' : 'offline'}`}>{row.is_online ? 'online' : 'offline'}</span>
+      <span className={`dv2-cash-online ${row.is_online ? 'online' : 'offline'}`}>{row.is_online ? 'Онлайн' : 'Оффлайн'}</span>
     </div>
   )
 }

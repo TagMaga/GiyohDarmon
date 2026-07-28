@@ -29,6 +29,11 @@ export default function UnassignModal({ open, onClose, order, courierMap = {} })
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.board })
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.couriers })
+      const orderId = getOrderId(order)
+      if (orderId) {
+        qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(orderId) })
+        qc.invalidateQueries({ queryKey: KEYS.dispatcher.timeline(orderId) })
+      }
       toast.success('Курьер снят — заказ возвращён в «Подтверждённые»')
       handleClose()
     },

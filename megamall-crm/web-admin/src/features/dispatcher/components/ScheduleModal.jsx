@@ -30,6 +30,11 @@ export default function ScheduleModal({ open, onClose, order }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.board })
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.newOrders })
+      const orderId = getOrderId(order)
+      if (orderId) {
+        qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(orderId) })
+        qc.invalidateQueries({ queryKey: KEYS.dispatcher.timeline(orderId) })
+      }
       toast.success('Доставка запланирована')
       handleClose()
     },
