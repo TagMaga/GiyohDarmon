@@ -200,7 +200,7 @@ export default function CompanySettlementTab() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full h-full">
       {/* KPI boxes — same size/style as the owner logistics cash tab (CashLedgerPanel) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="Долг курьеров" value={`${fmt(summary?.courier_debt)} с.`} icon={<AlertTriangle size={20} />} color="rose" loading={summaryLoading} />
