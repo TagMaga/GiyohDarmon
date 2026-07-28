@@ -43,6 +43,13 @@ func NewService(repo *Repository, logger *activity.Logger, db *gorm.DB, loc *tim
 	}
 }
 
+// BuildRateSnapshot resolves the canonical commission configuration without
+// persisting an order snapshot. Non-order domains copy the returned immutable
+// rates into their own snapshot table.
+func (s *Service) BuildRateSnapshot(ctx context.Context, input SnapshotInput) (*OrderFinancialSnapshot, error) {
+	return s.snapshot.Build(ctx, input)
+}
+
 // ─── Commission config operations ─────────────────────────────────────────────
 
 // CreateConfig creates a new commission config with full history management.

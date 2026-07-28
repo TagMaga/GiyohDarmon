@@ -1,5 +1,5 @@
 import { useLocation, Outlet, Link, NavLink } from 'react-router-dom'
-import { Info, Users, ChevronRight, LogOut, Trophy } from 'lucide-react'
+import { Info, Users, ChevronRight, LogOut, Trophy, Building2 } from 'lucide-react'
 import { useSellerMe, useSellerCompensation, useSellerTeamRank, useMyTeam } from '../hooks/useSellerMe'
 import useSellerOrders from '../hooks/useSellerOrders'
 import useAuthStore from '../../../shared/store/authStore'
@@ -240,6 +240,13 @@ export default function SellerProfilePage() {
               {/* Account section */}
               <SectionLabel style={{ margin: '20px 4px 10px' }}>Аккаунт</SectionLabel>
               <Card className="overflow-hidden">
+                <Link to="/seller/pharmacies" className="flex items-center gap-3 border-b" style={{ padding: '13px 15px', borderColor: M.borderAlt }}>
+                  <div className="flex items-center justify-center flex-shrink-0" style={{ width: 32, height: 32, color: M.indigo }}>
+                    <Building2 size={18} />
+                  </div>
+                  <span className="flex-1" style={{ fontSize: 13.5, fontWeight: 600, color: M.ink }}>Мои аптеки</span>
+                  <ChevronRight size={16} style={{ color: '#C7C5BC' }} />
+                </Link>
                 <Link to="/seller/profile/info" className="flex items-center gap-3" style={{ padding: '13px 15px' }}>
                   <div className="flex items-center justify-center flex-shrink-0" style={{ width: 32, height: 32, color: '#76766E' }}>
                     <Info size={18} />

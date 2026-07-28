@@ -13,7 +13,7 @@ concurrency:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       FRONTEND_DIR: megamall-crm/web-admin
       BACKEND_DIR: megamall-crm

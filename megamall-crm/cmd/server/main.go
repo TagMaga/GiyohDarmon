@@ -40,6 +40,7 @@ import (
 	"github.com/megamall/crm/internal/orders"
 	ordersmediabridge "github.com/megamall/crm/internal/orders/mediabridge"
 	"github.com/megamall/crm/internal/payouts"
+	"github.com/megamall/crm/internal/pharmacies"
 	"github.com/megamall/crm/internal/products"
 	"github.com/megamall/crm/internal/products/mediabridge"
 	"github.com/megamall/crm/internal/teams"
@@ -271,6 +272,10 @@ func main() {
 	inventorySvc := inventory.NewService(inventoryRepo, activityLogger)
 	inventoryHandler := inventory.NewHandler(inventorySvc)
 
+	pharmacyRepo := pharmacies.NewRepository(db)
+	pharmacySvc := pharmacies.NewService(pharmacyRepo, inventorySvc, compensationSvc)
+	pharmacyHandler := pharmacies.NewHandler(pharmacySvc)
+
 	// ── Phase 4: Customers + Orders ───────────────────────────────────────────
 	customerRepo := customers.NewRepository(db)
 	customerSvc := customers.NewService(customerRepo, activityLogger)
@@ -439,6 +444,7 @@ func main() {
 		// Phase 3
 		productsHandler.RegisterRoutes(v1)
 		inventoryHandler.RegisterRoutes(v1.Group("/inventory"))
+		pharmacyHandler.RegisterRoutes(v1.Group("/pharmacies"))
 
 		// Phase 4
 		customerHandler.RegisterRoutes(v1.Group("/customers"))
