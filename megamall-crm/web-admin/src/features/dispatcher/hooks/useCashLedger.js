@@ -3,11 +3,13 @@
  * cash tab (see features/logistics/hooks/useCashLedger.js), reused here:
  * courier→dispatcher handovers are system-wide (any dispatcher can act on
  * any courier's handover — see internal/dispatch.ListAllHandovers), so this
- * pulls the same enriched projection as the owner view (now readable by
- * the dispatcher role too, internal/logistics/routes.go) plus this
- * dispatcher's own settlements to the company (already owner_name-enriched
- * by the backend). Read-only here — no confirm/reject/edit, only the owner
- * decides those; see CompanySettlementTab.
+ * pulls the same enriched projection as the owner view (readable by the
+ * dispatcher role too, internal/logistics/routes.go) plus this dispatcher's
+ * own settlements to the company (already owner_name-enriched by the
+ * backend). Handover rows are actionable by the dispatcher here (confirm/
+ * reject via internal/dispatch's /cash/handovers/:id/confirm|reject — see
+ * CompanySettlementTab); settlement rows stay read-only, since only the
+ * owner can approve a dispatcher's own submission to the company.
  */
 import { useMemo } from 'react'
 import { useHandovers } from '../../logistics/hooks/useHandovers'
@@ -32,6 +34,7 @@ function normalizeHandover(h) {
     mediaAssets: h.media_assets ?? [],
     status: h.status,
     rejectionReason: h.status === 'rejected' ? h.admin_note : null,
+    raw: h,
   }
 }
 

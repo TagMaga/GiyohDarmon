@@ -2,17 +2,23 @@
  * CompanySettlementTab — Dispatcher Касса → "Компания" tab.
  *
  * Same merged ledger, KPI boxes, and filters as the owner logistics cash
- * tab (see features/logistics/components/CashLedgerPanel) — the one real
- * difference is the "Сдать компании" button, which submits the dispatcher's
- * current outstanding balance for owner review, and the fact that a
- * dispatcher has no confirm/reject/edit controls here at all: only the
- * owner decides pending requests (CashLedgerPanel on the owner side).
+ * tab (see features/logistics/components/CashLedgerPanel), plus the
+ * "Сдать компании" button, which submits the dispatcher's current
+ * outstanding balance for owner review. Handover rows (courier→dispatcher)
+ * are confirm/reject-able here by the dispatcher, via the same
+ * internal/dispatch endpoints as the "Сдачи" tab (CashHandovers.jsx) —
+ * any dispatcher can act on any courier's handover, see useCashLedger.
+ * Settlement rows (dispatcher→company) stay read-only: only the owner can
+ * approve a dispatcher's own submission to the company.
  */
 import { useRef, useState } from 'react'
-import { Wallet, Coins, Landmark, AlertTriangle, Camera, X, Send } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Wallet, Coins, Landmark, AlertTriangle, Camera, X, Send, CheckCircle2, XCircle } from 'lucide-react'
 import KpiCard from '../../../../shared/components/KpiCard'
 import Badge from '../../../../shared/components/Badge'
 import Button from '../../../../shared/components/Button'
+import Modal from '../../../../shared/components/Modal'
+import Alert from '../../../../shared/components/Alert'
 import Skeleton from '../../../../shared/components/Skeleton'
 import EmptyState from '../../../../shared/components/EmptyState'
 import CashLedgerFilterBar from '../../../../shared/components/CashLedgerFilterBar'
@@ -22,8 +28,105 @@ import {
 import { useToast } from '../../../../shared/components/ToastProvider'
 import { uploadToMedia } from '../../../../shared/api/mediaUpload'
 import { translateMediaError } from '../../../../shared/api/mediaErrors'
+import { KEYS } from '../../../../shared/queryKeys'
+import { confirmHandover, rejectHandover } from '../../api'
 import { useMySettlementsSummary, useSubmitSettlement } from '../../hooks/useCompanySettlement'
 import { useCashLedger } from '../../hooks/useCashLedger'
+
+// ── Confirm handover modal — mirrors CashHandovers.jsx's ConfirmHandoverModal,
+// adapted to the merged ledger's normalized row shape (row.raw is the
+// underlying cash_handovers record). ─────────────────────────────────────
+function ConfirmHandoverModal({ open, onClose, row }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [actual, setActual] = useState('')
+
+  const { mutate, isPending, error, reset } = useMutation({
+    mutationFn: () => confirmHandover(row.raw.id, { actual_returned: parseFloat(actual) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['logistics', 'handovers'] })
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.handovers })
+      toast.success('Сдача принята')
+      handleClose()
+    },
+    onError: (err) => toast.error(err?.response?.data?.error?.message ?? 'Ошибка'),
+  })
+
+  function handleClose() { reset(); setActual(''); onClose() }
+  const errMsg = error?.response?.data?.error?.message ?? error?.message
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title="Принять сдачу наличных"
+      description={row ? `Ожидается: ${fmt(row.expected)} c` : ''}
+      footer={
+        <>
+          <Button variant="secondary" onClick={handleClose} disabled={isPending}>Отмена</Button>
+          <Button variant="primary" onClick={() => actual && mutate()} loading={isPending} disabled={!actual}>
+            Подтвердить
+          </Button>
+        </>
+      }
+    >
+      {errMsg && <Alert variant="error" title="Ошибка" className="mb-4">{errMsg}</Alert>}
+      <div>
+        <label className="input-label">Фактически сдано (c) *</label>
+        <input
+          type="number" step="0.01" value={actual} onChange={(e) => setActual(e.target.value)}
+          className="input" placeholder="0.00" autoFocus
+        />
+      </div>
+    </Modal>
+  )
+}
+
+// ── Reject handover modal ──────────────────────────────────────────────────
+function RejectHandoverModal({ open, onClose, row }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [reason, setReason] = useState('')
+
+  const { mutate, isPending, error, reset } = useMutation({
+    mutationFn: () => rejectHandover(row.raw.id, { reason }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['logistics', 'handovers'] })
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.handovers })
+      toast.success('Сдача отклонена')
+      handleClose()
+    },
+    onError: (err) => toast.error(err?.response?.data?.error?.message ?? 'Ошибка'),
+  })
+
+  function handleClose() { reset(); setReason(''); onClose() }
+  const errMsg = error?.response?.data?.error?.message ?? error?.message
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title="Отклонить сдачу"
+      footer={
+        <>
+          <Button variant="secondary" onClick={handleClose} disabled={isPending}>Отмена</Button>
+          <Button variant="danger" onClick={() => reason.trim() && mutate()} loading={isPending} disabled={!reason.trim()}>
+            Отклонить
+          </Button>
+        </>
+      }
+    >
+      {errMsg && <Alert variant="error" title="Ошибка" className="mb-4">{errMsg}</Alert>}
+      <div>
+        <label className="input-label">Причина отклонения *</label>
+        <textarea
+          value={reason} onChange={(e) => setReason(e.target.value)}
+          className="input resize-none" rows={3} placeholder="Объясните причину…" autoFocus
+        />
+      </div>
+    </Modal>
+  )
+}
 
 export default function CompanySettlementTab() {
   const toast = useToast()
@@ -32,6 +135,8 @@ export default function CompanySettlementTab() {
   const [proofPreview, setProofPreview] = useState(null)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
+  const [confirmHandoverRow, setConfirmHandoverRow] = useState(null)
+  const [rejectHandoverRow, setRejectHandoverRow] = useState(null)
 
   const [range, setRange] = useState({ from: '', to: '' })
   const [sender, setSender] = useState('')
@@ -158,7 +263,12 @@ export default function CompanySettlementTab() {
                         <td className="px-4 py-3"><ReceiptThumb mediaAssets={row.mediaAssets} /></td>
                         <td className="px-4 py-3"><Badge variant={st.badge} dot>{st.label}</Badge></td>
                         <td className="px-4 py-3">
-                          {row.status === 'pending' ? (
+                          {row.status === 'pending' && row.source === 'handover' ? (
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="primary" icon={<CheckCircle2 size={14} />} onClick={() => setConfirmHandoverRow(row)}>Принять</Button>
+                              <Button size="sm" variant="danger" icon={<XCircle size={14} />} onClick={() => setRejectHandoverRow(row)}>Откл.</Button>
+                            </div>
+                          ) : row.status === 'pending' ? (
                             <span className="text-[11px] font-semibold italic text-amber-600">⏳ Ждём владельца</span>
                           ) : (
                             <span className="text-slate-300 text-xs">—</span>
@@ -192,7 +302,13 @@ export default function CompanySettlementTab() {
                   {row.status === 'rejected' && row.rejectionReason && (
                     <p className="text-xs text-rose-600">{row.rejectionReason}</p>
                   )}
-                  {row.status === 'pending' && (
+                  {row.status === 'pending' && row.source === 'handover' && (
+                    <div className="flex gap-2 pt-1">
+                      <Button size="sm" variant="primary" fullWidth onClick={() => setConfirmHandoverRow(row)}>Принять</Button>
+                      <Button size="sm" variant="danger" fullWidth onClick={() => setRejectHandoverRow(row)}>Отклонить</Button>
+                    </div>
+                  )}
+                  {row.status === 'pending' && row.source !== 'handover' && (
                     <span className="text-[11px] font-semibold italic text-amber-600">⏳ Ждём владельца</span>
                   )}
                 </div>
@@ -201,6 +317,9 @@ export default function CompanySettlementTab() {
           </div>
         </>
       )}
+
+      <ConfirmHandoverModal row={confirmHandoverRow} open={!!confirmHandoverRow} onClose={() => setConfirmHandoverRow(null)} />
+      <RejectHandoverModal row={rejectHandoverRow} open={!!rejectHandoverRow} onClose={() => setRejectHandoverRow(null)} />
 
       {/* Confirm submit sheet */}
       {confirmOpen && (
