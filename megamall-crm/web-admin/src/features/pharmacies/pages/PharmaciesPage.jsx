@@ -75,7 +75,7 @@ export default function PharmaciesPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <button className={secondary} onClick={exportExcel}><Download size={16} className="mr-2 inline" />Excel</button>
-            {role === 'owner' && <button className={primary} onClick={() => setCreateOpen(true)}><Plus size={16} className="mr-2 inline" />Добавить аптеку</button>}
+            {(role === 'owner' || role === 'warehouse_manager') && <button className={primary} onClick={() => setCreateOpen(true)}><Plus size={16} className="mr-2 inline" />Добавить аптеку</button>}
           </div>
         </div>
 
@@ -215,8 +215,8 @@ function PharmacyDetail({ id, role, onClose, onIssue }) {
         {(role === 'owner' || role === 'seller') && <button className={secondary} onClick={() => setPaymentOpen(true)}><Banknote size={15} className="mr-1 inline" />Добавить оплату</button>}
         {(role === 'owner' || role === 'seller') && <button className={secondary} onClick={() => setReturnOpen(true)}><Undo2 size={15} className="mr-1 inline" />Запрос возврата</button>}
         <button className={secondary} onClick={() => window.print()}><Printer size={15} className="mr-1 inline" />Печать</button>
-        {role === 'owner' && <button className={secondary} onClick={() => setTransferOpen(true)}><ArrowRightLeft size={15} className="mr-1 inline" />Ответственный</button>}
-        {role === 'owner' && <button className={secondary} onClick={() => mutation.mutate({ type: 'archive', id: pharmacy.id })}><Archive size={15} className="mr-1 inline" />Архив</button>}
+        {(role === 'owner' || role === 'warehouse_manager') && <button className={secondary} onClick={() => setTransferOpen(true)}><ArrowRightLeft size={15} className="mr-1 inline" />Ответственный</button>}
+        {(role === 'owner' || role === 'warehouse_manager') && <button className={secondary} onClick={() => mutation.mutate({ type: 'archive', id: pharmacy.id })}><Archive size={15} className="mr-1 inline" />Архив</button>}
       </div>
       <div className="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200">
         {tabs.map(([key, label]) => <button key={key} onClick={() => setTab(key)} className={`whitespace-nowrap border-b-2 px-3 py-2 text-xs font-semibold ${tab === key ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500'}`}>{label}</button>)}

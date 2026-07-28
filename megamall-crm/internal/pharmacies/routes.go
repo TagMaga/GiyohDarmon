@@ -16,10 +16,10 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/dashboard", read, h.Dashboard)
 	rg.GET("/:id", read, h.Detail)
 
-	rg.POST("", owner, h.Create)
-	rg.PUT("/:id", owner, h.Update)
-	rg.POST("/:id/archive", owner, h.Archive)
-	rg.POST("/:id/transfer-responsibility", owner, h.TransferResponsibility)
+	rg.POST("", ownerWarehouse, h.Create)
+	rg.PUT("/:id", ownerWarehouse, h.Update)
+	rg.POST("/:id/archive", ownerWarehouse, h.Archive)
+	rg.POST("/:id/transfer-responsibility", ownerWarehouse, h.TransferResponsibility)
 
 	rg.POST("/invoices", ownerWarehouse, h.CreateInvoice)
 	rg.POST("/invoices/:id/accept", seller, h.AcceptInvoice)
