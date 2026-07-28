@@ -84,6 +84,11 @@ export const KEYS = {
     salesReport: (params) => ['warehouse', 'salesReport', params ?? {}],
     slowMoving:  (params) => ['warehouse', 'slowMoving', params ?? {}],
   },
+  pharmacies: {
+    list:      (params) => ['pharmacies', 'list', params ?? {}],
+    dashboard: (params) => ['pharmacies', 'dashboard', params ?? {}],
+    detail:    (id) => ['pharmacies', 'detail', id],
+  },
   settings: {
     delivery: ['settings', 'delivery'],
   },

@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
+  Building2,
   Download,
   FilterX,
   Package,
@@ -58,6 +60,7 @@ const MOVEMENT_TYPES = [
 ]
 
 export default function OwnerWarehousePage() {
+  const navigate = useNavigate()
   const [tab, setTab] = useState('dashboard')
   const [inventorySearch, setInventorySearch] = useState('')
   const [movementSearch, setMovementSearch] = useState('')
@@ -253,6 +256,7 @@ export default function OwnerWarehousePage() {
       {tab === 'receiving' && (
         <div className="animate-fade-in space-y-4">
           <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="secondary" icon={<Building2 size={15} />} onClick={() => navigate('/owner/pharmacies')}>Выдать аптеке</Button>
             <Button variant="primary" icon={<PackagePlus size={15} />} onClick={() => setReceiveProduct(null)}>Новая приёмка</Button>
             <Button variant="danger" icon={<Trash2 size={15} />} onClick={() => setWriteoffProduct(null)}>Новое списание</Button>
           </div>

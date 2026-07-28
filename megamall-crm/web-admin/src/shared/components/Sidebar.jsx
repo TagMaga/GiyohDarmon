@@ -24,6 +24,7 @@ const NAV = {
     { label: 'Финансы',         icon: TrendingUp, path: '/owner/finance' },
     { label: 'Бюджет компании', icon: Wallet,     path: '/owner/budget' },
     { label: 'Склад',      icon: Building2,     path: '/owner/warehouse' },
+    { label: 'Аптеки',     icon: Building2,     path: '/owner/pharmacies' },
     { label: 'Команда',    icon: BookUser,      path: '/owner/team-directory' },
     { label: 'Профиль',    icon: User,          path: '/owner/profile' },
   ],
@@ -49,6 +50,7 @@ const NAV = {
     { label: 'Рабочий стол', icon: Home,             path: '/warehouse' },
     { label: 'Остатки и товары', icon: Package,      path: '/warehouse/inventory' },
     { label: 'Приёмка и списания', icon: PackagePlus, path: '/warehouse/receiving' },
+    { label: 'Аптеки', icon: Building2, path: '/warehouse/pharmacies' },
   ],
 }
 // it_specialist has full owner-level access — reuse the owner nav.

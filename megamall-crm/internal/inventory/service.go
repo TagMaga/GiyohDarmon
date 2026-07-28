@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/megamall/crm/internal/activity"
@@ -22,6 +23,110 @@ type Service struct {
 
 func NewService(repo *Repository, logger *activity.Logger) *Service {
 	return &Service{repo: repo, logger: logger}
+}
+
+// IssueExternalTx moves free stock out of the implicit main warehouse into an
+// externally tracked location (for example, a pharmacy).  The caller owns the
+// transaction so its domain document and the inventory movement either commit
+// together or roll back together.  The returned unit cost is the FIFO weighted
+// average and must be frozen on the destination document for later returns.
+func (s *Service) IssueExternalTx(
+	ctx context.Context,
+	tx *gorm.DB,
+	actorID, productID, referenceID uuid.UUID,
+	quantity int,
+	reason string,
+) (float64, error) {
+	if quantity <= 0 {
+		return 0, apperrors.BadRequest("quantity must be greater than zero")
+	}
+	inv, err := s.repo.GetOrCreateForUpdate(tx, ctx, productID)
+	if err != nil {
+		return 0, err
+	}
+	if inv.AvailableQuantity < quantity {
+		return 0, apperrors.BadRequest(fmt.Sprintf(
+			"insufficient available stock: have %d, need %d",
+			inv.AvailableQuantity, quantity,
+		))
+	}
+
+	movementID := uuid.New()
+	newQuantity := inv.Quantity - quantity
+	if err := s.repo.UpdateQuantity(tx, ctx, inv.ID, newQuantity); err != nil {
+		return 0, err
+	}
+	movement := &Movement{
+		ID:               movementID,
+		ProductID:        productID,
+		MovementType:     MovementTransferOut,
+		Quantity:         quantity,
+		PreviousQuantity: inv.Quantity,
+		NewQuantity:      newQuantity,
+		Reason:           &reason,
+		ReferenceID:      &referenceID,
+		CreatedBy:        actorID,
+	}
+	if err := s.repo.InsertMovement(tx, ctx, movement); err != nil {
+		return 0, err
+	}
+	consumptions, err := s.repo.ConsumeFIFO(tx, ctx, productID, quantity, movementID)
+	if err != nil {
+		return 0, fmt.Errorf("external issue FIFO consume: %w", err)
+	}
+	var totalCost float64
+	for _, c := range consumptions {
+		totalCost += float64(c.Quantity) * c.UnitCost
+	}
+	return totalCost / float64(quantity), nil
+}
+
+// ReturnExternalTx moves stock from an externally tracked location back into
+// the implicit main warehouse and recreates a FIFO batch at the cost frozen
+// when it left that warehouse.
+func (s *Service) ReturnExternalTx(
+	ctx context.Context,
+	tx *gorm.DB,
+	actorID, productID, referenceID uuid.UUID,
+	quantity int,
+	unitCost float64,
+	reason string,
+) error {
+	if quantity <= 0 {
+		return apperrors.BadRequest("quantity must be greater than zero")
+	}
+	inv, err := s.repo.GetOrCreateForUpdate(tx, ctx, productID)
+	if err != nil {
+		return err
+	}
+	newQuantity := inv.Quantity + quantity
+	if err := s.repo.UpdateQuantity(tx, ctx, inv.ID, newQuantity); err != nil {
+		return err
+	}
+	movement := &Movement{
+		ID:               uuid.New(),
+		ProductID:        productID,
+		MovementType:     MovementTransferIn,
+		Quantity:         quantity,
+		PreviousQuantity: inv.Quantity,
+		NewQuantity:      newQuantity,
+		Reason:           &reason,
+		ReferenceID:      &referenceID,
+		CreatedBy:        actorID,
+	}
+	if err := s.repo.InsertMovement(tx, ctx, movement); err != nil {
+		return err
+	}
+	return s.repo.CreateBatch(tx, ctx, &Batch{
+		ID:                uuid.New(),
+		ProductID:         productID,
+		ReceivedQuantity:  quantity,
+		RemainingQuantity: quantity,
+		UnitCost:          unitCost,
+		ReceivedAt:        time.Now().UTC(),
+		MovementID:        &movement.ID,
+		CreatedBy:         &actorID,
+	})
 }
 
 // ─── Read ─────────────────────────────────────────────────────────────────────

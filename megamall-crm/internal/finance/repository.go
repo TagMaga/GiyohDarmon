@@ -68,17 +68,44 @@ func (r *Repository) GetOrdersSummary(
 				WHERE m.movement_type = 'sale'
 				  AND m.reference_id IS NOT NULL
 				GROUP BY m.reference_id
+			),
+			pharmacy_payments_period AS (
+				SELECT COALESCE(SUM(amount),0) amount
+				FROM pharmacy_payments
+				WHERE status='confirmed' AND confirmed_at>=? AND confirmed_at<=?
+			),
+			pharmacy_invoice_costs AS (
+				SELECT invoice_id,SUM(quantity*unit_cost) cost,SUM(line_total) invoice_total
+				FROM pharmacy_invoice_items GROUP BY invoice_id
+			),
+			pharmacy_paid_cost AS (
+				SELECT COALESCE(SUM(x.amount/NULLIF(pic.invoice_total,0)*pic.cost),0) cost
+				FROM (
+					SELECT pa.invoice_id,pa.amount
+					FROM pharmacy_payment_allocations pa
+					JOIN pharmacy_payments pp ON pp.id=pa.payment_id
+					WHERE pa.invoice_id IS NOT NULL AND pp.status='confirmed'
+					  AND pa.reversed_at IS NULL
+					  AND pp.confirmed_at>=? AND pp.confirmed_at<=?
+					UNION ALL
+					SELECT cl.invoice_id,ABS(cl.amount)
+					FROM pharmacy_credit_ledger cl
+					WHERE cl.entry_type='applied' AND cl.invoice_id IS NOT NULL
+					  AND cl.created_at>=? AND cl.created_at<=?
+				) x JOIN pharmacy_invoice_costs pic ON pic.invoice_id=x.invoice_id
 			)
 			SELECT
 				COUNT(*)                                             AS total_count,
-				COALESCE(SUM(d.total_amount), 0)                     AS total_sales,
+				COALESCE(SUM(d.total_amount), 0)+MAX(ppp.amount)     AS total_sales,
 				COALESCE(SUM(d.courier_payout), 0)                   AS delivery_fees,
 				COALESCE(SUM(d.delivery_fee), 0)                     AS client_delivery_fees,
-				COALESCE(SUM(d.total_amount + d.delivery_fee - d.courier_payout), 0) AS net_revenue,
-				COALESCE(SUM(pc.product_cost), 0)                    AS product_cost
+				COALESCE(SUM(d.total_amount + d.delivery_fee - d.courier_payout), 0)+MAX(ppp.amount) AS net_revenue,
+				COALESCE(SUM(pc.product_cost), 0)+MAX(ppc.cost)      AS product_cost
 			FROM delivered_orders d
 			LEFT JOIN product_costs pc ON pc.order_id = d.id
-		`, from, to).Scan(&row).Error
+			CROSS JOIN pharmacy_payments_period ppp
+			CROSS JOIN pharmacy_paid_cost ppc
+		`, from, to, from, to, from, to, from, to).Scan(&row).Error
 	if err != nil {
 		return ordersSummaryRow{}, fmt.Errorf("get orders summary: %w", err)
 	}
@@ -102,14 +129,18 @@ func (r *Repository) GetRevenueSummary(
 			  AND tl.created_at >= ?
 			  AND tl.created_at <= ?
 		)
-		SELECT
-			fe.event_type::text          AS event_type,
-			COALESCE(SUM(fe.amount), 0)  AS total
-		FROM financial_events fe
-		JOIN delivered_orders d ON d.id = fe.order_id
+		SELECT event_type,COALESCE(SUM(amount),0) total
+		FROM (
+			SELECT fe.event_type::text event_type,fe.amount
+			FROM financial_events fe JOIN delivered_orders d ON d.id=fe.order_id
+			UNION ALL
+			SELECT pfe.event_type,pfe.amount
+			FROM pharmacy_financial_events pfe
+			WHERE pfe.created_at>=? AND pfe.created_at<=?
+		) x
 		GROUP BY event_type
 		ORDER BY event_type
-	`, from, to).Scan(&rows).Error
+	`, from, to, from, to).Scan(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("get revenue summary: %w", err)
 	}
@@ -203,7 +234,7 @@ func (r *Repository) GetNetProfit(ctx context.Context, from, to *time.Time) (flo
 }
 
 func (r *Repository) getCompanyGross(ctx context.Context, from, to *time.Time) (float64, error) {
-	query := `SELECT COALESCE(SUM(amount), 0) FROM financial_events WHERE event_type = 'company_revenue_earned'`
+	query := `SELECT COALESCE(SUM(amount),0) FROM unified_income_events WHERE event_type='company_revenue_earned'`
 	args := []interface{}{}
 	if from != nil {
 		query += " AND created_at >= ?"
@@ -533,7 +564,7 @@ func (r *Repository) ListFinancialEvents(
 			created_at,
 			NULL::uuid AS payer_id,
 			NULL::text AS payer_role
-		FROM financial_events WHERE %s`, eventsWhere)
+		FROM unified_income_events WHERE %s`, eventsWhere)
 
 	expensesSQL := fmt.Sprintf(`
 		SELECT
