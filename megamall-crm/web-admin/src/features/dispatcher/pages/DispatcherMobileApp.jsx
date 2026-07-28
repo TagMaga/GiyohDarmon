@@ -23,7 +23,7 @@ import CouriersTab from '../mobile/CouriersTab'
 import HistoryTab from '../mobile/HistoryTab'
 import CompanySettlementTab from '../components/v2/CompanySettlementTab'
 import OrderDetailSheet from '../mobile/OrderDetailSheet'
-import { AssignSheet, CancelSheet, IssueSheet, ScheduleSheet } from '../mobile/ActionSheets'
+import { AssignSheet, UnassignSheet, CancelSheet, IssueSheet, ScheduleSheet } from '../mobile/ActionSheets'
 import CreateOrderSheet from '../mobile/CreateOrderSheet'
 import { CourierDetailSheet } from '../mobile/CourierSheets'
 import ProfileSheet from '../mobile/ProfileSheet'
@@ -283,6 +283,11 @@ export default function DispatcherMobileApp() {
       <AssignSheet
         open={actionSheet?.type === 'assign' || actionSheet?.type === 'reassign'}
         mode={actionSheet?.type === 'reassign' ? 'reassign' : 'assign'}
+        order={actionSheet?.order}
+        onClose={() => setActionSheet(null)}
+      />
+      <UnassignSheet
+        open={actionSheet?.type === 'unassign'}
         order={actionSheet?.order}
         onClose={() => setActionSheet(null)}
       />

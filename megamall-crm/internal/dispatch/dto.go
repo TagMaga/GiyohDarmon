@@ -186,6 +186,10 @@ type AssignCourierRequest struct {
 	Note      *string   `json:"note"`
 }
 
+type UnassignCourierRequest struct {
+	Reason string `json:"reason" validate:"required,min=1,max=500"`
+}
+
 type ScheduleOrderRequest struct {
 	ScheduledAt time.Time `json:"scheduled_at" validate:"required"`
 }

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -306,6 +307,48 @@ func (s *Service) StartDelivery(ctx context.Context, courierID uuid.UUID, orderI
 		Status:  orders.StatusInDelivery,
 		Comment: req.Comment,
 	})
+}
+
+// ReleaseOrder lets the assigned courier give an active order back to the
+// confirmed pool when they can no longer complete the delivery. Unlike
+// UnclaimOrder, this is an explicit operational action: it is available after
+// the short undo window and while the courier is already en route or has
+// reported an issue. The reason is mandatory and is stored in the order
+// timeline; ChangeStatus atomically releases inventory and the assignment.
+func (s *Service) ReleaseOrder(ctx context.Context, courierID uuid.UUID, orderID uuid.UUID, req ReleaseOrderRequest) (*orders.Order, error) {
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, apperrors.BadRequest("укажите причину отказа от заказа")
+	}
+
+	status, err := s.repo.GetOrderStatus(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	switch status {
+	case orders.StatusAssigned, orders.StatusInDelivery, orders.StatusIssue:
+	default:
+		return nil, apperrors.BadRequest("заказ нельзя освободить в текущем статусе")
+	}
+
+	comment := "Курьер отказался от заказа. Причина: " + reason
+	updated, err := s.ordersSvc.ChangeStatus(ctx, courierID, "courier", orderID, orders.ChangeStatusRequest{
+		Status:  orders.StatusConfirmed,
+		Comment: &comment,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	s.logger.LogAsync(activity.Entry{
+		ActorID:    &courierID,
+		Action:     "release_order",
+		EntityType: "order",
+		EntityID:   &orderID,
+		Reason:     &reason,
+		AfterState: map[string]interface{}{"status": string(orders.StatusConfirmed), "courier_id": nil},
+	})
+	return updated, nil
 }
 
 // MarkDelivered transitions in_delivery → delivered.

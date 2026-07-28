@@ -154,6 +154,7 @@ Read-only info (name, phone, avatar) plus the courier's **active tariff rules**,
 | `getClaimableOrders()` | `GET /courier/available` |
 | `claimOrder(id)` | `POST /courier/available/:id/claim` |
 | `updateOrderStatus(id, status, data)` | `POST /courier/orders/:id/{start\|delivered\|returned\|issue\|address-changed}` — mapped via a local `STATUS_ENDPOINT` table keyed by the target status (`in_delivery→start`, `delivered→delivered`, `returned→returned`, `issue→issue`, `address_changed→address-changed`) |
+| `releaseOrder(id, reason)` | `POST /courier/orders/:id/release` — removes the current courier and returns the order to the confirmed pool |
 | `reportAddressChanged(id, newAddress)` | `POST /courier/orders/:id/address-changed` |
 | `deferOrder(id, scheduledAt)` | `POST /courier/orders/:id/defer` |
 | `getOrderComments(id)` / `addOrderComment(id, comment)` | `GET`/`POST /orders/:id/comments` (shared order-comments endpoint, not courier-prefixed) |

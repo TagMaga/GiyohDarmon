@@ -213,8 +213,17 @@ func (h *Handler) unassignCourier(c *gin.Context) {
 		response.HandleError(c, err)
 		return
 	}
+	var req UnassignCourierRequest
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
+		response.HandleError(c, apperrors.BadRequest("invalid request body"))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.HandleError(c, appErr)
+		return
+	}
 	claims := middleware.ClaimsFromContext(c)
-	order, svcErr := h.svc.UnassignCourier(c.Request.Context(), claims.UserID, id)
+	order, svcErr := h.svc.UnassignCourier(c.Request.Context(), claims.UserID, id, req)
 	if svcErr != nil {
 		response.HandleError(c, svcErr)
 		return

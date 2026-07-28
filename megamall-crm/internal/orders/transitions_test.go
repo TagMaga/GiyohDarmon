@@ -9,7 +9,11 @@ package orders
 //
 // Run with: go test ./internal/orders/ -v -run TestTransition
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/google/uuid"
+)
 
 // TestTransition_BackwardRecallEdges asserts the recovery transitions a dispatcher
 // relies on are valid. Each of these triggers assignment release in ChangeStatus.
@@ -74,5 +78,22 @@ func TestTransition_ForwardHappyPathIntact(t *testing.T) {
 func TestTransition_NoSelfLoopToConfirmed(t *testing.T) {
 	if CanTransition(StatusConfirmed, StatusConfirmed) {
 		t.Fatal("confirmed → confirmed must not be a valid state-machine transition")
+	}
+}
+
+func TestTransition_CourierMayReleaseOwnIssueOrderOnlyToConfirmed(t *testing.T) {
+	courierID := uuid.New()
+	otherCourierID := uuid.New()
+	svc := &Service{}
+	order := &Order{Status: StatusIssue, CourierID: &courierID}
+
+	if err := svc.validateTransitionRole("courier", courierID, order, StatusIssue, StatusConfirmed); err != nil {
+		t.Fatalf("assigned courier should be able to release their issue order: %v", err)
+	}
+	if err := svc.validateTransitionRole("courier", otherCourierID, order, StatusIssue, StatusConfirmed); err == nil {
+		t.Fatal("another courier must not be able to release the order")
+	}
+	if err := svc.validateTransitionRole("courier", courierID, order, StatusIssue, StatusAssigned); err == nil {
+		t.Fatal("courier must not resolve an issue into assigned; only the release edge is allowed")
 	}
 }

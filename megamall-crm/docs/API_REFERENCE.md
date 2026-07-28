@@ -153,7 +153,7 @@ The dispatcher board's backend. Every route requires `dispatcher` or `owner`, ex
 | GET | `/dispatch/couriers/:id/tariffs` | `dispatcher, owner` |
 | POST/DELETE | `/dispatch/couriers/:id/tariffs[/:rule_id]` | `owner` only |
 | GET | `/dispatch/cash/settlement`, `/dispatch/cash/transactions`, `/dispatch/history/orders` | `dispatcher, owner` |
-| POST | `/dispatch/orders/:id/{confirm,assign,reassign,unassign,schedule,issue,resolve-issue,return,cancel}` | `dispatcher, owner` |
+| POST | `/dispatch/orders/:id/{confirm,assign,reassign,unassign,schedule,issue,resolve-issue,return,cancel}` | `dispatcher, owner` (`unassign` requires `{ "reason": "..." }`) |
 | GET/POST | `/dispatch/orders/:id/comments` | `dispatcher, owner` |
 | GET | `/dispatch/cash/handovers` | `dispatcher, owner` |
 | POST | `/dispatch/cash/handovers/:id/{confirm,reject}` | `dispatcher, owner` |
@@ -171,6 +171,7 @@ Backend for [the mobile courier app](../../mobile/courier-app/DOCUMENTATION.md) 
 | POST | `/courier/available/:id/claim` |
 | GET | `/courier/orders/:id` |
 | POST | `/courier/orders/:id/start` |
+| POST | `/courier/orders/:id/release` — release an active assignment back to the confirmed pool; requires `{ "reason": "..." }` |
 | POST | `/courier/orders/:id/delivered` |
 | POST | `/courier/orders/:id/returned` |
 | POST | `/courier/orders/:id/issue` |
