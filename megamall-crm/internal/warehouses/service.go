@@ -53,7 +53,7 @@ func (s *Service) AdjustForOrder(
 	newQty := ci.Quantity + qtyDelta
 	newReserved := ci.ReservedQuantity + reservedDelta
 	if newQty < 0 {
-		return apperrors.BadRequest("courier inventory inconsistency: quantity would go negative")
+		return apperrors.BadRequest("ошибка склада курьера: количество не может стать отрицательным")
 	}
 	if newReserved < 0 {
 		newReserved = 0
@@ -100,6 +100,10 @@ func (s *Service) GetInventorySummary(ctx context.Context) (*InventorySummary, e
 	return s.repo.GetInventorySummary(ctx)
 }
 
+func (s *Service) ListCouriers(ctx context.Context) ([]CourierBrief, error) {
+	return s.repo.ListCouriers(ctx)
+}
+
 func (s *Service) CreateWarehouse(ctx context.Context, actorID uuid.UUID, req CreateWarehouseRequest) (*WarehouseResponse, error) {
 	w := &Warehouse{ID: uuid.New(), Type: WarehouseTypeMain, Name: req.Name, CityID: req.CityID, IsActive: true}
 	if err := s.repo.CreateWarehouse(ctx, w); err != nil {
@@ -121,14 +125,14 @@ func (s *Service) CreateTransfer(ctx context.Context, actorID uuid.UUID, req Cre
 		return nil, err
 	}
 	if courier == nil || courier.Role != users.RoleCourier {
-		return nil, apperrors.BadRequest("target user is not a courier")
+		return nil, apperrors.BadRequest("выбранный пользователь не является курьером")
 	}
 	from, err := s.repo.GetWarehouse(ctx, req.FromWarehouseID)
 	if err != nil {
 		return nil, err
 	}
 	if from == nil || from.Type != WarehouseTypeMain {
-		return nil, apperrors.BadRequest("from_warehouse_id must be an active main warehouse")
+		return nil, apperrors.BadRequest("склад-источник должен быть активным главным складом")
 	}
 
 	transfer := &InventoryTransfer{
@@ -138,12 +142,12 @@ func (s *Service) CreateTransfer(ctx context.Context, actorID uuid.UUID, req Cre
 	items := make([]InventoryTransferItem, 0, len(req.Items))
 	for _, it := range req.Items {
 		if it.Quantity <= 0 {
-			return nil, apperrors.BadRequest("quantity must be > 0")
+			return nil, apperrors.BadRequest("количество должно быть больше 0")
 		}
 		items = append(items, InventoryTransferItem{ID: uuid.New(), ProductID: it.ProductID, Quantity: it.Quantity})
 	}
 	if len(items) == 0 {
-		return nil, apperrors.BadRequest("transfer must contain at least one item")
+		return nil, apperrors.BadRequest("передача должна содержать хотя бы один товар")
 	}
 
 	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -158,7 +162,7 @@ func (s *Service) CreateTransfer(ctx context.Context, actorID uuid.UUID, req Cre
 				if p != nil {
 					name = p.Name
 				}
-				return apperrors.BadRequest(fmt.Sprintf("insufficient stock at source warehouse for %s: available %d, needed %d", name, inv.AvailableQuantity, it.Quantity))
+				return apperrors.BadRequest(fmt.Sprintf("недостаточно товара на складе-источнике: %s — доступно %d, требуется %d", name, inv.AvailableQuantity, it.Quantity))
 			}
 			if err := s.invRepo.UpdateBlockedQuantity(tx, ctx, inv.ID, inv.BlockedQuantity+it.Quantity); err != nil {
 				return err
@@ -264,10 +268,10 @@ func (s *Service) decideTransfer(ctx context.Context, courierID, transferID uuid
 			return apperrors.NotFound("transfer")
 		}
 		if t.ToCourierID != courierID {
-			return apperrors.Forbidden("this transfer is not addressed to you")
+			return apperrors.Forbidden("эта передача адресована не вам")
 		}
 		if t.Status != TransferIssued {
-			return apperrors.Conflict("transfer has already been decided")
+			return apperrors.Conflict("решение по этой передаче уже принято")
 		}
 
 		if !accept {
@@ -308,7 +312,7 @@ func (s *Service) decideTransfer(ctx context.Context, courierID, transferID uuid
 			prevQty := inv.Quantity
 			newQty := prevQty - it.Quantity
 			if newQty < 0 {
-				return apperrors.BadRequest("insufficient stock at source warehouse to complete transfer")
+				return apperrors.BadRequest("недостаточно товара на складе-источнике для завершения передачи")
 			}
 			if err := s.invRepo.UpdateQuantity(tx, ctx, inv.ID, newQty); err != nil {
 				return err
@@ -541,14 +545,14 @@ func (s *Service) CreateFullReturn(ctx context.Context, courierID uuid.UUID, req
 		return nil, err
 	}
 	if open {
-		return nil, apperrors.Conflict("a return request is already pending for this courier")
+		return nil, apperrors.Conflict("у курьера уже есть возврат, ожидающий рассмотрения")
 	}
 	toWh, err := s.repo.GetWarehouse(ctx, req.ToWarehouseID)
 	if err != nil {
 		return nil, err
 	}
 	if toWh == nil || toWh.Type != WarehouseTypeMain {
-		return nil, apperrors.BadRequest("to_warehouse_id must be an active main warehouse")
+		return nil, apperrors.BadRequest("склад назначения должен быть активным главным складом")
 	}
 
 	var ret *CourierReturn
@@ -576,7 +580,7 @@ func (s *Service) CreateFullReturn(ctx context.Context, courierID uuid.UUID, req
 			}
 		}
 		if len(items) == 0 {
-			return apperrors.BadRequest("no free stock available to return")
+			return apperrors.BadRequest("нет свободного товара для возврата")
 		}
 		ret = &CourierReturn{
 			ID: uuid.New(), CourierID: courierID, FromWarehouseID: courierWh.ID,
@@ -665,7 +669,7 @@ func (s *Service) decideReturn(ctx context.Context, actorID, returnID uuid.UUID,
 			return apperrors.NotFound("return")
 		}
 		if ret.Status != ReturnRequested {
-			return apperrors.Conflict("return has already been decided")
+			return apperrors.Conflict("решение по этому возврату уже принято")
 		}
 
 		for _, it := range ret.Items {
@@ -686,7 +690,7 @@ func (s *Service) decideReturn(ctx context.Context, actorID, returnID uuid.UUID,
 
 			newQty := ci.Quantity - it.Quantity
 			if newQty < 0 {
-				return apperrors.BadRequest("courier inventory inconsistency on return acceptance")
+				return apperrors.BadRequest("ошибка склада курьера при приёме возврата")
 			}
 			if err := s.repo.UpdateCourierInventory(tx, ctx, ci.ID, newQty, ci.ReservedQuantity, newBlocked); err != nil {
 				return err
@@ -763,7 +767,7 @@ func (s *Service) CreateLostReport(ctx context.Context, courierID uuid.UUID, req
 		return nil, err
 	}
 	if wh == nil {
-		return nil, apperrors.BadRequest("courier has no warehouse")
+		return nil, apperrors.BadRequest("у курьера нет склада")
 	}
 	product, err := s.prodRepo.GetProductByID(ctx, req.ProductID)
 	if err != nil || product == nil {
@@ -781,7 +785,7 @@ func (s *Service) CreateLostReport(ctx context.Context, courierID uuid.UUID, req
 			return err
 		}
 		if ci.AvailableQuantity < req.Quantity {
-			return apperrors.BadRequest("insufficient free stock to report as lost")
+			return apperrors.BadRequest("недостаточно свободного товара, чтобы заявить об утере")
 		}
 		rep = &LostProductReport{
 			ID: uuid.New(), CourierID: courierID, WarehouseID: wh.ID, ProductID: req.ProductID,
@@ -822,7 +826,7 @@ func (s *Service) DecideLostReport(ctx context.Context, actorID uuid.UUID, repor
 			return apperrors.NotFound("lost report")
 		}
 		if r.Status != LostReportPending {
-			return apperrors.Conflict("report has already been decided")
+			return apperrors.Conflict("решение по этой заявке уже принято")
 		}
 		rep = r
 
@@ -848,7 +852,7 @@ func (s *Service) DecideLostReport(ctx context.Context, actorID uuid.UUID, repor
 
 		newQty := ci.Quantity - r.Quantity
 		if newQty < 0 {
-			return apperrors.BadRequest("courier inventory inconsistency approving lost report")
+			return apperrors.BadRequest("ошибка склада курьера при утверждении заявки")
 		}
 		if err := s.repo.UpdateCourierInventory(tx, ctx, ci.ID, newQty, ci.ReservedQuantity, newBlocked); err != nil {
 			return err

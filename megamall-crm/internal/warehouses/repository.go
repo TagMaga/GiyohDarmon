@@ -346,6 +346,27 @@ type InventorySummary struct {
 	PendingLostReports  int `json:"pending_lost_reports"`
 }
 
+// CourierBrief is the minimal courier info exposed to the transfer-issuance
+// courier picker — no workload/cash data, unlike dispatch's overview
+// endpoint (which warehouse_manager isn't permitted to call).
+type CourierBrief struct {
+	ID       uuid.UUID `json:"id"`
+	FullName string    `json:"full_name"`
+}
+
+func (r *Repository) ListCouriers(ctx context.Context) ([]CourierBrief, error) {
+	var rows []CourierBrief
+	err := r.db.WithContext(ctx).Table("users").
+		Select("id, full_name").
+		Where("role = ? AND is_active = true AND deleted_at IS NULL", "courier").
+		Order("full_name ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("list couriers: %w", err)
+	}
+	return rows, nil
+}
+
 func (r *Repository) GetInventorySummary(ctx context.Context) (*InventorySummary, error) {
 	var s InventorySummary
 	// Two separate destination structs, not one shared struct reused across

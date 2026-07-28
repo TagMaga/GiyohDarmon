@@ -219,6 +219,14 @@ export async function createWriteoff(payload) {
 }
 
 // ── Courier warehouses (transfers, returns, lost reports) ──────────────────────
+// Minimal courier list (id + name only) for the transfer-issuance courier
+// picker — accessible to owner AND warehouse_manager, unlike
+// /dispatch/couriers/overview which is dispatcher/owner only.
+export async function fetchWarehouseCouriers() {
+  const res = await client.get('/warehouses/couriers')
+  return toArray(unwrap(res))
+}
+
 export async function fetchInventorySummary() {
   const res = await client.get('/warehouses/inventory/summary')
   return unwrap(res)

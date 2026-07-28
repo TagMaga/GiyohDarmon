@@ -11,6 +11,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	manage := middleware.RequireRoles("owner", "warehouse_manager")
 
 	rg.GET("/inventory/summary", manage, h.InventorySummary)
+	rg.GET("/couriers", manage, h.ListCouriers)
 	rg.GET("", manage, h.ListWarehouses)
 	rg.POST("", manage, h.CreateWarehouse)
 

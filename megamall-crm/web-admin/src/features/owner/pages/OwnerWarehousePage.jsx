@@ -18,6 +18,7 @@ import ProductModal from '../../warehouse/components/ProductModal'
 import ReceivingModal from '../../warehouse/components/ReceivingModal'
 import WriteoffModal from '../../warehouse/components/WriteoffModal'
 import {
+  CourierWarehouseSummary,
   LostReportsPanel,
   NewTransferModal,
   PendingReturnsPanel,
@@ -400,38 +401,6 @@ function MetricsStrip({ products = [], inventory = [], movements = [], batches =
           <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{item.label}</p>
           <p className={`mt-1 truncate text-base font-bold tabular-nums ${item.tone === 'amber' ? 'text-amber-700' : item.tone === 'rose' ? 'text-rose-700' : 'text-slate-950'}`}>
             {loading ? '—' : item.value}
-          </p>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function CourierWarehouseSummary({ summary, detailed = false }) {
-  if (!summary) return null
-  const totalPhysical = (summary.main_quantity ?? 0) + (summary.courier_quantity ?? 0)
-  const totalReserved = (summary.main_reserved ?? 0) + (summary.courier_reserved ?? 0)
-  const items = [
-    { label: 'Всего товара', value: totalPhysical },
-    { label: 'Резерв (заказы)', value: totalReserved, tone: 'amber' },
-    { label: 'У курьеров', value: summary.courier_quantity ?? 0, tone: 'indigo' },
-    { label: 'В передачах', value: summary.pending_transfers ?? 0, tone: summary.pending_transfers ? 'amber' : 'slate' },
-  ]
-  if (detailed) {
-    items.push(
-      { label: 'На главном складе', value: summary.main_quantity ?? 0 },
-      { label: 'Заблокировано (передачи)', value: summary.main_blocked ?? 0, tone: summary.main_blocked ? 'amber' : 'slate' },
-      { label: 'Возвраты на рассмотрении', value: summary.pending_returns ?? 0, tone: summary.pending_returns ? 'amber' : 'slate' },
-      { label: 'Заявки об утере', value: summary.pending_lost_reports ?? 0, tone: summary.pending_lost_reports ? 'rose' : 'slate' },
-    )
-  }
-  return (
-    <div className={`grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] sm:grid-cols-4 ${detailed ? 'lg:grid-cols-8' : ''}`}>
-      {items.map((item) => (
-        <div key={item.label} className="border-b border-r border-slate-100 px-3 py-3 last:border-r-0 sm:[&:nth-child(4n)]:border-r-0">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{item.label}</p>
-          <p className={`mt-1 truncate text-base font-bold tabular-nums ${item.tone === 'amber' ? 'text-amber-700' : item.tone === 'rose' ? 'text-rose-700' : item.tone === 'indigo' ? 'text-indigo-700' : 'text-slate-950'}`}>
-            {item.value.toLocaleString('ru-RU')}
           </p>
         </div>
       ))}

@@ -9,7 +9,13 @@ import Alert from '../../../shared/components/Alert'
 import Modal from '../../../shared/components/Modal'
 import { STATUS_LABELS, STATUS_BADGE } from '../../../shared/orderStatusConfig'
 import ReceivingEditModal from '../components/ReceivingEditModal'
+import {
+  NewTransferModal,
+  TRANSFER_STATUS_FILTERS,
+  TransferList,
+} from '../components/TransferComponents'
 import useWarehouseData from '../hooks/useWarehouseData'
+import { useTransfers } from '../hooks/useTransfers'
 import { fetchReceivingHistory } from '../api'
 import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getId, getMovementType, getMovementUnitCost, getProductImageSrcSet, getProductImageVariant, getProductName, getProductSku, getSalePrice, getSaleUnitPrice, isUUID } from '../utils/warehouseHelpers'
 
@@ -27,6 +33,9 @@ export default function WarehouseMovementsPage() {
   const [search, setSearch] = useState('')
   const [type, setType] = useState('')
   const [productId, setProductId] = useState('')
+  const [showNewTransfer, setShowNewTransfer] = useState(false)
+  const [transferStatus, setTransferStatus] = useState('')
+  const { data: transfers = [], isLoading: transfersLoading } = useTransfers({ status: transferStatus })
   const validProducts = data.products.filter((p) => isUUID(getId(p)))
 
   const rows = useMemo(() => {
@@ -53,8 +62,28 @@ export default function WarehouseMovementsPage() {
 
   return (
     <div className="animate-fade-in p-6">
-      <PageHeader title="Движения" subtitle="История операций по остаткам." icon={<ArrowLeftRight size={20} />} />
+      <PageHeader
+        title="Движения"
+        subtitle="История операций по остаткам."
+        icon={<ArrowLeftRight size={20} />}
+        action={
+          <Button variant="primary" icon={<Truck size={15} />} onClick={() => setShowNewTransfer(true)}>Новая передача</Button>
+        }
+      />
       {data.error && <Alert variant="error" title="Ошибка загрузки данных" className="mb-5">{data.error?.message}</Alert>}
+
+      <section className="mb-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-slate-950">Передачи курьерам</h2>
+            <p className="mt-1 text-xs text-slate-400">Выдача товара курьеру со склада, история и статусы.</p>
+          </div>
+          <select className="input py-2" value={transferStatus} onChange={(e) => setTransferStatus(e.target.value)}>
+            {TRANSFER_STATUS_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+          </select>
+        </div>
+        <TransferList transfers={transfers} loading={transfersLoading} />
+      </section>
 
       <section className="mb-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)] lg:grid-cols-[minmax(0,1fr)_160px_210px_auto]">
         <label className="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
@@ -70,6 +99,7 @@ export default function WarehouseMovementsPage() {
       </section>
 
       <MovementList rows={rows} data={data} />
+      <NewTransferModal open={showNewTransfer} onClose={() => setShowNewTransfer(false)} products={data.products} />
     </div>
   )
 }
