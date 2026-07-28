@@ -19,7 +19,7 @@ func TestCreateReceivingRequest_QuantityOverMaxRejected(t *testing.T) {
 }
 
 func TestCreateReceivingRequest_QuantityAtMaxAccepted(t *testing.T) {
-	req := CreateReceivingRequest{ProductID: uuid.New(), Quantity: 1_000_000, UnitCost: 10}
+	req := CreateReceivingRequest{ProductID: uuid.New(), Quantity: 1_000_000, UnitCost: 10, ExpiryDate: "2099-01-01"}
 	if appErr := validator.Validate(req); appErr != nil {
 		t.Fatalf("expected quantity at exactly the max to be accepted, got: %v", appErr)
 	}

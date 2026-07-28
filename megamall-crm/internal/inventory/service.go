@@ -3,6 +3,7 @@ package inventory
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,16 +14,48 @@ import (
 	"gorm.io/gorm"
 )
 
+// UpdateSalePriceFn patches a product's sale_price inside the caller's
+// transaction, so a goods-receipt line's optional sale price commits
+// atomically with the rest of the invoice. See internal/products.Repository.UpdateSalePriceTx.
+type UpdateSalePriceFn func(tx *gorm.DB, ctx context.Context, productID uuid.UUID, price float64) error
+
 // Service encapsulates all inventory mutation logic.
 // Every mutation that touches inventory.quantity also inserts an immutable movement
 // record inside the same DB transaction.
 type Service struct {
-	repo   *Repository
-	logger *activity.Logger
+	repo            *Repository
+	logger          *activity.Logger
+	loc             *time.Location
+	updateSalePrice UpdateSalePriceFn
 }
 
-func NewService(repo *Repository, logger *activity.Logger) *Service {
-	return &Service{repo: repo, logger: logger}
+func NewService(repo *Repository, logger *activity.Logger, loc *time.Location, updateSalePrice UpdateSalePriceFn) *Service {
+	return &Service{repo: repo, logger: logger, loc: loc, updateSalePrice: updateSalePrice}
+}
+
+// BusinessToday returns today's calendar date (no time component) in the
+// app's business timezone (Asia/Dushanbe), used to validate expiry dates and
+// compute expiry-alert day counts consistently regardless of server TZ.
+func (s *Service) BusinessToday() time.Time {
+	now := time.Now().In(s.loc)
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+// parseExpiryDate parses a required YYYY-MM-DD expiry date and rejects any
+// date before the business-date of receiving (today's business date is
+// allowed but immediately counts as expires_today/critical).
+func parseExpiryDate(s string, businessDate time.Time) (time.Time, error) {
+	if strings.TrimSpace(s) == "" {
+		return time.Time{}, apperrors.BadRequest("expiry_date is required")
+	}
+	d, err := time.Parse(ExpiryDateLayout, s)
+	if err != nil {
+		return time.Time{}, apperrors.BadRequest("expiry_date must be YYYY-MM-DD")
+	}
+	if d.Before(businessDate) {
+		return time.Time{}, apperrors.BadRequest("expiry_date cannot be in the past")
+	}
+	return d, nil
 }
 
 // IssueExternalTx moves free stock out of the implicit main warehouse into an
@@ -70,7 +103,7 @@ func (s *Service) IssueExternalTx(
 	if err := s.repo.InsertMovement(tx, ctx, movement); err != nil {
 		return 0, err
 	}
-	consumptions, err := s.repo.ConsumeFIFO(tx, ctx, productID, quantity, movementID)
+	consumptions, err := s.repo.ConsumeFEFO(tx, ctx, productID, quantity, movementID)
 	if err != nil {
 		return 0, fmt.Errorf("external issue FIFO consume: %w", err)
 	}
@@ -169,6 +202,12 @@ func (s *Service) SlowMovingStock(ctx context.Context, f ListSlowMovingFilter) (
 func (s *Service) Receive(ctx context.Context, actorID uuid.UUID, req CreateReceivingRequest) (*ReceivingResponse, error) {
 	var resp *ReceivingResponse
 
+	businessDate := s.BusinessToday()
+	expiryDate, err := parseExpiryDate(req.ExpiryDate, businessDate)
+	if err != nil {
+		return nil, err
+	}
+
 	txErr := s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		inv, err := s.repo.GetOrCreateForUpdate(tx, ctx, req.ProductID)
 		if err != nil {
@@ -211,6 +250,7 @@ func (s *Service) Receive(ctx context.Context, actorID uuid.UUID, req CreateRece
 			RemainingQuantity: req.Quantity,
 			UnitCost:          req.UnitCost,
 			ReceivedAt:        m.CreatedAt,
+			ExpiryDate:        &expiryDate,
 			MovementID:        &m.ID,
 			CreatedBy:         &actorID,
 		}
@@ -247,8 +287,154 @@ func (s *Service) Receive(ctx context.Context, actorID uuid.UUID, req CreateRece
 	return resp, nil
 }
 
+// ReceiveBatch records a multi-line goods receipt (invoice): one shared
+// header (invoice number, date, note, actor) and N line items, each of
+// which creates its own inventory batch + purchase movement — even when two
+// lines share a product_id (e.g. same product with a different expiry date
+// or price), matching FEFO's need for each lot to be tracked separately.
+// The whole invoice commits or rolls back as one unit: any invalid line
+// (unknown product, expired/missing expiry date, bad quantity/cost) aborts
+// the entire transaction before any row is written.
+func (s *Service) ReceiveBatch(ctx context.Context, actorID uuid.UUID, req CreateGoodsReceiptRequest) (*GoodsReceiptResponse, error) {
+	var resp *GoodsReceiptResponse
+
+	businessDate := s.BusinessToday()
+	receivedAt, err := time.Parse(ExpiryDateLayout, req.ReceivedAt)
+	if err != nil {
+		return nil, apperrors.BadRequest("received_at must be YYYY-MM-DD")
+	}
+
+	// Validate every line's expiry date up-front so a bad line further down
+	// the invoice never leaves earlier lines partially applied.
+	expiryDates := make([]time.Time, len(req.Items))
+	for i, item := range req.Items {
+		d, err := parseExpiryDate(item.ExpiryDate, businessDate)
+		if err != nil {
+			return nil, fmt.Errorf("line %d: %w", i+1, err)
+		}
+		expiryDates[i] = d
+	}
+
+	txErr := s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		gr := &GoodsReceipt{
+			ID:         uuid.New(),
+			InvoiceNo:  req.InvoiceNo,
+			ReceivedAt: receivedAt,
+			Notes:      req.Notes,
+			CreatedBy:  actorID,
+		}
+		if err := s.repo.CreateGoodsReceipt(tx, ctx, gr); err != nil {
+			return err
+		}
+
+		reasonBase := "Приёмка по накладной · " + req.InvoiceNo
+
+		lines := make([]GoodsReceiptLineResponse, 0, len(req.Items))
+		itemCount := 0
+		totalUnits := 0
+		totalValue := 0.0
+
+		for i, item := range req.Items {
+			inv, err := s.repo.GetOrCreateForUpdate(tx, ctx, item.ProductID)
+			if err != nil {
+				return fmt.Errorf("line %d: %w", i+1, err)
+			}
+
+			prevQty := inv.Quantity
+			newQty := prevQty + item.Quantity
+			if err := s.repo.UpdateQuantity(tx, ctx, inv.ID, newQty); err != nil {
+				return fmt.Errorf("line %d: %w", i+1, err)
+			}
+
+			m := &Movement{
+				ID:               uuid.New(),
+				ProductID:        item.ProductID,
+				MovementType:     MovementPurchase,
+				Quantity:         item.Quantity,
+				PreviousQuantity: prevQty,
+				NewQuantity:      newQty,
+				Reason:           &reasonBase,
+				ReferenceID:      &gr.ID,
+				CreatedBy:        actorID,
+			}
+			if err := s.repo.InsertMovement(tx, ctx, m); err != nil {
+				return fmt.Errorf("line %d: %w", i+1, err)
+			}
+
+			expiryDate := expiryDates[i]
+			b := &Batch{
+				ID:                uuid.New(),
+				ProductID:         item.ProductID,
+				ReceivedQuantity:  item.Quantity,
+				RemainingQuantity: item.Quantity,
+				UnitCost:          item.UnitCost,
+				ReceivedAt:        m.CreatedAt,
+				ExpiryDate:        &expiryDate,
+				MovementID:        &m.ID,
+				GoodsReceiptID:    &gr.ID,
+				CreatedBy:         &actorID,
+			}
+			if err := s.repo.CreateBatch(tx, ctx, b); err != nil {
+				return fmt.Errorf("line %d: %w", i+1, err)
+			}
+
+			if item.SalePrice != nil && s.updateSalePrice != nil {
+				if err := s.updateSalePrice(tx, ctx, item.ProductID, *item.SalePrice); err != nil {
+					return fmt.Errorf("line %d: %w", i+1, err)
+				}
+			}
+
+			lines = append(lines, GoodsReceiptLineResponse{MovementID: m.ID, Batch: ToBatchResponse(b)})
+			itemCount++
+			totalUnits += item.Quantity
+			totalValue += float64(item.Quantity) * item.UnitCost
+		}
+
+		if err := s.logger.LogSync(tx, activity.Entry{
+			ActorID:    &actorID,
+			Action:     "receive_batch",
+			EntityType: "goods_receipt",
+			EntityID:   &gr.ID,
+			AfterState: map[string]interface{}{
+				"invoice_no":  req.InvoiceNo,
+				"item_count":  itemCount,
+				"total_units": totalUnits,
+				"total_value": totalValue,
+			},
+			Reason: &reasonBase,
+		}); err != nil {
+			return err
+		}
+
+		resp = &GoodsReceiptResponse{
+			ID:         gr.ID,
+			InvoiceNo:  gr.InvoiceNo,
+			ReceivedAt: gr.ReceivedAt.Format(ExpiryDateLayout),
+			Notes:      gr.Notes,
+			CreatedBy:  gr.CreatedBy,
+			CreatedAt:  gr.CreatedAt,
+			Lines:      lines,
+			ItemCount:  itemCount,
+			TotalUnits: totalUnits,
+			TotalValue: totalValue,
+		}
+		return nil
+	})
+
+	if txErr != nil {
+		return nil, txErr
+	}
+	return resp, nil
+}
+
 func (s *Service) UpdateReceiving(ctx context.Context, actorID, movementID uuid.UUID, req UpdateReceivingRequest) (*ReceivingResponse, error) {
 	var resp *ReceivingResponse
+
+	businessDate := s.BusinessToday()
+	newExpiryDate, err := parseExpiryDate(req.ExpiryDate, businessDate)
+	if err != nil {
+		return nil, err
+	}
 
 	txErr := s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		m, err := s.repo.GetMovementForUpdate(tx, ctx, movementID)
@@ -271,6 +457,7 @@ func (s *Service) UpdateReceiving(ctx context.Context, actorID, movementID uuid.
 		oldProductID := m.ProductID
 		oldQuantity := m.Quantity
 		oldUnitCost := b.UnitCost
+		oldExpiryDate := b.ExpiryDate
 		oldNote := receivingNoteFromReason(m.Reason)
 		newNote := strings.TrimSpace(derefString(req.Notes))
 		consumedQty := b.ReceivedQuantity - b.RemainingQuantity
@@ -329,22 +516,25 @@ func (s *Service) UpdateReceiving(ctx context.Context, actorID, movementID uuid.
 		b.ReceivedQuantity = req.Quantity
 		b.RemainingQuantity = req.Quantity - consumedQty
 		b.UnitCost = req.UnitCost
+		b.ExpiryDate = &newExpiryDate
 		if err := s.repo.UpdateBatch(tx, ctx, b); err != nil {
 			return err
 		}
 
 		edit := &ReceivingEdit{
-			ID:           uuid.New(),
-			MovementID:   movementID,
-			EditedBy:     actorID,
-			OldProductID: oldProductID,
-			NewProductID: req.ProductID,
-			OldQuantity:  oldQuantity,
-			NewQuantity:  req.Quantity,
-			OldUnitCost:  oldUnitCost,
-			NewUnitCost:  req.UnitCost,
-			OldNote:      oldNote,
-			NewNote:      newNote,
+			ID:            uuid.New(),
+			MovementID:    movementID,
+			EditedBy:      actorID,
+			OldProductID:  oldProductID,
+			NewProductID:  req.ProductID,
+			OldQuantity:   oldQuantity,
+			NewQuantity:   req.Quantity,
+			OldUnitCost:   oldUnitCost,
+			NewUnitCost:   req.UnitCost,
+			OldNote:       oldNote,
+			NewNote:       newNote,
+			OldExpiryDate: oldExpiryDate,
+			NewExpiryDate: &newExpiryDate,
 		}
 		if err := s.repo.InsertReceivingEdit(tx, ctx, edit); err != nil {
 			return err
@@ -430,7 +620,7 @@ func (s *Service) updateWriteoffMovement(tx *gorm.DB, ctx context.Context, actor
 		return nil, err
 	}
 
-	if _, err := s.repo.ConsumeFIFO(tx, ctx, oldProductID, req.Quantity, m.ID); err != nil {
+	if _, err := s.repo.ConsumeFEFO(tx, ctx, oldProductID, req.Quantity, m.ID); err != nil {
 		return nil, fmt.Errorf("writeoff edit FIFO consume: %w", err)
 	}
 
@@ -533,7 +723,7 @@ func derefString(value *string) string {
 //  3. UPDATE inventory.quantity
 //  4. INSERT adjustment record
 //  5. INSERT movement record
-//  6. Create batch (increase) or ConsumeFIFO (decrease)
+//  6. Create batch (increase) or ConsumeFEFO (decrease)
 //  7. LogSync activity log
 //  8. Commit
 func (s *Service) Adjust(ctx context.Context, actorID uuid.UUID, req CreateAdjustmentRequest) (*Adjustment, error) {
@@ -612,7 +802,7 @@ func (s *Service) Adjust(ctx context.Context, actorID uuid.UUID, req CreateAdjus
 				return err
 			}
 		} else if signedDelta < 0 {
-			if _, err = s.repo.ConsumeFIFO(tx, ctx, req.ProductID, absDelta, m.ID); err != nil {
+			if _, err = s.repo.ConsumeFEFO(tx, ctx, req.ProductID, absDelta, m.ID); err != nil {
 				return fmt.Errorf("adjustment FIFO consume: %w", err)
 			}
 		}
@@ -651,7 +841,7 @@ func (s *Service) Adjust(ctx context.Context, actorID uuid.UUID, req CreateAdjus
 //  3. UPDATE inventory.quantity
 //  4. INSERT writeoff record
 //  5. INSERT movement record (type=writeoff)
-//  6. ConsumeFIFO → update batch remaining_quantities + insert consumptions
+//  6. ConsumeFEFO → update batch remaining_quantities + insert consumptions
 //  7. LogSync activity log
 //  8. Commit
 func (s *Service) Writeoff(ctx context.Context, actorID uuid.UUID, req CreateWriteoffRequest) (*Writeoff, error) {
@@ -703,7 +893,7 @@ func (s *Service) Writeoff(ctx context.Context, actorID uuid.UUID, req CreateWri
 			return err
 		}
 
-		if _, err = s.repo.ConsumeFIFO(tx, ctx, req.ProductID, req.Quantity, m.ID); err != nil {
+		if _, err = s.repo.ConsumeFEFO(tx, ctx, req.ProductID, req.Quantity, m.ID); err != nil {
 			return fmt.Errorf("writeoff FIFO consume: %w", err)
 		}
 
@@ -738,4 +928,42 @@ func (s *Service) ListBatches(ctx context.Context, f BatchListFilter, onlyActive
 
 func (s *Service) InventoryIntegrityCheck(ctx context.Context) ([]InventoryIntegrityDiscrepancy, error) {
 	return s.repo.InventoryIntegrityCheck(ctx)
+}
+
+// ─── Expiry alerts ────────────────────────────────────────────────────────────
+
+// expiryWarnDays is how many days ahead of expiry a batch starts warning
+// (inclusive) — day 14 warns, day 15 does not.
+const expiryWarnDays = 14
+
+// ExpiryAlerts returns every active batch expiring within expiryWarnDays or
+// already expired, sorted soonest/most-overdue first, plus summary counts.
+func (s *Service) ExpiryAlerts(ctx context.Context) ([]ExpiryAlertResponse, ExpiryAlertsMeta, error) {
+	businessDate := s.BusinessToday()
+	rows, err := s.repo.ListExpiryAlerts(ctx, businessDate, expiryWarnDays)
+	if err != nil {
+		return nil, ExpiryAlertsMeta{}, err
+	}
+
+	out := make([]ExpiryAlertResponse, 0, len(rows))
+	meta := ExpiryAlertsMeta{}
+	for i := range rows {
+		alert := ToExpiryAlertResponse(&rows[i], businessDate)
+		out = append(out, alert)
+		meta.Total++
+		if alert.Status == ExpiryStatusExpired {
+			meta.ExpiredCount++
+			meta.ExpiredUnits += alert.RemainingQuantity
+		} else {
+			meta.ExpiringCount++
+			meta.ExpiringUnits += alert.RemainingQuantity
+		}
+	}
+
+	// Expired first (most overdue first), then soonest-to-expire.
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].DaysUntilExpiry < out[j].DaysUntilExpiry
+	})
+
+	return out, meta, nil
 }

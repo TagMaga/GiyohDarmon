@@ -58,18 +58,20 @@ func (Movement) TableName() string { return "inventory_movements" }
 
 // ReceivingEdit records every edit to a purchase/receiving movement.
 type ReceivingEdit struct {
-	ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
-	MovementID   uuid.UUID `gorm:"type:uuid;not null;column:movement_id"`
-	EditedBy     uuid.UUID `gorm:"type:uuid;not null;column:edited_by"`
-	OldProductID uuid.UUID `gorm:"type:uuid;not null;column:old_product_id"`
-	NewProductID uuid.UUID `gorm:"type:uuid;not null;column:new_product_id"`
-	OldQuantity  int       `gorm:"not null;column:old_quantity"`
-	NewQuantity  int       `gorm:"not null;column:new_quantity"`
-	OldUnitCost  float64   `gorm:"type:numeric(12,2);not null;column:old_unit_cost"`
-	NewUnitCost  float64   `gorm:"type:numeric(12,2);not null;column:new_unit_cost"`
-	OldNote      string    `gorm:"not null;column:old_note"`
-	NewNote      string    `gorm:"not null;column:new_note"`
-	EditedAt     time.Time `gorm:"autoCreateTime;column:edited_at"`
+	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	MovementID    uuid.UUID  `gorm:"type:uuid;not null;column:movement_id"`
+	EditedBy      uuid.UUID  `gorm:"type:uuid;not null;column:edited_by"`
+	OldProductID  uuid.UUID  `gorm:"type:uuid;not null;column:old_product_id"`
+	NewProductID  uuid.UUID  `gorm:"type:uuid;not null;column:new_product_id"`
+	OldQuantity   int        `gorm:"not null;column:old_quantity"`
+	NewQuantity   int        `gorm:"not null;column:new_quantity"`
+	OldUnitCost   float64    `gorm:"type:numeric(12,2);not null;column:old_unit_cost"`
+	NewUnitCost   float64    `gorm:"type:numeric(12,2);not null;column:new_unit_cost"`
+	OldNote       string     `gorm:"not null;column:old_note"`
+	NewNote       string     `gorm:"not null;column:new_note"`
+	OldExpiryDate *time.Time `gorm:"type:date;column:old_expiry_date"`
+	NewExpiryDate *time.Time `gorm:"type:date;column:new_expiry_date"`
+	EditedAt      time.Time  `gorm:"autoCreateTime;column:edited_at"`
 }
 
 func (ReceivingEdit) TableName() string { return "inventory_receiving_edits" }
@@ -101,20 +103,39 @@ type Adjustment struct {
 func (Adjustment) TableName() string { return "inventory_adjustments" }
 
 // Batch represents a lot of inventory received at a specific unit cost.
-// remaining_quantity decreases as stock is consumed via FIFO.
+// remaining_quantity decreases as stock is consumed via FEFO (earliest
+// expiry first; NULL-expiry historical batches sort last and are consumed
+// FIFO among themselves — see Repository.GetBatchesForFEFO).
 type Batch struct {
-	ID                uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	ProductID         uuid.UUID  `gorm:"type:uuid;not null;column:product_id"`
-	ReceivedQuantity  int        `gorm:"not null;column:received_quantity"`
-	RemainingQuantity int        `gorm:"not null;column:remaining_quantity"`
-	UnitCost          float64    `gorm:"type:numeric(12,2);not null;column:unit_cost"`
-	ReceivedAt        time.Time  `gorm:"not null;column:received_at"`
-	MovementID        *uuid.UUID `gorm:"type:uuid;column:movement_id"`
-	CreatedBy         *uuid.UUID `gorm:"type:uuid;column:created_by"`
-	CreatedAt         time.Time  `gorm:"autoCreateTime"`
+	ID                uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ProductID         uuid.UUID `gorm:"type:uuid;not null;column:product_id"`
+	ReceivedQuantity  int       `gorm:"not null;column:received_quantity"`
+	RemainingQuantity int       `gorm:"not null;column:remaining_quantity"`
+	UnitCost          float64   `gorm:"type:numeric(12,2);not null;column:unit_cost"`
+	ReceivedAt        time.Time `gorm:"not null;column:received_at"`
+	// ExpiryDate is a calendar date (no time-of-day/timezone) — NULL only for
+	// batches created before this feature shipped. New receipts always set it.
+	ExpiryDate     *time.Time `gorm:"type:date;column:expiry_date"`
+	MovementID     *uuid.UUID `gorm:"type:uuid;column:movement_id"`
+	GoodsReceiptID *uuid.UUID `gorm:"type:uuid;column:goods_receipt_id"`
+	CreatedBy      *uuid.UUID `gorm:"type:uuid;column:created_by"`
+	CreatedAt      time.Time  `gorm:"autoCreateTime"`
 }
 
 func (Batch) TableName() string { return "inventory_batches" }
+
+// GoodsReceipt is the header of a multi-line receiving invoice. Each batch
+// it produced links back via Batch.GoodsReceiptID.
+type GoodsReceipt struct {
+	ID         uuid.UUID `gorm:"type:uuid;primaryKey"`
+	InvoiceNo  string    `gorm:"not null;column:invoice_no"`
+	ReceivedAt time.Time `gorm:"type:date;not null;column:received_at"`
+	Notes      *string   `gorm:"column:notes"`
+	CreatedBy  uuid.UUID `gorm:"type:uuid;not null;column:created_by"`
+	CreatedAt  time.Time `gorm:"autoCreateTime"`
+}
+
+func (GoodsReceipt) TableName() string { return "goods_receipts" }
 
 // BatchConsumption records how many units were consumed from a specific batch
 // by a specific movement (writeoff, transfer_out, adjustment decrease).

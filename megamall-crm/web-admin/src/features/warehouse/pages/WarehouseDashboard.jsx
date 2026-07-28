@@ -9,6 +9,8 @@ import ProductModal from '../components/ProductModal'
 import ReceivingModal from '../components/ReceivingModal'
 import WriteoffModal from '../components/WriteoffModal'
 import { CourierWarehouseSummary } from '../components/TransferComponents'
+import ExpiryAlertsPanel from '../components/ExpiryAlertsPanel'
+import NotificationBell from '../../../shared/components/NotificationBell'
 import useWarehouseData from '../hooks/useWarehouseData'
 import { useInventorySummary } from '../hooks/useTransfers'
 import { MovementList } from './WarehouseMovementsPage'
@@ -59,6 +61,9 @@ export default function WarehouseDashboard() {
         icon={<Warehouse size={20} />}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="lg:hidden">
+              <NotificationBell variant="light" />
+            </div>
             <button
               onClick={data.refetchAll}
               className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50"
@@ -119,6 +124,10 @@ export default function WarehouseDashboard() {
             </div>
           )}
         </Panel>
+
+        <ExpiryAlertsPanel
+          onOpenProduct={(alert) => navigate(`/warehouse/inventory?q=${encodeURIComponent(alert.sku)}`)}
+        />
 
         <section>
           <div className="mb-3">

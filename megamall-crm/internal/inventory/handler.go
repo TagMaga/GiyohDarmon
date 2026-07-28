@@ -134,6 +134,28 @@ func (h *Handler) CreateReceiving(c *gin.Context) {
 	response.Created(c, result)
 }
 
+// CreateGoodsReceipt provides the multi-line receiving invoice: one shared
+// header (invoice number/date/note) and N line items, each creating its own
+// batch, committed atomically. This is the primary receiving path for the UI.
+func (h *Handler) CreateGoodsReceipt(c *gin.Context) {
+	var req CreateGoodsReceiptRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	result, err := h.svc.ReceiveBatch(c.Request.Context(), claims.UserID, req)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.Created(c, result)
+}
+
 func (h *Handler) UpdateReceiving(c *gin.Context) {
 	id, ok := parseUUID(c, "id")
 	if !ok {
@@ -202,6 +224,17 @@ func (h *Handler) InventoryIntegrityCheck(c *gin.Context) {
 		return
 	}
 	response.OK(c, rows)
+}
+
+// ─── Expiry alerts ────────────────────────────────────────────────────────────
+
+func (h *Handler) ExpiryAlerts(c *gin.Context) {
+	rows, meta, err := h.svc.ExpiryAlerts(c.Request.Context())
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OKWithMeta(c, rows, meta)
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────

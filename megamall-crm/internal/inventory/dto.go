@@ -34,7 +34,12 @@ func ToInventoryResponse(inv *Inventory) InventoryResponse {
 	}
 }
 
-// ─── Receiving (FIFO batch receipt) ──────────────────────────────────────────
+// ─── Receiving (FEFO batch receipt) ──────────────────────────────────────────
+
+// ExpiryDateLayout is the wire format for every expiry_date /
+// received_at DATE field: a bare calendar date, no time-of-day or timezone
+// conversion (matches the underlying Postgres DATE column).
+const ExpiryDateLayout = "2006-01-02"
 
 type CreateReceivingRequest struct {
 	ProductID uuid.UUID `json:"product_id"   validate:"required"`
@@ -43,6 +48,10 @@ type CreateReceivingRequest struct {
 	UnitCost  float64 `json:"unit_cost"     validate:"min=0,max=10000000"`
 	InvoiceNo *string `json:"invoice_no"`
 	Notes     *string `json:"notes"`
+	// ExpiryDate is YYYY-MM-DD, required for every new receipt. Historical
+	// batches (created before this field existed) are the only rows where
+	// it may be NULL — never for a batch created through this endpoint.
+	ExpiryDate string `json:"expiry_date" validate:"required"`
 }
 
 type ReceivingResponse struct {
@@ -55,6 +64,47 @@ type UpdateReceivingRequest struct {
 	Quantity  int       `json:"quantity" validate:"required,min=1,max=1000000"`
 	UnitCost  float64   `json:"unit_cost" validate:"min=0,max=10000000"`
 	Notes     *string   `json:"notes"`
+	// ExpiryDate is YYYY-MM-DD. Required when editing a receiving (purchase)
+	// movement; ignored for a writeoff edit (writeoffs have no batch of
+	// their own to date).
+	ExpiryDate string `json:"expiry_date"`
+}
+
+// ─── Goods receipt (multi-line receiving invoice) ────────────────────────────
+
+type CreateGoodsReceiptItem struct {
+	ProductID uuid.UUID `json:"product_id" validate:"required"`
+	Quantity  int       `json:"quantity"   validate:"required,min=1,max=1000000"`
+	UnitCost  float64   `json:"unit_cost"  validate:"min=0,max=10000000"`
+	// SalePrice is optional; when set it patches products.sale_price.
+	SalePrice *float64 `json:"sale_price" validate:"omitempty,min=0,max=10000000"`
+	// ExpiryDate is YYYY-MM-DD, required for every line.
+	ExpiryDate string `json:"expiry_date" validate:"required"`
+}
+
+type CreateGoodsReceiptRequest struct {
+	InvoiceNo  string                   `json:"invoice_no"  validate:"required,max=100"`
+	ReceivedAt string                   `json:"received_at" validate:"required"`
+	Notes      *string                  `json:"notes"`
+	Items      []CreateGoodsReceiptItem `json:"items" validate:"required,min=1,dive"`
+}
+
+type GoodsReceiptLineResponse struct {
+	MovementID uuid.UUID     `json:"movement_id"`
+	Batch      BatchResponse `json:"batch"`
+}
+
+type GoodsReceiptResponse struct {
+	ID         uuid.UUID                  `json:"id"`
+	InvoiceNo  string                     `json:"invoice_no"`
+	ReceivedAt string                     `json:"received_at"`
+	Notes      *string                    `json:"notes"`
+	CreatedBy  uuid.UUID                  `json:"created_by"`
+	CreatedAt  time.Time                  `json:"created_at"`
+	Lines      []GoodsReceiptLineResponse `json:"lines"`
+	ItemCount  int                        `json:"item_count"`
+	TotalUnits int                        `json:"total_units"`
+	TotalValue float64                    `json:"total_value"`
 }
 
 type ReceivingEditResponse struct {
@@ -72,6 +122,8 @@ type ReceivingEditResponse struct {
 	NewUnitCost    float64   `json:"new_unit_cost"`
 	OldNote        string    `json:"old_note"`
 	NewNote        string    `json:"new_note"`
+	OldExpiryDate  *string   `json:"old_expiry_date"`
+	NewExpiryDate  *string   `json:"new_expiry_date"`
 	EditedAt       time.Time `json:"edited_at"`
 }
 
@@ -91,8 +143,18 @@ func ToReceivingEditResponse(row *ReceivingEditRow) ReceivingEditResponse {
 		NewUnitCost:    row.NewUnitCost,
 		OldNote:        row.OldNote,
 		NewNote:        row.NewNote,
+		OldExpiryDate:  formatDatePtr(row.OldExpiryDate),
+		NewExpiryDate:  formatDatePtr(row.NewExpiryDate),
 		EditedAt:       row.EditedAt,
 	}
+}
+
+func formatDatePtr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := t.Format(ExpiryDateLayout)
+	return &s
 }
 
 // ─── Batch ────────────────────────────────────────────────────────────────────
@@ -104,7 +166,10 @@ type BatchResponse struct {
 	RemainingQuantity int       `json:"remaining_quantity"`
 	UnitCost          float64   `json:"unit_cost"`
 	ReceivedAt        time.Time `json:"received_at"`
-	CreatedAt         time.Time `json:"created_at"`
+	// ExpiryDate is YYYY-MM-DD, or nil for historical batches predating this feature.
+	ExpiryDate     *string    `json:"expiry_date"`
+	GoodsReceiptID *uuid.UUID `json:"goods_receipt_id,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 func ToBatchResponse(b *Batch) BatchResponse {
@@ -115,6 +180,8 @@ func ToBatchResponse(b *Batch) BatchResponse {
 		RemainingQuantity: b.RemainingQuantity,
 		UnitCost:          b.UnitCost,
 		ReceivedAt:        b.ReceivedAt,
+		ExpiryDate:        formatDatePtr(b.ExpiryDate),
+		GoodsReceiptID:    b.GoodsReceiptID,
 		CreatedAt:         b.CreatedAt,
 	}
 }
@@ -215,6 +282,7 @@ type MovementResponse struct {
 	BatchUnitCost     *float64     `json:"batch_unit_cost,omitempty"`
 	BatchReceivedQty  *int         `json:"batch_received_quantity,omitempty"`
 	BatchRemainingQty *int         `json:"batch_remaining_quantity,omitempty"`
+	BatchExpiryDate   *string      `json:"batch_expiry_date,omitempty"`
 	EditCount         int          `json:"edit_count"`
 	OrderID           *uuid.UUID   `json:"order_id,omitempty"`
 	OrderNumber       string       `json:"order_number,omitempty"`
@@ -248,6 +316,7 @@ func ToMovementResponse(row *MovementRow) MovementResponse {
 		BatchUnitCost:     row.BatchUnitCost,
 		BatchReceivedQty:  row.BatchReceivedQty,
 		BatchRemainingQty: row.BatchRemainingQty,
+		BatchExpiryDate:   formatDatePtr(row.BatchExpiryDate),
 		EditCount:         row.EditCount,
 		OrderID:           row.OrderID,
 		OrderNumber:       row.OrderNumber,
@@ -337,4 +406,81 @@ func ToSlowMovingReportResponse(r *SlowMovingRow) SlowMovingReportResponse {
 		StockValue:  r.StockValue,
 		LastSoldAt:  r.LastSoldAt,
 	}
+}
+
+// ─── Expiry alerts ────────────────────────────────────────────────────────────
+
+type ExpiryStatus string
+
+const (
+	ExpiryStatusExpiringSoon ExpiryStatus = "expiring_soon" // 1-14 days left
+	ExpiryStatusExpiresToday ExpiryStatus = "expires_today"
+	ExpiryStatusExpired      ExpiryStatus = "expired"
+)
+
+// ExpiryAlertRow is one active batch (remaining_quantity > 0) whose expiry
+// date is today, within the next 14 days, or already in the past, as of the
+// Asia/Dushanbe business date.
+type ExpiryAlertRow struct {
+	BatchID           uuid.UUID `gorm:"column:batch_id"`
+	ProductID         uuid.UUID `gorm:"column:product_id"`
+	ProductName       string    `gorm:"column:product_name"`
+	SKU               string    `gorm:"column:sku"`
+	InvoiceNo         string    `gorm:"column:invoice_no"`
+	ExpiryDate        time.Time `gorm:"column:expiry_date"`
+	RemainingQuantity int       `gorm:"column:remaining_quantity"`
+	ReceivedAt        time.Time `gorm:"column:received_at"`
+}
+
+type ExpiryAlertResponse struct {
+	BatchID           uuid.UUID    `json:"batch_id"`
+	ProductID         uuid.UUID    `json:"product_id"`
+	ProductName       string       `json:"product_name"`
+	SKU               string       `json:"sku"`
+	InvoiceNo         string       `json:"invoice_no"`
+	ExpiryDate        string       `json:"expiry_date"`
+	DaysUntilExpiry   int          `json:"days_until_expiry"` // negative when already expired
+	RemainingQuantity int          `json:"remaining_quantity"`
+	Status            ExpiryStatus `json:"status"`
+	ReceivedAt        string       `json:"received_at"`
+}
+
+// ToExpiryAlertResponse converts a row into its API shape. businessDate is
+// the current calendar date (no time component) in the app's business
+// timezone (Asia/Dushanbe) — used to compute days_until_expiry and status.
+func ToExpiryAlertResponse(r *ExpiryAlertRow, businessDate time.Time) ExpiryAlertResponse {
+	days := daysBetween(businessDate, r.ExpiryDate)
+	status := ExpiryStatusExpiringSoon
+	switch {
+	case days < 0:
+		status = ExpiryStatusExpired
+	case days == 0:
+		status = ExpiryStatusExpiresToday
+	}
+	return ExpiryAlertResponse{
+		BatchID:           r.BatchID,
+		ProductID:         r.ProductID,
+		ProductName:       r.ProductName,
+		SKU:               r.SKU,
+		InvoiceNo:         r.InvoiceNo,
+		ExpiryDate:        r.ExpiryDate.Format(ExpiryDateLayout),
+		DaysUntilExpiry:   days,
+		RemainingQuantity: r.RemainingQuantity,
+		Status:            status,
+		ReceivedAt:        r.ReceivedAt.Format(ExpiryDateLayout),
+	}
+}
+
+func daysBetween(from, to time.Time) int {
+	from = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, time.UTC)
+	to = time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, time.UTC)
+	return int(to.Sub(from).Hours() / 24)
+}
+
+type ExpiryAlertsMeta struct {
+	Total         int `json:"total"`
+	ExpiredCount  int `json:"expired_count"`
+	ExpiredUnits  int `json:"expired_units"`
+	ExpiringCount int `json:"expiring_count"`
+	ExpiringUnits int `json:"expiring_units"`
 }

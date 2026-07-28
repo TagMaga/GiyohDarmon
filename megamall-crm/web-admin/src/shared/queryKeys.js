@@ -89,6 +89,7 @@ export const KEYS = {
     lostReports: (params) => ['warehouse', 'lostReports', params ?? {}],
     returns:     (params) => ['warehouse', 'returns', params ?? {}],
     inventorySummary: ['warehouse', 'inventorySummary'],
+    expiryAlerts: ['warehouse', 'expiryAlerts'],
   },
   pharmacies: {
     list:      (params) => ['pharmacies', 'list', params ?? {}],

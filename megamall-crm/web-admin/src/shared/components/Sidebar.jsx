@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import useAuthStore from '../store/authStore'
 import useProfile   from '../hooks/useProfile'
+import NotificationBell from './NotificationBell'
 
 // ─── Navigation config per role ───────────────────────────────────────────────
 // Rules:
@@ -110,7 +111,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
           <div className="flex-shrink-0 w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
             <ShoppingBag size={16} className="text-white" />
           </div>
-          <div className={`min-w-0 ${collapsed ? 'lg:hidden' : ''}`}>
+          <div className={`min-w-0 flex-1 ${collapsed ? 'lg:hidden' : ''}`}>
             <span className="text-sm font-bold text-white tracking-tight leading-none">
               MegaMall
             </span>
@@ -118,6 +119,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
               CRM
             </span>
           </div>
+          {!collapsed && <NotificationBell />}
         </div>
 
         {/* ── Navigation ───────────────────────────────────────────── */}

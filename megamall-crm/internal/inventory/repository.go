@@ -21,6 +21,7 @@ type MovementRow struct {
 	BatchUnitCost     *float64   `gorm:"column:batch_unit_cost"`
 	BatchReceivedQty  *int       `gorm:"column:batch_received_quantity"`
 	BatchRemainingQty *int       `gorm:"column:batch_remaining_quantity"`
+	BatchExpiryDate   *time.Time `gorm:"column:batch_expiry_date"`
 	EditCount         int        `gorm:"column:edit_count"`
 	OrderID           *uuid.UUID `gorm:"column:order_id"`
 	OrderNumber       string     `gorm:"column:order_number"`
@@ -253,6 +254,7 @@ func (r *Repository) ListMovements(ctx context.Context, f ListMovementsFilter, p
 			COALESCE(users.full_name, '') AS created_by_name,
 			inventory_batches.id AS batch_id,
 			inventory_batches.unit_cost AS batch_unit_cost,
+			inventory_batches.expiry_date AS batch_expiry_date,
 			inventory_batches.received_quantity AS batch_received_quantity,
 			inventory_batches.remaining_quantity AS batch_remaining_quantity,
 			(
@@ -444,18 +446,64 @@ func (r *Repository) CreateBatch(tx *gorm.DB, ctx context.Context, b *Batch) err
 	return nil
 }
 
-// GetBatchesForFIFO loads all batches with remaining_quantity > 0 for a
-// product, ordered oldest first, with row-level locks.
+// CreateGoodsReceipt inserts a multi-line receiving invoice header.
 // Must be called inside a transaction.
-func (r *Repository) GetBatchesForFIFO(tx *gorm.DB, ctx context.Context, productID uuid.UUID) ([]*Batch, error) {
+func (r *Repository) CreateGoodsReceipt(tx *gorm.DB, ctx context.Context, gr *GoodsReceipt) error {
+	if err := tx.WithContext(ctx).Create(gr).Error; err != nil {
+		return fmt.Errorf("create goods receipt: %w", err)
+	}
+	return nil
+}
+
+// ListExpiryAlerts returns every active batch (remaining_quantity > 0) with
+// a known expiry_date that is due within warnDays from now or already past.
+// businessDate must be the caller's current calendar date in the app's
+// business timezone (Asia/Dushanbe) with no time component.
+func (r *Repository) ListExpiryAlerts(ctx context.Context, businessDate time.Time, warnDays int) ([]ExpiryAlertRow, error) {
+	cutoff := businessDate.AddDate(0, 0, warnDays)
+	var rows []ExpiryAlertRow
+	err := r.db.WithContext(ctx).
+		Table("inventory_batches").
+		Joins("JOIN products ON products.id = inventory_batches.product_id").
+		Joins("LEFT JOIN goods_receipts ON goods_receipts.id = inventory_batches.goods_receipt_id").
+		Where("inventory_batches.remaining_quantity > 0").
+		Where("inventory_batches.expiry_date IS NOT NULL").
+		Where("inventory_batches.expiry_date <= ?", cutoff).
+		Select(`
+			inventory_batches.id AS batch_id,
+			inventory_batches.product_id AS product_id,
+			products.name AS product_name,
+			products.sku AS sku,
+			COALESCE(goods_receipts.invoice_no, '') AS invoice_no,
+			inventory_batches.expiry_date AS expiry_date,
+			inventory_batches.remaining_quantity AS remaining_quantity,
+			inventory_batches.received_at AS received_at
+		`).
+		Order("inventory_batches.expiry_date ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("list expiry alerts: %w", err)
+	}
+	return rows, nil
+}
+
+// GetBatchesForFEFO loads all batches with remaining_quantity > 0 for a
+// product, ordered for FEFO consumption, with row-level locks:
+//  1. Earliest expiry_date first (NULLS LAST — historical batches without a
+//     recorded expiry are consumed only after every dated batch).
+//  2. Tie-break (same expiry, or both NULL): earliest received_at first (FIFO).
+//  3. Stable tie-break: created_at, then id.
+//
+// Must be called inside a transaction.
+func (r *Repository) GetBatchesForFEFO(tx *gorm.DB, ctx context.Context, productID uuid.UUID) ([]*Batch, error) {
 	var batches []*Batch
 	err := tx.WithContext(ctx).
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("product_id = ? AND remaining_quantity > 0", productID).
-		Order("received_at ASC").
+		Order("expiry_date ASC NULLS LAST, received_at ASC, created_at ASC, id ASC").
 		Find(&batches).Error
 	if err != nil {
-		return nil, fmt.Errorf("lock batches for FIFO: %w", err)
+		return nil, fmt.Errorf("lock batches for FEFO: %w", err)
 	}
 	return batches, nil
 }
@@ -564,12 +612,18 @@ func (r *Repository) DeleteBatchConsumptionsByMovement(tx *gorm.DB, ctx context.
 	return nil
 }
 
-// ConsumeFIFO deducts qty units from the oldest available batches for the given
-// product. It locks the batch rows, updates remaining_quantity, inserts
-// BatchConsumption records, and returns them so callers can inspect per-batch costs.
-// Must be called inside a transaction. The caller must already hold the inventory row lock.
-func (r *Repository) ConsumeFIFO(tx *gorm.DB, ctx context.Context, productID uuid.UUID, qty int, movementID uuid.UUID) ([]*BatchConsumption, error) {
-	batches, err := r.GetBatchesForFIFO(tx, ctx, productID)
+// ConsumeFEFO deducts qty units from the available batches for the given
+// product in FEFO order (earliest expiry first; undated historical batches
+// last, FIFO among themselves — see GetBatchesForFEFO). It locks the batch
+// rows, updates remaining_quantity, inserts BatchConsumption records, and
+// returns them so callers can inspect per-batch costs. Must be called inside
+// a transaction. The caller must already hold the inventory row lock.
+//
+// Expired batches are NOT skipped or blocked — the business only wants a
+// warning (see ListExpiryAlerts), not an automatic hold, so an expired batch
+// with remaining stock is consumed first like any other, per FEFO order.
+func (r *Repository) ConsumeFEFO(tx *gorm.DB, ctx context.Context, productID uuid.UUID, qty int, movementID uuid.UUID) ([]*BatchConsumption, error) {
+	batches, err := r.GetBatchesForFEFO(tx, ctx, productID)
 	if err != nil {
 		return nil, err
 	}
@@ -599,7 +653,7 @@ func (r *Repository) ConsumeFIFO(tx *gorm.DB, ctx context.Context, productID uui
 	}
 
 	if remaining > 0 {
-		return nil, fmt.Errorf("insufficient batch stock: need %d more units (FIFO batches exhausted)", remaining)
+		return nil, fmt.Errorf("insufficient batch stock: need %d more units (FEFO batches exhausted)", remaining)
 	}
 
 	if err := r.InsertBatchConsumptions(tx, ctx, consumptions); err != nil {

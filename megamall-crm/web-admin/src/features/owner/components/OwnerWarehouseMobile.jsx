@@ -2,8 +2,11 @@ import {
   AlertTriangle, ChevronDown, Download, FilterX, Package, PackagePlus, PackageX, RefreshCw, Search, Trash2,
 } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
+import NotificationBell from '../../../shared/components/NotificationBell'
 import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'
 import SalesReportPanel from '../../warehouse/pages/WarehouseSalesReportPanel'
+import { ExpiryAlertsList } from '../../warehouse/components/ExpiryAlertsPanel'
+import useExpiryAlerts from '../../warehouse/hooks/useExpiryAlerts'
 import {
   STOCK_STATUS_BADGE,
   STOCK_STATUS_LABEL,
@@ -235,6 +238,7 @@ export default function OwnerWarehouseMobile({
   )
   const lowStock = data.inventory.filter((inv) => getStockStatus(inv) === 'low_stock').length
   const outStock = data.inventory.filter((inv) => getStockStatus(inv) === 'out_of_stock').length
+  const { alerts: expiryAlerts, meta: expiryMeta, isLoading: expiryLoading, isError: expiryIsError, error: expiryError } = useExpiryAlerts()
   const today = new Date().toDateString()
   const movementsToday = data.movements.filter((m) => {
     const date = m.created_at ?? m.CreatedAt
@@ -249,13 +253,16 @@ export default function OwnerWarehouseMobile({
           <h1 className="text-[27px] font-extrabold leading-none tracking-tight" style={{ color: INK, letterSpacing: '-0.7px' }}>Склад</h1>
           <p className="mt-1.5 text-[12.5px] font-medium" style={{ color: MUTED }}>Обзор остатков и движения</p>
         </div>
-        <button
-          onClick={onRefresh}
-          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[14px] border border-[#E7EAF0] bg-white text-slate-600"
-          style={{ boxShadow: CARD_SHADOW }}
-        >
-          <RefreshCw size={17} />
-        </button>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <NotificationBell variant="light" />
+          <button
+            onClick={onRefresh}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[14px] border border-[#E7EAF0] bg-white text-slate-600"
+            style={{ boxShadow: CARD_SHADOW }}
+          >
+            <RefreshCw size={17} />
+          </button>
+        </div>
       </div>
 
       <MobileTabPills tab={tab} onChange={onTab} />
@@ -280,6 +287,10 @@ export default function OwnerWarehouseMobile({
           <div className="grid grid-cols-2 gap-2.5">
             <AlertTile icon={<AlertTriangle size={20} />} tone="amber" value={lowStock} label="Мало на складе" />
             <AlertTile icon={<PackageX size={20} />} tone="rose" value={outStock} label="Нет в наличии" />
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <AlertTile icon={<AlertTriangle size={20} />} tone="rose" value={expiryMeta.expiring_count} label="Скоро истекает" />
+            <AlertTile icon={<AlertTriangle size={20} />} tone="rose" value={expiryMeta.expired_count} label="Просрочено" />
           </div>
 
           <div className="space-y-2.5">
@@ -325,6 +336,21 @@ export default function OwnerWarehouseMobile({
                 })}
               </div>
             )}
+          </div>
+
+          <div>
+            <div className="mb-2.5 flex items-center justify-between px-0.5">
+              <span className="text-[16px] font-extrabold" style={{ color: INK }}>Сроки годности</span>
+              {expiryAlerts.length > 0 && (
+                <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-700">{expiryAlerts.length} партий</span>
+              )}
+            </div>
+            <ExpiryAlertsList
+              alerts={expiryAlerts}
+              loading={expiryLoading}
+              error={expiryIsError ? expiryError : null}
+              onOpenProduct={(a) => onOpenAlert({ sku: a.sku, name: a.product_name })}
+            />
           </div>
 
           <div>
