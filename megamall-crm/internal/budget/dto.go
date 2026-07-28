@@ -20,15 +20,28 @@ type CreatorRow struct {
 	FullName string `gorm:"column:full_name" json:"full_name"`
 }
 
+// WithdrawalRequestRow is the read-side view of a pending/decided withdrawal
+// request, for the owner's "pending Telegram approval" list.
+type WithdrawalRequestRow struct {
+	ID              string     `gorm:"column:id"                json:"id"`
+	Amount          float64    `gorm:"column:amount"             json:"amount"`
+	Note            string     `gorm:"column:note"               json:"note"`
+	Status          string     `gorm:"column:status"             json:"status"`
+	RequestedByName *string    `gorm:"column:requested_by_name"  json:"requested_by_name"`
+	DecidedAt       *time.Time `gorm:"column:decided_at"         json:"decided_at,omitempty"`
+	ExpiresAt       time.Time  `gorm:"column:expires_at"         json:"expires_at"`
+	CreatedAt       time.Time  `gorm:"column:created_at"         json:"created_at"`
+}
+
 type TransactionRow struct {
-	ID              string    `gorm:"column:id"               json:"id"`
-	TransactionType string    `gorm:"column:transaction_type" json:"transaction_type"`
-	Amount          float64   `gorm:"column:amount"           json:"amount"`
-	Note            string    `gorm:"column:note"             json:"note"`
-	CreatedByName   *string   `gorm:"column:created_by_name"  json:"created_by_name"`
-	IsEdited        bool      `gorm:"column:is_edited"        json:"is_edited"`
-	EditCount       int       `gorm:"column:edit_count"       json:"edit_count"`
+	ID              string     `gorm:"column:id"               json:"id"`
+	TransactionType string     `gorm:"column:transaction_type" json:"transaction_type"`
+	Amount          float64    `gorm:"column:amount"           json:"amount"`
+	Note            string     `gorm:"column:note"             json:"note"`
+	CreatedByName   *string    `gorm:"column:created_by_name"  json:"created_by_name"`
+	IsEdited        bool       `gorm:"column:is_edited"        json:"is_edited"`
+	EditCount       int        `gorm:"column:edit_count"       json:"edit_count"`
 	LastEditedAt    *time.Time `gorm:"column:last_edited_at"  json:"last_edited_at,omitempty"`
-	BalanceAfter    float64   `gorm:"column:balance_after"    json:"balance_after"`
-	CreatedAt       time.Time `gorm:"column:created_at"       json:"created_at"`
+	BalanceAfter    float64    `gorm:"column:balance_after"    json:"balance_after"`
+	CreatedAt       time.Time  `gorm:"column:created_at"       json:"created_at"`
 }

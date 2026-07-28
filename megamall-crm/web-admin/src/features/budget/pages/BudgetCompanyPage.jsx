@@ -2,10 +2,11 @@ import { useState, useCallback } from 'react'
 import { useQueryClient, useMutation } from '@tanstack/react-query'
 import {
   ArrowDownCircle, ArrowUpCircle,
-  X, Check, Pencil, Plus, Minus,
+  X, Check, Pencil, Plus, Minus, Clock,
 } from 'lucide-react'
 import useBudgetSummary from '../hooks/useBudgetSummary'
 import useBudgetTransactions from '../hooks/useBudgetTransactions'
+import useBudgetWithdrawalRequests from '../hooks/useBudgetWithdrawalRequests'
 import { postBudgetIncome, postBudgetWithdrawal } from '../api'
 import EditBudgetTransactionModal from '../components/EditBudgetTransactionModal'
 import PeriodRangeFilter from '../../../shared/components/PeriodRangeFilter'
@@ -136,6 +137,38 @@ function Modal({ open, onClose, title, sub, iconBg, iconColor, Icon, onSubmit, l
   )
 }
 
+// ── Pending Telegram approval banner ─────────────────────────────────────────
+const REQUEST_STATUS_CFG = {
+  pending:  { label: 'Ожидает подтверждения в Telegram', badge: 'bg-amber-50 text-amber-700 border-amber-200' },
+  approved: { label: 'Подтверждено',                     badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  rejected: { label: 'Отклонено',                        badge: 'bg-red-50 text-red-700 border-red-200' },
+  expired:  { label: 'Истекло (нет ответа)',             badge: 'bg-slate-100 text-slate-500 border-slate-200' },
+}
+
+function PendingWithdrawalRequests({ requests }) {
+  const pending = (requests ?? []).filter((r) => r.status === 'pending')
+  if (pending.length === 0) return null
+  return (
+    <div className="rounded-[16px] border border-amber-200 bg-amber-50/60 px-5 py-4 space-y-2.5">
+      <div className="flex items-center gap-2 text-amber-800">
+        <Clock size={16} />
+        <span className="text-[13.5px] font-bold">Списания, ожидающие подтверждения в Telegram</span>
+      </div>
+      {pending.map((r) => (
+        <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3.5 py-2.5 border border-amber-100">
+          <div className="min-w-0">
+            <div className="text-[13.5px] font-bold text-slate-900">{fmt(r.amount)} с</div>
+            <div className="truncate text-[11.5px] text-slate-500">{r.note || '—'}{r.requested_by_name ? ` · ${r.requested_by_name}` : ''}</div>
+          </div>
+          <span className={`shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-[10.5px] font-bold border ${REQUEST_STATUS_CFG.pending.badge}`}>
+            {REQUEST_STATUS_CFG.pending.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function EditedMarker({ tx }) {
   if (!tx?.is_edited) return null
   const edits = Number(tx.edit_count || 0)
@@ -195,7 +228,7 @@ function MobileBudgetView({
   balance, sumLoading, sumError, onRetrySummary, allTimeProfit, allTimeSumLoading, summary,
   incomeCount, withdrawalCount, items, txLoading,
   typeFilter, onTypeFilter, onIncome, onWithdrawal, onEditTx,
-  range, onRangeChange,
+  range, onRangeChange, withdrawalRequests, pendingNotice, onDismissPendingNotice,
 }) {
   const today = new Date()
   const todayItems = items.filter((t) => isSameDay(new Date(t.created_at), today))
@@ -220,6 +253,15 @@ function MobileBudgetView({
           <button onClick={onRetrySummary} className="text-[12.5px] font-bold text-red-700 underline flex-shrink-0">Повторить</button>
         </div>
       )}
+
+      {pendingNotice && (
+        <div className="flex items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <span className="text-[12.5px] font-semibold text-amber-800">{pendingNotice}</span>
+          <button onClick={onDismissPendingNotice} className="text-amber-700 flex-shrink-0"><X size={14} /></button>
+        </div>
+      )}
+
+      <PendingWithdrawalRequests requests={withdrawalRequests} />
 
       {/* Hero balance card */}
       <div
@@ -343,6 +385,8 @@ export default function BudgetCompanyPage() {
   const { data: txData,  isLoading: txLoading  } = useBudgetTransactions(txParams)
   const { data: incomeTxData } = useBudgetTransactions(incomeCountParams)
   const { data: withdrawalTxData } = useBudgetTransactions(withdrawalCountParams)
+  const { data: withdrawalRequests } = useBudgetWithdrawalRequests()
+  const [pendingNotice, setPendingNotice] = useState('')
 
   const balance = summary?.balance ?? 0
   const allTimeProfit = allTimeSummary?.profit_from_finance ?? 0
@@ -356,7 +400,16 @@ export default function BudgetCompanyPage() {
   }, [qc])
 
   const incomeMut     = useMutation({ mutationFn: postBudgetIncome,     onSuccess: () => { setIncomeOpen(false); invalidate() } })
-  const withdrawalMut = useMutation({ mutationFn: postBudgetWithdrawal, onSuccess: () => { setWithdrawalOpen(false); invalidate() } })
+  const withdrawalMut = useMutation({
+    mutationFn: postBudgetWithdrawal,
+    onSuccess: (data) => {
+      setWithdrawalOpen(false)
+      invalidate()
+      if (data?.status === 'pending_telegram_approval') {
+        setPendingNotice('Заявка на списание отправлена в Telegram и ожидает подтверждения владельцем.')
+      }
+    },
+  })
 
   return (
     <>
@@ -381,6 +434,9 @@ export default function BudgetCompanyPage() {
           onEditTx={setEditingTx}
           range={range}
           onRangeChange={(nextRange) => { setRange({ from: nextRange.from, to: nextRange.to }); setPage(1) }}
+          withdrawalRequests={withdrawalRequests}
+          pendingNotice={pendingNotice}
+          onDismissPendingNotice={() => setPendingNotice('')}
         />
       </div>
 
@@ -427,6 +483,15 @@ export default function BudgetCompanyPage() {
           </button>
         </div>
       )}
+
+      {pendingNotice && (
+        <div className="flex items-center justify-between gap-2 rounded-[16px] border border-amber-200 bg-amber-50 px-5 py-3.5">
+          <span className="text-[13px] font-semibold text-amber-800">{pendingNotice}</span>
+          <button onClick={() => setPendingNotice('')} className="text-amber-700 flex-shrink-0"><X size={16} /></button>
+        </div>
+      )}
+
+      <PendingWithdrawalRequests requests={withdrawalRequests} />
 
       {/* KPI grid — balance is all-time, other cards are scoped to the selected date range */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.4fr_1fr_1fr_1fr] gap-3">

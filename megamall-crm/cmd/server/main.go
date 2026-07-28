@@ -44,6 +44,7 @@ import (
 	"github.com/megamall/crm/internal/products"
 	"github.com/megamall/crm/internal/products/mediabridge"
 	"github.com/megamall/crm/internal/teams"
+	"github.com/megamall/crm/internal/telegram"
 	"github.com/megamall/crm/internal/uploads"
 	"github.com/megamall/crm/internal/users"
 	usersmediabridge "github.com/megamall/crm/internal/users/mediabridge"
@@ -289,6 +290,65 @@ func main() {
 	budgetRepo := budget.NewRepository(db, loc, financeRepo)
 	budgetHandler := budget.NewHandler(budgetRepo)
 
+	// ── Telegram budget-withdrawal approval gate ──────────────────────────────
+	// Gated behind TELEGRAM_APPROVAL_ENABLED (config.TelegramConfig.Enabled,
+	// defaults to false). When disabled, budgetHandler.SetTelegramApproval is
+	// never called, so POST /owner/budget/withdrawal keeps writing to the
+	// ledger immediately exactly as before — this feature is fully inert
+	// until explicitly turned on with real bot credentials, mirroring the
+	// MEDIA_PIPELINE_ENABLED pattern above.
+	var telegramWebhookHandler *telegram.Handler
+	if cfg.Telegram.Enabled {
+		telegramClient := telegram.NewClient(cfg.Telegram.BotToken)
+
+		budgetHandler.SetTelegramApproval(func(ctx context.Context, requestID uuid.UUID, amount float64, note, requestedByName string) (int64, int64, error) {
+			text := fmt.Sprintf(
+				"💰 <b>Budget withdrawal request</b>\n\nRequested by: %s\nAmount: %.2f\nNote: %s\n\nApprove or reject:",
+				requestedByName, amount, note,
+			)
+			messageID, err := telegramClient.SendMessage(ctx, cfg.Telegram.ApprovalChatID, text, telegram.ApprovalButtons(requestID.String()))
+			if err != nil {
+				return 0, 0, err
+			}
+			return cfg.Telegram.ApprovalChatID, messageID, nil
+		}, cfg.Telegram.ApprovalTimeout)
+
+		telegramWebhookHandler = telegram.NewHandler(
+			telegramClient,
+			cfg.Telegram.WebhookSecret,
+			cfg.Telegram.AllowedUserIDs(),
+			budgetHandler.HandleTelegramDecision,
+		)
+
+		// Expiry sweep: auto-rejects any withdrawal request nobody approved/
+		// rejected within TELEGRAM_APPROVAL_TIMEOUT, editing its Telegram
+		// message so stale buttons visibly stop being actionable. Runs every
+		// 5 minutes; a single missed/slow tick just means expiry happens on
+		// the next one, so no locking/leader-election needed for this
+		// single-instance deployment (same reasoning as the media quarantine
+		// purge goroutine below).
+		go func() {
+			ticker := time.NewTicker(5 * time.Minute)
+			defer ticker.Stop()
+			for range ticker.C {
+				expired, err := budgetRepo.ExpirePendingRequests(context.Background(), time.Now())
+				if err != nil {
+					log.Printf("[telegram] withdrawal request expiry sweep error: %v", err)
+					continue
+				}
+				for _, req := range expired {
+					if req.TelegramChatID == nil || req.TelegramMessageID == nil {
+						continue
+					}
+					text := fmt.Sprintf("⏱️ Withdrawal request expired (no response within timeout).\nAmount: %.2f", req.Amount)
+					if err := telegramClient.EditMessageText(context.Background(), *req.TelegramChatID, *req.TelegramMessageID, text); err != nil {
+						log.Printf("[telegram] failed to edit expired request %s message: %v", req.ID, err)
+					}
+				}
+			}
+		}()
+	}
+
 	orderRepo := orders.NewRepository(db, loc)
 	orderSvc := orders.NewService(
 		orderRepo,
@@ -412,6 +472,14 @@ func main() {
 
 		// Company Budget
 		budgetHandler.RegisterRoutes(v1.Group("/owner/budget"))
+
+		// Telegram webhook (budget-withdrawal Approve/Reject button presses).
+		// Deliberately unauthenticated by JWT — Telegram calls this directly —
+		// but every request is rejected unless its X-Telegram-Bot-Api-Secret-Token
+		// header matches TELEGRAM_WEBHOOK_SECRET (see telegram.Handler.Webhook).
+		if telegramWebhookHandler != nil {
+			telegramWebhookHandler.RegisterRoutes(v1.Group("/telegram"))
+		}
 
 		// Phase 17: Owner Logistics
 		logisticsHandler.RegisterRoutes(v1.Group("/owner/logistics"))

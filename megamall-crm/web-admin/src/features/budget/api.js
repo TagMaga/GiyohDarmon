@@ -24,6 +24,9 @@ export const postBudgetIncome = (body) =>
 export const postBudgetWithdrawal = (body) =>
   client.post('/owner/budget/withdrawal', body).then(unwrap)
 
+export const fetchBudgetWithdrawalRequests = () =>
+  client.get('/owner/budget/withdrawal-requests').then((res) => res.data?.data ?? [])
+
 export const patchBudgetTransaction = ({ id, ...body }) =>
   client.patch(`/owner/budget/transaction/${id}`, body).then(unwrap)
 
