@@ -10,7 +10,9 @@ import ProductDrawer from '../components/ProductDrawer'
 import ProductModal from '../components/ProductModal'
 import ReceivingModal from '../components/ReceivingModal'
 import WriteoffModal from '../components/WriteoffModal'
+import { CourierWarehouseSummary } from '../components/TransferComponents'
 import useWarehouseData from '../hooks/useWarehouseData'
+import { useInventorySummary } from '../hooks/useTransfers'
 import {
   STOCK_STATUS_BADGE,
   STOCK_STATUS_LABEL,
@@ -42,6 +44,7 @@ export default function WarehouseInventoryPage() {
   const [receiveProduct, setReceiveProduct] = useState(undefined)
   const [writeoffProduct, setWriteoffProduct] = useState(null)
   const data = useWarehouseData()
+  const { data: invSummary } = useInventorySummary()
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -91,6 +94,8 @@ export default function WarehouseInventoryPage() {
           </label>
         </div>
       </section>
+
+      <div className="mb-4"><CourierWarehouseSummary summary={invSummary} detailed /></div>
 
       <div className="hidden lg:block">
           <InventoryTable

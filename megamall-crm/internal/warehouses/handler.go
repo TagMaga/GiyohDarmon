@@ -30,6 +30,15 @@ func parseUUID(c *gin.Context, param string) (uuid.UUID, bool) {
 
 // ─── Warehouses ───────────────────────────────────────────────────────────────
 
+func (h *Handler) ListCouriers(c *gin.Context) {
+	rows, err := h.svc.ListCouriers(c.Request.Context())
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, rows)
+}
+
 func (h *Handler) InventorySummary(c *gin.Context) {
 	s, err := h.svc.GetInventorySummary(c.Request.Context())
 	if err != nil {

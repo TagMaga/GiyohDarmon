@@ -8,7 +8,9 @@ import Badge from '../../../shared/components/Badge'
 import ProductModal from '../components/ProductModal'
 import ReceivingModal from '../components/ReceivingModal'
 import WriteoffModal from '../components/WriteoffModal'
+import { CourierWarehouseSummary } from '../components/TransferComponents'
 import useWarehouseData from '../hooks/useWarehouseData'
+import { useInventorySummary } from '../hooks/useTransfers'
 import { MovementList } from './WarehouseMovementsPage'
 import {
   MOVEMENT_BADGE,
@@ -35,6 +37,7 @@ export default function WarehouseDashboard() {
   const [showProduct, setShowProduct] = useState(false)
   const [receiveProduct, setReceiveProduct] = useState(undefined)
   const [showWriteoff, setShowWriteoff] = useState(false)
+  const { data: invSummary } = useInventorySummary()
 
   const stockAlerts = useMemo(() => data.inventory
     .filter((inv) => {
@@ -96,6 +99,7 @@ export default function WarehouseDashboard() {
       </section>
 
       <MetricsStrip products={data.products} inventory={data.inventory} movements={data.movements} batches={data.batches} loading={data.loading} />
+      <div className="mb-4"><CourierWarehouseSummary summary={invSummary} /></div>
 
       <section className="space-y-4">
         <Panel title="Требует внимания" subtitle="Товары с низким остатком и отсутствующие позиции.">

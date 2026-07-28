@@ -1908,9 +1908,13 @@ func (s *Service) revertCourierReservations(ctx context.Context, tx *gorm.DB, o 
 		// with a clear error rather than letting the DB's non-negative
 		// check constraint surface as a raw 500.
 		if mainInv.AvailableQuantity < it.Quantity {
+			name := it.ProductName
+			if name == "" {
+				name = it.ProductID.String()
+			}
 			return apperrors.Conflict(fmt.Sprintf(
-				"cannot unassign: main warehouse only has %d available for product %s, needs %d to restore the reservation",
-				mainInv.AvailableQuantity, it.ProductID, it.Quantity,
+				"нельзя снять курьера с заказа: на главном складе доступно только %d товара «%s», требуется %d для восстановления резерва",
+				mainInv.AvailableQuantity, name, it.Quantity,
 			))
 		}
 		if err := s.invRepo.UpdateReservedQuantity(tx, ctx, mainInv.ID, mainInv.ReservedQuantity+it.Quantity); err != nil {

@@ -6,7 +6,7 @@ import Button from '../../../shared/components/Button'
 import Badge from '../../../shared/components/Badge'
 import Alert from '../../../shared/components/Alert'
 import { useToast } from '../../../shared/components/ToastProvider'
-import { fetchCouriersOverview } from '../../dispatcher/api'
+import { fetchWarehouseCouriers } from '../api'
 import {
   useAcceptReturn,
   useCreateTransfer,
@@ -37,16 +37,15 @@ export const TRANSFER_STATUS_FILTERS = [
 export function NewTransferModal({ open, onClose, products = [] }) {
   const toast = useToast()
   const { data: warehouses = [] } = useWarehouses({ enabled: open })
-  const { data: couriers } = useQuery({
-    queryKey: ['dispatch', 'couriers-overview'],
-    queryFn: fetchCouriersOverview,
+  const { data: courierList = [] } = useQuery({
+    queryKey: ['warehouse', 'couriers'],
+    queryFn: fetchWarehouseCouriers,
     enabled: open,
     staleTime: 30_000,
   })
   const createTransfer = useCreateTransfer()
 
   const mainWarehouses = useMemo(() => warehouses.filter((w) => w.type === 'main'), [warehouses])
-  const courierList = Array.isArray(couriers) ? couriers : (couriers?.couriers ?? [])
 
   const [fromWarehouseId, setFromWarehouseId] = useState('')
   const [courierId, setCourierId] = useState('')
@@ -122,7 +121,7 @@ export function NewTransferModal({ open, onClose, products = [] }) {
             <span className="mb-1 block text-xs font-semibold text-slate-500">Курьер</span>
             <select className="input" value={courierId} onChange={(e) => setCourierId(e.target.value)}>
               <option value="">Выберите курьера</option>
-              {courierList.map((c) => <option key={c.courier_id} value={c.courier_id}>{c.full_name}</option>)}
+              {courierList.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
             </select>
           </label>
         </div>
@@ -332,5 +331,39 @@ export function LostReportsPanel() {
         </div>
       )}
     </section>
+  )
+}
+
+// ─── Courier-warehouse summary strip (owner + warehouse manager dashboards) ─
+
+export function CourierWarehouseSummary({ summary, detailed = false }) {
+  if (!summary) return null
+  const totalPhysical = (summary.main_quantity ?? 0) + (summary.courier_quantity ?? 0)
+  const totalReserved = (summary.main_reserved ?? 0) + (summary.courier_reserved ?? 0)
+  const items = [
+    { label: 'Всего товара', value: totalPhysical },
+    { label: 'Резерв (заказы)', value: totalReserved, tone: 'amber' },
+    { label: 'У курьеров', value: summary.courier_quantity ?? 0, tone: 'indigo' },
+    { label: 'В передачах', value: summary.pending_transfers ?? 0, tone: summary.pending_transfers ? 'amber' : 'slate' },
+  ]
+  if (detailed) {
+    items.push(
+      { label: 'На главном складе', value: summary.main_quantity ?? 0 },
+      { label: 'Заблокировано (передачи)', value: summary.main_blocked ?? 0, tone: summary.main_blocked ? 'amber' : 'slate' },
+      { label: 'Возвраты на рассмотрении', value: summary.pending_returns ?? 0, tone: summary.pending_returns ? 'amber' : 'slate' },
+      { label: 'Заявки об утере', value: summary.pending_lost_reports ?? 0, tone: summary.pending_lost_reports ? 'rose' : 'slate' },
+    )
+  }
+  return (
+    <div className={`grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)] sm:grid-cols-4 ${detailed ? 'lg:grid-cols-8' : ''}`}>
+      {items.map((item) => (
+        <div key={item.label} className="border-b border-r border-slate-100 px-3 py-3 last:border-r-0 sm:[&:nth-child(4n)]:border-r-0">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{item.label}</p>
+          <p className={`mt-1 truncate text-base font-bold tabular-nums ${item.tone === 'amber' ? 'text-amber-700' : item.tone === 'rose' ? 'text-rose-700' : item.tone === 'indigo' ? 'text-indigo-700' : 'text-slate-950'}`}>
+            {item.value.toLocaleString('ru-RU')}
+          </p>
+        </div>
+      ))}
+    </div>
   )
 }

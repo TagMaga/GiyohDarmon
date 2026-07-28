@@ -5,6 +5,7 @@ import PageHeader from '../../../shared/components/PageHeader'
 import Button from '../../../shared/components/Button'
 import ReceivingModal from '../components/ReceivingModal'
 import WriteoffModal from '../components/WriteoffModal'
+import { LostReportsPanel, PendingReturnsPanel } from '../components/TransferComponents'
 import useWarehouseData from '../hooks/useWarehouseData'
 import { MovementList } from './WarehouseMovementsPage'
 import { getMovementType } from '../utils/warehouseHelpers'
@@ -34,6 +35,10 @@ export default function WarehouseReceivingPage() {
         }
       />
       <MovementList rows={rows} data={data} emptyTitle="Операций пока нет" showEntryActions />
+      <div className="mt-5 space-y-4">
+        <PendingReturnsPanel />
+        <LostReportsPanel />
+      </div>
       <ReceivingModal open={receivingOpen} onClose={() => setReceivingOpen(false)} products={data.products} inventory={data.inventory} />
       <WriteoffModal open={writeoffOpen} onClose={() => setWriteoffOpen(false)} products={data.products} inventory={data.inventory} />
     </div>
