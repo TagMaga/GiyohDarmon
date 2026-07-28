@@ -90,6 +90,11 @@ export const KEYS = {
     returns:     (params) => ['warehouse', 'returns', params ?? {}],
     inventorySummary: ['warehouse', 'inventorySummary'],
   },
+  pharmacies: {
+    list:      (params) => ['pharmacies', 'list', params ?? {}],
+    dashboard: (params) => ['pharmacies', 'dashboard', params ?? {}],
+    detail:    (id) => ['pharmacies', 'detail', id],
+  },
   settings: {
     delivery: ['settings', 'delivery'],
   },

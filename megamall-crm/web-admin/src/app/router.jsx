@@ -75,6 +75,7 @@ const WarehouseMovementsPage = lazy(() => import('../features/warehouse/pages/Wa
 const WarehouseReceivingPage = lazy(() => import('../features/warehouse/pages/WarehouseReceivingPage'))
 const WarehouseProfilePage   = lazy(() => import('../features/warehouse/pages/WarehouseProfilePage'))
 const WarehouseChangePasswordPage = lazy(() => import('../features/warehouse/pages/WarehouseChangePasswordPage'))
+const PharmaciesPage = lazy(() => import('../features/pharmacies/pages/PharmaciesPage'))
 
 // Courier — web panel removed; couriers use the mobile app (see docs).
 const CourierAppNotice = lazy(() => import('../shared/components/CourierAppNotice'))
@@ -136,6 +137,7 @@ const router = createBrowserRouter([
 
         // Dedicated owner sections
         { path: 'warehouse', element: <Lazy><OwnerWarehousePage /></Lazy> },
+        { path: 'pharmacies', element: <Lazy><PharmaciesPage /></Lazy> },
         { path: 'reports',   element: <Lazy><OwnerReportsPage /></Lazy> },
 
         // Settings hub
@@ -233,6 +235,7 @@ const router = createBrowserRouter([
           ],
         },
         { path: 'income', element: <Lazy><SellerIncomePage /></Lazy> },
+        { path: 'pharmacies', element: <Lazy><PharmaciesPage /></Lazy> },
         {
           path: 'profile',
           element: <Lazy><SellerProfilePage /></Lazy>,
@@ -274,6 +277,7 @@ const router = createBrowserRouter([
         { path: 'products',     element: <Navigate to="/warehouse/inventory" replace /> },
         { path: 'movements',    element: <Lazy><WarehouseMovementsPage /></Lazy> },
         { path: 'receiving',    element: <Lazy><WarehouseReceivingPage /></Lazy> },
+        { path: 'pharmacies',   element: <Lazy><PharmaciesPage /></Lazy> },
         { path: 'writeoffs',    element: <Navigate to="/warehouse/receiving" replace /> },
         { path: 'profile',          element: <Lazy><WarehouseProfilePage /></Lazy> },
         { path: 'profile/password', element: <Lazy><WarehouseChangePasswordPage /></Lazy> },

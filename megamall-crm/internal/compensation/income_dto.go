@@ -62,10 +62,14 @@ type incomeOrderTotalsRow struct {
 type incomeEventRow struct {
 	ID            uuid.UUID          `gorm:"column:id"`
 	OrderID       *uuid.UUID         `gorm:"column:order_id"`
+	PharmacyID    *uuid.UUID         `gorm:"column:pharmacy_id"`
+	PaymentID     *uuid.UUID         `gorm:"column:payment_id"`
 	EventType     FinancialEventType `gorm:"column:event_type"`
 	Amount        float64            `gorm:"column:amount"`
 	CreatedAt     time.Time          `gorm:"column:created_at"`
 	OrderNumber   string             `gorm:"column:order_number"`
+	PharmacyName  string             `gorm:"column:pharmacy_name"`
+	PaymentNumber string             `gorm:"column:payment_number"`
 	OrderType     string             `gorm:"column:order_type"`
 	NetRevenue    float64            `gorm:"column:net_revenue"`
 	TotalAmount   float64            `gorm:"column:total_amount"`
@@ -88,16 +92,20 @@ type IncomeByType map[string]float64
 
 // IncomeEventResponse is one enriched event row inside the income report's events list.
 type IncomeEventResponse struct {
-	ID          uuid.UUID          `json:"id"`
-	OrderID     *uuid.UUID         `json:"order_id"`
-	EventType   FinancialEventType `json:"event_type"`
-	Amount      float64            `json:"amount"`
-	CreatedAt   time.Time          `json:"created_at"`
-	OrderNumber string             `json:"order_number,omitempty"`
-	OrderType   string             `json:"order_type,omitempty"`
-	NetRevenue  float64            `json:"net_revenue,omitempty"`
-	TotalAmount float64            `json:"total_amount,omitempty"`
-	DeliveryFee float64            `json:"delivery_fee,omitempty"`
+	ID            uuid.UUID          `json:"id"`
+	OrderID       *uuid.UUID         `json:"order_id"`
+	PharmacyID    *uuid.UUID         `json:"pharmacy_id,omitempty"`
+	PaymentID     *uuid.UUID         `json:"payment_id,omitempty"`
+	EventType     FinancialEventType `json:"event_type"`
+	Amount        float64            `json:"amount"`
+	CreatedAt     time.Time          `json:"created_at"`
+	OrderNumber   string             `json:"order_number,omitempty"`
+	PharmacyName  string             `json:"pharmacy_name,omitempty"`
+	PaymentNumber string             `json:"payment_number,omitempty"`
+	OrderType     string             `json:"order_type,omitempty"`
+	NetRevenue    float64            `json:"net_revenue,omitempty"`
+	TotalAmount   float64            `json:"total_amount,omitempty"`
+	DeliveryFee   float64            `json:"delivery_fee,omitempty"`
 	// CourierPayout is what MegaMall actually pays the courier for this order —
 	// the amount the commission math subtracts before applying the seller's
 	// rate (internal/orders/financial.go), as opposed to DeliveryFee (what the

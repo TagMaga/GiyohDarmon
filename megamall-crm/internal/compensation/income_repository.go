@@ -27,8 +27,8 @@ func (r *Repository) GetUserIncomeTotal(
 	filter FinancialEventFilter,
 ) (totalIncome float64, ordersCount int, err error) {
 	q := r.db.WithContext(ctx).
-		Table("financial_events").
-		Select("COALESCE(SUM(amount), 0) AS total_income, COUNT(DISTINCT order_id) AS orders_count").
+		Table("unified_income_events").
+		Select("COALESCE(SUM(amount), 0) AS total_income, COUNT(DISTINCT COALESCE(order_id, payment_id)) AS orders_count").
 		Where("user_id = ?", userID)
 
 	q = r.applyIncomeFilter(q, filter)
@@ -47,8 +47,8 @@ func (r *Repository) GetUserIncomeByType(
 	filter FinancialEventFilter,
 ) ([]incomeAggRow, error) {
 	q := r.db.WithContext(ctx).
-		Table("financial_events").
-		Select("event_type, COALESCE(SUM(amount), 0) AS total, COUNT(DISTINCT order_id) AS orders_count").
+		Table("unified_income_events").
+		Select("event_type, COALESCE(SUM(amount), 0) AS total, COUNT(DISTINCT COALESCE(order_id, payment_id)) AS orders_count").
 		Where("user_id = ?", userID)
 
 	q = r.applyIncomeFilter(q, filter)
@@ -68,14 +68,20 @@ func (r *Repository) GetUserIncomeOrderTotals(
 	from := filter.From
 	to := filter.To
 	typeWhere := ""
+	pharmacyTypeWhere := ""
 	typeArgs := []interface{}{}
 	if filter.EventType != "" {
 		typeWhere = "AND fe.event_type = ?"
+		pharmacyTypeWhere = "AND pfe.event_type = ?"
 		typeArgs = append(typeArgs, filter.EventType)
 	}
 
 	args := []interface{}{userID, from, to}
 	args = append(args, typeArgs...)
+	args = append(args, userID, from, to)
+	if filter.EventType != "" {
+		args = append(args, filter.EventType)
+	}
 
 	var row incomeOrderTotalsRow
 	err := r.db.WithContext(ctx).Raw(`
@@ -97,6 +103,19 @@ func (r *Repository) GetUserIncomeOrderTotals(
 			  AND fe.created_at >= ?
 			  AND fe.created_at <= ?
 			  `+typeWhere+`
+			UNION ALL
+			SELECT DISTINCT ON (pp.id)
+				pp.id,
+				pp.amount AS total_amount,
+				0 AS delivery_fee,
+				pp.amount AS net_revenue,
+				0 AS courier_payout
+			FROM pharmacy_financial_events pfe
+			JOIN pharmacy_payments pp ON pp.id=pfe.payment_id AND pp.status='confirmed'
+			WHERE pfe.user_id=?
+			  AND pfe.created_at>=?
+			  AND pfe.created_at<=?
+			  `+pharmacyTypeWhere+`
 		) x
 	`, args...).Scan(&row).Error
 	if err != nil {
@@ -114,7 +133,7 @@ func (r *Repository) GetUserIncomeEvents(
 	p pagination.Params,
 ) ([]incomeEventRow, int, error) {
 	// Count first — plain table scan, no JOIN needed.
-	cq := r.db.WithContext(ctx).Table("financial_events").Where("user_id = ?", userID)
+	cq := r.db.WithContext(ctx).Table("unified_income_events").Where("user_id = ?", userID)
 	cq = r.applyIncomeFilter(cq, filter)
 	var total int64
 	if err := cq.Count(&total).Error; err != nil {
@@ -127,7 +146,7 @@ func (r *Repository) GetUserIncomeEvents(
 	typeWhere := ""
 	typeArgs := []interface{}{}
 	if filter.EventType != "" {
-		typeWhere = "AND fe.event_type = ?"
+		typeWhere = "AND ue.event_type = ?"
 		typeArgs = append(typeArgs, filter.EventType)
 	}
 
@@ -138,24 +157,30 @@ func (r *Repository) GetUserIncomeEvents(
 	var rows []incomeEventRow
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT
-			fe.id,
-			fe.order_id,
-			fe.event_type,
-			fe.amount,
-			fe.created_at,
+			ue.id,
+			ue.order_id,
+			ue.pharmacy_id,
+			ue.payment_id,
+			ue.event_type,
+			ue.amount,
+			ue.created_at,
 			COALESCE(o.order_number,        '')  AS order_number,
+			COALESCE(p.name, '') AS pharmacy_name,
+			COALESCE(pp.payment_number, '') AS payment_number,
 			COALESCE(o.order_type::text,    '')  AS order_type,
 			COALESCE(o.net_revenue,     0)  AS net_revenue,
 			COALESCE(o.total_amount,    0)  AS total_amount,
 			COALESCE(o.delivery_fee,    0)  AS delivery_fee,
 			COALESCE(o.courier_payout,  0)  AS courier_payout
-		FROM financial_events fe
-		LEFT JOIN orders o ON o.id = fe.order_id
-		WHERE fe.user_id    =  ?
-		  AND fe.created_at >= ?
-		  AND fe.created_at <= ?
+		FROM unified_income_events ue
+		LEFT JOIN orders o ON o.id = ue.order_id
+		LEFT JOIN pharmacies p ON p.id=ue.pharmacy_id
+		LEFT JOIN pharmacy_payments pp ON pp.id=ue.payment_id
+		WHERE ue.user_id    =  ?
+		  AND ue.created_at >= ?
+		  AND ue.created_at <= ?
 		  `+typeWhere+`
-		ORDER BY fe.created_at DESC
+		ORDER BY ue.created_at DESC
 		LIMIT ? OFFSET ?
 	`, args...).Scan(&rows).Error
 	if err != nil {
@@ -176,19 +201,25 @@ func (r *Repository) GetTeamIncomeSummary(
 	var rows []teamMemberIncomeRow
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT
-			fe.user_id,
-			fe.event_type,
-			COALESCE(SUM(fe.amount), 0)  AS total,
-			COUNT(DISTINCT fe.order_id)  AS orders_count
-		FROM financial_events fe
-		JOIN orders o ON o.id = fe.order_id AND o.deleted_at IS NULL
-		WHERE o.team_lead_id = ?
-		  AND fe.user_id     IS NOT NULL
-		  AND fe.created_at >= ?
-		  AND fe.created_at <= ?
-		GROUP BY fe.user_id, fe.event_type
-		ORDER BY fe.user_id, fe.event_type
-	`, teamLeadID, from, to).Scan(&rows).Error
+			x.user_id,
+			x.event_type,
+			COALESCE(SUM(x.amount), 0) AS total,
+			COUNT(DISTINCT x.source_id) AS orders_count
+		FROM (
+			SELECT fe.user_id,fe.event_type::text event_type,fe.amount,fe.order_id source_id
+			FROM financial_events fe
+			JOIN orders o ON o.id=fe.order_id AND o.deleted_at IS NULL
+			WHERE o.team_lead_id=? AND fe.user_id IS NOT NULL
+			  AND fe.created_at>=? AND fe.created_at<=?
+			UNION ALL
+			SELECT pfe.user_id,pfe.event_type,pfe.amount,pfe.payment_id source_id
+			FROM pharmacy_financial_events pfe
+			WHERE pfe.team_lead_id=? AND pfe.user_id IS NOT NULL
+			  AND pfe.created_at>=? AND pfe.created_at<=?
+		) x
+		GROUP BY x.user_id,x.event_type
+		ORDER BY x.user_id,x.event_type
+	`, teamLeadID, from, to, teamLeadID, from, to).Scan(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("get team income summary: %w", err)
 	}

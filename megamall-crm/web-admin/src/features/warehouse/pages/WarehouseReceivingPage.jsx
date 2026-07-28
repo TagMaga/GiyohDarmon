@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Download, PackagePlus, Plus, Trash2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Building2, Download, PackagePlus, Plus, Trash2 } from 'lucide-react'
 import PageHeader from '../../../shared/components/PageHeader'
 import Button from '../../../shared/components/Button'
 import ReceivingModal from '../components/ReceivingModal'
@@ -9,6 +10,7 @@ import { MovementList } from './WarehouseMovementsPage'
 import { getMovementType } from '../utils/warehouseHelpers'
 
 export default function WarehouseReceivingPage() {
+  const navigate = useNavigate()
   const data = useWarehouseData()
   const [receivingOpen, setReceivingOpen] = useState(false)
   const [writeoffOpen, setWriteoffOpen] = useState(false)
@@ -25,6 +27,7 @@ export default function WarehouseReceivingPage() {
         icon={<Download size={20} />}
         action={
           <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="secondary" icon={<Building2 size={15} />} onClick={() => navigate('/warehouse/pharmacies')}>Выдать аптеке</Button>
             <Button variant="primary" icon={<PackagePlus size={15} />} onClick={() => setReceivingOpen(true)}>Новая приёмка</Button>
             <Button variant="danger" icon={<Plus size={15} />} onClick={() => setWriteoffOpen(true)}>Новое списание</Button>
           </div>
