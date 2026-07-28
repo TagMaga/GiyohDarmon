@@ -22,13 +22,18 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/reports/sales-by-product", readRoles, h.SalesByProductReport)
 	rg.GET("/reports/slow-moving", readRoles, h.SlowMovingReport)
 
-	// FIFO batch reads (?product_id=&only_active=true)
+	// FEFO batch reads (?product_id=&only_active=true)
 	rg.GET("/batches", readRoles, h.ListBatches)
 	rg.GET("/integrity", readRoles, h.InventoryIntegrityCheck)
 	rg.GET("/receiving/:id/history", readRoles, h.ListReceivingHistory)
 
+	// Expiry warnings: owner + warehouse_manager only.
+	expiryRoles := middleware.RequireRoles("owner", "warehouse_manager")
+	rg.GET("/expiry-alerts", expiryRoles, h.ExpiryAlerts)
+
 	// Mutations
 	rg.POST("/receiving", writeRoles, h.CreateReceiving)
+	rg.POST("/receiving/batch", writeRoles, h.CreateGoodsReceipt)
 	rg.PATCH("/receiving/:id", writeRoles, h.UpdateReceiving)
 	rg.POST("/adjustments", writeRoles, h.CreateAdjustment)
 	rg.POST("/writeoffs", writeRoles, h.CreateWriteoff)

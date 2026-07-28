@@ -30,6 +30,9 @@ import { useInventorySummary, useTransfers } from '../../warehouse/hooks/useTran
 import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'
 import SalesReportPanel from '../../warehouse/pages/WarehouseSalesReportPanel'
 import OwnerWarehouseMobile from '../components/OwnerWarehouseMobile'
+import ExpiryAlertsPanel from '../../warehouse/components/ExpiryAlertsPanel'
+import useExpiryAlerts from '../../warehouse/hooks/useExpiryAlerts'
+import { getNearestExpiry, hasAlertForProduct, sumAlertUnitsForProduct, fmtExpiryDate } from '../../warehouse/utils/warehouseHelpers'
 import {
   STOCK_STATUS_BADGE,
   STOCK_STATUS_LABEL,
@@ -85,6 +88,7 @@ export default function OwnerWarehousePage() {
   const data = useWarehouseData()
   const { data: transfers = [], isLoading: transfersLoading } = useTransfers({ status: transferStatus })
   const { data: invSummary } = useInventorySummary()
+  const { alerts: expiryAlerts } = useExpiryAlerts()
 
   const inventoryByProduct = useMemo(
     () => new Map(data.inventory.map((inv) => [inv.product_id ?? inv.ProductID, inv])),
@@ -235,6 +239,12 @@ export default function OwnerWarehousePage() {
             }}
             onReceive={setReceiveProduct}
           />
+          <ExpiryAlertsPanel
+            onOpenProduct={(alert) => {
+              setInventorySearch(alert.sku)
+              setTab('inventory')
+            }}
+          />
           <section>
             <div className="mb-3">
               <h2 className="text-sm font-bold text-slate-950">Движения</h2>
@@ -262,6 +272,7 @@ export default function OwnerWarehousePage() {
           <InventoryTable
             rows={inventoryRows}
             data={data}
+            expiryAlerts={expiryAlerts}
             onReceive={setReceiveProduct}
             onWriteoff={setWriteoffProduct}
             onEdit={setEditingProduct}
@@ -464,14 +475,14 @@ function ProblemProductRow({ inventory, product, onOpen, onReceive }) {
   )
 }
 
-function InventoryTable({ rows, data, onReceive, onWriteoff, onEdit }) {
+function InventoryTable({ rows, data, expiryAlerts = [], onReceive, onWriteoff, onEdit }) {
   if (!rows.length) {
     return <CompactEmpty icon={<Package size={18} />} title="Остатки не найдены" description="Измените поиск или сбросьте фильтры." />
   }
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
-      <table className="w-full min-w-[960px] text-sm">
+      <table className="w-full min-w-[1080px] text-sm">
         <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           <tr>
             <th className="px-3 py-2.5 text-left">Товар</th>
@@ -481,6 +492,7 @@ function InventoryTable({ rows, data, onReceive, onWriteoff, onEdit }) {
             <th className="px-3 py-2.5 text-right">Закупка</th>
             <th className="px-3 py-2.5 text-right">Продажа</th>
             <th className="px-3 py-2.5 text-right">Стоимость</th>
+            <th className="px-3 py-2.5 text-left">Срок годности</th>
             <th className="px-3 py-2.5 text-left">Статус</th>
             <th className="px-3 py-2.5 text-right">Операции</th>
           </tr>
@@ -490,8 +502,12 @@ function InventoryTable({ rows, data, onReceive, onWriteoff, onEdit }) {
             const status = getStockStatus(inv)
             const last = getLastMovementForProduct(getId(product), data.movements)
             const stockValue = getInventoryFifoValue(inv, data.batches)
+            const productId = getId(product)
+            const nearestExpiry = getNearestExpiry(productId, data.batches)
+            const expiringUnits = sumAlertUnitsForProduct(productId, expiryAlerts)
+            const flagged = hasAlertForProduct(productId, expiryAlerts)
             return (
-              <tr key={getId(product)} className="hover:bg-slate-50">
+              <tr key={productId} className="hover:bg-slate-50">
                 <td className="px-3 py-2.5">
                   <div className="flex min-w-0 items-center gap-3">
                     <ProductThumb product={product} />
@@ -507,6 +523,17 @@ function InventoryTable({ rows, data, onReceive, onWriteoff, onEdit }) {
                 <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-600">{fmtMoney(getLastPrice(getId(product), data.movements) ?? getPurchasePrice(product))}</td>
                 <td className="px-3 py-2.5 text-right font-bold tabular-nums text-indigo-700">{fmtMoney(getSalePrice(product))}</td>
                 <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-700">{fmtMoney(stockValue)}</td>
+                <td className="px-3 py-2.5">
+                  {nearestExpiry ? (
+                    <div className="flex items-center gap-1.5">
+                      {flagged && <span className="h-2 w-2 flex-shrink-0 rounded-full bg-rose-500" title="Есть просроченная или скоро истекающая партия" />}
+                      <span className={`text-xs font-semibold ${flagged ? 'text-rose-700' : 'text-slate-600'}`}>{fmtExpiryDate(nearestExpiry)}</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-300">—</span>
+                  )}
+                  {expiringUnits > 0 && <p className="mt-0.5 text-[11px] text-rose-500">{expiringUnits} шт. ≤14 дней</p>}
+                </td>
                 <td className="px-3 py-2.5">
                   <div className="flex flex-col gap-1.5">
                     <Badge variant={isProductActive(product) ? STOCK_STATUS_BADGE[status] : 'slate'}>{isProductActive(product) ? STOCK_STATUS_LABEL[status] : 'Неактивен'}</Badge>

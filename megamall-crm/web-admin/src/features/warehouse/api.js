@@ -186,6 +186,18 @@ export async function fetchBatches(params = {}) {
   return toArray(unwrap(res))
 }
 
+// ── Expiry alerts ────────────────────────────────────────────────────────────
+// Returns { alerts, meta } — meta carries expired/expiring counts+units so the
+// notification bell and dashboard cards don't need to recompute them.
+export async function fetchExpiryAlerts() {
+  const res = await client.get('/inventory/expiry-alerts')
+  const body = res.data
+  return {
+    alerts: toArray(body?.data),
+    meta: body?.meta ?? { total: 0, expired_count: 0, expired_units: 0, expiring_count: 0, expiring_units: 0 },
+  }
+}
+
 // ── Mutations ─────────────────────────────────────────────────────────────────
 export async function createAdjustment(payload) {
   const res = await client.post('/inventory/adjustments', cleanPayload(payload))
@@ -194,6 +206,14 @@ export async function createAdjustment(payload) {
 
 export async function createReceiving(payload) {
   const res = await client.post('/inventory/receiving', cleanPayload(payload))
+  return unwrap(res)
+}
+
+// createGoodsReceipt is the primary multi-line receiving invoice: one shared
+// header (invoice_no/received_at/notes) and N line items, each becoming its
+// own FEFO batch, committed atomically server-side.
+export async function createGoodsReceipt(payload) {
+  const res = await client.post('/inventory/receiving/batch', payload)
   return unwrap(res)
 }
 

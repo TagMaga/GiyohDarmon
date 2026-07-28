@@ -295,6 +295,55 @@ export function exportRowsToCsv(filename, columns, rows) {
   URL.revokeObjectURL(url)
 }
 
+// ── Expiry ─────────────────────────────────────────────────────────────────────
+
+export const EXPIRY_STATUS_LABEL = {
+  expiring_soon: 'Скоро истекает',
+  expires_today: 'Истекает сегодня',
+  expired:       'Просрочено',
+}
+
+export const EXPIRY_STATUS_BADGE = {
+  expiring_soon: 'rose',
+  expires_today: 'rose',
+  expired:       'rose',
+}
+
+// fmtExpiryDate formats a bare YYYY-MM-DD date (no time component — expiry
+// dates never have a time-of-day) as DD.MM.YYYY for display.
+export function fmtExpiryDate(ymd) {
+  if (!ymd) return '—'
+  const [y, m, d] = String(ymd).split('-')
+  if (!y || !m || !d) return ymd
+  return `${d}.${m}.${y}`
+}
+
+// getNearestExpiry returns the batch with the soonest expiry_date among
+// active batches for a product, or null if none have a recorded expiry.
+export function getNearestExpiry(productId, batches = []) {
+  let nearest = null
+  for (const b of batches) {
+    if ((b.product_id ?? b.ProductID) !== productId) continue
+    const expiry = b.expiry_date ?? b.ExpiryDate
+    if (!expiry) continue
+    if (!nearest || expiry < nearest) nearest = expiry
+  }
+  return nearest
+}
+
+// sumExpiringUnits sums remaining_quantity across active batches for a
+// product whose expiry falls within the given alert list (already filtered
+// to the 14-day / expired window server-side).
+export function sumAlertUnitsForProduct(productId, alerts = []) {
+  return alerts
+    .filter((a) => a.product_id === productId)
+    .reduce((sum, a) => sum + (a.remaining_quantity ?? 0), 0)
+}
+
+export function hasAlertForProduct(productId, alerts = []) {
+  return alerts.some((a) => a.product_id === productId)
+}
+
 // ── Build lookup maps ──────────────────────────────────────────────────────────
 
 /** Build { id → product } map from products array */

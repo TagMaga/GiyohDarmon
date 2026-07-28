@@ -33,6 +33,9 @@ function HistoryItem({ edit }) {
   }
   if (edit.old_quantity !== edit.new_quantity) changes.push(`количество ${fmtQty(edit.old_quantity)} -> ${fmtQty(edit.new_quantity)}`)
   if (Number(edit.old_unit_cost) !== Number(edit.new_unit_cost)) changes.push(`цена ${fmtMoney(edit.old_unit_cost)} -> ${fmtMoney(edit.new_unit_cost)}`)
+  if ((edit.old_expiry_date ?? null) !== (edit.new_expiry_date ?? null)) {
+    changes.push(`срок годности ${edit.old_expiry_date ?? '-'} -> ${edit.new_expiry_date ?? '-'}`)
+  }
   if ((edit.old_note ?? '') !== (edit.new_note ?? '')) changes.push(`примечание "${edit.old_note || '-'}" -> "${edit.new_note || '-'}"`)
 
   return (
@@ -61,6 +64,7 @@ export default function ReceivingEditModal({ movement, products = [], onClose })
   const [quantity, setQuantity] = useState('')
   const [unitCost, setUnitCost] = useState('')
   const [salePrice, setSalePrice] = useState('')
+  const [expiryDate, setExpiryDate] = useState('')
   const [notes, setNotes] = useState('')
   const movementId = getId(movement)
   const movementType = getMovementType(movement)
@@ -77,6 +81,7 @@ export default function ReceivingEditModal({ movement, products = [], onClose })
     setProductId(pid)
     setQuantity(String(movement.quantity ?? movement.Quantity ?? ''))
     setUnitCost(String(movement.batch_unit_cost ?? ''))
+    setExpiryDate(movement.batch_expiry_date ?? '')
     const product = validProducts.find((p) => getId(p) === pid)
     setSalePrice(product ? String(getSalePrice(product) ?? '') : '')
     setNotes(movementNote(movement))
@@ -90,7 +95,7 @@ export default function ReceivingEditModal({ movement, products = [], onClose })
 
   const qty = Number.parseInt(quantity, 10)
   const cost = unitCost === '' ? 0 : Number.parseFloat(unitCost)
-  const canSubmit = isUUID(productId) && qty > 0 && (isWriteoff || (!Number.isNaN(cost) && cost >= 0))
+  const canSubmit = isUUID(productId) && qty > 0 && (isWriteoff || (!Number.isNaN(cost) && cost >= 0 && Boolean(expiryDate)))
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -98,6 +103,7 @@ export default function ReceivingEditModal({ movement, products = [], onClose })
         product_id: productId,
         quantity: qty,
         unit_cost: isWriteoff ? 0 : cost,
+        expiry_date: isWriteoff ? undefined : expiryDate,
         notes: notes.trim() || undefined,
       })
       if (!isWriteoff && salePrice !== '') {
@@ -160,6 +166,12 @@ export default function ReceivingEditModal({ movement, products = [], onClose })
           <label>
             <span className="input-label">Закупочная цена *</span>
             <input className="input" type="number" min="0" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+          </label>
+        )}
+        {!isWriteoff && (
+          <label>
+            <span className="input-label">Срок годности *</span>
+            <input className="input" type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
           </label>
         )}
         {!isWriteoff && (

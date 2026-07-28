@@ -51,6 +51,7 @@ import (
 	"github.com/megamall/crm/internal/warehouses"
 	"github.com/megamall/crm/pkg/database"
 	"github.com/megamall/crm/pkg/middleware"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -269,7 +270,10 @@ func main() {
 	productsHandler := products.NewHandler(productsSvc)
 
 	inventoryRepo := inventory.NewRepository(db)
-	inventorySvc := inventory.NewService(inventoryRepo, activityLogger)
+	updateSalePriceFn := func(tx *gorm.DB, ctx context.Context, productID uuid.UUID, price float64) error {
+		return productsRepo.UpdateSalePriceTx(tx, ctx, productID, price)
+	}
+	inventorySvc := inventory.NewService(inventoryRepo, activityLogger, loc, updateSalePriceFn)
 	inventoryHandler := inventory.NewHandler(inventorySvc)
 
 	pharmacyRepo := pharmacies.NewRepository(db)

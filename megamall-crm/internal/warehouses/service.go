@@ -327,7 +327,7 @@ func (s *Service) decideTransfer(ctx context.Context, courierID, transferID uuid
 			if err := s.invRepo.InsertMovement(tx, ctx, mv); err != nil {
 				return err
 			}
-			if _, err := s.invRepo.ConsumeFIFO(tx, ctx, it.ProductID, it.Quantity, mv.ID); err != nil {
+			if _, err := s.invRepo.ConsumeFEFO(tx, ctx, it.ProductID, it.Quantity, mv.ID); err != nil {
 				return err
 			}
 

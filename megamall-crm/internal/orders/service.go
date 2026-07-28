@@ -1875,8 +1875,8 @@ func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, ac
 		if err := s.invRepo.InsertMovement(tx, ctx, m); err != nil {
 			return fmt.Errorf("insert sale movement: %w", err)
 		}
-		if _, err := s.invRepo.ConsumeFIFO(tx, ctx, it.ProductID, it.Quantity, m.ID); err != nil {
-			return fmt.Errorf("sale FIFO consume: %w", err)
+		if _, err := s.invRepo.ConsumeFEFO(tx, ctx, it.ProductID, it.Quantity, m.ID); err != nil {
+			return fmt.Errorf("sale FEFO consume: %w", err)
 		}
 	}
 	return nil

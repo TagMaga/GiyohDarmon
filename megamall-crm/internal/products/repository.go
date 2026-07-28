@@ -162,6 +162,20 @@ func (r *Repository) UpdateProduct(ctx context.Context, p *Product) error {
 	return nil
 }
 
+// UpdateSalePriceTx sets a product's sale_price inside a caller-owned
+// transaction. Used by internal/inventory's goods-receipt flow so patching
+// the sale price commits atomically with the rest of the invoice.
+func (r *Repository) UpdateSalePriceTx(tx *gorm.DB, ctx context.Context, productID uuid.UUID, price float64) error {
+	result := tx.WithContext(ctx).
+		Model(&Product{}).
+		Where("id = ?", productID).
+		UpdateColumn("sale_price", price)
+	if result.Error != nil {
+		return fmt.Errorf("update sale price: %w", result.Error)
+	}
+	return nil
+}
+
 // SoftDelete sets deleted_at to now.
 func (r *Repository) SoftDeleteProduct(ctx context.Context, id uuid.UUID) error {
 	result := r.db.WithContext(ctx).
