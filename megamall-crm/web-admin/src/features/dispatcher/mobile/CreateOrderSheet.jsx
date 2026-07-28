@@ -154,7 +154,7 @@ export default function CreateOrderSheet({ open, onClose }) {
       {!form.customerId && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
           <Field label="Телефон" required>
-            <input value={form.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="+996 …" style={inputStyle} />
+            <input value={form.phone} onChange={(e) => setField('phone', e.target.value)} placeholder="+992 …" style={inputStyle} />
           </Field>
           <Field label="Имя">
             <input value={form.fullName} onChange={(e) => setField('fullName', e.target.value)} placeholder="Имя клиента" style={inputStyle} />

@@ -61,6 +61,11 @@ export default function AssignCourierModal({ open, onClose, order, mode = 'assig
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.board })
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.newOrders })
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.couriers })
+      const orderId = getOrderId(order)
+      if (orderId) {
+        qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(orderId) })
+        qc.invalidateQueries({ queryKey: KEYS.dispatcher.timeline(orderId) })
+      }
       toast.success(mode === 'reassign' ? 'Курьер переназначен' : 'Курьер назначен')
       handleClose()
     },

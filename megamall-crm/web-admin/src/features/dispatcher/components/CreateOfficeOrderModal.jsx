@@ -268,7 +268,7 @@ export default function CreateOfficeOrderModal({ open, onClose }) {
               <div>
                 <label className="dv2-field-label">Телефон *</label>
                 <input value={form.phone} onChange={(e) => setField('phone', e.target.value)}
-                  placeholder="+996…" className="dv2-cash-select w-full" style={{ fontSize: 13 }} />
+                  placeholder="+992…" className="dv2-cash-select w-full" style={{ fontSize: 13 }} />
               </div>
               <div>
                 <label className="dv2-field-label">Имя</label>

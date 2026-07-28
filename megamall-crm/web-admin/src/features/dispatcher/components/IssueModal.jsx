@@ -35,6 +35,11 @@ export default function IssueModal({ open, onClose, order, mode = 'mark' }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.board })
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.newOrders })
+      const orderId = getOrderId(order)
+      if (orderId) {
+        qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(orderId) })
+        qc.invalidateQueries({ queryKey: KEYS.dispatcher.timeline(orderId) })
+      }
       toast.success(isResolve ? 'Проблема решена' : 'Проблема отмечена')
       handleClose()
     },
