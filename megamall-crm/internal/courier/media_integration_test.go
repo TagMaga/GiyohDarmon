@@ -327,6 +327,9 @@ func TestSubmitHandover_NoEligibleOrders_WithDeclaredAmount_CreatesSettlementHan
 
 	asset := courierUploadAsset(t, mediaSvc, media.CategoryCashHandoverProof, c.ID, "proof.png", courierFixture(t, "transparent.png"))
 	amount := 89.03
+	// A previous confirmed handover was short by exactly amount, so this
+	// standalone settlement has real remaining debt to pay.
+	createConfirmedHandover(t, db, c.ID, amount, f64(0))
 
 	handover, err := svc.SubmitHandover(context.Background(), c.ID, SubmitHandoverRequest{
 		MediaAssetIDs: []uuid.UUID{asset.ID},

@@ -848,6 +848,71 @@ func (r *Repository) LockCourierForHandover(tx *gorm.DB, ctx context.Context, co
 	return tx.WithContext(ctx).Exec("SELECT pg_advisory_xact_lock(hashtext(?))", courierID.String()).Error
 }
 
+type handoverPaymentLimit struct {
+	CurrentDebt   float64
+	PendingAmount float64
+	Available     float64
+}
+
+// GetHandoverPaymentLimit returns how much the courier may put into a new
+// handover after reserving every amount that is already awaiting a dispatcher
+// decision. It must be called inside the same transaction and after
+// LockCourierForHandover, so two simultaneous submissions cannot both spend
+// the same remaining debt.
+func (r *Repository) GetHandoverPaymentLimit(tx *gorm.DB, ctx context.Context, courierID uuid.UUID) (handoverPaymentLimit, error) {
+	type result struct {
+		CurrentDebt   float64 `gorm:"column:current_debt"`
+		PendingAmount float64 `gorm:"column:pending_amount"`
+	}
+	var row result
+	if err := tx.WithContext(ctx).Raw(`
+		WITH order_debt AS (
+			SELECT COALESCE(SUM(GREATEST(0, total_amount + delivery_fee - prepayment_amount - courier_payout)), 0) AS amount
+			FROM orders
+			WHERE courier_id = ?
+			  AND status = 'delivered'
+			  AND deleted_at IS NULL
+			  AND id NOT IN (
+				  SELECT cho.order_id
+				  FROM cash_handover_orders cho
+				  JOIN cash_handovers ch ON ch.id = cho.handover_id
+				  WHERE ch.status = 'confirmed'
+			  )
+		),
+		confirmed_residue AS (
+			SELECT COALESCE(SUM(total_to_return - COALESCE(actual_returned, total_to_return)), 0) AS amount
+			FROM cash_handovers
+			WHERE courier_id = ?
+			  AND status = 'confirmed'
+		),
+		pending_handovers AS (
+			SELECT COALESCE(SUM(COALESCE(actual_returned, total_to_return)), 0) AS amount
+			FROM cash_handovers
+			WHERE courier_id = ?
+			  AND status IN ('pending', 'disputed')
+		)
+		SELECT
+			(SELECT amount FROM order_debt) + (SELECT amount FROM confirmed_residue) AS current_debt,
+			(SELECT amount FROM pending_handovers) AS pending_amount
+	`, courierID, courierID, courierID).Scan(&row).Error; err != nil {
+		return handoverPaymentLimit{}, fmt.Errorf("get handover payment limit: %w", err)
+	}
+
+	currentDebt := row.CurrentDebt
+	if currentDebt < 0 {
+		currentDebt = 0
+	}
+	available := currentDebt - row.PendingAmount
+	if available < 0 {
+		available = 0
+	}
+	return handoverPaymentLimit{
+		CurrentDebt:   currentDebt,
+		PendingAmount: row.PendingAmount,
+		Available:     available,
+	}, nil
+}
+
 func (r *Repository) FindEligibleHandoverOrders(tx *gorm.DB, ctx context.Context, courierID uuid.UUID) ([]orders.Order, error) {
 	var rows []orders.Order
 	err := tx.WithContext(ctx).
@@ -1023,9 +1088,11 @@ func (r *Repository) GetCashSummary(ctx context.Context, courierID uuid.UUID) (*
 		debt = 0
 	}
 
-	// Split handover totals by status: confirmed (settled today) vs pending
-	// (submitted, awaiting dispatcher). Pending is reported separately and must
-	// NOT reduce the debt above.
+	// Split handover totals by status: confirmed is a "today" KPI, while
+	// pending/disputed is an all-time reservation against the current debt.
+	// Use the courier-declared amount for pending rows because that is what a
+	// dispatcher will accept; total_to_return can be smaller and previously
+	// allowed the UI to hide a pending overpayment.
 	type handoverTotals struct {
 		Confirmed float64 `gorm:"column:confirmed"`
 		Pending   float64 `gorm:"column:pending"`
@@ -1033,11 +1100,14 @@ func (r *Repository) GetCashSummary(ctx context.Context, courierID uuid.UUID) (*
 	var ht handoverTotals
 	if err := r.db.WithContext(ctx).Raw(`
 		SELECT
-			COALESCE(SUM(total_to_return) FILTER (WHERE status = 'confirmed'), 0)              AS confirmed,
-			COALESCE(SUM(total_to_return) FILTER (WHERE status IN ('pending', 'disputed')), 0) AS pending
+			COALESCE(SUM(total_to_return) FILTER (
+				WHERE status = 'confirmed' AND created_at >= CURRENT_DATE
+			), 0) AS confirmed,
+			COALESCE(SUM(COALESCE(actual_returned, total_to_return)) FILTER (
+				WHERE status IN ('pending', 'disputed')
+			), 0) AS pending
 		FROM cash_handovers
 		WHERE courier_id = ?
-		  AND created_at >= CURRENT_DATE
 	`, courierID).Scan(&ht).Error; err != nil {
 		return nil, fmt.Errorf("handover totals: %w", err)
 	}

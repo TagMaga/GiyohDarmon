@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -521,6 +522,18 @@ func (s *Service) SubmitHandover(ctx context.Context, courierID uuid.UUID, req S
 		// orders can't prevent a duplicate handover here.
 		if err := s.repo.LockCourierForHandover(tx, ctx, courierID); err != nil {
 			return err
+		}
+
+		limit, err := s.repo.GetHandoverPaymentLimit(tx, ctx, courierID)
+		if err != nil {
+			return err
+		}
+		if req.ActualAmount != nil && math.Round(*req.ActualAmount*100) > math.Round(limit.Available*100) {
+			return apperrors.BadRequest(fmt.Sprintf(
+				"Нельзя оплатить больше оставшегося долга. Уже ожидает подтверждения: %.2f с. Доступно к оплате: %.2f с.",
+				limit.PendingAmount,
+				limit.Available,
+			))
 		}
 
 		eligible, err := s.repo.FindEligibleHandoverOrders(tx, ctx, courierID)

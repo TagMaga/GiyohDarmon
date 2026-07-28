@@ -25,6 +25,7 @@ const C = {
 
 const MAX_ATTACHMENTS = 5
 const fmt = (n) => Number(n || 0).toLocaleString()
+const toCents = (n) => Math.round(Number(n || 0) * 100)
 
 // Cap for a receipt photo's longer side before upload. The picker's own
 // `quality` option only re-encodes JPEGs — it does nothing to an
@@ -210,10 +211,17 @@ export default function CashScreen() {
     setHandoverError(null)
     const amt = parseFloat(actualAmount)
     const amountBad = !amt || amt <= 0
+    const amountOverLimit = !amountBad && toCents(amt) > toCents(availableToSubmit)
     const attachmentsBad = attachments.length === 0
-    setAmountError(amountBad ? 'Введите сумму перевода' : null)
+    setAmountError(
+      amountBad
+        ? 'Введите сумму перевода'
+        : amountOverLimit
+          ? `Нельзя оплатить больше оставшегося долга. Уже ожидает подтверждения: ${fmt(pendingHandover)} c. Доступно к оплате: ${fmt(availableToSubmit)} c.`
+          : null
+    )
     setAttachError(attachmentsBad ? 'Прикрепите скриншот перевода' : null)
-    if (amountBad || attachmentsBad) return
+    if (amountBad || amountOverLimit || attachmentsBad) return
 
     setSubmitting(true)
     try {
@@ -279,7 +287,12 @@ export default function CashScreen() {
   const cashOrders = summary?.orders_collected || 0
   // Pending-review amount on the hero card is a real-time status, not tied
   // to the display filters below — it always reflects the full history.
-  const pendingHandover = history.filter(h => h.status === 'pending').reduce((s, h) => s + (h.actual_returned ?? h.total_to_return ?? 0), 0)
+  // The backend returns the all-time amount reserved by pending/disputed
+  // submissions. Do not derive this from the paginated history: missing an
+  // older pending row would let the courier submit more than the remaining
+  // debt and create an overpayment when both rows are confirmed.
+  const pendingHandover = Math.max(0, Number(summary?.pending_amount || 0))
+  const availableToSubmit = Math.max(0, toReturn - pendingHandover)
 
   const PERIOD_OPTIONS = [
     { key: 'all',   label: 'Все' },
@@ -331,8 +344,9 @@ export default function CashScreen() {
   const toggleQuickPeriod = (key) => { setOpenFilter(null); animateLayout(); setPeriodFilter(prev => prev === key ? 'all' : key) }
 
   const amtNum = parseFloat(actualAmount) || 0
-  const diff = amtNum - toReturn
+  const diff = amtNum - availableToSubmit
   const hasDiff = amtNum > 0
+  const amountOverLimit = toCents(amtNum) > toCents(availableToSubmit)
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
@@ -409,21 +423,12 @@ export default function CashScreen() {
                 </View>
               )}
               <PressScale
-                style={[s.submitBtn, toReturn === 0 && s.submitBtnDisabled]}
+                style={[s.submitBtn, availableToSubmit <= 0.01 && s.submitBtnDisabled]}
                 scaleTo={0.96}
                 onPress={() => {
                   if (toReturn === 0) return
-                  // The whole debt is already tied up in a handover pending
-                  // dispatcher review (debt only drops on CONFIRM, not on
-                  // submit — see GetCashSummary's doc comment), so there are
-                  // no new delivered orders to attach to another one. The
-                  // backend would now accept a resubmission anyway (as a
-                  // standalone settlement — see SubmitHandover), but doing
-                  // so here would just duplicate the same pending amount
-                  // into a second handover, so head it off before the
-                  // courier fills out the whole sheet for nothing.
-                  if (pendingHandover > 0 && toReturn <= pendingHandover + 0.01) {
-                    showToast({ type: 'ok', title: 'Уже отправлено на проверку', subtitle: 'Новых доставленных заказов для сдачи пока нет — дождитесь подтверждения диспетчера' })
+                  if (availableToSubmit <= 0.01) {
+                    showToast({ type: 'ok', title: 'Уже отправлено на проверку', subtitle: `${fmt(pendingHandover)} c уже ожидает подтверждения диспетчера` })
                     return
                   }
                   setAmountError(null); setAttachError(null); setHandoverError(null)
@@ -431,7 +436,7 @@ export default function CashScreen() {
                 }}
               >
                 <Text style={s.submitBtnText}>
-                  {toReturn === 0 ? 'Касса сдана' : 'Сдать наличные'}
+                  {toReturn === 0 ? 'Касса сдана' : availableToSubmit <= 0.01 ? 'Заявка на проверке' : 'Сдать наличные'}
                 </Text>
               </PressScale>
             </View>
@@ -593,8 +598,8 @@ export default function CashScreen() {
               <Text style={s.sheetTitle}>Сдать наличные</Text>
 
               <View style={s.sheetRow}>
-                <Text style={s.sheetRowLabel}>Ожидается к сдаче</Text>
-                <Text style={s.sheetRowVal}>{fmt(toReturn)} c</Text>
+                <Text style={s.sheetRowLabel}>Доступно к новой сдаче</Text>
+                <Text style={s.sheetRowVal}>{fmt(availableToSubmit)} c</Text>
               </View>
 
               <View style={s.field}>
@@ -604,7 +609,15 @@ export default function CashScreen() {
                   placeholder="0"
                   placeholderTextColor={C.muted}
                   value={actualAmount}
-                  onChangeText={(v) => { setActualAmount(v); if (amountError) setAmountError(null) }}
+                  onChangeText={(v) => {
+                    setActualAmount(v)
+                    const nextAmount = parseFloat(v)
+                    setAmountError(
+                      toCents(nextAmount) > toCents(availableToSubmit)
+                        ? `Нельзя оплатить больше оставшегося долга. Уже ожидает подтверждения: ${fmt(pendingHandover)} c. Доступно к оплате: ${fmt(availableToSubmit)} c.`
+                        : null
+                    )
+                  }}
                   keyboardType="decimal-pad"
                 />
                 {amountError && <Text style={s.inlineErr}>⚠ {amountError}</Text>}
@@ -674,7 +687,7 @@ export default function CashScreen() {
                 </View>
               )}
 
-              <TouchableOpacity style={[s.submitBigBtn, submitting && { opacity: 0.5 }]} onPress={handleHandover} disabled={submitting}>
+              <TouchableOpacity style={[s.submitBigBtn, (submitting || amountOverLimit) && { opacity: 0.5 }]} onPress={handleHandover} disabled={submitting || amountOverLimit}>
                 {submitting ? <ActivityIndicator color="#fff" /> : <Text style={s.submitBigBtnText}>↑ Отправить на проверку</Text>}
               </TouchableOpacity>
             </ScrollView>

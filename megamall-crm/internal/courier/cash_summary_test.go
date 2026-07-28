@@ -15,6 +15,7 @@ package courier
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/megamall/crm/internal/testutil"
@@ -122,5 +123,35 @@ func TestGetCashSummary_NullActualMeansAcceptedAsDeclared(t *testing.T) {
 	}
 	if s.CashToHandover != 0 {
 		t.Fatalf("cash_to_handover = %v, want 0 for NULL actual_returned", s.CashToHandover)
+	}
+}
+
+func TestGetCashSummary_PendingAmountUsesDeclaredAmountAcrossDays(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	ctx := context.Background()
+	c := testutil.CreateUser(t, db, users.RoleCourier)
+	repo := NewRepository(db)
+
+	actual := 1120.0
+	h := &CashHandover{
+		ID:                uuid.New(),
+		CourierID:         c.ID,
+		TotalCollected:    200,
+		TotalDeliveryFees: 0,
+		TotalToReturn:     200,
+		ActualReturned:    &actual,
+		Status:            HandoverStatusPending,
+		CreatedAt:         time.Now().AddDate(0, 0, -2),
+	}
+	if err := db.Create(h).Error; err != nil {
+		t.Fatalf("create pending handover: %v", err)
+	}
+
+	s, err := repo.GetCashSummary(ctx, c.ID)
+	if err != nil {
+		t.Fatalf("cash summary: %v", err)
+	}
+	if s.PendingAmount != actual {
+		t.Fatalf("pending_amount = %v, want declared amount %v", s.PendingAmount, actual)
 	}
 }
