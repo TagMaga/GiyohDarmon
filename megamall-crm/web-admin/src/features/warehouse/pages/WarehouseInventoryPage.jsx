@@ -126,7 +126,7 @@ export default function WarehouseInventoryPage() {
 
       <button
         onClick={() => setReceiveProduct(null)}
-        className="fixed bottom-5 right-5 z-30 flex min-h-[56px] items-center gap-2 rounded-full bg-indigo-600 px-5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 lg:hidden"
+        className="fixed bottom-24 right-5 z-30 flex min-h-[56px] items-center gap-2 rounded-full bg-indigo-600 px-5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 lg:hidden"
       >
         <Download size={18} />
         Приход
