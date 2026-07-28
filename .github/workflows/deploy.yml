@@ -72,11 +72,22 @@ jobs:
           go test \
             ./internal/compensation \
             ./internal/finance \
-            ./internal/inventory \
             ./internal/payouts \
             ./internal/seed \
             ./internal/uploads \
             ./pkg/middleware
+
+      # internal/inventory's dto_test.go and rbac_test.go are DB-independent
+      # (pure request validation / route-gating unit tests, package
+      # inventory). service_test.go and testmain_test.go (expiry-date/FEFO
+      # integration tests, added alongside the goods-receipt invoice) live
+      # in the external inventory_test package and need TEST_ADMIN_DSN's
+      # disposable Postgres — same pattern as internal/courier's and
+      # internal/users' equivalents below — so, like those, they aren't run
+      # in this workflow; only the -run filter below is.
+      - name: Run inventory no-DB tests
+        working-directory: ${{ env.BACKEND_DIR }}
+        run: go test ./internal/inventory -run 'TestCreateReceivingRequest|TestCreateAdjustmentRequest|TestCreateWriteoffRequest|TestExpiryAlertsRBAC'
 
       # internal/courier's dto_test.go is DB-independent (pure request
       # validation), but media_integration_test.go (cash-handover proofs,
