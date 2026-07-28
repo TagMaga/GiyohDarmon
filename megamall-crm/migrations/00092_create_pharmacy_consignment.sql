@@ -1,7 +1,7 @@
 -- +goose Up
 -- +goose StatementBegin
 
--- Pharmacy consignment is intentionally kept in dedicated ledgers.  The
+-- Pharmacy consignment is intentionally kept in dedicated ledgers. The
 -- existing inventory table remains the implicit main warehouse; accepted
 -- invoices/returns maintain the physical pharmacy balance below.
 
