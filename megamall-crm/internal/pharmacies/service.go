@@ -93,8 +93,8 @@ func (s *Service) Detail(ctx context.Context, actor Actor, id uuid.UUID) (*Detai
 }
 
 func (s *Service) Create(ctx context.Context, actor Actor, req CreatePharmacyRequest) (*Pharmacy, error) {
-	if actor.Role != "owner" {
-		return nil, apperrors.Forbidden("only owner can create a pharmacy")
+	if actor.Role != "owner" && actor.Role != "warehouse_manager" {
+		return nil, apperrors.Forbidden("only owner or warehouse manager can create a pharmacy")
 	}
 	p := &Pharmacy{
 		ID: uuid.New(), Name: strings.TrimSpace(req.Name), Address: strings.TrimSpace(req.Address),
@@ -122,8 +122,8 @@ func (s *Service) Create(ctx context.Context, actor Actor, req CreatePharmacyReq
 }
 
 func (s *Service) Update(ctx context.Context, actor Actor, id uuid.UUID, req UpdatePharmacyRequest) (*Pharmacy, error) {
-	if actor.Role != "owner" {
-		return nil, apperrors.Forbidden("only owner can edit a pharmacy")
+	if actor.Role != "owner" && actor.Role != "warehouse_manager" {
+		return nil, apperrors.Forbidden("only owner or warehouse manager can edit a pharmacy")
 	}
 	var p *Pharmacy
 	err := s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -145,8 +145,8 @@ func (s *Service) Update(ctx context.Context, actor Actor, id uuid.UUID, req Upd
 }
 
 func (s *Service) TransferResponsibility(ctx context.Context, actor Actor, id uuid.UUID, req TransferResponsibilityRequest) error {
-	if actor.Role != "owner" {
-		return apperrors.Forbidden("only owner can transfer responsibility")
+	if actor.Role != "owner" && actor.Role != "warehouse_manager" {
+		return apperrors.Forbidden("only owner or warehouse manager can transfer responsibility")
 	}
 	return s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		p, err := s.getPharmacy(ctx, tx, actor, id, true)
@@ -183,8 +183,8 @@ func (s *Service) TransferResponsibility(ctx context.Context, actor Actor, id uu
 }
 
 func (s *Service) Archive(ctx context.Context, actor Actor, id uuid.UUID) error {
-	if actor.Role != "owner" {
-		return apperrors.Forbidden("only owner can archive a pharmacy")
+	if actor.Role != "owner" && actor.Role != "warehouse_manager" {
+		return apperrors.Forbidden("only owner or warehouse manager can archive a pharmacy")
 	}
 	return s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		p, err := s.getPharmacy(ctx, tx, actor, id, true)
