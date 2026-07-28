@@ -449,24 +449,26 @@ function DispatcherBoardDesktop() {
         {couriersOpen && <div className="dv2-mobile-overlay" onClick={() => setCouriersOpen(false)} />}
 
         {/* V3: CourierRail gets pendingCourierId + smart onSelect */}
-        <CourierRail
-          couriers={courierList}
-          activeCourier={filters.courier}
-          mobileOpen={couriersOpen}
-          unassignedCount={counts.unassigned}
-          pendingCourierId={pendingCourierId}
-          hasSelectedOrder={!!selectedOrder}
-          onSelect={(id) => {
-            if (selectedOrder && id !== 'unassigned') {
-              // Order open → toggle pending for quick assign
-              setPendingCourierId((prev) => prev === id ? null : id)
-            } else {
-              // No order open → filter the kanban
-              setFilters((prev) => ({ ...prev, courier: prev.courier === id ? '' : id }))
-              setCouriersOpen(false)
-            }
-          }}
-        />
+        {filters.tab !== 'cashRegister' && (
+          <CourierRail
+            couriers={courierList}
+            activeCourier={filters.courier}
+            mobileOpen={couriersOpen}
+            unassignedCount={counts.unassigned}
+            pendingCourierId={pendingCourierId}
+            hasSelectedOrder={!!selectedOrder}
+            onSelect={(id) => {
+              if (selectedOrder && id !== 'unassigned') {
+                // Order open → toggle pending for quick assign
+                setPendingCourierId((prev) => prev === id ? null : id)
+              } else {
+                // No order open → filter the kanban
+                setFilters((prev) => ({ ...prev, courier: prev.courier === id ? '' : id }))
+                setCouriersOpen(false)
+              }
+            }}
+          />
+        )}
 
         {filters.tab === 'cash' ? (
           <CashView
