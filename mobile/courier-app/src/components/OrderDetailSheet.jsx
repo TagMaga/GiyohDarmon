@@ -8,7 +8,7 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Phone, MessageCircle, Send, MapPin } from 'lucide-react-native'
 import { GlassFill, Sheen } from './glass'
-import { updateOrderStatus, reportAddressChanged, deferOrder, getOrderComments, addOrderComment } from '../api/orders'
+import { updateOrderStatus, releaseOrder, reportAddressChanged, deferOrder, getOrderComments, addOrderComment } from '../api/orders'
 import useAuthStore from '../store/authStore'
 import { resolveCreator } from '../lib/creator'
 import Avatar, { resolveMediaUrl } from './Avatar'
@@ -39,9 +39,11 @@ export const STATUS_COLOR = {
 const PROBLEM_OPTIONS = [
   { key: 'later',   label: 'Доставить позже',     icon: '🕐', desc: 'Перенести доставку' },
   { key: 'address', label: 'Клиент сменил адрес', icon: '📍', desc: 'Снять назначение курьера' },
-  { key: 'cancel',  label: 'Отмена заказа',       icon: '✕',  desc: 'Отменить заказ' },
+  { key: 'release', label: 'Отказаться от заказа', icon: '↩', desc: 'Освободить для другого курьера' },
+  { key: 'cancel',  label: 'Клиент отказался',     icon: '✕', desc: 'Оформить возврат заказа' },
 ]
 const CANCEL_REASONS = ['Клиент не отвечает', 'Клиент отказался', 'Неверный адрес', 'Товар повреждён', 'Другое']
+const RELEASE_REASONS = ['Не могу продолжить доставку', 'Проблема с транспортом', 'Плохое самочувствие', 'Заказ взят по ошибке', 'Другое']
 const DEFER_OPTIONS = [
   { key: 'd1', label: 'Завтра',       days: 1 },
   { key: 'd2', label: '+2 дня',       days: 2 },
@@ -200,6 +202,8 @@ export function OrderDetailSheet({
 }) {
   const [step, setStep]               = useState(initialStep)
   const [cancelReason, setCancelReason] = useState('')
+  const [releaseReason, setReleaseReason] = useState('')
+  const [releaseComment, setReleaseComment] = useState('')
   const [laterDate, setLaterDate]     = useState(null)
   const [newAddress, setNewAddress]   = useState('')
   const [stepLoading, setStepLoading] = useState(false)
@@ -214,6 +218,8 @@ export function OrderDetailSheet({
     if (order) {
       setStep(initialStep)
       setCancelReason('')
+      setReleaseReason('')
+      setReleaseComment('')
       setLaterDate(null)
       setNewAddress('')
       setCommentText('')
@@ -239,7 +245,14 @@ export function OrderDetailSheet({
     if (order?.id) loadComments()
   }, [order?.id])
 
-  const resetStep  = () => { setStep('detail'); setCancelReason(''); setLaterDate(null); setNewAddress('') }
+  const resetStep  = () => {
+    setStep('detail')
+    setCancelReason('')
+    setReleaseReason('')
+    setReleaseComment('')
+    setLaterDate(null)
+    setNewAddress('')
+  }
   const handleClose = () => { resetStep(); onClose() }
 
   if (!order) return null
@@ -318,6 +331,33 @@ export function OrderDetailSheet({
     } catch (e) {
       Alert.alert('Ошибка', e?.response?.data?.error?.message || 'Что-то пошло не так')
     } finally { setStepLoading(false) }
+  }
+
+  const submitRelease = async () => {
+    const detail = releaseComment.trim()
+    const reason = detail ? `${releaseReason}: ${detail}` : releaseReason
+    setStepLoading(true)
+    try {
+      await releaseOrder(order.id, reason)
+      handleClose()
+      onRefresh?.()
+      Alert.alert('Заказ освобождён', 'Теперь его может принять другой курьер.')
+    } catch (e) {
+      Alert.alert('Ошибка', e?.response?.data?.error?.message || 'Не удалось освободить заказ')
+    } finally {
+      setStepLoading(false)
+    }
+  }
+
+  const confirmRelease = () => {
+    Alert.alert(
+      'Освободить заказ?',
+      'Вы будете сняты с заказа, и он станет доступен другим курьерам.',
+      [
+        { text: 'Не освобождать', style: 'cancel' },
+        { text: 'Освободить', style: 'destructive', onPress: submitRelease },
+      ],
+    )
   }
 
   const sendComment = async () => {
@@ -408,8 +448,35 @@ export function OrderDetailSheet({
               </TouchableOpacity>
             </>)}
 
-{step === 'cancel' && (<>
-              <Text style={ps.stepTitle}>Отмена заказа</Text>
+            {step === 'release' && (<>
+              <Text style={ps.stepTitle}>Отказаться от заказа</Text>
+              <Text style={ps.stepSub}>Укажите причину. Заказ станет доступен другому курьеру.</Text>
+              {RELEASE_REASONS.map(r => (
+                <TouchableOpacity key={r} style={[ps.reasonRow, releaseReason === r && ps.reasonRowActive]} onPress={() => setReleaseReason(r)}>
+                  <View style={[ps.radio, releaseReason === r && ps.radioActive]} />
+                  <Text style={[ps.reasonText, releaseReason === r && { color: C.ink, fontWeight: '600' }]}>{r}</Text>
+                </TouchableOpacity>
+              ))}
+              <TextInput
+                style={ps.input}
+                placeholder={releaseReason === 'Другое' ? 'Опишите причину *' : 'Комментарий (необязательно)'}
+                placeholderTextColor={C.muted}
+                value={releaseComment}
+                onChangeText={setReleaseComment}
+                maxLength={400}
+                multiline
+              />
+              <TouchableOpacity
+                style={[ps.btnPrimary, { backgroundColor: C.red }, (!releaseReason || (releaseReason === 'Другое' && !releaseComment.trim()) || stepLoading) && ps.btnDisabled]}
+                disabled={!releaseReason || (releaseReason === 'Другое' && !releaseComment.trim()) || stepLoading}
+                onPress={confirmRelease}
+              >
+                {stepLoading ? <ActivityIndicator color="#fff" /> : <Text style={ps.btnText}>Освободить заказ</Text>}
+              </TouchableOpacity>
+            </>)}
+
+            {step === 'cancel' && (<>
+              <Text style={ps.stepTitle}>Возврат заказа</Text>
               <Text style={ps.stepSub}>Выберите причину</Text>
               {CANCEL_REASONS.map(r => (
                 <TouchableOpacity key={r} style={[ps.reasonRow, cancelReason === r && ps.reasonRowActive]} onPress={() => setCancelReason(r)}>
@@ -418,7 +485,7 @@ export function OrderDetailSheet({
                 </TouchableOpacity>
               ))}
               <TouchableOpacity style={[ps.btnPrimary, { backgroundColor: C.red }, (!cancelReason || stepLoading) && ps.btnDisabled]} disabled={!cancelReason || stepLoading} onPress={() => doStatus('returned', cancelReason)}>
-                {stepLoading ? <ActivityIndicator color="#fff" /> : <Text style={ps.btnText}>Отменить заказ</Text>}
+                {stepLoading ? <ActivityIndicator color="#fff" /> : <Text style={ps.btnText}>Оформить возврат</Text>}
               </TouchableOpacity>
             </>)}
 
@@ -685,7 +752,16 @@ export function OrderDetailSheet({
           </TouchableOpacity>
         </>)}
 
-        {step === 'detail' && ['delivered', 'returned', 'issue', 'confirmed', 'new', 'cancelled'].includes(status) && (
+        {step === 'detail' && status === 'issue' && (<>
+          <TouchableOpacity style={[d.primaryBtn, { backgroundColor: C.red }]} onPress={() => setStep('release')}>
+            <Text style={d.primaryBtnText}>↩ Отказаться от заказа</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={d.secondaryBtn} onPress={handleClose}>
+            <Text style={d.secondaryBtnText}>Закрыть</Text>
+          </TouchableOpacity>
+        </>)}
+
+        {step === 'detail' && ['delivered', 'returned', 'confirmed', 'new', 'cancelled'].includes(status) && (
           <TouchableOpacity style={[d.primaryBtn, { backgroundColor: C.violet }]} onPress={handleClose}>
             <Text style={d.primaryBtnText}>Закрыть</Text>
           </TouchableOpacity>

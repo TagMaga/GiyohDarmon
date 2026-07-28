@@ -121,6 +121,30 @@ func (h *Handler) startDelivery(c *gin.Context) {
 	response.OK(c, order)
 }
 
+func (h *Handler) releaseOrder(c *gin.Context) {
+	orderID, err := parseID(c, "id")
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	var req ReleaseOrderRequest
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
+		response.HandleError(c, apperrors.BadRequest("invalid request body"))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.HandleError(c, appErr)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	order, svcErr := h.svc.ReleaseOrder(c.Request.Context(), claims.UserID, orderID, req)
+	if svcErr != nil {
+		response.HandleError(c, svcErr)
+		return
+	}
+	response.OK(c, order)
+}
+
 func (h *Handler) markDelivered(c *gin.Context) {
 	orderID, err := parseID(c, "id")
 	if err != nil {

@@ -8,12 +8,13 @@ import { KEYS } from '../../../shared/queryKeys'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { getOrderId, formatOrderLabel } from '../utils/orderHelpers'
 import {
-  fetchCouriersOverview, assignCourier, reassignCourier, cancelOrder, markIssue, resolveIssue, scheduleOrder,
+  fetchCouriersOverview, assignCourier, reassignCourier, unassignCourier, cancelOrder, markIssue, resolveIssue, scheduleOrder,
 } from '../api'
 
 const invalidateBoard = (qc) => {
   qc.invalidateQueries({ queryKey: KEYS.dispatcher.board })
   qc.invalidateQueries({ queryKey: KEYS.dispatcher.newOrders })
+  qc.invalidateQueries({ queryKey: KEYS.dispatcher.issues })
   qc.invalidateQueries({ queryKey: KEYS.dispatcher.couriers })
 }
 
@@ -96,6 +97,68 @@ export function AssignSheet({ open, mode, order, onClose }) {
       </div>
       <SheetPrimaryButton onClick={() => pick && mutate()} disabled={!pick || isPending} background={pick ? undefined : '#C9C7BF'}>
         {isPending ? '...' : pick ? (mode === 'reassign' ? 'Переназначить курьера' : 'Назначить курьера') : 'Выберите курьера'}
+      </SheetPrimaryButton>
+    </Sheet>
+  )
+}
+
+// ── Unassign courier sheet ───────────────────────────────────────────────────
+const UNASSIGN_REASONS = ['Курьер не может доставить', 'Поломка транспорта', 'Плохое самочувствие', 'Ошибка назначения']
+
+export function UnassignSheet({ open, order, onClose }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [reason, setReason] = useState('')
+  const [comment, setComment] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      setReason('')
+      setComment('')
+    }
+  }, [open])
+
+  const finalReason = comment.trim()
+    ? (reason ? `${reason}: ${comment.trim()}` : comment.trim())
+    : reason
+  const { mutate, isPending } = useMutation({
+    mutationFn: () => unassignCourier(getOrderId(order), { reason: finalReason }),
+    onSuccess: () => {
+      invalidateBoard(qc)
+      toast.success('Курьер снят — заказ снова доступен')
+      onClose()
+    },
+    onError: (err) => toast.error(err?.response?.data?.error?.message ?? err?.message ?? 'Ошибка'),
+  })
+
+  if (!open) return null
+
+  return (
+    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={41}>
+      <SheetTitle sub={`Заказ #${order ? formatOrderLabel(order) : ''} вернётся в «Подтверждённые»`}>
+        Снять курьера
+      </SheetTitle>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+        {UNASSIGN_REASONS.map((r) => (
+          <button
+            key={r}
+            onClick={() => setReason(r)}
+            style={{ padding: '9px 13px', borderRadius: 11, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, ...chipStyle(reason === r) }}
+          >
+            {r}
+          </button>
+        ))}
+      </div>
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        maxLength={500}
+        placeholder="Или укажите другую причину"
+        rows={3}
+        style={{ width: '100%', border: `1px solid ${C.border}`, background: '#fff', borderRadius: 13, padding: 12, fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'none', marginBottom: 14 }}
+      />
+      <SheetPrimaryButton onClick={() => finalReason && mutate()} disabled={!finalReason || isPending}>
+        {isPending ? '...' : 'Снять курьера'}
       </SheetPrimaryButton>
     </Sheet>
   )

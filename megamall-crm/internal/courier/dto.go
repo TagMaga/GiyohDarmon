@@ -14,6 +14,10 @@ type StatusChangeRequest struct {
 	Comment *string `json:"comment"`
 }
 
+type ReleaseOrderRequest struct {
+	Reason string `json:"reason" validate:"required,min=1,max=500"`
+}
+
 type AddressChangedRequest struct {
 	NewAddress string `json:"new_address"`
 }

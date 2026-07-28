@@ -408,7 +408,11 @@ func (s *Service) checkCourierCapacity(tx *gorm.DB, ctx context.Context, courier
 //
 // Returns BadRequest when the order is not in a courier-holding state, so the UI
 // can hide / disable the action and surface a clear message.
-func (s *Service) UnassignCourier(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID) (*orders.Order, error) {
+func (s *Service) UnassignCourier(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, req UnassignCourierRequest) (*orders.Order, error) {
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, apperrors.BadRequest("укажите причину снятия курьера")
+	}
 	o, err := s.repo.GetOrder(ctx, orderID)
 	if err != nil {
 		return nil, err
@@ -420,7 +424,7 @@ func (s *Service) UnassignCourier(ctx context.Context, actorID uuid.UUID, orderI
 		return nil, apperrors.BadRequest("order has no active courier to unassign")
 	}
 
-	comment := "courier unassigned by dispatcher"
+	comment := "Диспетчер снял курьера. Причина: " + reason
 	return s.ordersSvc.ChangeStatus(ctx, actorID, "dispatcher", orderID, orders.ChangeStatusRequest{
 		Status:  orders.StatusConfirmed,
 		Comment: &comment,

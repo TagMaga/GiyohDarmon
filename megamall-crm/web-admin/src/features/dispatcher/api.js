@@ -178,8 +178,8 @@ export async function reassignCourier(id, { courier_id, note = '' }) {
 }
 
 /** POST /dispatch/orders/:id/unassign — release courier, order returns to confirmed */
-export async function unassignCourier(id) {
-  const res = await client.post(`/dispatch/orders/${id}/unassign`)
+export async function unassignCourier(id, { reason }) {
+  const res = await client.post(`/dispatch/orders/${id}/unassign`, { reason })
   return unwrap(res)
 }
 

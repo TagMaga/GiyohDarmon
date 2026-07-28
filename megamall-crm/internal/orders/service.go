@@ -1389,7 +1389,7 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 			if err := s.deductInventory(ctx, tx, o, actorID); err != nil {
 				return err
 			}
-		} else if to == StatusConfirmed && (from == StatusAssigned || from == StatusInDelivery) {
+		} else if to == StatusConfirmed && (from == StatusAssigned || from == StatusInDelivery || from == StatusIssue) {
 			// Courier unassigned (unclaim / dispatcher recall): any item
 			// reservation that had moved to that courier's own warehouse
 			// (see internal/warehouses.ReserveForClaim) must move back to
@@ -2081,6 +2081,12 @@ func (s *Service) validateTransitionRole(role string, actorID uuid.UUID, o *Orde
 		}
 
 	case StatusIssue:
+		if role == "courier" && to == StatusConfirmed {
+			if o.CourierID == nil || *o.CourierID != actorID {
+				return apperrors.Forbidden("you are not the assigned courier for this order")
+			}
+			return nil
+		}
 		if role != "dispatcher" {
 			return apperrors.Forbidden("only dispatcher or owner can resolve issue status")
 		}
