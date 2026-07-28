@@ -2,7 +2,10 @@ import client from '../../shared/api/client'
 
 const unwrap = response => response?.data?.data ?? response?.data
 
-export const fetchPharmacies = async params => unwrap(await client.get('/pharmacies', { params }))
+export const fetchPharmacies = async params => {
+  const body = unwrap(await client.get('/pharmacies', { params }))
+  return Array.isArray(body) ? body : []
+}
 export const fetchPharmacyDashboard = async params => unwrap(await client.get('/pharmacies/dashboard', { params }))
 export const fetchPharmacy = async id => unwrap(await client.get(`/pharmacies/${id}`))
 export const createPharmacy = async payload => unwrap(await client.post('/pharmacies', payload))
