@@ -96,12 +96,12 @@ export default function CompanySettlementTab() {
 
   return (
     <div className="space-y-4">
-      {/* KPI boxes */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard compact label="Долг курьеров" value={`${fmt(summary?.courier_debt)} с.`} icon={<AlertTriangle size={20} />} color="rose" loading={summaryLoading} />
-        <KpiCard compact label="Я получил" value={`${fmt(summary?.received)} с.`} icon={<Coins size={20} />} color="sky" loading={summaryLoading} />
-        <KpiCard compact label="Я сдал компании" value={`${fmt(summary?.paid)} с.`} icon={<Landmark size={20} />} color="emerald" loading={summaryLoading} />
-        <KpiCard compact label="Мой долг компании" value={`${fmt(summary?.dispatcher_debt)} с.`} icon={<Wallet size={20} />} color="amber" loading={summaryLoading} />
+      {/* KPI boxes — same size/style as the owner logistics cash tab (CashLedgerPanel) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard label="Долг курьеров" value={`${fmt(summary?.courier_debt)} с.`} icon={<AlertTriangle size={20} />} color="rose" loading={summaryLoading} />
+        <KpiCard label="Я получил" value={`${fmt(summary?.received)} с.`} icon={<Coins size={20} />} color="sky" loading={summaryLoading} />
+        <KpiCard label="Я сдал компании" value={`${fmt(summary?.paid)} с.`} icon={<Landmark size={20} />} color="emerald" loading={summaryLoading} />
+        <KpiCard label="Мой долг компании" value={`${fmt(summary?.dispatcher_debt)} с.`} icon={<Wallet size={20} />} color="amber" loading={summaryLoading} />
       </div>
 
       <CashLedgerFilterBar
