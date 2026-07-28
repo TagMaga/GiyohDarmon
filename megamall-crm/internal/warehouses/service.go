@@ -880,8 +880,8 @@ func (s *Service) DecideLostReport(ctx context.Context, actorID uuid.UUID, repor
 	return &resp, nil
 }
 
-func (s *Service) ListLostReports(ctx context.Context, courierID *uuid.UUID, p pagination.Params) ([]LostReportResponse, int, error) {
-	rows, total, err := s.repo.ListLostReports(ctx, courierID, p)
+func (s *Service) ListLostReports(ctx context.Context, status string, courierID *uuid.UUID, p pagination.Params) ([]LostReportResponse, int, error) {
+	rows, total, err := s.repo.ListLostReports(ctx, status, courierID, p)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -122,7 +122,7 @@ export function NewTransferModal({ open, onClose, products = [] }) {
             <span className="mb-1 block text-xs font-semibold text-slate-500">Курьер</span>
             <select className="input" value={courierId} onChange={(e) => setCourierId(e.target.value)}>
               <option value="">Выберите курьера</option>
-              {courierList.map((c) => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+              {courierList.map((c) => <option key={c.courier_id} value={c.courier_id}>{c.full_name}</option>)}
             </select>
           </label>
         </div>

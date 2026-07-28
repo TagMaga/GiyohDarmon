@@ -5,9 +5,17 @@ export function getId(obj) {
   return obj.id ?? obj.ID ?? null
 }
 
+// Deliberately format-only (not RFC 4122 version/variant strict): the
+// backend seeds well-known non-v4 IDs for singleton rows (e.g. the default
+// main warehouse, 00000000-0000-0000-0000-000000000001 — see
+// internal/warehouses.DefaultMainWarehouseID) which Postgres's uuid column
+// stores and returns just fine but a version/variant-strict regex would
+// reject, breaking any form that submits one (found via manual QA: the New
+// Transfer form's warehouse picker silently failed validation despite a
+// warehouse being visibly selected).
 export function isUUID(value) {
   return typeof value === 'string' &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }
 
 export function getValidId(obj) {

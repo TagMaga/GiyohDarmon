@@ -348,23 +348,43 @@ type InventorySummary struct {
 
 func (r *Repository) GetInventorySummary(ctx context.Context) (*InventorySummary, error) {
 	var s InventorySummary
+	// Two separate destination structs, not one shared struct reused across
+	// Raw().Scan() calls: GORM's Scan resets the destination before
+	// populating it, so a second Scan into the same struct silently zeroes
+	// whatever the first query set (verified live — main_quantity/reserved/
+	// blocked came back 0 despite real stock on hand).
+	var mainStats struct {
+		MainQuantity int `json:"main_quantity"`
+		MainReserved int `json:"main_reserved"`
+		MainBlocked  int `json:"main_blocked"`
+	}
 	if err := r.db.WithContext(ctx).Raw(`
 		SELECT
 			COALESCE(SUM(quantity), 0)::int AS main_quantity,
 			COALESCE(SUM(reserved_quantity), 0)::int AS main_reserved,
 			COALESCE(SUM(blocked_quantity), 0)::int AS main_blocked
 		FROM inventory
-	`).Scan(&s).Error; err != nil {
+	`).Scan(&mainStats).Error; err != nil {
 		return nil, fmt.Errorf("main inventory summary: %w", err)
+	}
+	var courierStats struct {
+		CourierQuantity int `json:"courier_quantity"`
+		CourierReserved int `json:"courier_reserved"`
 	}
 	if err := r.db.WithContext(ctx).Raw(`
 		SELECT
 			COALESCE(SUM(quantity), 0)::int AS courier_quantity,
 			COALESCE(SUM(reserved_quantity), 0)::int AS courier_reserved
 		FROM courier_inventory
-	`).Scan(&s).Error; err != nil {
+	`).Scan(&courierStats).Error; err != nil {
 		return nil, fmt.Errorf("courier inventory summary: %w", err)
 	}
+	s.MainQuantity = mainStats.MainQuantity
+	s.MainReserved = mainStats.MainReserved
+	s.MainBlocked = mainStats.MainBlocked
+	s.CourierQuantity = courierStats.CourierQuantity
+	s.CourierReserved = courierStats.CourierReserved
+
 	var pendingTransfers, pendingReturns, pendingLost int64
 	r.db.WithContext(ctx).Model(&InventoryTransfer{}).Where("status = ?", TransferIssued).Count(&pendingTransfers)
 	r.db.WithContext(ctx).Model(&CourierReturn{}).Where("status = ?", ReturnRequested).Count(&pendingReturns)
@@ -406,8 +426,11 @@ func (r *Repository) UpdateLostReportStatus(tx *gorm.DB, ctx context.Context, id
 	return nil
 }
 
-func (r *Repository) ListLostReports(ctx context.Context, courierID *uuid.UUID, p pagination.Params) ([]LostProductReport, int, error) {
+func (r *Repository) ListLostReports(ctx context.Context, status string, courierID *uuid.UUID, p pagination.Params) ([]LostProductReport, int, error) {
 	q := r.db.WithContext(ctx).Model(&LostProductReport{})
+	if status != "" {
+		q = q.Where("status = ?", status)
+	}
 	if courierID != nil {
 		q = q.Where("courier_id = ?", *courierID)
 	}
