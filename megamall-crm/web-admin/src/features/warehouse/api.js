@@ -217,3 +217,64 @@ export async function createWriteoff(payload) {
   const res = await client.post('/inventory/writeoffs', cleanPayload(payload))
   return unwrap(res)
 }
+
+// ── Courier warehouses (transfers, returns, lost reports) ──────────────────────
+export async function fetchInventorySummary() {
+  const res = await client.get('/warehouses/inventory/summary')
+  return unwrap(res)
+}
+
+export async function fetchWarehouses(params = {}) {
+  const res = await client.get('/warehouses', { params: cleanParams(params) })
+  return toArray(unwrap(res))
+}
+
+export async function createWarehouse(payload) {
+  const res = await client.post('/warehouses', payload)
+  return unwrap(res)
+}
+
+export async function fetchTransfers(params = {}) {
+  const res = await client.get('/warehouses/transfers', { params: { limit: 100, ...cleanParams(params) } })
+  return toArray(unwrap(res))
+}
+
+export async function fetchTransfer(transferId) {
+  if (!isUUID(transferId)) return null
+  const res = await client.get(`/warehouses/transfers/${transferId}`)
+  return unwrap(res)
+}
+
+export async function createTransfer(payload) {
+  const res = await client.post('/warehouses/transfers', {
+    ...payload,
+    from_warehouse_id: requireUUID(payload.from_warehouse_id, 'from_warehouse_id'),
+    courier_id: requireUUID(payload.courier_id, 'courier_id'),
+  })
+  return unwrap(res)
+}
+
+export async function fetchReturns(params = {}) {
+  const res = await client.get('/warehouses/returns', { params: { limit: 100, ...cleanParams(params) } })
+  return toArray(unwrap(res))
+}
+
+export async function acceptReturn(returnId) {
+  const res = await client.post(`/warehouses/returns/${requireUUID(returnId, 'return_id')}/accept`)
+  return unwrap(res)
+}
+
+export async function rejectReturn(returnId) {
+  const res = await client.post(`/warehouses/returns/${requireUUID(returnId, 'return_id')}/reject`)
+  return unwrap(res)
+}
+
+export async function fetchLostReports(params = {}) {
+  const res = await client.get('/warehouses/lost-reports', { params: { limit: 100, ...cleanParams(params) } })
+  return toArray(unwrap(res))
+}
+
+export async function decideLostReport(reportId, payload) {
+  const res = await client.post(`/warehouses/lost-reports/${requireUUID(reportId, 'report_id')}/decide`, payload)
+  return unwrap(res)
+}

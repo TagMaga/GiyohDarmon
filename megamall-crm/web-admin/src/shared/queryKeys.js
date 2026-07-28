@@ -83,6 +83,12 @@ export const KEYS = {
     batches:    (productId) => ['warehouse', 'batches', productId ?? ''],
     salesReport: (params) => ['warehouse', 'salesReport', params ?? {}],
     slowMoving:  (params) => ['warehouse', 'slowMoving', params ?? {}],
+    warehouses:  ['warehouse', 'warehouses'],
+    transfers:   (params) => ['warehouse', 'transfers', params ?? {}],
+    transfer:    (id) => ['warehouse', 'transfer', id ?? ''],
+    lostReports: (params) => ['warehouse', 'lostReports', params ?? {}],
+    returns:     (params) => ['warehouse', 'returns', params ?? {}],
+    inventorySummary: ['warehouse', 'inventorySummary'],
   },
   settings: {
     delivery: ['settings', 'delivery'],

@@ -46,6 +46,7 @@ import (
 	"github.com/megamall/crm/internal/uploads"
 	"github.com/megamall/crm/internal/users"
 	usersmediabridge "github.com/megamall/crm/internal/users/mediabridge"
+	"github.com/megamall/crm/internal/warehouses"
 	"github.com/megamall/crm/pkg/database"
 	"github.com/megamall/crm/pkg/middleware"
 )
@@ -309,9 +310,16 @@ func main() {
 	}
 	orderHandler := orders.NewHandler(orderSvc)
 
+	// ── Courier warehouses (issuance, self-assign stock gating, returns,
+	// lost-product reports) ───────────────────────────────────────────────────
+	warehousesRepo := warehouses.NewRepository(db)
+	warehousesSvc := warehouses.NewService(warehousesRepo, inventoryRepo, orderSvc, productsRepo, userRepo, activityLogger, db)
+	orderSvc.SetWarehouseAdapter(warehousesSvc.AdjustForOrder)
+	warehousesHandler := warehouses.NewHandler(warehousesSvc)
+
 	// ── Phase 5: Dispatch + Courier ───────────────────────────────────────────
 	courierRepo := courier.NewRepository(db)
-	courierSvc := courier.NewService(courierRepo, orderSvc, activityLogger, db)
+	courierSvc := courier.NewService(courierRepo, orderSvc, warehousesSvc, activityLogger, db)
 	if cfg.Media.Enabled {
 		attachCashHandoverProofFn, listCashHandoverProofsFn, releaseCourierMediaFn, signedCourierMediaURLFn := couriermediabridge.Adapters(mediaSvc)
 		courierSvc.SetMediaAdapters(attachCashHandoverProofFn, listCashHandoverProofsFn, releaseCourierMediaFn, signedCourierMediaURLFn)
@@ -379,6 +387,12 @@ func main() {
 		// Phase 5
 		dispatchHandler.RegisterRoutes(v1.Group("/dispatch"))
 		courierHandler.RegisterRoutes(v1.Group("/courier"))
+
+		// Courier warehouses: owner/warehouse_manager management + the
+		// courier-facing "My Warehouse" surface (mounted under /courier so it
+		// shares that group's auth middleware, per pkg/middleware convention).
+		warehousesHandler.RegisterRoutes(v1.Group("/warehouses"))
+		warehousesHandler.RegisterCourierRoutes(v1.Group("/courier/warehouse"))
 
 		// Phase 6: health checks (unauthenticated)
 		healthHandler.RegisterRoutes(v1)

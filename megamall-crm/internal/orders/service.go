@@ -112,6 +112,10 @@ type Service struct {
 	attachPrepaymentProof AttachPrepaymentProofFn
 	releaseMedia          ReleaseMediaFn
 	signedMediaURL        SignedMediaURLFn
+
+	// adjustCourierWarehouse is nil until SetWarehouseAdapter is called at
+	// startup (see cmd/server/main.go). See AdjustCourierWarehouseFn.
+	adjustCourierWarehouse AdjustCourierWarehouseFn
 }
 
 // NewService wires up the order service and its dependencies.
@@ -518,11 +522,12 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 			total := float64(it.Quantity) * it.UnitPrice
 			subtotal += total
 			items = append(items, OrderItem{
-				ID:         uuid.New(),
-				ProductID:  it.ProductID,
-				Quantity:   it.Quantity,
-				UnitPrice:  it.UnitPrice,
-				TotalPrice: total,
+				ID:                  uuid.New(),
+				ProductID:           it.ProductID,
+				Quantity:            it.Quantity,
+				UnitPrice:           it.UnitPrice,
+				TotalPrice:          total,
+				ReservedWarehouseID: MainWarehouseID,
 			})
 		}
 		if subtotal < 1 {
@@ -955,19 +960,11 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 				return apperrors.BadRequest("order total must be at least 1")
 			}
 
-			// 1. Release old inventory reservations.
-			for _, old := range o.Items {
-				inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, old.ProductID)
-				if err != nil {
-					return fmt.Errorf("release inventory: %w", err)
-				}
-				newReserved := inv.ReservedQuantity - old.Quantity
-				if newReserved < 0 {
-					newReserved = 0
-				}
-				if err := s.invRepo.UpdateReservedQuantity(tx, ctx, inv.ID, newReserved); err != nil {
-					return fmt.Errorf("release inventory: %w", err)
-				}
+			// 1. Release old inventory reservations (branches per item on
+			// whether it's still at the main pool or already moved to a
+			// courier warehouse — see releaseInventory).
+			if err := s.releaseInventory(ctx, tx, o, "cancelled"); err != nil {
+				return fmt.Errorf("release inventory: %w", err)
 			}
 
 			// 2. Delete old order items.
@@ -984,12 +981,13 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 				total := float64(it.Quantity) * it.UnitPrice
 				subtotal += total
 				newItems = append(newItems, OrderItem{
-					ID:         uuid.New(),
-					OrderID:    o.ID,
-					ProductID:  it.ProductID,
-					Quantity:   it.Quantity,
-					UnitPrice:  it.UnitPrice,
-					TotalPrice: total,
+					ID:                  uuid.New(),
+					OrderID:             o.ID,
+					ProductID:           it.ProductID,
+					Quantity:            it.Quantity,
+					UnitPrice:           it.UnitPrice,
+					TotalPrice:          total,
+					ReservedWarehouseID: MainWarehouseID,
 				})
 			}
 
@@ -1380,11 +1378,24 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 
 		// ── Inventory side effects ────────────────────────────────────────────
 		if to == StatusCancelled || to == StatusReturned {
-			if err := s.releaseInventory(ctx, tx, o); err != nil {
+			movementType := "cancelled"
+			if to == StatusReturned {
+				movementType = "returned"
+			}
+			if err := s.releaseInventory(ctx, tx, o, movementType); err != nil {
 				return err
 			}
 		} else if to == StatusDelivered {
 			if err := s.deductInventory(ctx, tx, o, actorID); err != nil {
+				return err
+			}
+		} else if to == StatusConfirmed && (from == StatusAssigned || from == StatusInDelivery) {
+			// Courier unassigned (unclaim / dispatcher recall): any item
+			// reservation that had moved to that courier's own warehouse
+			// (see internal/warehouses.ReserveForClaim) must move back to
+			// the main pool — the order is no longer tied to that
+			// courier's stock and needs to be reclaimable by anyone.
+			if err := s.revertCourierReservations(ctx, tx, o, actorID); err != nil {
 				return err
 			}
 		}
@@ -1755,34 +1766,72 @@ func (s *Service) AddAttachment(ctx context.Context, actorID uuid.UUID, orderID 
 
 // ─── Inventory helpers ─────────────────────────────────────────────────────────
 
-// releaseInventory decrements reserved_quantity for each item without touching quantity.
-// Called when order is cancelled or returned.
-func (s *Service) releaseInventory(ctx context.Context, tx *gorm.DB, o *Order) error {
+// AdjustCourierWarehouseFn lets internal/warehouses handle the courier-side
+// half of a reservation release/deduction without orders importing
+// warehouses (warehouses already imports orders — see SetWarehouseAdapter).
+// movementType is one of the internal/warehouses.CourierMovementType values
+// ("refused", "postponed", "delivered", "claim_release"); qtyDelta is added
+// to courier_inventory.quantity (negative to deduct), reservedDelta is added
+// to reserved_quantity (negative to release).
+type AdjustCourierWarehouseFn func(
+	ctx context.Context, tx *gorm.DB, warehouseID, productID uuid.UUID,
+	qtyDelta, reservedDelta int, movementType string,
+	referenceID, actorID uuid.UUID, reason string,
+) error
+
+// releaseInventory decrements reserved_quantity for each item without touching
+// physical quantity. Called when an order is cancelled, returned, refused, or
+// postponed. Items still reserved at the legacy main pool are released there;
+// items already moved to a courier's warehouse (see internal/warehouses) are
+// released via the injected adapter instead.
+func (s *Service) releaseInventory(ctx context.Context, tx *gorm.DB, o *Order, movementType string) error {
 	for _, it := range o.Items {
-		inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, it.ProductID)
-		if err != nil {
-			return fmt.Errorf("release inventory lock: %w", err)
+		if it.ReservedWarehouseID == MainWarehouseID {
+			inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, it.ProductID)
+			if err != nil {
+				return fmt.Errorf("release inventory lock: %w", err)
+			}
+			newReserved := inv.ReservedQuantity - it.Quantity
+			if newReserved < 0 {
+				newReserved = 0 // guard against data inconsistency
+			}
+			if err := s.invRepo.UpdateReservedQuantity(tx, ctx, inv.ID, newReserved); err != nil {
+				return fmt.Errorf("release inventory: %w", err)
+			}
+			continue
 		}
-		newReserved := inv.ReservedQuantity - it.Quantity
-		if newReserved < 0 {
-			newReserved = 0 // guard against data inconsistency
+		if s.adjustCourierWarehouse == nil {
+			return fmt.Errorf("courier warehouse adapter not configured")
 		}
-		if err := s.invRepo.UpdateReservedQuantity(tx, ctx, inv.ID, newReserved); err != nil {
-			return fmt.Errorf("release inventory: %w", err)
+		actor := o.SellerID
+		if o.CourierID != nil {
+			actor = *o.CourierID
+		}
+		if err := s.adjustCourierWarehouse(ctx, tx, it.ReservedWarehouseID, it.ProductID, 0, -it.Quantity, movementType, o.ID, actor, "order "+movementType); err != nil {
+			return fmt.Errorf("release courier inventory: %w", err)
 		}
 	}
 	return nil
 }
 
-// deductInventory decrements both quantity and reserved_quantity, writes a sale
-// movement, and consumes FIFO batches. Called ONLY when order is delivered.
-//
-// quantity        -= item.quantity
-// reserved_quantity -= item.quantity
-// movement type    = sale
-// batch consumption = FIFO
+// deductInventory decrements both quantity and reserved_quantity and records
+// the sale, consuming FIFO batches when the item is still backed by the
+// legacy main pool. Called ONLY when order is delivered. Items already held
+// by a courier warehouse are deducted there instead (no FIFO batches on that
+// side — cost was already recognized when the transfer left the main
+// warehouse, see internal/warehouses.AcceptTransfer).
 func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, actorID uuid.UUID) error {
 	for _, it := range o.Items {
+		if it.ReservedWarehouseID != MainWarehouseID {
+			if s.adjustCourierWarehouse == nil {
+				return fmt.Errorf("courier warehouse adapter not configured")
+			}
+			if err := s.adjustCourierWarehouse(ctx, tx, it.ReservedWarehouseID, it.ProductID, -it.Quantity, -it.Quantity, "delivered", o.ID, actorID, "order delivered"); err != nil {
+				return fmt.Errorf("deduct courier inventory: %w", err)
+			}
+			continue
+		}
+
 		inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, it.ProductID)
 		if err != nil {
 			return fmt.Errorf("deduct inventory lock: %w", err)
@@ -1831,6 +1880,85 @@ func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, ac
 		}
 	}
 	return nil
+}
+
+// revertCourierReservations moves any item reservation still held at a
+// courier's warehouse back to the legacy main pool. Called when a courier is
+// unassigned (unclaim or dispatcher recall) so the order becomes claimable
+// again without permanently pinning stock at a courier no longer involved.
+func (s *Service) revertCourierReservations(ctx context.Context, tx *gorm.DB, o *Order, actorID uuid.UUID) error {
+	for _, it := range o.Items {
+		if it.ReservedWarehouseID == MainWarehouseID {
+			continue
+		}
+		if s.adjustCourierWarehouse == nil {
+			return fmt.Errorf("courier warehouse adapter not configured")
+		}
+		if err := s.adjustCourierWarehouse(ctx, tx, it.ReservedWarehouseID, it.ProductID, 0, -it.Quantity, "claim_release", o.ID, actorID, "courier unassigned"); err != nil {
+			return fmt.Errorf("release courier reservation: %w", err)
+		}
+		mainInv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, it.ProductID)
+		if err != nil {
+			return err
+		}
+		if err := s.invRepo.UpdateReservedQuantity(tx, ctx, mainInv.ID, mainInv.ReservedQuantity+it.Quantity); err != nil {
+			return err
+		}
+		if err := s.repo.UpdateItemWarehouse(ctx, tx, it.ID, MainWarehouseID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SetWarehouseAdapter wires the courier-warehouse half of reservation
+// release/deduction. Must be called once at startup (see cmd/server/main.go)
+// before any order reaches a courier-backed reservation; nil-checked at call
+// sites so tests that don't need courier warehouses keep working unmodified.
+func (s *Service) SetWarehouseAdapter(fn AdjustCourierWarehouseFn) {
+	s.adjustCourierWarehouse = fn
+}
+
+// LockOrderForWarehouseOp fetches an order (with items) locked FOR UPDATE,
+// for use by internal/warehouses inside its own transfer/claim transaction.
+func (s *Service) LockOrderForWarehouseOp(tx *gorm.DB, ctx context.Context, orderID uuid.UUID) (*Order, error) {
+	o, err := s.repo.GetByIDForUpdate(tx, ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if o == nil {
+		return nil, apperrors.NotFound("order")
+	}
+	return o, nil
+}
+
+// FindActiveReservationsForCourier exposes Repository.FindActiveReservationsForCourier
+// for internal/warehouses (transfer acceptance / self-assignment reservation moves).
+func (s *Service) FindActiveReservationsForCourier(tx *gorm.DB, ctx context.Context, productID, courierID uuid.UUID) ([]OrderItem, error) {
+	return s.repo.FindActiveReservationsForCourier(tx, ctx, productID, courierID, MainWarehouseID)
+}
+
+// SetItemWarehouse flips a single order item's reservation to a new
+// warehouse. Called by internal/warehouses once it has moved the physical
+// reservation counters on both sides within the same transaction.
+func (s *Service) SetItemWarehouse(tx *gorm.DB, ctx context.Context, itemID, warehouseID uuid.UUID) error {
+	return s.repo.UpdateItemWarehouse(ctx, tx, itemID, warehouseID)
+}
+
+// ReleaseOrderReservation releases an order's inventory reservation without
+// going through ChangeStatus — used by courier address-change/defer flows,
+// which reset the order back to `confirmed` via their own transaction and
+// don't call ChangeStatus (see internal/courier.Service.DeferOrder /
+// AddressChanged). Runs inside the caller's transaction.
+func (s *Service) ReleaseOrderReservation(ctx context.Context, tx *gorm.DB, orderID uuid.UUID, movementType string) error {
+	o, err := s.repo.GetByIDForUpdate(tx, ctx, orderID)
+	if err != nil {
+		return err
+	}
+	if o == nil {
+		return apperrors.NotFound("order")
+	}
+	return s.releaseInventory(ctx, tx, o, movementType)
 }
 
 // ─── Role-based validation helpers ────────────────────────────────────────────

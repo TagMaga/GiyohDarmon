@@ -13,6 +13,7 @@ type InventoryResponse struct {
 	ProductID         uuid.UUID `json:"product_id"`
 	Quantity          int       `json:"quantity"`
 	ReservedQuantity  int       `json:"reserved_quantity"`
+	BlockedQuantity   int       `json:"blocked_quantity"`
 	AvailableQuantity int       `json:"available_quantity"`
 	LowStockThreshold int       `json:"low_stock_threshold"`
 	IsLowStock        bool      `json:"is_low_stock"`
@@ -25,6 +26,7 @@ func ToInventoryResponse(inv *Inventory) InventoryResponse {
 		ProductID:         inv.ProductID,
 		Quantity:          inv.Quantity,
 		ReservedQuantity:  inv.ReservedQuantity,
+		BlockedQuantity:   inv.BlockedQuantity,
 		AvailableQuantity: inv.AvailableQuantity,
 		LowStockThreshold: inv.LowStockThreshold,
 		IsLowStock:        inv.AvailableQuantity <= inv.LowStockThreshold,

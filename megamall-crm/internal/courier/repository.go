@@ -583,10 +583,15 @@ func (r *Repository) GetOrderForClaim(tx *gorm.DB, ctx context.Context, orderID 
 //  3. Deactivates the assignment row.
 //  4. Clears courier_id cache, sets status → confirmed.
 //  5. Inserts a timeline entry with the new address as comment.
-func (r *Repository) AddressChanged(ctx context.Context, courierID, orderID uuid.UUID, newAddress string) error {
+func (r *Repository) AddressChanged(ctx context.Context, courierID, orderID uuid.UUID, newAddress string, releaseReservation func(tx *gorm.DB) error) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := r.verifyActiveAssignment(ctx, orderID, courierID); err != nil {
 			return err
+		}
+		if releaseReservation != nil {
+			if err := releaseReservation(tx); err != nil {
+				return err
+			}
 		}
 
 		var currentStatus string
@@ -634,10 +639,15 @@ func (r *Repository) AddressChanged(ctx context.Context, courierID, orderID uuid
 
 // DeferOrder returns an order to confirmed with a future scheduled_at so it
 // only appears in ListAvailableOrders once that date arrives.
-func (r *Repository) DeferOrder(ctx context.Context, courierID, orderID uuid.UUID, scheduledAt time.Time) error {
+func (r *Repository) DeferOrder(ctx context.Context, courierID, orderID uuid.UUID, scheduledAt time.Time, releaseReservation func(tx *gorm.DB) error) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := r.verifyActiveAssignment(ctx, orderID, courierID); err != nil {
 			return err
+		}
+		if releaseReservation != nil {
+			if err := releaseReservation(tx); err != nil {
+				return err
+			}
 		}
 
 		var currentStatus string
@@ -682,7 +692,14 @@ func (r *Repository) DeferOrder(ctx context.Context, courierID, orderID uuid.UUI
 //  2. Creates assignment.
 //  3. Updates orders.courier_id cache and status=assigned.
 //  4. Inserts timeline entry.
-func (r *Repository) ClaimOrder(ctx context.Context, courierID, orderID uuid.UUID) error {
+// ClaimOrder atomically assigns the courier to a confirmed order. stockCheck
+// (see Service.ClaimOrder) runs inside the same transaction, after the
+// assignment is created but before anything commits — a failure there
+// (insufficient stock in the courier's own warehouse) rolls back the entire
+// claim, so the order is never assigned without the reservation actually
+// moving. See spec section 5: this check must be server-side, in one
+// transaction — never trust a frontend-only check.
+func (r *Repository) ClaimOrder(ctx context.Context, courierID, orderID uuid.UUID, stockCheck func(tx *gorm.DB) error) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		enabled, err := r.courierOrderIntakeEnabledTx(tx, ctx, courierID)
 		if err != nil {
@@ -720,6 +737,12 @@ func (r *Repository) ClaimOrder(ctx context.Context, courierID, orderID uuid.UUI
 		// Create assignment.
 		if _, err := r.createAssignment(tx, ctx, orderID, courierID, courierID); err != nil {
 			return err
+		}
+
+		if stockCheck != nil {
+			if err := stockCheck(tx); err != nil {
+				return err
+			}
 		}
 
 		// Update cache + freeze payout + status.

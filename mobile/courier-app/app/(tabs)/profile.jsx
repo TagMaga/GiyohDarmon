@@ -79,6 +79,14 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* My Warehouse */}
+        <View style={[s.card, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
+          <TouchableOpacity style={s.infoRow} onPress={() => router.push('/warehouse')}>
+            <Text style={[s.infoLabel, { color: T.muted }]}>Мой склад</Text>
+            <ChevronRight size={16} color={T.muted} />
+          </TouchableOpacity>
+        </View>
+
         {/* Tariff card */}
         <View style={[s.card, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
           <Text style={[s.cardTitle, { color: T.muted }]}>ТАРИФ</Text>

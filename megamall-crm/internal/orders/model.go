@@ -6,6 +6,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// MainWarehouseID is the single main warehouse seeded by migration 00091
+// (internal/warehouses.DefaultMainWarehouseID — duplicated here as a literal
+// rather than imported to avoid an orders<->warehouses import cycle, since
+// internal/warehouses depends on internal/orders, not the other way round).
+var MainWarehouseID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
+
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 // OrderType represents who created the order and which commission rules apply.
@@ -264,6 +270,12 @@ type OrderItem struct {
 	Quantity   int       `gorm:"not null"`
 	UnitPrice  float64   `gorm:"type:numeric(12,2);not null;column:unit_price"`
 	TotalPrice float64   `gorm:"type:numeric(12,2);not null;column:total_price"`
+	// ReservedWarehouseID names which stock ledger currently backs this
+	// item's reservation: MainWarehouseID (the legacy internal/inventory
+	// pool, see migration 00091) until a courier accepts a transfer or
+	// self-assigns against their own stock, at which point it flips to
+	// that courier's warehouse (internal/warehouses.CourierInventory).
+	ReservedWarehouseID uuid.UUID `gorm:"type:uuid;not null;column:reserved_warehouse_id"`
 	// ProductName and ProductImageURL are populated at query time — not stored.
 	ProductName     string  `gorm:"column:product_name;<-:false"`
 	ProductImageURL *string `gorm:"column:product_image_url;<-:false"`

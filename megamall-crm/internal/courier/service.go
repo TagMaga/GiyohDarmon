@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/megamall/crm/internal/activity"
 	"github.com/megamall/crm/internal/orders"
+	"github.com/megamall/crm/internal/warehouses"
 	apperrors "github.com/megamall/crm/pkg/errors"
 	"github.com/megamall/crm/pkg/pagination"
 	"gorm.io/gorm"
@@ -80,6 +81,7 @@ const MaxCashHandoverProofs = 5
 type Service struct {
 	repo      *Repository
 	ordersSvc *orders.Service
+	whSvc     *warehouses.Service
 	logger    *activity.Logger
 	db        *gorm.DB
 
@@ -96,12 +98,14 @@ type Service struct {
 func NewService(
 	repo *Repository,
 	ordersSvc *orders.Service,
+	whSvc *warehouses.Service,
 	logger *activity.Logger,
 	db *gorm.DB,
 ) *Service {
 	return &Service{
 		repo:      repo,
 		ordersSvc: ordersSvc,
+		whSvc:     whSvc,
 		logger:    logger,
 		db:        db,
 	}
@@ -222,7 +226,10 @@ func (s *Service) AvailableOrders(ctx context.Context, courierID uuid.UUID, p pa
 // and transitions it to assigned.  The entire operation runs in a single
 // repository transaction to prevent race conditions.
 func (s *Service) ClaimOrder(ctx context.Context, courierID uuid.UUID, orderID uuid.UUID) error {
-	if err := s.repo.ClaimOrder(ctx, courierID, orderID); err != nil {
+	stockCheck := func(tx *gorm.DB) error {
+		return s.whSvc.ReserveForClaim(tx, ctx, courierID, orderID)
+	}
+	if err := s.repo.ClaimOrder(ctx, courierID, orderID, stockCheck); err != nil {
 		return err
 	}
 	s.logger.LogAsync(activity.Entry{
@@ -320,7 +327,10 @@ func (s *Service) MarkReturned(ctx context.Context, courierID uuid.UUID, orderID
 // AddressChanged returns the order to confirmed with no courier, recording
 // the new address as a timeline comment.
 func (s *Service) AddressChanged(ctx context.Context, courierID uuid.UUID, orderID uuid.UUID, newAddress string) error {
-	if err := s.repo.AddressChanged(ctx, courierID, orderID, newAddress); err != nil {
+	release := func(tx *gorm.DB) error {
+		return s.ordersSvc.ReleaseOrderReservation(ctx, tx, orderID, string(warehouses.CourierMovementAddressChanged))
+	}
+	if err := s.repo.AddressChanged(ctx, courierID, orderID, newAddress, release); err != nil {
 		return err
 	}
 	s.logger.LogAsync(activity.Entry{
@@ -335,7 +345,10 @@ func (s *Service) AddressChanged(ctx context.Context, courierID uuid.UUID, order
 
 // DeferOrder unassigns the courier and schedules the order for a future date.
 func (s *Service) DeferOrder(ctx context.Context, courierID uuid.UUID, orderID uuid.UUID, req DeferOrderRequest) error {
-	if err := s.repo.DeferOrder(ctx, courierID, orderID, req.ScheduledAt); err != nil {
+	release := func(tx *gorm.DB) error {
+		return s.ordersSvc.ReleaseOrderReservation(ctx, tx, orderID, string(warehouses.CourierMovementPostponed))
+	}
+	if err := s.repo.DeferOrder(ctx, courierID, orderID, req.ScheduledAt, release); err != nil {
 		return err
 	}
 	s.logger.LogAsync(activity.Entry{

@@ -25,7 +25,11 @@ type Inventory struct {
 	ProductID        uuid.UUID `gorm:"type:uuid;not null;column:product_id"`
 	Quantity         int       `gorm:"not null;default:0"`
 	ReservedQuantity int       `gorm:"not null;default:0;column:reserved_quantity"`
-	// Read-only: PostgreSQL GENERATED ALWAYS AS (quantity - reserved_quantity) STORED
+	// BlockedQuantity is held by an issued-but-not-yet-accepted/rejected
+	// courier transfer (see internal/warehouses). Zero for every row unless
+	// a transfer is in flight.
+	BlockedQuantity int `gorm:"not null;default:0;column:blocked_quantity"`
+	// Read-only: PostgreSQL GENERATED ALWAYS AS (quantity - reserved_quantity - blocked_quantity) STORED
 	AvailableQuantity int       `gorm:"->;<-:false;column:available_quantity"`
 	LowStockThreshold int       `gorm:"not null;default:0;column:low_stock_threshold"`
 	CreatedAt         time.Time `gorm:"autoCreateTime"`

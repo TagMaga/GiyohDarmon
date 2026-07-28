@@ -395,6 +395,45 @@ func (r *Repository) UpdateFinancials(ctx context.Context, tx *gorm.DB, id uuid.
 
 // ─── Order Items ──────────────────────────────────────────────────────────────
 
+// UpdateItemWarehouse flips a single order item's reservation to a new
+// warehouse. Must be called inside a transaction that already holds the
+// relevant inventory/courier_inventory row locks.
+func (r *Repository) UpdateItemWarehouse(ctx context.Context, tx *gorm.DB, itemID, warehouseID uuid.UUID) error {
+	result := tx.WithContext(ctx).
+		Model(&OrderItem{}).
+		Where("id = ?", itemID).
+		UpdateColumn("reserved_warehouse_id", warehouseID)
+	if result.Error != nil {
+		return fmt.Errorf("update item warehouse: %w", result.Error)
+	}
+	return nil
+}
+
+// FindActiveReservationsForCourier returns order items for the given product
+// still reserved at the legacy main pool, belonging to orders assigned to
+// courierID and not yet delivered/cancelled/returned — the pool of
+// reservations a transfer acceptance or self-assignment may pull from.
+// Ordered oldest-order-first (FIFO). Locks the returned rows.
+func (r *Repository) FindActiveReservationsForCourier(tx *gorm.DB, ctx context.Context, productID, courierID, mainWarehouseID uuid.UUID) ([]OrderItem, error) {
+	var items []OrderItem
+	err := tx.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "order_items"}}).
+		Table("order_items").
+		Joins("JOIN orders ON orders.id = order_items.order_id").
+		Where("order_items.product_id = ?", productID).
+		Where("order_items.reserved_warehouse_id = ?", mainWarehouseID).
+		Where("orders.courier_id = ?", courierID).
+		Where("orders.status IN (?)", []OrderStatus{StatusAssigned, StatusInDelivery}).
+		Where("orders.deleted_at IS NULL").
+		Order("orders.created_at ASC").
+		Select("order_items.*").
+		Find(&items).Error
+	if err != nil {
+		return nil, fmt.Errorf("find active reservations for courier: %w", err)
+	}
+	return items, nil
+}
+
 func (r *Repository) CreateItems(ctx context.Context, tx *gorm.DB, items []OrderItem) error {
 	if len(items) == 0 {
 		return nil
