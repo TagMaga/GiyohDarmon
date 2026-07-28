@@ -8,11 +8,12 @@ import (
 func (h *Handler) RegisterRoutes(g *gin.RouterGroup) {
 	ownerOnly := middleware.RequireRoles("owner")
 
-	g.GET("/summary",                  ownerOnly, h.GetSummary)
-	g.GET("/transactions",             ownerOnly, h.ListTransactions)
-	g.POST("/income",                  ownerOnly, h.AddIncome)
-	g.POST("/withdrawal",              ownerOnly, h.AddWithdrawal)
-	g.PATCH("/transaction/:id",        ownerOnly, h.UpdateTransaction)
-	g.GET("/transaction/:id/history",  ownerOnly, h.GetTransactionHistory)
-	g.GET("/creators",                 ownerOnly, h.ListCreators)
+	g.GET("/summary", ownerOnly, h.GetSummary)
+	g.GET("/transactions", ownerOnly, h.ListTransactions)
+	g.POST("/income", ownerOnly, h.AddIncome)
+	g.POST("/withdrawal", ownerOnly, h.AddWithdrawal)
+	g.GET("/withdrawal-requests", ownerOnly, h.ListWithdrawalRequests)
+	g.PATCH("/transaction/:id", ownerOnly, h.UpdateTransaction)
+	g.GET("/transaction/:id/history", ownerOnly, h.GetTransactionHistory)
+	g.GET("/creators", ownerOnly, h.ListCreators)
 }

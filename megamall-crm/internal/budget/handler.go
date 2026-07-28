@@ -1,7 +1,9 @@
 package budget
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -13,11 +15,33 @@ import (
 	"github.com/megamall/crm/pkg/response"
 )
 
+// SendApprovalRequestFn sends the Telegram Approve/Reject message for a
+// pending withdrawal request and returns the resulting chat/message ID (so it
+// can be edited later once decided). Injected from cmd/server/main.go — the
+// budget module deliberately doesn't import internal/telegram directly, to
+// keep the same narrow-function-injection pattern used for cross-module
+// dependencies elsewhere in this codebase.
+type SendApprovalRequestFn func(ctx context.Context, requestID uuid.UUID, amount float64, note, requestedByName string) (chatID, messageID int64, err error)
+
 type Handler struct {
-	repo *Repository
+	repo            *Repository
+	sendApproval    SendApprovalRequestFn
+	approvalTimeout time.Duration
 }
 
-func NewHandler(repo *Repository) *Handler { return &Handler{repo: repo} }
+func NewHandler(repo *Repository) *Handler {
+	return &Handler{repo: repo, approvalTimeout: 24 * time.Hour}
+}
+
+// SetTelegramApproval wires up the Telegram approval gate. When unset (the
+// default), owner withdrawals post directly to the ledger exactly as before —
+// this is what keeps a deploy with TELEGRAM_APPROVAL_ENABLED=false a no-op.
+func (h *Handler) SetTelegramApproval(sendFn SendApprovalRequestFn, timeout time.Duration) {
+	h.sendApproval = sendFn
+	if timeout > 0 {
+		h.approvalTimeout = timeout
+	}
+}
 
 // GET /owner/budget/summary?from=&to=
 func (h *Handler) GetSummary(c *gin.Context) {
@@ -120,7 +144,11 @@ type withdrawalRequest struct {
 	Note   string  `json:"note"`
 }
 
-// POST /owner/budget/withdrawal — owner withdrawal
+// POST /owner/budget/withdrawal — owner withdrawal. When Telegram approval is
+// configured (SetTelegramApproval called with a non-nil sender), this creates
+// a pending request and returns 202 instead of writing the ledger row
+// immediately; the actual withdrawal only happens once approved via the
+// Telegram Approve button (see HandleTelegramDecision).
 func (h *Handler) AddWithdrawal(c *gin.Context) {
 	var req withdrawalRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -132,16 +160,55 @@ func (h *Handler) AddWithdrawal(c *gin.Context) {
 		response.Error(c, apperrors.Unauthorized("not authenticated"))
 		return
 	}
-	newBal, err := h.repo.AddWithdrawal(c.Request.Context(), nil, claims.UserID, req.Amount, req.Note)
-	if err != nil {
-		if errors.Is(err, ErrInsufficientBalance) {
-			response.Error(c, apperrors.Unprocessable("insufficient balance"))
+
+	if h.sendApproval == nil {
+		newBal, err := h.repo.AddWithdrawal(c.Request.Context(), nil, claims.UserID, req.Amount, req.Note)
+		if err != nil {
+			if errors.Is(err, ErrInsufficientBalance) {
+				response.Error(c, apperrors.Unprocessable("insufficient balance"))
+				return
+			}
+			response.Error(c, apperrors.Internal(err))
 			return
 		}
+		c.JSON(http.StatusCreated, gin.H{"success": true, "data": gin.H{"balance": newBal}})
+		return
+	}
+
+	ctx := c.Request.Context()
+	expiresAt := time.Now().Add(h.approvalTimeout)
+	pending, err := h.repo.CreateWithdrawalRequest(ctx, claims.UserID, req.Amount, req.Note, expiresAt)
+	if err != nil {
 		response.Error(c, apperrors.Internal(err))
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"success": true, "data": gin.H{"balance": newBal}})
+
+	requesterName, _ := h.repo.UserFullName(ctx, claims.UserID)
+	chatID, messageID, err := h.sendApproval(ctx, pending.ID, req.Amount, req.Note, requesterName)
+	if err != nil {
+		response.Error(c, apperrors.Internal(fmt.Errorf("send telegram approval message: %w", err)))
+		return
+	}
+	if err := h.repo.SetTelegramMessage(ctx, pending.ID, chatID, messageID); err != nil {
+		response.Error(c, apperrors.Internal(err))
+		return
+	}
+
+	c.JSON(http.StatusAccepted, gin.H{"success": true, "data": gin.H{
+		"status":     "pending_telegram_approval",
+		"request_id": pending.ID,
+		"expires_at": pending.ExpiresAt,
+	}})
+}
+
+// GET /owner/budget/withdrawal-requests — recent pending/decided requests.
+func (h *Handler) ListWithdrawalRequests(c *gin.Context) {
+	rows, err := h.repo.ListWithdrawalRequests(c.Request.Context(), 50)
+	if err != nil {
+		response.Error(c, apperrors.Internal(err))
+		return
+	}
+	response.OK(c, rows)
 }
 
 type transactionUpdateRequest struct {
@@ -200,4 +267,48 @@ func (h *Handler) ListCreators(c *gin.Context) {
 		return
 	}
 	response.OK(c, rows)
+}
+
+// HandleTelegramDecision processes an Approve/Reject button press for a
+// withdrawal request. It matches internal/telegram.CallbackHandlerFn's
+// signature so it can be injected directly as that package's callback
+// (cmd/server/main.go wires it up) without internal/budget importing
+// internal/telegram. ok=false + no error means the press was valid but stale
+// (already decided) — a benign no-op, not a failure to log/alert on.
+func (h *Handler) HandleTelegramDecision(ctx context.Context, requestIDStr, action string, telegramUserID int64) (toast, editedText string, err error) {
+	requestID, err := uuid.Parse(requestIDStr)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid request id %q: %w", requestIDStr, err)
+	}
+
+	switch action {
+	case "approve":
+		newBalance, err := h.repo.ApproveWithdrawalRequest(ctx, requestID, telegramUserID)
+		if errors.Is(err, ErrWithdrawalRequestDecided) {
+			return "Already decided.", "", nil
+		}
+		if errors.Is(err, ErrWithdrawalRequestNotFound) {
+			return "Request not found.", "", nil
+		}
+		if err != nil {
+			return "", "", err
+		}
+		return "Approved.", fmt.Sprintf("✅ Withdrawal approved.\nNew balance: %.2f", newBalance), nil
+
+	case "reject":
+		err := h.repo.RejectWithdrawalRequest(ctx, requestID, telegramUserID)
+		if errors.Is(err, ErrWithdrawalRequestDecided) {
+			return "Already decided.", "", nil
+		}
+		if errors.Is(err, ErrWithdrawalRequestNotFound) {
+			return "Request not found.", "", nil
+		}
+		if err != nil {
+			return "", "", err
+		}
+		return "Rejected.", "❌ Withdrawal rejected.", nil
+
+	default:
+		return "", "", fmt.Errorf("unknown action %q", action)
+	}
 }

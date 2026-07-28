@@ -345,6 +345,14 @@ func (r *Repository) ListTransactionHistory(ctx context.Context, id uuid.UUID) (
 	return rows, err
 }
 
+// UserFullName looks up a user's display name for building the Telegram
+// approval message text.
+func (r *Repository) UserFullName(ctx context.Context, userID uuid.UUID) (string, error) {
+	var name string
+	err := r.db.WithContext(ctx).Raw(`SELECT full_name FROM users WHERE id = ?`, userID).Scan(&name).Error
+	return name, err
+}
+
 // ListCreators returns the distinct users who created a top-up/withdrawal, for
 // the "filter by owner" dropdown.
 func (r *Repository) ListCreators(ctx context.Context) ([]CreatorRow, error) {

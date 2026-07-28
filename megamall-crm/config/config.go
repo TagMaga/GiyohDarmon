@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
@@ -13,6 +15,7 @@ type Config struct {
 	JWT      JWTConfig
 	Redis    RedisConfig
 	Media    MediaConfig
+	Telegram TelegramConfig
 }
 
 type ServerConfig struct {
@@ -128,6 +131,49 @@ type MediaConfig struct {
 	UploadDir string `envconfig:"MEDIA_UPLOAD_DIR" default:"./uploads"`
 }
 
+// TelegramConfig governs the owner-budget-withdrawal Telegram approval gate
+// (internal/telegram, internal/budget). Every owner withdrawal is held as a
+// pending request until approved via an inline Approve/Reject button in the
+// configured chat, or auto-expired after ApprovalTimeout.
+type TelegramConfig struct {
+	// Enabled is the master switch. Defaults to false so a deploy of this
+	// code is a no-op (owner withdrawals behave as before) until explicitly
+	// turned on with real bot credentials configured.
+	Enabled bool `envconfig:"TELEGRAM_APPROVAL_ENABLED" default:"false"`
+	// BotToken is the Bot API token from @BotFather.
+	BotToken string `envconfig:"TELEGRAM_BOT_TOKEN"`
+	// ApprovalChatID is the chat the approval message is sent to.
+	ApprovalChatID int64 `envconfig:"TELEGRAM_APPROVAL_CHAT_ID"`
+	// AllowedUserIDsRaw is a comma-separated list of Telegram user IDs
+	// permitted to press Approve/Reject; clicks from any other user are
+	// rejected even if they land in the configured chat. Use AllowedUserIDs
+	// to read the parsed form.
+	AllowedUserIDsRaw string `envconfig:"TELEGRAM_ALLOWED_USER_IDS"`
+	// WebhookSecret is an arbitrary string registered with Telegram's
+	// setWebhook secret_token; incoming webhook requests are rejected unless
+	// their X-Telegram-Bot-Api-Secret-Token header matches.
+	WebhookSecret string `envconfig:"TELEGRAM_WEBHOOK_SECRET"`
+	// ApprovalTimeout is how long a pending withdrawal request waits for a
+	// button press before the sweep goroutine marks it expired.
+	ApprovalTimeout time.Duration `envconfig:"TELEGRAM_APPROVAL_TIMEOUT" default:"24h"`
+}
+
+// AllowedUserIDs parses AllowedUserIDsRaw into int64 Telegram user IDs,
+// skipping blank entries.
+func (t TelegramConfig) AllowedUserIDs() []int64 {
+	var ids []int64
+	for _, part := range strings.Split(t.AllowedUserIDsRaw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if id, err := strconv.ParseInt(part, 10, 64); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 // Load reads all config from environment variables.
 func Load() (*Config, error) {
 	var cfg Config
@@ -149,6 +195,23 @@ func Load() (*Config, error) {
 	}
 	if cfg.Media.Enabled && cfg.Media.SigningSecret == "" {
 		return nil, fmt.Errorf("media config: MEDIA_SIGNING_SECRET is required when MEDIA_PIPELINE_ENABLED=true")
+	}
+	if err := envconfig.Process("", &cfg.Telegram); err != nil {
+		return nil, fmt.Errorf("telegram config: %w", err)
+	}
+	if cfg.Telegram.Enabled {
+		if cfg.Telegram.BotToken == "" {
+			return nil, fmt.Errorf("telegram config: TELEGRAM_BOT_TOKEN is required when TELEGRAM_APPROVAL_ENABLED=true")
+		}
+		if cfg.Telegram.ApprovalChatID == 0 {
+			return nil, fmt.Errorf("telegram config: TELEGRAM_APPROVAL_CHAT_ID is required when TELEGRAM_APPROVAL_ENABLED=true")
+		}
+		if cfg.Telegram.WebhookSecret == "" {
+			return nil, fmt.Errorf("telegram config: TELEGRAM_WEBHOOK_SECRET is required when TELEGRAM_APPROVAL_ENABLED=true")
+		}
+		if len(cfg.Telegram.AllowedUserIDs()) == 0 {
+			return nil, fmt.Errorf("telegram config: TELEGRAM_ALLOWED_USER_IDS is required when TELEGRAM_APPROVAL_ENABLED=true")
+		}
 	}
 
 	return &cfg, nil
