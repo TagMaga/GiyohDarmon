@@ -158,7 +158,7 @@ func (h *Handler) RejectReturn(c *gin.Context) {
 
 func (h *Handler) ListLostReports(c *gin.Context) {
 	p := pagination.ParseFromQuery(c)
-	rows, total, err := h.svc.ListLostReports(c.Request.Context(), nil, p)
+	rows, total, err := h.svc.ListLostReports(c.Request.Context(), c.Query("status"), nil, p)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -282,7 +282,7 @@ func (h *Handler) CreateLostReport(c *gin.Context) {
 func (h *Handler) MyLostReports(c *gin.Context) {
 	p := pagination.ParseFromQuery(c)
 	claims := middleware.ClaimsFromContext(c)
-	rows, total, err := h.svc.ListLostReports(c.Request.Context(), &claims.UserID, p)
+	rows, total, err := h.svc.ListLostReports(c.Request.Context(), c.Query("status"), &claims.UserID, p)
 	if err != nil {
 		response.HandleError(c, err)
 		return

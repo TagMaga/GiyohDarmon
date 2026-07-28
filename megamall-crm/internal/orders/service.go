@@ -1901,6 +1901,18 @@ func (s *Service) revertCourierReservations(ctx context.Context, tx *gorm.DB, o 
 		if err != nil {
 			return err
 		}
+		// The physical units backing this reservation may already have
+		// left the main pool via an accepted transfer (fungible goods, so
+		// any equal quantity currently at main can back it instead) — but
+		// if main stock has since been depleted below what's needed, fail
+		// with a clear error rather than letting the DB's non-negative
+		// check constraint surface as a raw 500.
+		if mainInv.AvailableQuantity < it.Quantity {
+			return apperrors.Conflict(fmt.Sprintf(
+				"cannot unassign: main warehouse only has %d available for product %s, needs %d to restore the reservation",
+				mainInv.AvailableQuantity, it.ProductID, it.Quantity,
+			))
+		}
 		if err := s.invRepo.UpdateReservedQuantity(tx, ctx, mainInv.ID, mainInv.ReservedQuantity+it.Quantity); err != nil {
 			return err
 		}

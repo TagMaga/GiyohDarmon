@@ -24,6 +24,7 @@ import (
 	"github.com/megamall/crm/internal/teams"
 	"github.com/megamall/crm/internal/testutil"
 	"github.com/megamall/crm/internal/users"
+	"github.com/megamall/crm/pkg/pagination"
 	"gorm.io/gorm"
 )
 
@@ -679,5 +680,191 @@ func TestConcurrentTransfers_CannotOverAllocateSameStock(t *testing.T) {
 	}
 	if inv.AvailableQuantity < 0 {
 		t.Errorf("available_quantity must never go negative, got %d", inv.AvailableQuantity)
+	}
+}
+
+// ─── Dispatcher recall after a transfer moved the reservation ──────────────
+//
+// If a dispatcher (not the courier) directly assigns an order, and a later
+// transfer's acceptance sweeps that order's still-at-main reservation into
+// the courier's warehouse (see AcceptTransfer's "move active reservations"
+// step), then main-warehouse stock gets depleted before the dispatcher
+// recalls the courier, restoring the reservation at main must fail cleanly
+// — not corrupt data, and not leak a raw DB constraint error as a 500.
+func TestRecallAfterTransferMove_MainStockDepleted_FailsCleanlyNoCorruption(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	whSvc, orderSvc := buildTestServices(t, db)
+	owner := testutil.CreateUser(t, db, users.RoleOwner)
+	seller := createSellerWithTeam(t, db)
+	courier := testutil.CreateUser(t, db, users.RoleCourier)
+	p := testutil.CreateProduct(t, db)
+	testutil.CreateInventory(t, db, p.ID, owner.ID, 20)
+
+	// Order created and reserved at main (no self-claim — simulates a
+	// dispatcher-direct assignment, which never calls ReserveForClaim).
+	order := createOrderForCourier(t, db, orderSvc, seller.ID, p.ID, 3)
+	db.Exec(`UPDATE orders SET status = 'assigned', courier_id = ? WHERE id = ?`, courier.ID, order.ID)
+	db.Exec(`INSERT INTO order_assignments (id, order_id, courier_id, assigned_by, is_active) VALUES (?, ?, ?, ?, true)`,
+		uuid.New(), order.ID, courier.ID, courier.ID)
+
+	// A transfer of the same product is issued and accepted — its
+	// acceptance sweeps the order's reservation into the courier warehouse.
+	transfer, err := whSvc.CreateTransfer(context.Background(), owner.ID, CreateTransferRequest{
+		FromWarehouseID: DefaultMainWarehouseID, CourierID: courier.ID,
+		Items: []TransferItemRequest{{ProductID: p.ID, Quantity: 10}},
+	})
+	if err != nil {
+		t.Fatalf("create transfer: %v", err)
+	}
+	if _, err := whSvc.AcceptTransfer(context.Background(), courier.ID, transfer.ID); err != nil {
+		t.Fatalf("accept transfer: %v", err)
+	}
+
+	var item orders.OrderItem
+	db.Where("order_id = ?", order.ID).First(&item)
+	if item.ReservedWarehouseID == orders.MainWarehouseID {
+		t.Fatal("expected the order's reservation to have moved to the courier warehouse via transfer acceptance")
+	}
+
+	// Deplete main stock: quantity is now 10 (20-10 transferred), reserved 0
+	// (moved away). Write off down to less than the 3 units the recall will
+	// need to restore.
+	invRepo := inventory.NewRepository(db)
+	mainInv, err := invRepo.GetOrCreateForUpdate(db, context.Background(), p.ID)
+	if err != nil {
+		t.Fatalf("lock main inventory: %v", err)
+	}
+	if err := invRepo.UpdateQuantity(db, context.Background(), mainInv.ID, 1); err != nil {
+		t.Fatalf("deplete main stock: %v", err)
+	}
+
+	// Recall: dispatcher moves the order back to confirmed.
+	_, err = orderSvc.ChangeStatus(context.Background(), owner.ID, "dispatcher", order.ID, orders.ChangeStatusRequest{
+		Status: orders.StatusConfirmed,
+	})
+	if err == nil {
+		t.Fatal("expected recall to fail cleanly when main stock can't back the restored reservation")
+	}
+	t.Logf("got expected clean error: %v", err)
+
+	// No corruption: order/assignment/warehouse state must be exactly as
+	// before the failed recall attempt (transaction rolled back).
+	var afterOrder orders.Order
+	db.Where("id = ?", order.ID).First(&afterOrder)
+	if afterOrder.Status != orders.StatusAssigned {
+		t.Errorf("expected order to remain 'assigned' after a rolled-back recall, got %q", afterOrder.Status)
+	}
+	var ci CourierInventory
+	db.Where("product_id = ?", p.ID).First(&ci)
+	if ci.ReservedQuantity != 3 {
+		t.Errorf("expected courier reserved_quantity to remain 3 (unassign rolled back), got %d", ci.ReservedQuantity)
+	}
+	var mainAfter inventory.Inventory
+	db.Where("id = ?", mainInv.ID).First(&mainAfter)
+	if mainAfter.AvailableQuantity < 0 {
+		t.Fatalf("main available_quantity must never go negative, got %d", mainAfter.AvailableQuantity)
+	}
+}
+
+// ─── Inventory summary (owner dashboard) ────────────────────────────────────
+
+func TestGetInventorySummary_AggregatesBothLedgersCorrectly(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	whSvc, _ := buildTestServices(t, db)
+	owner := testutil.CreateUser(t, db, users.RoleOwner)
+	courier := testutil.CreateUser(t, db, users.RoleCourier)
+	p := testutil.CreateProduct(t, db)
+
+	// Baseline before this test's own data — other tests in this package
+	// (e.g. the concurrency test) intentionally use testutil.DB, a real
+	// non-transactional connection, so their committed rows are visible
+	// here too; assert on the delta, not absolute totals.
+	before, err := whSvc.GetInventorySummary(context.Background())
+	if err != nil {
+		t.Fatalf("get baseline inventory summary: %v", err)
+	}
+
+	testutil.CreateInventory(t, db, p.ID, owner.ID, 50)
+
+	transfer, err := whSvc.CreateTransfer(context.Background(), owner.ID, CreateTransferRequest{
+		FromWarehouseID: DefaultMainWarehouseID, CourierID: courier.ID,
+		Items: []TransferItemRequest{{ProductID: p.ID, Quantity: 20}},
+	})
+	if err != nil {
+		t.Fatalf("create transfer: %v", err)
+	}
+	if _, err := whSvc.AcceptTransfer(context.Background(), courier.ID, transfer.ID); err != nil {
+		t.Fatalf("accept transfer: %v", err)
+	}
+
+	after, err := whSvc.GetInventorySummary(context.Background())
+	if err != nil {
+		t.Fatalf("get inventory summary: %v", err)
+	}
+	// A prior bug reused one destination struct across two Raw().Scan()
+	// calls, silently zeroing the first query's main_* fields — this
+	// guards against that regression.
+	if got := after.MainQuantity - before.MainQuantity; got != 30 {
+		t.Errorf("expected main_quantity delta = 30 (50-20 transferred), got %d", got)
+	}
+	if got := after.CourierQuantity - before.CourierQuantity; got != 20 {
+		t.Errorf("expected courier_quantity delta = 20, got %d", got)
+	}
+}
+
+// ─── Lost report status filtering (owner dashboard panel) ──────────────────
+
+func TestListLostReports_FiltersByStatus(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	whSvc, _ := buildTestServices(t, db)
+	owner := testutil.CreateUser(t, db, users.RoleOwner)
+	courier := testutil.CreateUser(t, db, users.RoleCourier)
+	p := testutil.CreateProduct(t, db)
+	testutil.CreateInventory(t, db, p.ID, owner.ID, 100)
+
+	transfer, err := whSvc.CreateTransfer(context.Background(), owner.ID, CreateTransferRequest{
+		FromWarehouseID: DefaultMainWarehouseID, CourierID: courier.ID,
+		Items: []TransferItemRequest{{ProductID: p.ID, Quantity: 10}},
+	})
+	if err != nil {
+		t.Fatalf("create transfer: %v", err)
+	}
+	if _, err := whSvc.AcceptTransfer(context.Background(), courier.ID, transfer.ID); err != nil {
+		t.Fatalf("accept transfer: %v", err)
+	}
+
+	pending, err := whSvc.CreateLostReport(context.Background(), courier.ID, CreateLostReportRequest{
+		ProductID: p.ID, Quantity: 1, PhotoURL: "https://example.com/a.jpg", Comment: "stays pending",
+	})
+	if err != nil {
+		t.Fatalf("create pending report: %v", err)
+	}
+	decided, err := whSvc.CreateLostReport(context.Background(), courier.ID, CreateLostReportRequest{
+		ProductID: p.ID, Quantity: 1, PhotoURL: "https://example.com/b.jpg", Comment: "gets approved",
+	})
+	if err != nil {
+		t.Fatalf("create report to approve: %v", err)
+	}
+	if _, err := whSvc.DecideLostReport(context.Background(), owner.ID, decided.ID, DecideLostReportRequest{Approve: true}); err != nil {
+		t.Fatalf("approve report: %v", err)
+	}
+
+	// A prior bug: the "pending" filter the owner dashboard panel relies on
+	// was silently ignored end-to-end (handler never read the query param),
+	// so an approved/rejected report never left the "awaiting decision" list.
+	rows, total, err := whSvc.ListLostReports(context.Background(), string(LostReportPending), nil, pagination.Params{Limit: 50})
+	if err != nil {
+		t.Fatalf("list pending reports: %v", err)
+	}
+	if total != 1 || len(rows) != 1 || rows[0].ID != pending.ID {
+		t.Fatalf("expected exactly the 1 still-pending report, got total=%d rows=%v", total, rows)
+	}
+
+	allRows, allTotal, err := whSvc.ListLostReports(context.Background(), "", nil, pagination.Params{Limit: 50})
+	if err != nil {
+		t.Fatalf("list all reports: %v", err)
+	}
+	if allTotal != 2 || len(allRows) != 2 {
+		t.Fatalf("expected 2 reports with no status filter, got total=%d rows=%d", allTotal, len(allRows))
 	}
 }
