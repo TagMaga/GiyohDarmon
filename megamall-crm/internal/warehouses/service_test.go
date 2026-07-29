@@ -887,6 +887,62 @@ func TestGetInventorySummary_AggregatesBothLedgersCorrectly(t *testing.T) {
 	}
 }
 
+func TestGetInventoryDistribution_ListsMainAndCourierBalances(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	whSvc, _ := buildTestServices(t, db)
+	owner := testutil.CreateUser(t, db, users.RoleOwner)
+	courier := testutil.CreateUser(t, db, users.RoleCourier)
+	p := testutil.CreateProduct(t, db)
+	testutil.CreateInventory(t, db, p.ID, owner.ID, 50)
+
+	transfer, err := whSvc.CreateTransfer(context.Background(), owner.ID, CreateTransferRequest{
+		FromWarehouseID: DefaultMainWarehouseID,
+		CourierID:       courier.ID,
+		Items:           []TransferItemRequest{{ProductID: p.ID, Quantity: 20}},
+	})
+	if err != nil {
+		t.Fatalf("create transfer: %v", err)
+	}
+	if _, err := whSvc.AcceptTransfer(context.Background(), courier.ID, transfer.ID); err != nil {
+		t.Fatalf("accept transfer: %v", err)
+	}
+
+	distribution, err := whSvc.GetInventoryDistribution(context.Background())
+	if err != nil {
+		t.Fatalf("get inventory distribution: %v", err)
+	}
+
+	var courierWarehouseID uuid.UUID
+	for _, location := range distribution.Locations {
+		if location.CourierID != nil && *location.CourierID == courier.ID {
+			courierWarehouseID = location.ID
+			break
+		}
+	}
+	if courierWarehouseID == uuid.Nil {
+		t.Fatal("expected courier warehouse in distribution locations")
+	}
+
+	var mainQty, courierQty int
+	for _, item := range distribution.Items {
+		if item.ProductID != p.ID {
+			continue
+		}
+		switch item.WarehouseID {
+		case DefaultMainWarehouseID:
+			mainQty = item.Quantity
+		case courierWarehouseID:
+			courierQty = item.Quantity
+		}
+	}
+	if mainQty != 30 {
+		t.Errorf("expected main product quantity 30, got %d", mainQty)
+	}
+	if courierQty != 20 {
+		t.Errorf("expected courier product quantity 20, got %d", courierQty)
+	}
+}
+
 // ─── Lost report status filtering (owner dashboard panel) ──────────────────
 
 func TestListLostReports_FiltersByStatus(t *testing.T) {

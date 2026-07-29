@@ -48,6 +48,15 @@ func (h *Handler) InventorySummary(c *gin.Context) {
 	response.OK(c, s)
 }
 
+func (h *Handler) InventoryDistribution(c *gin.Context) {
+	distribution, err := h.svc.GetInventoryDistribution(c.Request.Context())
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, distribution)
+}
+
 func (h *Handler) ListWarehouses(c *gin.Context) {
 	rows, err := h.svc.ListWarehouses(c.Request.Context(), c.Query("type"))
 	if err != nil {

@@ -5,6 +5,7 @@ import {
   createTransfer,
   createWarehouse,
   decideLostReport,
+  fetchInventoryDistribution,
   fetchInventorySummary,
   fetchLostReports,
   fetchReturns,
@@ -17,6 +18,15 @@ export function useInventorySummary(options = {}) {
   return useQuery({
     queryKey: KEYS.warehouse.inventorySummary,
     queryFn: fetchInventorySummary,
+    staleTime: 15_000,
+    enabled: options.enabled ?? true,
+  })
+}
+
+export function useInventoryDistribution(options = {}) {
+  return useQuery({
+    queryKey: KEYS.warehouse.inventoryDistribution,
+    queryFn: fetchInventoryDistribution,
     staleTime: 15_000,
     enabled: options.enabled ?? true,
   })
@@ -55,6 +65,8 @@ export function useCreateTransfer() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['warehouse', 'transfers'] })
       qc.invalidateQueries({ queryKey: KEYS.warehouse.inventory })
+      qc.invalidateQueries({ queryKey: KEYS.warehouse.inventorySummary })
+      qc.invalidateQueries({ queryKey: KEYS.warehouse.inventoryDistribution })
       qc.invalidateQueries({ queryKey: KEYS.warehouse.movements })
     },
   })
@@ -73,7 +85,11 @@ export function useDecideLostReport() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ reportId, payload }) => decideLostReport(reportId, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['warehouse', 'lostReports'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['warehouse', 'lostReports'] })
+      qc.invalidateQueries({ queryKey: KEYS.warehouse.inventorySummary })
+      qc.invalidateQueries({ queryKey: KEYS.warehouse.inventoryDistribution })
+    },
   })
 }
 
@@ -93,6 +109,8 @@ export function useAcceptReturn() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['warehouse', 'returns'] })
       qc.invalidateQueries({ queryKey: KEYS.warehouse.inventory })
+      qc.invalidateQueries({ queryKey: KEYS.warehouse.inventorySummary })
+      qc.invalidateQueries({ queryKey: KEYS.warehouse.inventoryDistribution })
       qc.invalidateQueries({ queryKey: KEYS.warehouse.movements })
     },
   })

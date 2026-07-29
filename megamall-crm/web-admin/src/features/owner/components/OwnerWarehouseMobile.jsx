@@ -6,6 +6,13 @@ import NotificationBell from '../../../shared/components/NotificationBell'
 import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'
 import SalesReportPanel from '../../warehouse/pages/WarehouseSalesReportPanel'
 import { ExpiryAlertsList } from '../../warehouse/components/ExpiryAlertsPanel'
+import { CourierWarehouseSummary } from '../../warehouse/components/TransferComponents'
+import {
+  DistributionText,
+  getDerivedStockStatus,
+  getLocationDisplayName,
+  InventoryFilterBar,
+} from '../../warehouse/components/InventoryFilters'
 import useExpiryAlerts from '../../warehouse/hooks/useExpiryAlerts'
 import {
   STOCK_STATUS_BADGE,
@@ -20,7 +27,6 @@ import {
   getProductSku,
   getPurchasePrice,
   getQuantity,
-  getReservedQty,
   getSalePrice,
   getStockStatus,
   isProductActive,
@@ -173,8 +179,9 @@ function AttentionCard({ inventory, product, onOpen, onReceive }) {
   )
 }
 
-function MobileInventoryCard({ product, inv, movements = [], onReceive, onWriteoff, onEdit }) {
-  const status = getStockStatus(inv)
+function MobileInventoryCard({ row, movements = [], onReceive, onWriteoff, onEdit }) {
+  const { product, inv, metrics, visibleStocks } = row
+  const status = getDerivedStockStatus(metrics, inv)
   return (
     <div className="rounded-[18px] bg-white p-3.5" style={{ boxShadow: CARD_SHADOW }}>
       <div className="flex items-start justify-between gap-2">
@@ -191,17 +198,21 @@ function MobileInventoryCard({ product, inv, movements = [], onReceive, onWriteo
       </div>
       <div className="mt-3.5 grid grid-cols-3 gap-2 text-center">
         <div>
-          <p className="text-[16px] font-extrabold tabular-nums" style={{ color: INK }}>{getQuantity(inv)}</p>
-          <p className="mt-0.5 text-[10px] font-semibold" style={{ color: MUTED }}>На складе</p>
+          <p className="text-[16px] font-extrabold tabular-nums" style={{ color: INK }}>{metrics.quantity}</p>
+          <p className="mt-0.5 text-[10px] font-semibold" style={{ color: MUTED }}>Остаток</p>
         </div>
         <div>
-          <p className="text-[16px] font-extrabold tabular-nums text-emerald-700">{getAvailableQty(inv)}</p>
+          <p className="text-[16px] font-extrabold tabular-nums text-emerald-700">{metrics.available}</p>
           <p className="mt-0.5 text-[10px] font-semibold" style={{ color: MUTED }}>Доступно</p>
         </div>
         <div>
-          <p className="text-[16px] font-extrabold tabular-nums text-amber-700">{getReservedQty(inv)}</p>
+          <p className="text-[16px] font-extrabold tabular-nums text-amber-700">{metrics.reserved}</p>
           <p className="mt-0.5 text-[10px] font-semibold" style={{ color: MUTED }}>Резерв</p>
         </div>
+      </div>
+      <div className="mt-3 border-t border-slate-100 pt-2.5">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Распределение</p>
+        <DistributionText stocks={visibleStocks} compact />
       </div>
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-[12px] text-slate-500">
         <span>Закупка <b className="text-slate-700">{fmtMoney(getLastPrice(getId(product), movements) ?? getPurchasePrice(product))}</b></span>
@@ -227,6 +238,9 @@ function MobileEmpty({ title }) {
 export default function OwnerWarehouseMobile({
   tab, onTab, data,
   inventorySearch, onInventorySearch,
+  selectedProducts, onProducts, selectedWarehouses, onWarehouses,
+  selectedStatuses, onStatuses, selectedExpiry, onExpiry,
+  inventoryLocations, filteredSummary,
   movementSearch, onMovementSearch, movementType, onMovementType, movementProductId, onMovementProductId, clearMovementFilters,
   inventoryRows, stockAlerts, receivingRows, movementRows, validProducts,
   onReceive, onWriteoff, onEdit, onProduct, onOpenAlert, onRefresh,
@@ -365,17 +379,36 @@ export default function OwnerWarehouseMobile({
 
       {tab === 'inventory' && (
         <div className="space-y-2.5">
-          <MobileSearchBar
-            value={inventorySearch}
-            onChange={onInventorySearch}
-            placeholder="Товар, SKU или штрихкод…"
+          <InventoryFilterBar
+            search={inventorySearch}
+            onSearch={onInventorySearch}
+            productOptions={data.products.map((product) => ({
+              value: getId(product),
+              label: getProductName(product),
+              description: getProductSku(product),
+            }))}
+            locationOptions={inventoryLocations.map((location) => ({
+              value: location.id,
+              label: getLocationDisplayName(location),
+              description: location.type === 'main' ? 'Главный склад' : 'Склад курьера',
+            }))}
+            selectedProducts={selectedProducts}
+            onProducts={onProducts}
+            selectedWarehouses={selectedWarehouses}
+            onWarehouses={onWarehouses}
+            selectedStatuses={selectedStatuses}
+            onStatuses={onStatuses}
+            selectedExpiry={selectedExpiry}
+            onExpiry={onExpiry}
+            resultCount={inventoryRows.length}
           />
+          <CourierWarehouseSummary summary={filteredSummary} detailed />
           {inventoryRows.length === 0 ? (
             <MobileEmpty title="Остатки не найдены" />
           ) : (
             <div className="space-y-2.5">
-              {inventoryRows.map(({ product, inv }) => (
-                <MobileInventoryCard key={getId(product)} product={product} inv={inv} movements={data.movements} onReceive={onReceive} onWriteoff={onWriteoff} onEdit={onEdit} />
+              {inventoryRows.map((row) => (
+                <MobileInventoryCard key={getId(row.product)} row={row} movements={data.movements} onReceive={onReceive} onWriteoff={onWriteoff} onEdit={onEdit} />
               ))}
             </div>
           )}

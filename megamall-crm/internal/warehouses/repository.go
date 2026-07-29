@@ -336,14 +336,14 @@ func (r *Repository) HasOpenReturn(ctx context.Context, courierID uuid.UUID) (bo
 // ─── Aggregate summary (owner dashboard / inventory tab) ───────────────────────
 
 type InventorySummary struct {
-	MainQuantity        int `json:"main_quantity"`
-	MainReserved        int `json:"main_reserved"`
-	MainBlocked         int `json:"main_blocked"`
-	CourierQuantity     int `json:"courier_quantity"`
-	CourierReserved     int `json:"courier_reserved"`
-	PendingTransfers    int `json:"pending_transfers"`
-	PendingReturns      int `json:"pending_returns"`
-	PendingLostReports  int `json:"pending_lost_reports"`
+	MainQuantity       int `json:"main_quantity"`
+	MainReserved       int `json:"main_reserved"`
+	MainBlocked        int `json:"main_blocked"`
+	CourierQuantity    int `json:"courier_quantity"`
+	CourierReserved    int `json:"courier_reserved"`
+	PendingTransfers   int `json:"pending_transfers"`
+	PendingReturns     int `json:"pending_returns"`
+	PendingLostReports int `json:"pending_lost_reports"`
 }
 
 // CourierBrief is the minimal courier info exposed to the transfer-issuance
@@ -414,6 +414,77 @@ func (r *Repository) GetInventorySummary(ctx context.Context) (*InventorySummary
 	s.PendingReturns = int(pendingReturns)
 	s.PendingLostReports = int(pendingLost)
 	return &s, nil
+}
+
+// GetInventoryDistribution returns the normalized per-product balances used by
+// the inventory page's warehouse filter and "Распределение" column.
+//
+// The pre-warehouse inventory table is still the source of truth for the one
+// main pool, so it is mapped to DefaultMainWarehouseID. Courier balances are
+// already warehouse-scoped in courier_inventory.
+func (r *Repository) GetInventoryDistribution(ctx context.Context) (*InventoryDistributionResponse, error) {
+	result := &InventoryDistributionResponse{
+		Locations: []InventoryLocationResponse{},
+		Items:     []InventoryDistributionItemResponse{},
+	}
+
+	if err := r.db.WithContext(ctx).Raw(`
+		SELECT id, type, name, courier_id
+		FROM warehouses
+		WHERE is_active = true
+		  AND (id = ? OR type = ?)
+		ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END, name ASC
+	`, DefaultMainWarehouseID, WarehouseTypeCourier, DefaultMainWarehouseID).
+		Scan(&result.Locations).Error; err != nil {
+		return nil, fmt.Errorf("list inventory locations: %w", err)
+	}
+
+	// A defensive fallback keeps the main location selectable if a development
+	// database was created without the migration's seeded warehouse row.
+	hasMain := false
+	for _, location := range result.Locations {
+		if location.ID == DefaultMainWarehouseID {
+			hasMain = true
+			break
+		}
+	}
+	if !hasMain {
+		result.Locations = append([]InventoryLocationResponse{{
+			ID: DefaultMainWarehouseID, Type: WarehouseTypeMain, Name: "Главный склад",
+		}}, result.Locations...)
+	}
+
+	if err := r.db.WithContext(ctx).Raw(`
+		SELECT
+			i.product_id,
+			?::uuid AS warehouse_id,
+			i.quantity,
+			i.reserved_quantity,
+			i.blocked_quantity,
+			i.available_quantity
+		FROM inventory i
+
+		UNION ALL
+
+		SELECT
+			ci.product_id,
+			ci.warehouse_id,
+			ci.quantity,
+			ci.reserved_quantity,
+			ci.blocked_quantity,
+			ci.available_quantity
+		FROM courier_inventory ci
+		JOIN warehouses w ON w.id = ci.warehouse_id
+		WHERE w.is_active = true
+		  AND w.type = ?
+
+		ORDER BY product_id, warehouse_id
+	`, DefaultMainWarehouseID, WarehouseTypeCourier).
+		Scan(&result.Items).Error; err != nil {
+		return nil, fmt.Errorf("list inventory distribution: %w", err)
+	}
+
+	return result, nil
 }
 
 // ─── Lost reports ─────────────────────────────────────────────────────────────

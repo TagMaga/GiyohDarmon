@@ -100,6 +100,10 @@ func (s *Service) GetInventorySummary(ctx context.Context) (*InventorySummary, e
 	return s.repo.GetInventorySummary(ctx)
 }
 
+func (s *Service) GetInventoryDistribution(ctx context.Context) (*InventoryDistributionResponse, error) {
+	return s.repo.GetInventoryDistribution(ctx)
+}
+
 func (s *Service) ListCouriers(ctx context.Context) ([]CourierBrief, error) {
 	return s.repo.ListCouriers(ctx)
 }
