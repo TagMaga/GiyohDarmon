@@ -9,13 +9,13 @@ import (
 // ─── Warehouses ───────────────────────────────────────────────────────────────
 
 type WarehouseResponse struct {
-	ID         uuid.UUID     `json:"id"`
-	Type       WarehouseType `json:"type"`
-	Name       string        `json:"name"`
-	CityID     *uuid.UUID    `json:"city_id,omitempty"`
-	CourierID  *uuid.UUID    `json:"courier_id,omitempty"`
-	IsActive   bool          `json:"is_active"`
-	CreatedAt  time.Time     `json:"created_at"`
+	ID        uuid.UUID     `json:"id"`
+	Type      WarehouseType `json:"type"`
+	Name      string        `json:"name"`
+	CityID    *uuid.UUID    `json:"city_id,omitempty"`
+	CourierID *uuid.UUID    `json:"courier_id,omitempty"`
+	IsActive  bool          `json:"is_active"`
+	CreatedAt time.Time     `json:"created_at"`
 }
 
 func ToWarehouseResponse(w *Warehouse) WarehouseResponse {
@@ -30,6 +30,35 @@ type CreateWarehouseRequest struct {
 	CityID *uuid.UUID `json:"city_id"`
 }
 
+// ─── Inventory distribution ──────────────────────────────────────────────────
+
+// InventoryLocationResponse is a selectable stock location on the inventory
+// page. The legacy main inventory pool is represented by the seeded default
+// main warehouse; courier locations come from courier_inventory.
+type InventoryLocationResponse struct {
+	ID        uuid.UUID     `json:"id"`
+	Type      WarehouseType `json:"type"`
+	Name      string        `json:"name"`
+	CourierID *uuid.UUID    `json:"courier_id,omitempty"`
+}
+
+// InventoryDistributionItemResponse is one product's balance at one location.
+// Keeping the response normalized avoids repeating warehouse names for every
+// product and lets the frontend aggregate any selected location combination.
+type InventoryDistributionItemResponse struct {
+	ProductID         uuid.UUID `json:"product_id"`
+	WarehouseID       uuid.UUID `json:"warehouse_id"`
+	Quantity          int       `json:"quantity"`
+	ReservedQuantity  int       `json:"reserved_quantity"`
+	BlockedQuantity   int       `json:"blocked_quantity"`
+	AvailableQuantity int       `json:"available_quantity"`
+}
+
+type InventoryDistributionResponse struct {
+	Locations []InventoryLocationResponse         `json:"locations"`
+	Items     []InventoryDistributionItemResponse `json:"items"`
+}
+
 // ─── Transfers ────────────────────────────────────────────────────────────────
 
 type TransferItemRequest struct {
@@ -38,9 +67,9 @@ type TransferItemRequest struct {
 }
 
 type CreateTransferRequest struct {
-	FromWarehouseID uuid.UUID              `json:"from_warehouse_id" validate:"required"`
-	CourierID       uuid.UUID              `json:"courier_id" validate:"required"`
-	Items           []TransferItemRequest  `json:"items" validate:"required,min=1,dive"`
+	FromWarehouseID uuid.UUID             `json:"from_warehouse_id" validate:"required"`
+	CourierID       uuid.UUID             `json:"courier_id" validate:"required"`
+	Items           []TransferItemRequest `json:"items" validate:"required,min=1,dive"`
 }
 
 type TransferItemResponse struct {
@@ -57,7 +86,7 @@ type TransferResponse struct {
 	ToCourierID       uuid.UUID              `json:"to_courier_id"`
 	CourierName       string                 `json:"courier_name,omitempty"`
 	ToWarehouseID     *uuid.UUID             `json:"to_warehouse_id,omitempty"`
-	Status            TransferStatus        `json:"status"`
+	Status            TransferStatus         `json:"status"`
 	CreatedBy         uuid.UUID              `json:"created_by"`
 	CreatedByName     string                 `json:"created_by_name,omitempty"`
 	CreatedAt         time.Time              `json:"created_at"`
@@ -75,17 +104,17 @@ type ListTransfersFilter struct {
 // CourierStockItem is deliberately cost-free — couriers must never see
 // purchase price or the monetary value of their inventory.
 type CourierStockItem struct {
-	ProductID       uuid.UUID `json:"product_id"`
-	ProductName     string    `json:"product_name"`
-	ProductImageURL *string   `json:"product_image_url,omitempty"`
-	Quantity        int       `json:"quantity"`
-	ReservedQuantity int      `json:"reserved_quantity"`
-	AvailableQuantity int     `json:"available_quantity"`
+	ProductID         uuid.UUID `json:"product_id"`
+	ProductName       string    `json:"product_name"`
+	ProductImageURL   *string   `json:"product_image_url,omitempty"`
+	Quantity          int       `json:"quantity"`
+	ReservedQuantity  int       `json:"reserved_quantity"`
+	AvailableQuantity int       `json:"available_quantity"`
 }
 
 type MyWarehouseResponse struct {
-	WarehouseID     *uuid.UUID          `json:"warehouse_id,omitempty"`
-	Items           []CourierStockItem  `json:"items"`
+	WarehouseID      *uuid.UUID         `json:"warehouse_id,omitempty"`
+	Items            []CourierStockItem `json:"items"`
 	PendingTransfers []TransferResponse `json:"pending_transfers"`
 }
 
@@ -125,8 +154,8 @@ type CreateLostReportRequest struct {
 }
 
 type DecideLostReportRequest struct {
-	Approve          bool    `json:"approve"`
-	RejectionReason  *string `json:"rejection_reason"`
+	Approve         bool    `json:"approve"`
+	RejectionReason *string `json:"rejection_reason"`
 }
 
 type LostReportResponse struct {

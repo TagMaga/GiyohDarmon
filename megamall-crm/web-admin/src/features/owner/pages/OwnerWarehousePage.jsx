@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Building2,
   Download,
@@ -26,12 +26,21 @@ import {
   TransferList,
 } from '../../warehouse/components/TransferComponents'
 import useWarehouseData from '../../warehouse/hooks/useWarehouseData'
-import { useInventorySummary, useTransfers } from '../../warehouse/hooks/useTransfers'
+import { useInventoryDistribution, useInventorySummary, useTransfers } from '../../warehouse/hooks/useTransfers'
 import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'
 import SalesReportPanel from '../../warehouse/pages/WarehouseSalesReportPanel'
 import OwnerWarehouseMobile from '../components/OwnerWarehouseMobile'
 import ExpiryAlertsPanel from '../../warehouse/components/ExpiryAlertsPanel'
 import useExpiryAlerts from '../../warehouse/hooks/useExpiryAlerts'
+import {
+  aggregateStocks,
+  DistributionText,
+  getDerivedStockStatus,
+  getExpiryBucket,
+  getLocationDisplayName,
+  InventoryFilterBar,
+  MAIN_WAREHOUSE_ID,
+} from '../../warehouse/components/InventoryFilters'
 import { getNearestExpiry, hasAlertForProduct, sumAlertUnitsForProduct, fmtExpiryDate } from '../../warehouse/utils/warehouseHelpers'
 import {
   STOCK_STATUS_BADGE,
@@ -74,8 +83,14 @@ const MOVEMENT_TYPES = [
 
 export default function OwnerWarehousePage() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState('dashboard')
-  const [inventorySearch, setInventorySearch] = useState('')
+  const [routeParams] = useSearchParams()
+  const requestedProduct = routeParams.get('q') ?? ''
+  const [tab, setTab] = useState(requestedProduct ? 'inventory' : 'dashboard')
+  const [inventorySearch, setInventorySearch] = useState(requestedProduct)
+  const [selectedProducts, setSelectedProducts] = useState([])
+  const [selectedWarehouses, setSelectedWarehouses] = useState([])
+  const [selectedStatuses, setSelectedStatuses] = useState([])
+  const [selectedExpiry, setSelectedExpiry] = useState([])
   const [movementSearch, setMovementSearch] = useState('')
   const [movementType, setMovementType] = useState('')
   const [movementProductId, setMovementProductId] = useState('')
@@ -87,20 +102,95 @@ export default function OwnerWarehousePage() {
   const [transferStatus, setTransferStatus] = useState('')
   const data = useWarehouseData()
   const { data: transfers = [], isLoading: transfersLoading } = useTransfers({ status: transferStatus })
-  const { data: invSummary } = useInventorySummary()
+  const { data: invSummary, refetch: refetchSummary } = useInventorySummary()
+  const distributionQ = useInventoryDistribution()
   const { alerts: expiryAlerts } = useExpiryAlerts()
+
+  useEffect(() => {
+    if (!requestedProduct) return
+    setInventorySearch(requestedProduct)
+    setTab('inventory')
+  }, [requestedProduct])
 
   const inventoryByProduct = useMemo(
     () => new Map(data.inventory.map((inv) => [inv.product_id ?? inv.ProductID, inv])),
     [data.inventory]
   )
 
+  const distribution = useMemo(() => {
+    if (distributionQ.data) return distributionQ.data
+    return {
+      locations: [{ id: MAIN_WAREHOUSE_ID, type: 'main', name: 'Главный склад' }],
+      items: data.inventory.map((inv) => ({
+        product_id: inv.product_id ?? inv.ProductID,
+        warehouse_id: MAIN_WAREHOUSE_ID,
+        quantity: getQuantity(inv),
+        reserved_quantity: getReservedQty(inv),
+        blocked_quantity: inv.blocked_quantity ?? inv.BlockedQuantity ?? 0,
+        available_quantity: getAvailableQty(inv),
+      })),
+    }
+  }, [data.inventory, distributionQ.data])
+
+  const locations = distribution.locations ?? []
+  const locationById = useMemo(
+    () => new Map(locations.map((location) => [location.id, location])),
+    [locations],
+  )
+  const stockByProduct = useMemo(() => {
+    const result = new Map()
+    for (const item of distribution.items ?? []) {
+      if (!result.has(item.product_id)) result.set(item.product_id, [])
+      result.get(item.product_id).push({
+        ...item,
+        location: locationById.get(item.warehouse_id) ?? {
+          id: item.warehouse_id,
+          name: 'Склад',
+          type: 'courier',
+        },
+      })
+    }
+    return result
+  }, [distribution.items, locationById])
+
   const inventoryRows = useMemo(() => {
     const q = inventorySearch.trim().toLowerCase()
     return data.products.map((product) => {
-      const inv = inventoryByProduct.get(getId(product)) ?? null
-      return { product, inv }
-    }).filter(({ product, inv }) => {
+      const productId = getId(product)
+      const inv = inventoryByProduct.get(productId) ?? null
+      const allStocks = stockByProduct.get(productId) ?? []
+      const visibleStocks = selectedWarehouses.length
+        ? allStocks.filter((stock) => selectedWarehouses.includes(stock.warehouse_id))
+        : allStocks
+      const includesMain = !selectedWarehouses.length ||
+        selectedWarehouses.some((id) => locationById.get(id)?.type === 'main')
+      const metrics = aggregateStocks(visibleStocks)
+      const nearestExpiry = includesMain ? getNearestExpiry(productId, data.batches) : null
+      const expiryBucket = getExpiryBucket(nearestExpiry)
+      const lowThreshold = inv?.low_stock_threshold ?? inv?.LowStockThreshold ?? 0
+      const flags = {
+        in_stock: metrics.quantity > 0 && metrics.available > lowThreshold,
+        low_stock: metrics.quantity > 0 && metrics.available <= lowThreshold,
+        out_of_stock: metrics.quantity <= 0,
+        reserved: metrics.reserved > 0,
+        courier: metrics.courierQuantity > 0,
+        in_transfer: metrics.blocked > 0,
+      }
+      return {
+        product,
+        inv,
+        allStocks,
+        visibleStocks,
+        metrics: { ...metrics, includesMain },
+        nearestExpiry,
+        expiryBucket,
+        flags,
+      }
+    }).filter((row) => {
+      const { product, flags, expiryBucket } = row
+      if (selectedProducts.length && !selectedProducts.includes(getId(product))) return false
+      if (selectedStatuses.length && !selectedStatuses.some((status) => flags[status])) return false
+      if (selectedExpiry.length && !selectedExpiry.includes(expiryBucket)) return false
       if (!q) return true
       return (
         getProductName(product).toLowerCase().includes(q) ||
@@ -108,7 +198,40 @@ export default function OwnerWarehousePage() {
         getProductBarcode(product).toLowerCase().includes(q)
       )
     })
-  }, [data.products, inventoryByProduct, inventorySearch])
+  }, [
+    data.batches,
+    data.products,
+    inventoryByProduct,
+    inventorySearch,
+    locationById,
+    selectedExpiry,
+    selectedProducts,
+    selectedStatuses,
+    selectedWarehouses,
+    stockByProduct,
+  ])
+
+  const filteredSummary = useMemo(() => {
+    const summary = {
+      main_quantity: 0,
+      main_reserved: 0,
+      main_blocked: 0,
+      courier_quantity: 0,
+      courier_reserved: 0,
+      pending_transfers: 0,
+      pending_returns: invSummary?.pending_returns ?? 0,
+      pending_lost_reports: invSummary?.pending_lost_reports ?? 0,
+    }
+    for (const row of inventoryRows) {
+      summary.main_quantity += row.metrics.mainQuantity
+      summary.main_reserved += row.metrics.mainReserved
+      summary.main_blocked += row.metrics.mainBlocked
+      summary.courier_quantity += row.metrics.courierQuantity
+      summary.courier_reserved += row.metrics.courierReserved
+      summary.pending_transfers += row.metrics.blocked
+    }
+    return summary
+  }, [inventoryRows, invSummary])
 
   const stockAlerts = useMemo(() => data.inventory
     .filter((inv) => {
@@ -146,6 +269,12 @@ export default function OwnerWarehousePage() {
     setMovementProductId('')
   }
 
+  function refreshAll() {
+    data.refetchAll()
+    distributionQ.refetch()
+    refetchSummary()
+  }
+
   return (
     <>
       <div className="lg:hidden">
@@ -155,6 +284,16 @@ export default function OwnerWarehousePage() {
           data={data}
           inventorySearch={inventorySearch}
           onInventorySearch={setInventorySearch}
+          selectedProducts={selectedProducts}
+          onProducts={setSelectedProducts}
+          selectedWarehouses={selectedWarehouses}
+          onWarehouses={setSelectedWarehouses}
+          selectedStatuses={selectedStatuses}
+          onStatuses={setSelectedStatuses}
+          selectedExpiry={selectedExpiry}
+          onExpiry={setSelectedExpiry}
+          inventoryLocations={locations}
+          filteredSummary={filteredSummary}
           movementSearch={movementSearch}
           onMovementSearch={setMovementSearch}
           movementType={movementType}
@@ -175,7 +314,7 @@ export default function OwnerWarehousePage() {
             setInventorySearch(getProductSku(product))
             setTab('inventory')
           }}
-          onRefresh={data.refetchAll}
+          onRefresh={refreshAll}
         />
       </div>
 
@@ -186,7 +325,7 @@ export default function OwnerWarehousePage() {
           <p className="text-[12.5px] text-slate-400 mt-0.5">Остатки, товары, приёмка, списания и движение товара</p>
         </div>
         <button
-          onClick={data.refetchAll}
+          onClick={refreshAll}
           className="flex min-h-[44px] flex-shrink-0 items-center gap-2 rounded-[10px] bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 transition-all hover:bg-slate-200"
         >
           <RefreshCw size={14} />
@@ -212,9 +351,9 @@ export default function OwnerWarehousePage() {
         })}
       </div>
 
-      {data.error && (
+      {(data.error || distributionQ.error) && (
         <Alert variant="error" title="Ошибка загрузки данных">
-          {data.error?.response?.data?.error?.message ?? data.error?.message}
+          {(data.error || distributionQ.error)?.response?.data?.error?.message ?? (data.error || distributionQ.error)?.message}
         </Alert>
       )}
 
@@ -257,18 +396,30 @@ export default function OwnerWarehousePage() {
 
       {tab === 'inventory' && (
         <div className="animate-fade-in space-y-4">
-          <div className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
-            <label className="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
-              <Search size={17} className="text-slate-400" />
-              <input
-                value={inventorySearch}
-                onChange={(e) => setInventorySearch(e.target.value)}
-                placeholder="Поиск по товару, SKU или штрихкоду…"
-                className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
-              />
-            </label>
-          </div>
-          <CourierWarehouseSummary summary={invSummary} detailed />
+          <InventoryFilterBar
+            search={inventorySearch}
+            onSearch={setInventorySearch}
+            productOptions={data.products.map((product) => ({
+              value: getId(product),
+              label: getProductName(product),
+              description: getProductSku(product),
+            }))}
+            locationOptions={locations.map((location) => ({
+              value: location.id,
+              label: getLocationDisplayName(location),
+              description: location.type === 'main' ? 'Главный склад' : 'Склад курьера',
+            }))}
+            selectedProducts={selectedProducts}
+            onProducts={setSelectedProducts}
+            selectedWarehouses={selectedWarehouses}
+            onWarehouses={setSelectedWarehouses}
+            selectedStatuses={selectedStatuses}
+            onStatuses={setSelectedStatuses}
+            selectedExpiry={selectedExpiry}
+            onExpiry={setSelectedExpiry}
+            resultCount={inventoryRows.length}
+          />
+          <CourierWarehouseSummary summary={filteredSummary} detailed />
           <InventoryTable
             rows={inventoryRows}
             data={data}
@@ -482,13 +633,14 @@ function InventoryTable({ rows, data, expiryAlerts = [], onReceive, onWriteoff, 
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
-      <table className="w-full min-w-[1080px] text-sm">
+      <table className="w-full min-w-[1320px] text-sm">
         <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           <tr>
             <th className="px-3 py-2.5 text-left">Товар</th>
-            <th className="px-3 py-2.5 text-right">На складе</th>
+            <th className="px-3 py-2.5 text-right">Остаток</th>
             <th className="px-3 py-2.5 text-right">Доступно</th>
             <th className="px-3 py-2.5 text-right">Резерв</th>
+            <th className="min-w-[260px] px-3 py-2.5 text-left">Распределение</th>
             <th className="px-3 py-2.5 text-right">Закупка</th>
             <th className="px-3 py-2.5 text-right">Продажа</th>
             <th className="px-3 py-2.5 text-right">Стоимость</th>
@@ -498,14 +650,14 @@ function InventoryTable({ rows, data, expiryAlerts = [], onReceive, onWriteoff, 
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {rows.map(({ product, inv }) => {
-            const status = getStockStatus(inv)
+          {rows.map((row) => {
+            const { product, inv, metrics, nearestExpiry, visibleStocks } = row
+            const status = getDerivedStockStatus(metrics, inv)
             const last = getLastMovementForProduct(getId(product), data.movements)
             const stockValue = getInventoryFifoValue(inv, data.batches)
             const productId = getId(product)
-            const nearestExpiry = getNearestExpiry(productId, data.batches)
-            const expiringUnits = sumAlertUnitsForProduct(productId, expiryAlerts)
-            const flagged = hasAlertForProduct(productId, expiryAlerts)
+            const expiringUnits = metrics.includesMain ? sumAlertUnitsForProduct(productId, expiryAlerts) : 0
+            const flagged = metrics.includesMain && hasAlertForProduct(productId, expiryAlerts)
             return (
               <tr key={productId} className="hover:bg-slate-50">
                 <td className="px-3 py-2.5">
@@ -517,12 +669,13 @@ function InventoryTable({ rows, data, expiryAlerts = [], onReceive, onWriteoff, 
                     </span>
                   </div>
                 </td>
-                <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-950">{getQuantity(inv)}</td>
-                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-emerald-700">{getAvailableQty(inv)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-amber-700">{getReservedQty(inv)}</td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-950">{metrics.quantity}</td>
+                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-emerald-700">{metrics.available}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-amber-700">{metrics.reserved}</td>
+                <td className="px-3 py-2.5"><DistributionText stocks={visibleStocks} /></td>
                 <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-600">{fmtMoney(getLastPrice(getId(product), data.movements) ?? getPurchasePrice(product))}</td>
                 <td className="px-3 py-2.5 text-right font-bold tabular-nums text-indigo-700">{fmtMoney(getSalePrice(product))}</td>
-                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-700">{fmtMoney(stockValue)}</td>
+                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-700">{metrics.includesMain ? fmtMoney(stockValue) : '—'}</td>
                 <td className="px-3 py-2.5">
                   {nearestExpiry ? (
                     <div className="flex items-center gap-1.5">
@@ -530,7 +683,7 @@ function InventoryTable({ rows, data, expiryAlerts = [], onReceive, onWriteoff, 
                       <span className={`text-xs font-semibold ${flagged ? 'text-rose-700' : 'text-slate-600'}`}>{fmtExpiryDate(nearestExpiry)}</span>
                     </div>
                   ) : (
-                    <span className="text-xs text-slate-300">—</span>
+                    <span className="text-xs text-slate-400">{metrics.includesMain ? 'Не указан' : 'Не отслеживается'}</span>
                   )}
                   {expiringUnits > 0 && <p className="mt-0.5 text-[11px] text-rose-500">{expiringUnits} шт. ≤14 дней</p>}
                 </td>

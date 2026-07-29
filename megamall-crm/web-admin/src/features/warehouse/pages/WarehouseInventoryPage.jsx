@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Clock, Download, Package, PackagePlus, Pencil, Search, Trash2 } from 'lucide-react'
+import { Clock, Download, Package, PackagePlus, Pencil, Trash2 } from 'lucide-react'
 import PageHeader from '../../../shared/components/PageHeader'
 import Button from '../../../shared/components/Button'
 import Badge from '../../../shared/components/Badge'
@@ -12,8 +12,17 @@ import ReceivingModal from '../components/ReceivingModal'
 import WriteoffModal from '../components/WriteoffModal'
 import { CourierWarehouseSummary } from '../components/TransferComponents'
 import useWarehouseData from '../hooks/useWarehouseData'
-import { useInventorySummary } from '../hooks/useTransfers'
+import { useInventoryDistribution, useInventorySummary } from '../hooks/useTransfers'
 import useExpiryAlerts from '../hooks/useExpiryAlerts'
+import {
+  aggregateStocks,
+  DistributionText,
+  getDerivedStockStatus,
+  getExpiryBucket,
+  getLocationDisplayName,
+  MAIN_WAREHOUSE_ID,
+  InventoryFilterBar,
+} from '../components/InventoryFilters'
 import {
   STOCK_STATUS_BADGE,
   STOCK_STATUS_LABEL,
@@ -34,7 +43,6 @@ import {
   getQuantity,
   getReservedQty,
   getSalePrice,
-  getStockStatus,
   hasAlertForProduct,
   isProductActive,
   sumAlertUnitsForProduct,
@@ -43,6 +51,10 @@ import {
 export default function WarehouseInventoryPage() {
   const [params] = useSearchParams()
   const [search, setSearch] = useState(params.get('q') ?? '')
+  const [selectedProducts, setSelectedProducts] = useState([])
+  const [selectedWarehouses, setSelectedWarehouses] = useState([])
+  const [selectedStatuses, setSelectedStatuses] = useState([])
+  const [selectedExpiry, setSelectedExpiry] = useState([])
   const [drawerProduct, setDrawerProduct] = useState(null)
   const [modalProduct, setModalProduct] = useState(null)
   const [showCreateProduct, setShowCreateProduct] = useState(false)
@@ -50,15 +62,85 @@ export default function WarehouseInventoryPage() {
   const [writeoffProduct, setWriteoffProduct] = useState(null)
   const data = useWarehouseData()
   const { data: invSummary } = useInventorySummary()
+  const distributionQ = useInventoryDistribution()
   const { alerts: expiryAlerts } = useExpiryAlerts()
+
+  const distribution = useMemo(() => {
+    if (distributionQ.data) return distributionQ.data
+    return {
+      locations: [{ id: MAIN_WAREHOUSE_ID, type: 'main', name: 'Главный склад' }],
+      items: data.inventory.map((inv) => ({
+        product_id: inv.product_id ?? inv.ProductID,
+        warehouse_id: MAIN_WAREHOUSE_ID,
+        quantity: getQuantity(inv),
+        reserved_quantity: getReservedQty(inv),
+        blocked_quantity: inv.blocked_quantity ?? inv.BlockedQuantity ?? 0,
+        available_quantity: getAvailableQty(inv),
+      })),
+    }
+  }, [data.inventory, distributionQ.data])
+
+  const locations = distribution.locations ?? []
+  const locationById = useMemo(
+    () => new Map(locations.map((location) => [location.id, location])),
+    [locations],
+  )
+  const stockByProduct = useMemo(() => {
+    const result = new Map()
+    for (const item of distribution.items ?? []) {
+      const productId = item.product_id
+      if (!result.has(productId)) result.set(productId, [])
+      result.get(productId).push({
+        ...item,
+        location: locationById.get(item.warehouse_id) ?? {
+          id: item.warehouse_id,
+          name: 'Склад',
+          type: 'courier',
+        },
+      })
+    }
+    return result
+  }, [distribution.items, locationById])
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
     const inventoryByProduct = new Map(data.inventory.map((inv) => [inv.product_id ?? inv.ProductID, inv]))
     return data.products.map((product) => {
-      const inv = inventoryByProduct.get(getId(product)) ?? null
-      return { product, inv }
-    }).filter(({ product, inv }) => {
+      const productId = getId(product)
+      const inv = inventoryByProduct.get(productId) ?? null
+      const allStocks = stockByProduct.get(productId) ?? []
+      const visibleStocks = selectedWarehouses.length
+        ? allStocks.filter((stock) => selectedWarehouses.includes(stock.warehouse_id))
+        : allStocks
+      const includesMain = !selectedWarehouses.length ||
+        selectedWarehouses.some((id) => locationById.get(id)?.type === 'main')
+      const metrics = aggregateStocks(visibleStocks)
+      const nearestExpiry = includesMain ? getNearestExpiry(productId, data.batches) : null
+      const expiryBucket = getExpiryBucket(nearestExpiry)
+      const lowThreshold = inv?.low_stock_threshold ?? inv?.LowStockThreshold ?? 0
+      const flags = {
+        in_stock: metrics.quantity > 0 && metrics.available > lowThreshold,
+        low_stock: metrics.quantity > 0 && metrics.available <= lowThreshold,
+        out_of_stock: metrics.quantity <= 0,
+        reserved: metrics.reserved > 0,
+        courier: metrics.courierQuantity > 0,
+        in_transfer: metrics.blocked > 0,
+      }
+      return {
+        product,
+        inv,
+        allStocks,
+        visibleStocks,
+        metrics: { ...metrics, includesMain },
+        nearestExpiry,
+        expiryBucket,
+        flags,
+      }
+    }).filter((row) => {
+      const { product, flags, expiryBucket } = row
+      if (selectedProducts.length && !selectedProducts.includes(getId(product))) return false
+      if (selectedStatuses.length && !selectedStatuses.some((status) => flags[status])) return false
+      if (selectedExpiry.length && !selectedExpiry.includes(expiryBucket)) return false
       if (!q) return true
       return (
         getProductName(product).toLowerCase().includes(q) ||
@@ -66,7 +148,40 @@ export default function WarehouseInventoryPage() {
         getProductBarcode(product).toLowerCase().includes(q)
       )
     })
-  }, [data.inventory, data.products, search])
+  }, [
+    data.batches,
+    data.inventory,
+    data.products,
+    locationById,
+    search,
+    selectedExpiry,
+    selectedProducts,
+    selectedStatuses,
+    selectedWarehouses,
+    stockByProduct,
+  ])
+
+  const filteredSummary = useMemo(() => {
+    const summary = {
+      main_quantity: 0,
+      main_reserved: 0,
+      main_blocked: 0,
+      courier_quantity: 0,
+      courier_reserved: 0,
+      pending_transfers: 0,
+      pending_returns: invSummary?.pending_returns ?? 0,
+      pending_lost_reports: invSummary?.pending_lost_reports ?? 0,
+    }
+    for (const row of filteredRows) {
+      summary.main_quantity += row.metrics.mainQuantity
+      summary.main_reserved += row.metrics.mainReserved
+      summary.main_blocked += row.metrics.mainBlocked
+      summary.courier_quantity += row.metrics.courierQuantity
+      summary.courier_reserved += row.metrics.courierReserved
+      summary.pending_transfers += row.metrics.blocked
+    }
+    return summary
+  }, [filteredRows, invSummary])
 
   return (
     <div className="animate-fade-in p-6 pb-20 lg:pb-6">
@@ -81,27 +196,38 @@ export default function WarehouseInventoryPage() {
         }
       />
 
-      {data.error && (
+      {(data.error || distributionQ.error) && (
         <Alert variant="error" title="Ошибка загрузки данных" className="mb-5">
-          {data.error?.response?.data?.error?.message ?? data.error?.message}
+          {(data.error || distributionQ.error)?.response?.data?.error?.message ?? (data.error || distributionQ.error)?.message}
         </Alert>
       )}
 
-      <section className="mb-4 rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
-        <div className="grid gap-2">
-          <label className="flex min-h-[40px] items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
-            <Search size={17} className="text-slate-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск по товару, SKU или штрихкоду…"
-              className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
-            />
-          </label>
-        </div>
-      </section>
+      <InventoryFilterBar
+        className="mb-4"
+        search={search}
+        onSearch={setSearch}
+        productOptions={data.products.map((product) => ({
+          value: getId(product),
+          label: getProductName(product),
+          description: getProductSku(product),
+        }))}
+        locationOptions={locations.map((location) => ({
+          value: location.id,
+          label: getLocationDisplayName(location),
+          description: location.type === 'main' ? 'Главный склад' : 'Склад курьера',
+        }))}
+        selectedProducts={selectedProducts}
+        onProducts={setSelectedProducts}
+        selectedWarehouses={selectedWarehouses}
+        onWarehouses={setSelectedWarehouses}
+        selectedStatuses={selectedStatuses}
+        onStatuses={setSelectedStatuses}
+        selectedExpiry={selectedExpiry}
+        onExpiry={setSelectedExpiry}
+        resultCount={filteredRows.length}
+      />
 
-      <div className="mb-4"><CourierWarehouseSummary summary={invSummary} detailed /></div>
+      <div className="mb-4"><CourierWarehouseSummary summary={filteredSummary} detailed /></div>
 
       <div className="hidden lg:block">
           <InventoryTable
@@ -117,11 +243,10 @@ export default function WarehouseInventoryPage() {
       <div className="space-y-3 lg:hidden">
         {filteredRows.length === 0 ? (
           <EmptyState icon={<Package size={22} />} title="Остатки не найдены" description="Измените поиск или сбросьте фильтры." />
-        ) : filteredRows.map(({ product, inv }) => (
+        ) : filteredRows.map((row) => (
           <InventoryCard
-            key={getId(product)}
-            inv={inv}
-            product={product}
+            key={getId(row.product)}
+            row={row}
             data={data}
             expiryAlerts={expiryAlerts}
             onProduct={setDrawerProduct}
@@ -163,13 +288,14 @@ function InventoryTable({ rows, data, expiryAlerts = [], onProduct, onReceive, o
   }
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
-      <table className="w-full min-w-[1080px] text-sm">
+      <table className="w-full min-w-[1320px] text-sm">
         <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           <tr>
             <th className="px-3 py-2.5 text-left">Товар</th>
-            <th className="px-3 py-2.5 text-right">На складе</th>
+            <th className="px-3 py-2.5 text-right">Остаток</th>
             <th className="px-3 py-2.5 text-right">Доступно</th>
             <th className="px-3 py-2.5 text-right">Резерв</th>
+            <th className="min-w-[260px] px-3 py-2.5 text-left">Распределение</th>
             <th className="px-3 py-2.5 text-right">Посл. цена</th>
             <th className="px-3 py-2.5 text-right">Продажа</th>
             <th className="px-3 py-2.5 text-right">Стоимость</th>
@@ -179,14 +305,14 @@ function InventoryTable({ rows, data, expiryAlerts = [], onProduct, onReceive, o
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {rows.map(({ product, inv }) => {
-            const status = getStockStatus(inv)
+          {rows.map((row) => {
+            const { product, inv, metrics, nearestExpiry, visibleStocks } = row
+            const status = getDerivedStockStatus(metrics, inv)
             const last = getLastMovementForProduct(getId(product), data.movements)
             const stockValue = getInventoryFifoValue(inv, data.batches)
             const productId = getId(product)
-            const nearestExpiry = getNearestExpiry(productId, data.batches)
-            const expiringUnits = sumAlertUnitsForProduct(productId, expiryAlerts)
-            const flagged = hasAlertForProduct(productId, expiryAlerts)
+            const expiringUnits = metrics.includesMain ? sumAlertUnitsForProduct(productId, expiryAlerts) : 0
+            const flagged = metrics.includesMain && hasAlertForProduct(productId, expiryAlerts)
             return (
               <tr key={productId} className="hover:bg-slate-50">
                 <td className="px-3 py-2.5">
@@ -198,12 +324,13 @@ function InventoryTable({ rows, data, expiryAlerts = [], onProduct, onReceive, o
                     </span>
                   </button>
                 </td>
-                <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-950">{getQuantity(inv)}</td>
-                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-emerald-700">{getAvailableQty(inv)}</td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-amber-700">{getReservedQty(inv)}</td>
+                <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-950">{metrics.quantity}</td>
+                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-emerald-700">{metrics.available}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-amber-700">{metrics.reserved}</td>
+                <td className="px-3 py-2.5"><DistributionText stocks={visibleStocks} /></td>
                 <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-600">{fmtMoney(getLastPrice(getId(product), data.movements) ?? getPurchasePrice(product))}</td>
                 <td className="px-3 py-2.5 text-right font-bold tabular-nums text-indigo-700">{fmtMoney(getSalePrice(product))}</td>
-                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-700">{fmtMoney(stockValue)}</td>
+                <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-slate-700">{metrics.includesMain ? fmtMoney(stockValue) : '—'}</td>
                 <td className="px-3 py-2.5">
                   {nearestExpiry ? (
                     <div className="flex items-center gap-1.5">
@@ -211,7 +338,7 @@ function InventoryTable({ rows, data, expiryAlerts = [], onProduct, onReceive, o
                       <span className={`text-xs font-semibold ${flagged ? 'text-rose-700' : 'text-slate-600'}`}>{fmtExpiryDate(nearestExpiry)}</span>
                     </div>
                   ) : (
-                    <span className="text-xs text-slate-300">—</span>
+                    <span className="text-xs text-slate-400">{metrics.includesMain ? 'Не указан' : 'Не отслеживается'}</span>
                   )}
                   {expiringUnits > 0 && <p className="mt-0.5 text-[11px] text-rose-500">{expiringUnits} шт. ≤14 дней</p>}
                 </td>
@@ -237,13 +364,13 @@ function InventoryTable({ rows, data, expiryAlerts = [], onProduct, onReceive, o
   )
 }
 
-function InventoryCard({ inv, product, data, expiryAlerts = [], onProduct, onReceive, onWriteoff, onEdit }) {
-  const status = getStockStatus(inv)
+function InventoryCard({ row, data, expiryAlerts = [], onProduct, onReceive, onWriteoff, onEdit }) {
+  const { inv, product, metrics, nearestExpiry, visibleStocks } = row
+  const status = getDerivedStockStatus(metrics, inv)
   const last = getLastMovementForProduct(getId(product), data.movements)
   const productId = getId(product)
-  const nearestExpiry = getNearestExpiry(productId, data.batches)
-  const expiringUnits = sumAlertUnitsForProduct(productId, expiryAlerts)
-  const flagged = hasAlertForProduct(productId, expiryAlerts)
+  const expiringUnits = metrics.includesMain ? sumAlertUnitsForProduct(productId, expiryAlerts) : 0
+  const flagged = metrics.includesMain && hasAlertForProduct(productId, expiryAlerts)
   return (
     <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
       <button onClick={() => onProduct(product)} className="flex w-full items-start gap-3 text-left">
@@ -259,15 +386,24 @@ function InventoryCard({ inv, product, data, expiryAlerts = [], onProduct, onRec
         </div>
       </button>
       <div className="mt-3 grid grid-cols-4 gap-2 rounded-lg bg-slate-50 p-2.5 text-center">
-        <MiniMetric label="Склад" value={getQuantity(inv)} />
-        <MiniMetric label="Доступ" value={getAvailableQty(inv)} tone="emerald" />
-        <MiniMetric label="Резерв" value={getReservedQty(inv)} tone="amber" />
+        <MiniMetric label="Остаток" value={metrics.quantity} />
+        <MiniMetric label="Доступ" value={metrics.available} tone="emerald" />
+        <MiniMetric label="Резерв" value={metrics.reserved} tone="amber" />
         <MiniMetric label="Продажа" value={fmtMoney(getSalePrice(product))} />
+      </div>
+      <div className="mt-2 rounded-lg border border-slate-100 px-2.5 py-2">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Распределение</p>
+        <DistributionText stocks={visibleStocks} />
       </div>
       {nearestExpiry && (
         <div className={`mt-2 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs ${flagged ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-500'}`}>
           <span className="flex items-center gap-1">{flagged && <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />}Срок годности: {fmtExpiryDate(nearestExpiry)}</span>
           {expiringUnits > 0 && <span className="font-semibold">{expiringUnits} шт. ≤14 дней</span>}
+        </div>
+      )}
+      {!nearestExpiry && (
+        <div className="mt-2 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs text-slate-400">
+          Срок годности: {metrics.includesMain ? 'не указан' : 'не отслеживается на складе курьера'}
         </div>
       )}
       <div className="mt-3 flex items-center justify-between text-xs text-slate-400">

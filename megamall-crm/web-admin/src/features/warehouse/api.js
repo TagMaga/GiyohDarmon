@@ -252,6 +252,11 @@ export async function fetchInventorySummary() {
   return unwrap(res)
 }
 
+export async function fetchInventoryDistribution() {
+  const res = await client.get('/warehouses/inventory/distribution')
+  return unwrap(res)
+}
+
 export async function fetchWarehouses(params = {}) {
   const res = await client.get('/warehouses', { params: cleanParams(params) })
   return toArray(unwrap(res))
