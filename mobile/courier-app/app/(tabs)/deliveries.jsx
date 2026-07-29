@@ -43,7 +43,11 @@ export default function DeliveriesScreen() {
   // order, changing a status, etc. always shows current data — expo-router's
   // Tabs keep every tab screen mounted, so a mount-only effect only ever ran
   // once and left the list stale until a manual pull-to-refresh.
-  useFocusEffect(useCallback(() => { fetchOrders() }, []))
+  useFocusEffect(useCallback(() => {
+    fetchOrders()
+    const refreshTimer = setInterval(fetchOrders, 30_000)
+    return () => clearInterval(refreshTimer)
+  }, []))
 
   const isUrgent = (o) => {
     const m = String(o?.delivery_method ?? o?.DeliveryMethod ?? o?.deliveryMethod ?? '').toLowerCase()

@@ -371,6 +371,70 @@ func TestReserveForClaim_SufficientStock_MovesReservationToCourierWarehouse(t *t
 	}
 }
 
+func TestReserveForClaim_ReleasedOrder_MigratesReservationBetweenCouriers(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	whSvc, orderSvc := buildTestServices(t, db)
+	owner := testutil.CreateUser(t, db, users.RoleOwner)
+	seller := createSellerWithTeam(t, db)
+	courierA := testutil.CreateUser(t, db, users.RoleCourier)
+	courierB := testutil.CreateUser(t, db, users.RoleCourier)
+	p := testutil.CreateProduct(t, db)
+	testutil.CreateInventory(t, db, p.ID, owner.ID, 100)
+
+	for _, courier := range []*users.User{courierA, courierB} {
+		transfer, err := whSvc.CreateTransfer(context.Background(), owner.ID, CreateTransferRequest{
+			FromWarehouseID: DefaultMainWarehouseID,
+			CourierID:       courier.ID,
+			Items:           []TransferItemRequest{{ProductID: p.ID, Quantity: 20}},
+		})
+		if err != nil {
+			t.Fatalf("create transfer for %s: %v", courier.ID, err)
+		}
+		if _, err := whSvc.AcceptTransfer(context.Background(), courier.ID, transfer.ID); err != nil {
+			t.Fatalf("accept transfer for %s: %v", courier.ID, err)
+		}
+	}
+
+	order := createOrderForCourier(t, db, orderSvc, seller.ID, p.ID, 5)
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		return whSvc.ReserveForClaim(tx, context.Background(), courierA.ID, order.ID)
+	}); err != nil {
+		t.Fatalf("initial reserve for courier A: %v", err)
+	}
+	db.Exec(`UPDATE orders SET status = 'assigned', courier_id = ? WHERE id = ?`, courierA.ID, order.ID)
+	db.Exec(`INSERT INTO order_assignments (id, order_id, courier_id, assigned_by, is_active) VALUES (?, ?, ?, ?, true)`,
+		uuid.New(), order.ID, courierA.ID, owner.ID)
+
+	if _, err := orderSvc.ChangeStatus(context.Background(), courierA.ID, "courier", order.ID, orders.ChangeStatusRequest{
+		Status: orders.StatusConfirmed,
+	}); err != nil {
+		t.Fatalf("release order from courier A: %v", err)
+	}
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		return whSvc.ReserveForClaim(tx, context.Background(), courierB.ID, order.ID)
+	}); err != nil {
+		t.Fatalf("reserve released order for courier B: %v", err)
+	}
+
+	var whA, whB Warehouse
+	db.Where("courier_id = ?", courierA.ID).First(&whA)
+	db.Where("courier_id = ?", courierB.ID).First(&whB)
+	var invA, invB CourierInventory
+	db.Where("warehouse_id = ? AND product_id = ?", whA.ID, p.ID).First(&invA)
+	db.Where("warehouse_id = ? AND product_id = ?", whB.ID, p.ID).First(&invB)
+	if invA.ReservedQuantity != 0 {
+		t.Errorf("expected courier A reservation to be released, got %d", invA.ReservedQuantity)
+	}
+	if invB.ReservedQuantity != 5 {
+		t.Errorf("expected courier B reservation to become 5, got %d", invB.ReservedQuantity)
+	}
+	var item orders.OrderItem
+	db.Where("order_id = ?", order.ID).First(&item)
+	if item.ReservedWarehouseID != whB.ID {
+		t.Errorf("expected reservation warehouse %s, got %s", whB.ID, item.ReservedWarehouseID)
+	}
+}
+
 // ─── Delivery, refusal, postponement (spec section 6) ──────────────────────
 
 func TestDeliveredOrder_DeductsFromCourierWarehouse(t *testing.T) {
@@ -685,13 +749,10 @@ func TestConcurrentTransfers_CannotOverAllocateSameStock(t *testing.T) {
 
 // ─── Dispatcher recall after a transfer moved the reservation ──────────────
 //
-// If a dispatcher (not the courier) directly assigns an order, and a later
-// transfer's acceptance sweeps that order's still-at-main reservation into
-// the courier's warehouse (see AcceptTransfer's "move active reservations"
-// step), then main-warehouse stock gets depleted before the dispatcher
-// recalls the courier, restoring the reservation at main must fail cleanly
-// — not corrupt data, and not leak a raw DB constraint error as a 500.
-func TestRecallAfterTransferMove_MainStockDepleted_FailsCleanlyNoCorruption(t *testing.T) {
+// A recall must never be blocked merely because main stock is depleted.
+// The reservation stays in the warehouse that physically holds the product
+// until the next courier claim/assignment atomically migrates it.
+func TestRecallAfterTransferMove_MainStockDepleted_StillReleasesCourier(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	whSvc, orderSvc := buildTestServices(t, db)
 	owner := testutil.CreateUser(t, db, users.RoleOwner)
@@ -738,26 +799,40 @@ func TestRecallAfterTransferMove_MainStockDepleted_FailsCleanlyNoCorruption(t *t
 		t.Fatalf("deplete main stock: %v", err)
 	}
 
-	// Recall: dispatcher moves the order back to confirmed.
+	// Recall: dispatcher moves the order back to confirmed even though main
+	// cannot currently back a replacement reservation.
 	_, err = orderSvc.ChangeStatus(context.Background(), owner.ID, "dispatcher", order.ID, orders.ChangeStatusRequest{
 		Status: orders.StatusConfirmed,
 	})
-	if err == nil {
-		t.Fatal("expected recall to fail cleanly when main stock can't back the restored reservation")
+	if err != nil {
+		t.Fatalf("recall must succeed despite depleted main stock: %v", err)
 	}
-	t.Logf("got expected clean error: %v", err)
 
-	// No corruption: order/assignment/warehouse state must be exactly as
-	// before the failed recall attempt (transaction rolled back).
+	// The assignment is released while the reservation remains where the
+	// physical stock is held.
 	var afterOrder orders.Order
 	db.Where("id = ?", order.ID).First(&afterOrder)
-	if afterOrder.Status != orders.StatusAssigned {
-		t.Errorf("expected order to remain 'assigned' after a rolled-back recall, got %q", afterOrder.Status)
+	if afterOrder.Status != orders.StatusConfirmed {
+		t.Errorf("expected order to return to confirmed, got %q", afterOrder.Status)
+	}
+	if afterOrder.CourierID != nil {
+		t.Errorf("expected courier cache to be cleared, got %v", afterOrder.CourierID)
+	}
+	var activeAssignments int64
+	db.Table("order_assignments").
+		Where("order_id = ? AND is_active = TRUE", order.ID).
+		Count(&activeAssignments)
+	if activeAssignments != 0 {
+		t.Errorf("expected no active assignment, got %d", activeAssignments)
 	}
 	var ci CourierInventory
 	db.Where("product_id = ?", p.ID).First(&ci)
 	if ci.ReservedQuantity != 3 {
-		t.Errorf("expected courier reserved_quantity to remain 3 (unassign rolled back), got %d", ci.ReservedQuantity)
+		t.Errorf("expected physical courier reservation to remain 3, got %d", ci.ReservedQuantity)
+	}
+	db.Where("order_id = ?", order.ID).First(&item)
+	if item.ReservedWarehouseID == orders.MainWarehouseID {
+		t.Error("reservation must not move to depleted main warehouse")
 	}
 	var mainAfter inventory.Inventory
 	db.Where("id = ?", mainInv.ID).First(&mainAfter)

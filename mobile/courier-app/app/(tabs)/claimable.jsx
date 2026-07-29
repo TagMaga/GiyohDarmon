@@ -44,7 +44,11 @@ export default function ClaimableScreen() {
   // useFocusEffect so a claim made from another session/device, or an order
   // that expired while this tab was backgrounded, is reflected on return —
   // see deliveries.jsx for the same fix and the reason it's needed.
-  useFocusEffect(useCallback(() => { fetchOrders() }, []))
+  useFocusEffect(useCallback(() => {
+    fetchOrders()
+    const refreshTimer = setInterval(fetchOrders, 30_000)
+    return () => clearInterval(refreshTimer)
+  }, []))
 
   // Direct claim — no confirmation popup, no success popup
   const handleClaim = async (order) => {

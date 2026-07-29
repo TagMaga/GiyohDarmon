@@ -397,6 +397,7 @@ func main() {
 
 	dispatchRepo := dispatch.NewRepository(db)
 	dispatchSvc := dispatch.NewService(dispatchRepo, orderSvc, activityLogger, db)
+	dispatchSvc.SetWarehouseReservationAdapter(warehousesSvc.ReserveForClaim)
 	dispatchHandler := dispatch.NewHandler(dispatchSvc, courierSvc)
 
 	// ── Phase 6: Health checks ────────────────────────────────────────────────

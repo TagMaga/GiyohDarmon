@@ -434,14 +434,19 @@ func (s *Service) ReserveForClaim(tx *gorm.DB, ctx context.Context, courierID, o
 		return err
 	}
 
-	// First pass: verify every item has enough available stock. No mutation
-	// yet — if any product is short, nothing is assigned/reserved.
+	// First pass: verify every item has enough available stock. If this same
+	// warehouse already backs the released order, its existing reservation
+	// counts toward the claim and does not need to be reserved twice.
 	for _, it := range o.Items {
 		ci, err := s.repo.GetOrCreateCourierInventoryForUpdate(tx, ctx, courierWh.ID, it.ProductID)
 		if err != nil {
 			return err
 		}
-		if ci.AvailableQuantity < it.Quantity {
+		available := ci.AvailableQuantity
+		if it.ReservedWarehouseID == courierWh.ID {
+			available += it.Quantity
+		}
+		if available < it.Quantity {
 			name := it.ProductName
 			if name == "" {
 				name = it.ProductID.String()
@@ -450,8 +455,13 @@ func (s *Service) ReserveForClaim(tx *gorm.DB, ctx context.Context, courierID, o
 		}
 	}
 
-	// Second pass: reserve at the courier warehouse and release at main.
+	// Second pass: atomically move the reservation from whichever warehouse
+	// currently backs the order to the claiming courier's warehouse.
 	for _, it := range o.Items {
+		if it.ReservedWarehouseID == courierWh.ID {
+			continue
+		}
+
 		ci, err := s.repo.GetOrCreateCourierInventoryForUpdate(tx, ctx, courierWh.ID, it.ProductID)
 		if err != nil {
 			return err
@@ -480,6 +490,14 @@ func (s *Service) ReserveForClaim(tx *gorm.DB, ctx context.Context, courierID, o
 				newReserved = 0
 			}
 			if err := s.invRepo.UpdateReservedQuantity(tx, ctx, mainInv.ID, newReserved); err != nil {
+				return err
+			}
+		} else {
+			if err := s.AdjustForOrder(
+				ctx, tx, it.ReservedWarehouseID, it.ProductID,
+				0, -it.Quantity, string(CourierMovementClaimRelease),
+				orderID, courierID, "reservation moved to another courier",
+			); err != nil {
 				return err
 			}
 		}

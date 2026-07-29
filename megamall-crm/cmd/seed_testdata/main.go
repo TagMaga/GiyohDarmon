@@ -36,6 +36,7 @@ import (
 	"github.com/megamall/crm/internal/seed"
 	"github.com/megamall/crm/internal/teams"
 	"github.com/megamall/crm/internal/users"
+	"github.com/megamall/crm/internal/warehouses"
 	"github.com/megamall/crm/pkg/database"
 	"github.com/megamall/crm/pkg/dbsafety"
 	"golang.org/x/crypto/bcrypt"
@@ -107,7 +108,13 @@ func main() {
 		},
 	)
 
+	warehousesSvc := warehouses.NewService(
+		warehouses.NewRepository(db), inventoryRepo, orderSvc,
+		productRepo, seedUserRepo, activityLogger, db,
+	)
+	orderSvc.SetWarehouseAdapter(warehousesSvc.AdjustForOrder)
 	dispatchSvc := dispatch.NewService(dispatch.NewRepository(db), orderSvc, activityLogger, db)
+	dispatchSvc.SetWarehouseReservationAdapter(warehousesSvc.ReserveForClaim)
 
 	// ── Actors used to drive the state machine ────────────────────────────────
 	owner := mustGetUserByPhone(ctx, db, "+992900000001")
