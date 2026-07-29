@@ -1389,15 +1389,6 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 			if err := s.deductInventory(ctx, tx, o, actorID); err != nil {
 				return err
 			}
-		} else if to == StatusConfirmed && (from == StatusAssigned || from == StatusInDelivery || from == StatusIssue) {
-			// Courier unassigned (unclaim / dispatcher recall): any item
-			// reservation that had moved to that courier's own warehouse
-			// (see internal/warehouses.ReserveForClaim) must move back to
-			// the main pool — the order is no longer tied to that
-			// courier's stock and needs to be reclaimable by anyone.
-			if err := s.revertCourierReservations(ctx, tx, o, actorID); err != nil {
-				return err
-			}
 		}
 
 		// ── Financial events on delivery ──────────────────────────────────────
@@ -1448,6 +1439,8 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 		// Moving an order back to confirmed/new means the courier no longer holds
 		// it. Deactivate the active assignment + clear the courier_id cache in the
 		// same transaction so the order can be re-assigned and never gets stuck.
+		// Its stock reservation stays in the warehouse that physically holds the
+		// product; the next claim/assignment migrates it atomically.
 		if to == StatusConfirmed || to == StatusNew {
 			released, rerr := s.repo.ReleaseAssignment(ctx, tx, orderID)
 			if rerr != nil {
@@ -1877,51 +1870,6 @@ func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, ac
 		}
 		if _, err := s.invRepo.ConsumeFEFO(tx, ctx, it.ProductID, it.Quantity, m.ID); err != nil {
 			return fmt.Errorf("sale FEFO consume: %w", err)
-		}
-	}
-	return nil
-}
-
-// revertCourierReservations moves any item reservation still held at a
-// courier's warehouse back to the legacy main pool. Called when a courier is
-// unassigned (unclaim or dispatcher recall) so the order becomes claimable
-// again without permanently pinning stock at a courier no longer involved.
-func (s *Service) revertCourierReservations(ctx context.Context, tx *gorm.DB, o *Order, actorID uuid.UUID) error {
-	for _, it := range o.Items {
-		if it.ReservedWarehouseID == MainWarehouseID {
-			continue
-		}
-		if s.adjustCourierWarehouse == nil {
-			return fmt.Errorf("courier warehouse adapter not configured")
-		}
-		if err := s.adjustCourierWarehouse(ctx, tx, it.ReservedWarehouseID, it.ProductID, 0, -it.Quantity, "claim_release", o.ID, actorID, "courier unassigned"); err != nil {
-			return fmt.Errorf("release courier reservation: %w", err)
-		}
-		mainInv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, it.ProductID)
-		if err != nil {
-			return err
-		}
-		// The physical units backing this reservation may already have
-		// left the main pool via an accepted transfer (fungible goods, so
-		// any equal quantity currently at main can back it instead) — but
-		// if main stock has since been depleted below what's needed, fail
-		// with a clear error rather than letting the DB's non-negative
-		// check constraint surface as a raw 500.
-		if mainInv.AvailableQuantity < it.Quantity {
-			name := it.ProductName
-			if name == "" {
-				name = it.ProductID.String()
-			}
-			return apperrors.Conflict(fmt.Sprintf(
-				"нельзя снять курьера с заказа: на главном складе доступно только %d товара «%s», требуется %d для восстановления резерва",
-				mainInv.AvailableQuantity, name, it.Quantity,
-			))
-		}
-		if err := s.invRepo.UpdateReservedQuantity(tx, ctx, mainInv.ID, mainInv.ReservedQuantity+it.Quantity); err != nil {
-			return err
-		}
-		if err := s.repo.UpdateItemWarehouse(ctx, tx, it.ID, MainWarehouseID); err != nil {
-			return err
 		}
 	}
 	return nil

@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Verify HTTPS certificate and readiness
         env:
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          PUBLIC_ORIGIN: https://giyohdarmon.tj
         run: |
           curl --fail --silent --show-error --retry 3 --retry-delay 5 \
-            --max-time 15 "https://$SERVER_HOST/api/v1/ready" >/dev/null
+            --max-time 15 "$PUBLIC_ORIGIN/api/v1/ready" >/dev/null

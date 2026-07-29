@@ -44,7 +44,11 @@ export default function DashboardScreen() {
   // useFocusEffect so the KPIs/active-orders refresh whenever this tab
   // regains focus (e.g. after claiming or delivering an order elsewhere),
   // not just once on first mount — see deliveries.jsx for the same fix.
-  useFocusEffect(useCallback(() => { fetchAll() }, []))
+  useFocusEffect(useCallback(() => {
+    fetchAll()
+    const refreshTimer = setInterval(fetchAll, 30_000)
+    return () => clearInterval(refreshTimer)
+  }, []))
 
   const handleStart = async (order) => {
     setActionLoading(true)

@@ -10,7 +10,8 @@ package dispatch
 //      update courier cache + change status.  Because orders.Service.ChangeStatus
 //      manages its own transaction internally, these special flows run a single
 //      local transaction that updates the DB directly for status and cache.
-//   4. Never touch financial or inventory logic.
+//   4. Financial logic stays in orders.Service; inventory reservation movement
+//      is delegated to the warehouse adapter inside the assignment transaction.
 
 import (
 	"context"
@@ -27,11 +28,14 @@ import (
 )
 
 type Service struct {
-	repo      *Repository
-	ordersSvc *orders.Service
-	logger    *activity.Logger
-	db        *gorm.DB
+	repo              *Repository
+	ordersSvc         *orders.Service
+	reserveForCourier ReserveForCourierFn
+	logger            *activity.Logger
+	db                *gorm.DB
 }
+
+type ReserveForCourierFn func(tx *gorm.DB, ctx context.Context, courierID, orderID uuid.UUID) error
 
 func NewService(
 	repo *Repository,
@@ -45,6 +49,13 @@ func NewService(
 		logger:    logger,
 		db:        db,
 	}
+}
+
+// SetWarehouseReservationAdapter wires stock validation and reservation
+// migration into dispatcher assignment/reassignment without creating an
+// import cycle with internal/warehouses.
+func (s *Service) SetWarehouseReservationAdapter(fn ReserveForCourierFn) {
+	s.reserveForCourier = fn
 }
 
 // ─── Board ────────────────────────────────────────────────────────────────────
@@ -219,6 +230,11 @@ func (s *Service) AssignCourier(ctx context.Context, actorID uuid.UUID, orderID 
 		if err != nil {
 			return err
 		}
+		if s.reserveForCourier != nil {
+			if err := s.reserveForCourier(tx, ctx, req.CourierID, orderID); err != nil {
+				return err
+			}
+		}
 
 		assign := &OrderAssignment{
 			ID:         uuid.New(),
@@ -326,6 +342,11 @@ func (s *Service) ReassignCourier(ctx context.Context, actorID uuid.UUID, orderI
 		payout, err := logistics_settings.ResolveAssignmentPayout(tx, req.CourierID, o.CityID, o.DeliveryMethod)
 		if err != nil {
 			return err
+		}
+		if s.reserveForCourier != nil {
+			if err := s.reserveForCourier(tx, ctx, req.CourierID, orderID); err != nil {
+				return err
+			}
 		}
 
 		if err := s.repo.DeactivateAssignment(tx, ctx, existing.ID); err != nil {

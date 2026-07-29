@@ -81,18 +81,22 @@ func TestTransition_NoSelfLoopToConfirmed(t *testing.T) {
 	}
 }
 
-func TestTransition_CourierMayReleaseOwnIssueOrderOnlyToConfirmed(t *testing.T) {
+func TestTransition_CourierMayReleaseOwnActiveOrderOnlyToConfirmed(t *testing.T) {
 	courierID := uuid.New()
 	otherCourierID := uuid.New()
 	svc := &Service{}
-	order := &Order{Status: StatusIssue, CourierID: &courierID}
 
-	if err := svc.validateTransitionRole("courier", courierID, order, StatusIssue, StatusConfirmed); err != nil {
-		t.Fatalf("assigned courier should be able to release their issue order: %v", err)
+	for _, from := range []OrderStatus{StatusAssigned, StatusInDelivery, StatusIssue} {
+		order := &Order{Status: from, CourierID: &courierID}
+		if err := svc.validateTransitionRole("courier", courierID, order, from, StatusConfirmed); err != nil {
+			t.Fatalf("assigned courier should be able to release their %s order: %v", from, err)
+		}
+		if err := svc.validateTransitionRole("courier", otherCourierID, order, from, StatusConfirmed); err == nil {
+			t.Fatalf("another courier must not be able to release a %s order", from)
+		}
 	}
-	if err := svc.validateTransitionRole("courier", otherCourierID, order, StatusIssue, StatusConfirmed); err == nil {
-		t.Fatal("another courier must not be able to release the order")
-	}
+
+	order := &Order{Status: StatusIssue, CourierID: &courierID}
 	if err := svc.validateTransitionRole("courier", courierID, order, StatusIssue, StatusAssigned); err == nil {
 		t.Fatal("courier must not resolve an issue into assigned; only the release edge is allowed")
 	}
