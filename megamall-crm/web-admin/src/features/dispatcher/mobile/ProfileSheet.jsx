@@ -5,6 +5,7 @@ import { C } from './theme'
 import useProfile from '../../../shared/hooks/useProfile'
 import useCurrentUser from '../../../shared/hooks/useCurrentUser'
 import { useToast } from '../../../shared/components/ToastProvider'
+import PasswordInput from '../../../shared/components/PasswordInput'
 import { changePassword } from '../../seller/api'
 
 export default function ProfileSheet({ open, onClose, onLogout }) {
@@ -14,12 +15,26 @@ export default function ProfileSheet({ open, onClose, onLogout }) {
   const [currentPwd, setCurrentPwd] = useState('')
   const [pwd, setPwd] = useState('')
   const [pwd2, setPwd2] = useState('')
+  const [passwordOpen, setPasswordOpen] = useState(false)
 
-  useEffect(() => { if (open) { setCurrentPwd(''); setPwd(''); setPwd2('') } }, [open])
+  useEffect(() => {
+    if (open) {
+      setCurrentPwd('')
+      setPwd('')
+      setPwd2('')
+      setPasswordOpen(false)
+    }
+  }, [open])
 
   const { mutate: savePassword, isPending } = useMutation({
     mutationFn: () => changePassword(userId, { current_password: currentPwd, new_password: pwd }),
-    onSuccess: () => { toast.success('Пароль изменён'); setCurrentPwd(''); setPwd(''); setPwd2('') },
+    onSuccess: () => {
+      toast.success('Пароль успешно изменён')
+      setCurrentPwd('')
+      setPwd('')
+      setPwd2('')
+      setPasswordOpen(false)
+    },
     onError: (err) => toast.error(err?.response?.data?.error?.message ?? err?.message ?? 'Ошибка'),
   })
 
@@ -47,23 +62,45 @@ export default function ProfileSheet({ open, onClose, onLogout }) {
         <InfoRow label="Должность" value="Диспетчер" />
       </div>
 
-      <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: C.text3, padding: '0 2px 10px' }}>Смена пароля</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 16 }}>
-        <input type="password" value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} placeholder="Текущий пароль" style={inputStyle} />
-        <input type="password" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="Новый пароль (мин. 8 символов)" style={inputStyle} />
-        <input type="password" value={pwd2} onChange={(e) => setPwd2(e.target.value)} placeholder="Повторите пароль" style={inputStyle} />
-      </div>
-      <button
-        onClick={() => canSave && savePassword()}
-        disabled={!canSave || isPending}
-        style={{ width: '100%', padding: 14, border: 'none', borderRadius: 14, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, color: '#fff', cursor: canSave ? 'pointer' : 'default', background: C.gradient, marginBottom: 9, opacity: canSave ? 1 : 0.5 }}
-      >
-        {isPending ? '...' : 'Сохранить пароль'}
-      </button>
-      <button onClick={onLogout} style={{ width: '100%', padding: 13, border: `1px solid ${C.redSoft}`, borderRadius: 13, background: '#fff', color: C.red, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', marginBottom: 9 }}>
+      {!passwordOpen ? (
+        <button
+          type="button"
+          onClick={() => setPasswordOpen(true)}
+          style={{ width: '100%', padding: 13, border: `1px solid ${C.border}`, borderRadius: 13, background: '#fff', color: C.text1, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', marginBottom: 9 }}
+        >
+          Изменить пароль
+        </button>
+      ) : (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: C.text3, padding: '0 2px 10px' }}>Смена пароля</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 12 }}>
+            <PasswordInput value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} placeholder="Текущий пароль" autoComplete="current-password" style={inputStyle} />
+            <PasswordInput value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="Новый пароль (мин. 8 символов)" autoComplete="new-password" style={inputStyle} />
+            <PasswordInput value={pwd2} onChange={(e) => setPwd2(e.target.value)} placeholder="Повторите новый пароль" autoComplete="new-password" style={inputStyle} />
+          </div>
+          <div style={{ display: 'flex', gap: 9 }}>
+            <button
+              type="button"
+              onClick={() => { setPasswordOpen(false); setCurrentPwd(''); setPwd(''); setPwd2('') }}
+              style={{ flex: 1, padding: 13, border: `1px solid ${C.border}`, borderRadius: 13, background: '#fff', color: C.text2, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              onClick={() => canSave && savePassword()}
+              disabled={!canSave || isPending}
+              style={{ flex: 1, padding: 13, border: 'none', borderRadius: 13, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, color: '#fff', cursor: canSave ? 'pointer' : 'default', background: C.gradient, opacity: canSave ? 1 : 0.5 }}
+            >
+              {isPending ? '...' : 'Изменить пароль'}
+            </button>
+          </div>
+        </div>
+      )}
+      <button type="button" onClick={onLogout} style={{ width: '100%', padding: 13, border: `1px solid ${C.redSoft}`, borderRadius: 13, background: '#fff', color: C.red, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', marginBottom: 9 }}>
         Выйти
       </button>
-      <button onClick={onClose} style={{ width: '100%', padding: 13, border: `1px solid ${C.border}`, borderRadius: 13, background: '#fff', color: C.text2, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>
+      <button type="button" onClick={onClose} style={{ width: '100%', padding: 13, border: `1px solid ${C.border}`, borderRadius: 13, background: '#fff', color: C.text2, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>
         Закрыть
       </button>
     </Sheet>
@@ -72,7 +109,7 @@ export default function ProfileSheet({ open, onClose, onLogout }) {
 
 const inputStyle = {
   border: `1px solid ${C.border}`, background: '#fff', borderRadius: 12, padding: '12px 13px',
-  fontFamily: 'inherit', fontSize: 13, outline: 'none',
+  width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: 13, outline: 'none',
 }
 
 function InfoRow({ label, value, phone, border }) {

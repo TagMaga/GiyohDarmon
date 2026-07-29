@@ -5,6 +5,7 @@ import { Truck, Package, UserX } from 'lucide-react'
 
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
+import useAuthStore from '../../../shared/store/authStore'
 import useProfile from '../../../shared/hooks/useProfile'
 
 import {
@@ -42,6 +43,7 @@ export default function DispatcherMobileApp() {
   const toast = useToast()
   const navigate = useNavigate()
   const profile = useProfile()
+  const clearAuth = useAuthStore((state) => state.clearAuth)
 
   const [tab, setTab] = useState('dispatch')
   const [search, setSearch] = useState('')
@@ -167,6 +169,8 @@ export default function DispatcherMobileApp() {
   }, [doConfirm, doReturn, isConfirming])
 
   function logout() {
+    setProfileOpen(false)
+    clearAuth()
     navigate('/login', { replace: true })
   }
 
@@ -182,19 +186,22 @@ export default function DispatcherMobileApp() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 18px 14px' }}>
         <button
+          type="button"
           onClick={() => setProfileOpen(true)}
           style={{
-            width: 34, height: 34, border: 'none', padding: 0, borderRadius: 10, background: C.violet,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 6px 16px rgba(99,102,241,.3)', flexShrink: 0, cursor: 'pointer',
+            flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10,
+            border: 'none', padding: 0, background: 'transparent', textAlign: 'left',
+            fontFamily: 'inherit', color: 'inherit', cursor: 'pointer',
           }}
         >
-          <span style={{ color: '#fff', fontWeight: 900, fontSize: 15 }}>{profile.initials}</span>
+          <span style={{ width: 34, height: 34, borderRadius: 10, background: C.violet, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 16px rgba(99,102,241,.3)', flexShrink: 0, color: '#fff', fontWeight: 900, fontSize: 15 }}>
+            {profile.initials}
+          </span>
+          <span style={{ flex: 1, minWidth: 0, lineHeight: 1.1 }}>
+            <span style={{ display: 'block', fontSize: 15, fontWeight: 800, letterSpacing: '-.01em' }}>{TAB_TITLES[tab]}</span>
+            <span style={{ display: 'block', fontSize: 10.5, color: C.text3, fontWeight: 600 }}>MegaMall Dispatch</span>
+          </span>
         </button>
-        <div style={{ flex: 1, minWidth: 0, lineHeight: 1.1 }}>
-          <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-.01em' }}>{TAB_TITLES[tab]}</div>
-          <div style={{ fontSize: 10.5, color: C.text3, fontWeight: 600 }}>MegaMall Dispatch</div>
-        </div>
       </div>
 
       {/* KPI strip — dispatch tab only */}

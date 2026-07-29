@@ -11,6 +11,7 @@ import useAppSettings    from '../hooks/useAppSettings'
 import { useToast }      from './ToastProvider'
 import PasswordInput     from './PasswordInput'
 import { updateEmployee } from '../../features/people/api'
+import { changePassword } from '../../features/seller/api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -171,8 +172,13 @@ function MainView({ fullName, phone, role, initials, onGo }) {
 
       <Divider />
 
-      {/* Logout */}
       <div style={{ padding: '6px' }}>
+        {role === 'dispatcher' && (
+          <>
+            <MenuRow icon={Lock} label="Изменить пароль" onClick={() => onGo('password')} trailing={null} />
+            <Divider />
+          </>
+        )}
         <MenuRow icon={LogOut} label="Выйти из системы" onClick={() => onGo('logout')} danger trailing={null} />
       </div>
     </>
@@ -297,6 +303,90 @@ function ProfileView({ onBack, fullName, phone, role, employee, userId }) {
             </div>
           </div>
         )}
+      </div>
+    </>
+  )
+}
+
+// ── Self-service password panel ───────────────────────────────────────────────
+
+function PasswordView({ onBack, userId }) {
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const toast = useToast()
+
+  const { mutate: savePassword, isPending } = useMutation({
+    mutationFn: () => changePassword(userId, {
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+    onSuccess: () => {
+      toast.success('Пароль успешно изменён')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      onBack()
+    },
+    onError: (err) => toast.error(err?.response?.data?.error?.message ?? err?.message ?? 'Ошибка'),
+  })
+
+  const canSave = currentPassword.length > 0
+    && newPassword.length >= 8
+    && newPassword === confirmPassword
+
+  function submitPassword() {
+    if (!currentPassword) { toast.error('Введите текущий пароль'); return }
+    if (newPassword.length < 8) { toast.error('Новый пароль должен содержать минимум 8 символов'); return }
+    if (newPassword !== confirmPassword) { toast.error('Пароли не совпадают'); return }
+    savePassword()
+  }
+
+  const inputStyle = {
+    width: '100%', boxSizing: 'border-box',
+    background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 8, padding: '9px 12px',
+    fontSize: 13, color: '#f1f5f9',
+    outline: 'none',
+  }
+
+  return (
+    <>
+      <PanelHeader onBack={onBack} title="Изменить пароль" />
+      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <PasswordInput
+          theme="dark"
+          placeholder="Текущий пароль"
+          autoComplete="current-password"
+          value={currentPassword}
+          onChange={(event) => setCurrentPassword(event.target.value)}
+          style={inputStyle}
+        />
+        <PasswordInput
+          theme="dark"
+          placeholder="Новый пароль (мин. 8 символов)"
+          autoComplete="new-password"
+          value={newPassword}
+          onChange={(event) => setNewPassword(event.target.value)}
+          style={inputStyle}
+        />
+        <PasswordInput
+          theme="dark"
+          placeholder="Повторите новый пароль"
+          autoComplete="new-password"
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
+          onKeyDown={(event) => event.key === 'Enter' && submitPassword()}
+          style={inputStyle}
+        />
+        <button
+          type="button"
+          onClick={submitPassword}
+          disabled={!canSave || isPending}
+          style={{ width: '100%', padding: '10px 0', marginTop: 2, borderRadius: 10, border: 'none', background: '#6366f1', color: '#fff', fontSize: 13, fontWeight: 700, cursor: canSave && !isPending ? 'pointer' : 'default', opacity: canSave && !isPending ? 1 : 0.5 }}
+        >
+          {isPending ? 'Сохранение...' : 'Изменить пароль'}
+        </button>
       </div>
     </>
   )
@@ -561,6 +651,12 @@ export default function AccountMenu({ variant = 'light' }) {
               phone={phone}
               role={role}
               employee={employee}
+              userId={userId}
+            />
+          )}
+          {view === 'password' && (
+            <PasswordView
+              onBack={() => setView('main')}
               userId={userId}
             />
           )}
