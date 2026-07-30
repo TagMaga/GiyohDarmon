@@ -119,15 +119,33 @@
   border: 1px solid var(--border);
 }
 .dv2-dot-live {
+  position: relative;
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--green);
+}
+/* Ripple drawn as a pseudo-element animated with transform/opacity only
+   (compositor-only properties) instead of animating box-shadow, which
+   forces a paint on every frame — same visual "pulse" without the
+   repaint cost. */
+.dv2-dot-live::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.4);
   animation: dv2Pulse 2s infinite;
 }
 @keyframes dv2Pulse {
-  0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,185,129,.4); }
-  50% { opacity: .8; box-shadow: 0 0 0 4px rgba(16,185,129,0); }
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dv2-dot-live::after {
+    animation: none;
+    opacity: 0;
+  }
 }
 .dv2-icon-btn {
   width: 30px;

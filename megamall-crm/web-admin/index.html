@@ -5,16 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="MegaMall CRM — панель управления" />
     <title>MegaMall CRM</title>
-    <!-- Inter font — matches Stripe/Linear aesthetic -->
+    <!-- Inter (Stripe/Linear aesthetic) + Golos Text (seller mobile design
+         language), fetched via a single stylesheet request instead of two.
+         Weight 300 dropped — grep across src/ found no font-light/font-thin
+         or fontWeight:300 usage anywhere in the app. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <!-- Golos Text — seller mobile design language -->
-    <link
-      href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Golos+Text:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
     />
   </head>

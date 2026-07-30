@@ -241,6 +241,101 @@ NGINX_BLOCK
   fi
 }
 
+# sync_nginx_perf_config idempotently patches NGINX_SITE_CONF to add gzip
+# compression and a cache-control policy for the SPA's hashed static assets,
+# then validates and reloads nginx. Mirrors sync_nginx_media_routes above —
+# same backup/validate/restore-on-failure shape — because this is the only
+# way to update an already-provisioned server; scripts/setup_https_remote.sh's
+# apply() only writes the file from scratch the first time a host is set up.
+# Keep the gzip/location content identical between the two scripts.
+sync_nginx_perf_config() {
+  if [[ ! -f "$NGINX_SITE_CONF" ]]; then
+    echo "  $NGINX_SITE_CONF not found — nginx not provisioned yet, skipping"
+    return 0
+  fi
+  if grep -qF 'location /assets/ {' "$NGINX_SITE_CONF"; then
+    echo "  already present — skipping"
+    return 0
+  fi
+
+  local nginx_backup="$BACKUP/nginx-site-conf-perf"
+  cp -a "$NGINX_SITE_CONF" "$nginx_backup"
+
+  local gzip_file assets_file
+  gzip_file=$(mktemp)
+  cat > "$gzip_file" <<'NGINX_BLOCK'
+
+    # Compress text-based responses (JS/CSS/JSON/SVG/HTML). Already-compressed
+    # formats (images, video, fonts in woff2) are left alone — recompressing
+    # them wastes CPU for zero size benefit.
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 6;
+    gzip_min_length 256;
+    gzip_proxied any;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        text/javascript
+        application/json
+        application/javascript
+        application/xml
+        application/xml+rss
+        application/vnd.ms-fontobject
+        image/svg+xml
+        font/ttf
+        font/otf;
+
+    # Vite emits every JS/CSS/image asset with a content hash in the
+    # filename (dist/assets/*-<hash>.js), so it is safe to cache these
+    # forever — a new deploy always ships new filenames, never mutates an
+    # old one in place.
+    location /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+NGINX_BLOCK
+
+  assets_file=$(mktemp)
+  cat > "$assets_file" <<'NGINX_BLOCK'
+        # index.html (and the SPA fallback that serves it for client-side
+        # routes) is NOT hashed and must always be revalidated so a deploy
+        # is picked up immediately instead of being served stale from cache.
+        add_header Cache-Control "no-cache" always;
+NGINX_BLOCK
+
+  awk -v gzipfile="$gzip_file" -v assetsfile="$assets_file" '
+    /^    index index\.html;$/ {
+      print
+      while ((getline line < gzipfile) > 0) print line
+      close(gzipfile)
+      next
+    }
+    /^    location \/ \{$/ { in_root = 1 }
+    { print }
+    in_root && /^    \}$/ {
+      # insert before the closing brace we just printed
+    }
+    in_root && /try_files \$uri \$uri\/ \/index\.html;$/ {
+      while ((getline line < assetsfile) > 0) print line
+      close(assetsfile)
+      in_root = 0
+    }
+  ' "$NGINX_SITE_CONF" > "$NGINX_SITE_CONF.new"
+  rm -f "$gzip_file" "$assets_file"
+  mv "$NGINX_SITE_CONF.new" "$NGINX_SITE_CONF"
+
+  if nginx -t; then
+    systemctl reload nginx
+    echo "  added gzip compression and asset cache-control headers"
+  else
+    echo "nginx config test failed after adding perf config; restoring previous config" >&2
+    cp -a "$nginx_backup" "$NGINX_SITE_CONF"
+    return 1
+  fi
+}
+
 rollback() {
   local failed_status=$?
   trap - ERR
@@ -308,6 +403,7 @@ mv -f "${BACKEND_LIVE}.next" "$BACKEND_LIVE"
 
 echo "4/7 - Syncing nginx media/uploads proxy config"
 sync_nginx_media_routes
+sync_nginx_perf_config
 
 echo "5/7 - Restarting backend"
 systemctl restart "$SERVICE"

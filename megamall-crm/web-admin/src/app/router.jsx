@@ -1,18 +1,21 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import ProtectedRoute  from '../shared/components/ProtectedRoute'
-import Layout          from '../shared/components/Layout'
-import SellerLayout    from '../features/seller/components/SellerLayout'
-import TeamLeadLayout  from '../features/team-lead/components/TeamLeadLayout'
-import ManagerLayout   from '../features/manager/components/ManagerLayout'
 import Login           from '../pages/Login'
 import RootRedirect    from '../shared/components/RootRedirect'
 import ComingSoon      from '../shared/components/ComingSoon'
 import LoadingSpinner  from '../shared/components/LoadingSpinner'
 
+// Role layout shells — lazy so an anonymous /login visit (and every other
+// role) doesn't download all four sidebars/nav bars up front.
+const Layout          = lazy(() => import('../shared/components/Layout'))
+const SellerLayout    = lazy(() => import('../features/seller/components/SellerLayout'))
+const TeamLeadLayout  = lazy(() => import('../features/team-lead/components/TeamLeadLayout'))
+const ManagerLayout   = lazy(() => import('../features/manager/components/ManagerLayout'))
+
 // ── Lazy page imports (route-level code splitting) ───────────────────────────
 // Each role's subtree loads only when that role first navigates to it.
-// Shared infrastructure (Layout, ProtectedRoute, Login) stays in the main chunk.
+// Shared infrastructure (ProtectedRoute, Login) stays in the main chunk.
 
 // Owner
 const OwnerDashboard          = lazy(() => import('../pages/OwnerDashboard'))
@@ -121,7 +124,7 @@ const router = createBrowserRouter([
     element: <ProtectedRoute allowedRole={['owner', 'it_specialist']} />,
     children: [{
       path: '/owner',
-      element: <Layout />,
+      element: <Lazy><Layout /></Lazy>,
       children: [
         { index: true, element: <Lazy><OwnerDashboard /></Lazy> },
 
@@ -163,7 +166,7 @@ const router = createBrowserRouter([
     element: <ProtectedRoute allowedRole="sales_team_lead" />,
     children: [{
       path: '/team-lead',
-      element: <TeamLeadLayout />,
+      element: <Lazy><TeamLeadLayout /></Lazy>,
       children: [
         { index: true,      element: <Lazy><TeamLeadDashboardPage /></Lazy> },
         { path: 'income',   element: <Lazy><TeamLeadIncomePage /></Lazy> },
@@ -195,7 +198,7 @@ const router = createBrowserRouter([
     element: <ProtectedRoute allowedRole="manager" />,
     children: [{
       path: '/manager',
-      element: <ManagerLayout />,
+      element: <Lazy><ManagerLayout /></Lazy>,
       children: [
         { index: true,        element: <Lazy><ManagerDashboardPage /></Lazy> },
         { path: 'income',     element: <Lazy><ManagerIncomePage /></Lazy> },
@@ -224,7 +227,7 @@ const router = createBrowserRouter([
     element: <ProtectedRoute allowedRole="seller" />,
     children: [{
       path: '/seller',
-      element: <SellerLayout />,
+      element: <Lazy><SellerLayout /></Lazy>,
       children: [
         {
           element: <Lazy><SellerDashboard /></Lazy>,
@@ -257,7 +260,7 @@ const router = createBrowserRouter([
     element: <ProtectedRoute allowedRole="dispatcher" />,
     children: [{
       path: '/dispatcher',
-      element: <Layout />,
+      element: <Lazy><Layout /></Lazy>,
       children: [
         { index: true,      element: <Lazy><DispatcherBoardV3 /></Lazy>        },
         { path: 'cash',    element: <Lazy><DispatcherCashDashboard /></Lazy> },
@@ -271,7 +274,7 @@ const router = createBrowserRouter([
     element: <ProtectedRoute allowedRole="warehouse_manager" />,
     children: [{
       path: '/warehouse',
-      element: <Layout />,
+      element: <Lazy><Layout /></Lazy>,
       children: [
         { index: true,          element: <Lazy><WarehouseDashboardPage /></Lazy> },
         { path: 'inventory',    element: <Lazy><WarehouseInventoryPage /></Lazy> },
