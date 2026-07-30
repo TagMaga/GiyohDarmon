@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
+  Archive,
   Building2,
   Download,
   FilterX,
@@ -17,6 +18,8 @@ import Button from '../../../shared/components/Button'
 import ProductModal from '../../warehouse/components/ProductModal'
 import ReceivingModal from '../../warehouse/components/ReceivingModal'
 import WriteoffModal from '../../warehouse/components/WriteoffModal'
+import ArchiveProductModal from '../../warehouse/components/ArchiveProductModal'
+import ProductArchivePanel from '../../warehouse/components/ProductArchivePanel'
 import {
   CourierWarehouseSummary,
   LostReportsPanel,
@@ -67,6 +70,7 @@ import {
 const TABS = [
   { id: 'dashboard', label: 'Дашборд' },
   { id: 'inventory', label: 'Остатки и товары' },
+  { id: 'archive', label: 'Архив' },
   { id: 'receiving', label: 'Приёмка и списания' },
   { id: 'movements', label: 'Движение товара' },
   { id: 'reports', label: 'Отчёты' },
@@ -98,6 +102,7 @@ export default function OwnerWarehousePage() {
   const [editingProduct, setEditingProduct] = useState(null)
   const [receiveProduct, setReceiveProduct] = useState(undefined)
   const [writeoffProduct, setWriteoffProduct] = useState(undefined)
+  const [archiveTarget, setArchiveTarget] = useState(null)
   const [showNewTransfer, setShowNewTransfer] = useState(false)
   const [transferStatus, setTransferStatus] = useState('')
   const data = useWarehouseData()
@@ -105,6 +110,14 @@ export default function OwnerWarehousePage() {
   const { data: invSummary, refetch: refetchSummary } = useInventorySummary()
   const distributionQ = useInventoryDistribution()
   const { alerts: expiryAlerts } = useExpiryAlerts()
+  const activeProducts = useMemo(
+    () => data.products.filter(isProductActive),
+    [data.products],
+  )
+  const activeProductIds = useMemo(
+    () => new Set(activeProducts.map((product) => getId(product))),
+    [activeProducts],
+  )
 
   useEffect(() => {
     if (!requestedProduct) return
@@ -155,7 +168,7 @@ export default function OwnerWarehousePage() {
 
   const inventoryRows = useMemo(() => {
     const q = inventorySearch.trim().toLowerCase()
-    return data.products.map((product) => {
+    return activeProducts.map((product) => {
       const productId = getId(product)
       const inv = inventoryByProduct.get(productId) ?? null
       const allStocks = stockByProduct.get(productId) ?? []
@@ -200,7 +213,7 @@ export default function OwnerWarehousePage() {
     })
   }, [
     data.batches,
-    data.products,
+    activeProducts,
     inventoryByProduct,
     inventorySearch,
     locationById,
@@ -234,11 +247,12 @@ export default function OwnerWarehousePage() {
   }, [inventoryRows, invSummary])
 
   const stockAlerts = useMemo(() => data.inventory
+    .filter((inv) => activeProductIds.has(inv.product_id ?? inv.ProductID))
     .filter((inv) => {
       const status = getStockStatus(inv)
       return status === 'low_stock' || status === 'out_of_stock'
     })
-    .slice(0, 6), [data.inventory])
+    .slice(0, 6), [activeProductIds, data.inventory])
 
   const receivingRows = useMemo(() => data.movements.filter((m) => {
     const type = getMovementType(m)
@@ -293,6 +307,7 @@ export default function OwnerWarehousePage() {
           selectedExpiry={selectedExpiry}
           onExpiry={setSelectedExpiry}
           inventoryLocations={locations}
+          inventoryDistribution={distribution}
           filteredSummary={filteredSummary}
           movementSearch={movementSearch}
           onMovementSearch={setMovementSearch}
@@ -309,6 +324,7 @@ export default function OwnerWarehousePage() {
           onReceive={setReceiveProduct}
           onWriteoff={setWriteoffProduct}
           onEdit={setEditingProduct}
+          onArchive={setArchiveTarget}
           onProduct={() => setShowProduct(true)}
           onOpenAlert={(product) => {
             setInventorySearch(getProductSku(product))
@@ -367,7 +383,7 @@ export default function OwnerWarehousePage() {
             onWriteoff={() => setWriteoffProduct(null)}
             onProduct={() => setShowProduct(true)}
           />
-          <MetricsStrip products={data.products} inventory={data.inventory} movements={data.movements} batches={data.batches} loading={data.loading} />
+          <MetricsStrip products={activeProducts} inventory={data.inventory.filter((inv) => activeProductIds.has(inv.product_id ?? inv.ProductID))} movements={data.movements} batches={data.batches.filter((batch) => activeProductIds.has(batch.product_id ?? batch.ProductID))} loading={data.loading} />
           <CourierWarehouseSummary summary={invSummary} />
           <AttentionPanel
             alerts={stockAlerts}
@@ -399,7 +415,7 @@ export default function OwnerWarehousePage() {
           <InventoryFilterBar
             search={inventorySearch}
             onSearch={setInventorySearch}
-            productOptions={data.products.map((product) => ({
+            productOptions={activeProducts.map((product) => ({
               value: getId(product),
               label: getProductName(product),
               description: getProductSku(product),
@@ -427,6 +443,19 @@ export default function OwnerWarehousePage() {
             onReceive={setReceiveProduct}
             onWriteoff={setWriteoffProduct}
             onEdit={setEditingProduct}
+            onArchive={setArchiveTarget}
+          />
+        </div>
+      )}
+
+      {tab === 'archive' && (
+        <div className="animate-fade-in">
+          <ProductArchivePanel
+            products={data.products}
+            inventory={data.inventory}
+            distribution={distributionQ.data}
+            loading={data.loading || distributionQ.isPending}
+            error={data.error || distributionQ.error}
           />
         </div>
       )}
@@ -494,9 +523,14 @@ export default function OwnerWarehousePage() {
 
       <ProductModal open={showProduct} onClose={() => setShowProduct(false)} suppliers={data.suppliers} />
       <ProductModal open={Boolean(editingProduct)} onClose={() => setEditingProduct(null)} product={editingProduct} suppliers={data.suppliers} />
-      <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={data.products} inventory={data.inventory} />
-      <WriteoffModal open={writeoffProduct !== undefined} onClose={() => setWriteoffProduct(undefined)} products={writeoffProduct ? [writeoffProduct] : data.products} inventory={data.inventory} />
-      <NewTransferModal open={showNewTransfer} onClose={() => setShowNewTransfer(false)} products={data.products} />
+      <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={activeProducts} inventory={data.inventory} />
+      <WriteoffModal open={writeoffProduct !== undefined} onClose={() => setWriteoffProduct(undefined)} products={writeoffProduct ? [writeoffProduct] : activeProducts} inventory={data.inventory} />
+      <NewTransferModal open={showNewTransfer} onClose={() => setShowNewTransfer(false)} products={activeProducts} />
+      <ArchiveProductModal
+        product={archiveTarget?.product}
+        stocks={archiveTarget?.allStocks}
+        onClose={() => setArchiveTarget(null)}
+      />
     </>
   )
 }
@@ -626,7 +660,7 @@ function ProblemProductRow({ inventory, product, onOpen, onReceive }) {
   )
 }
 
-function InventoryTable({ rows, data, expiryAlerts = [], onReceive, onWriteoff, onEdit }) {
+function InventoryTable({ rows, data, expiryAlerts = [], onReceive, onWriteoff, onEdit, onArchive }) {
   if (!rows.length) {
     return <CompactEmpty icon={<Package size={18} />} title="Остатки не найдены" description="Измените поиск или сбросьте фильтры." />
   }
@@ -698,6 +732,7 @@ function InventoryTable({ rows, data, expiryAlerts = [], onReceive, onWriteoff, 
                     <IconAction title="Приход" icon={<Download size={15} />} onClick={() => onReceive(product)} />
                     <IconAction title="Списание" icon={<Trash2 size={15} />} onClick={() => onWriteoff(product)} danger />
                     <IconAction title="Изменить" icon={<PackagePlus size={15} />} onClick={() => onEdit(product)} />
+                    <IconAction title="В архив" icon={<Archive size={15} />} onClick={() => onArchive(row)} />
                   </div>
                 </td>
               </tr>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Building2, Download, PackagePlus, Plus, Trash2 } from 'lucide-react'
 import PageHeader from '../../../shared/components/PageHeader'
@@ -8,13 +8,14 @@ import WriteoffModal from '../components/WriteoffModal'
 import { LostReportsPanel, PendingReturnsPanel } from '../components/TransferComponents'
 import useWarehouseData from '../hooks/useWarehouseData'
 import { MovementList } from './WarehouseMovementsPage'
-import { getMovementType } from '../utils/warehouseHelpers'
+import { getMovementType, isProductActive } from '../utils/warehouseHelpers'
 
 export default function WarehouseReceivingPage() {
   const navigate = useNavigate()
   const data = useWarehouseData()
   const [receivingOpen, setReceivingOpen] = useState(false)
   const [writeoffOpen, setWriteoffOpen] = useState(false)
+  const activeProducts = useMemo(() => data.products.filter(isProductActive), [data.products])
   const rows = data.movements.filter((m) => {
     const type = getMovementType(m)
     return type === 'purchase' || type === 'adjustment' || type === 'writeoff' || type === 'sale'
@@ -39,8 +40,8 @@ export default function WarehouseReceivingPage() {
         <PendingReturnsPanel />
         <LostReportsPanel />
       </div>
-      <ReceivingModal open={receivingOpen} onClose={() => setReceivingOpen(false)} products={data.products} inventory={data.inventory} />
-      <WriteoffModal open={writeoffOpen} onClose={() => setWriteoffOpen(false)} products={data.products} inventory={data.inventory} />
+      <ReceivingModal open={receivingOpen} onClose={() => setReceivingOpen(false)} products={activeProducts} inventory={data.inventory} />
+      <WriteoffModal open={writeoffOpen} onClose={() => setWriteoffOpen(false)} products={activeProducts} inventory={data.inventory} />
     </div>
   )
 }

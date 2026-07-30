@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Clock, Download, Package, PackagePlus, Pencil, Trash2 } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Archive, Clock, Download, Package, PackagePlus, Pencil, Trash2 } from 'lucide-react'
 import PageHeader from '../../../shared/components/PageHeader'
 import Button from '../../../shared/components/Button'
 import Badge from '../../../shared/components/Badge'
@@ -10,6 +10,7 @@ import ProductDrawer from '../components/ProductDrawer'
 import ProductModal from '../components/ProductModal'
 import ReceivingModal from '../components/ReceivingModal'
 import WriteoffModal from '../components/WriteoffModal'
+import ArchiveProductModal from '../components/ArchiveProductModal'
 import { CourierWarehouseSummary } from '../components/TransferComponents'
 import useWarehouseData from '../hooks/useWarehouseData'
 import { useInventoryDistribution, useInventorySummary } from '../hooks/useTransfers'
@@ -49,6 +50,7 @@ import {
 } from '../utils/warehouseHelpers'
 
 export default function WarehouseInventoryPage() {
+  const navigate = useNavigate()
   const [params] = useSearchParams()
   const [search, setSearch] = useState(params.get('q') ?? '')
   const [selectedProducts, setSelectedProducts] = useState([])
@@ -60,10 +62,15 @@ export default function WarehouseInventoryPage() {
   const [showCreateProduct, setShowCreateProduct] = useState(false)
   const [receiveProduct, setReceiveProduct] = useState(undefined)
   const [writeoffProduct, setWriteoffProduct] = useState(null)
+  const [archiveTarget, setArchiveTarget] = useState(null)
   const data = useWarehouseData()
   const { data: invSummary } = useInventorySummary()
   const distributionQ = useInventoryDistribution()
   const { alerts: expiryAlerts } = useExpiryAlerts()
+  const activeProducts = useMemo(
+    () => data.products.filter(isProductActive),
+    [data.products],
+  )
 
   const distribution = useMemo(() => {
     if (distributionQ.data) return distributionQ.data
@@ -105,7 +112,7 @@ export default function WarehouseInventoryPage() {
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
     const inventoryByProduct = new Map(data.inventory.map((inv) => [inv.product_id ?? inv.ProductID, inv]))
-    return data.products.map((product) => {
+    return activeProducts.map((product) => {
       const productId = getId(product)
       const inv = inventoryByProduct.get(productId) ?? null
       const allStocks = stockByProduct.get(productId) ?? []
@@ -151,7 +158,7 @@ export default function WarehouseInventoryPage() {
   }, [
     data.batches,
     data.inventory,
-    data.products,
+    activeProducts,
     locationById,
     search,
     selectedExpiry,
@@ -191,6 +198,13 @@ export default function WarehouseInventoryPage() {
         icon={<Package size={20} />}
         action={
           <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="secondary"
+              icon={<Archive size={15} />}
+              onClick={() => navigate('/warehouse/archive')}
+            >
+              Архив
+            </Button>
             <Button icon={<PackagePlus size={15} />} onClick={() => setShowCreateProduct(true)}>Добавить товар</Button>
           </div>
         }
@@ -206,7 +220,7 @@ export default function WarehouseInventoryPage() {
         className="mb-4"
         search={search}
         onSearch={setSearch}
-        productOptions={data.products.map((product) => ({
+        productOptions={activeProducts.map((product) => ({
           value: getId(product),
           label: getProductName(product),
           description: getProductSku(product),
@@ -238,6 +252,7 @@ export default function WarehouseInventoryPage() {
           onReceive={setReceiveProduct}
           onWriteoff={setWriteoffProduct}
           onEdit={setModalProduct}
+          onArchive={setArchiveTarget}
         />
       </div>
       <div className="space-y-3 lg:hidden">
@@ -253,6 +268,7 @@ export default function WarehouseInventoryPage() {
             onReceive={setReceiveProduct}
             onWriteoff={setWriteoffProduct}
             onEdit={setModalProduct}
+            onArchive={setArchiveTarget}
           />
         ))}
       </div>
@@ -276,13 +292,18 @@ export default function WarehouseInventoryPage() {
       />
       <ProductModal open={Boolean(modalProduct)} onClose={() => setModalProduct(null)} product={modalProduct} suppliers={data.suppliers} />
       <ProductModal open={showCreateProduct} onClose={() => setShowCreateProduct(false)} suppliers={data.suppliers} />
-      <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={data.products} inventory={data.inventory} />
-      <WriteoffModal open={Boolean(writeoffProduct)} onClose={() => setWriteoffProduct(null)} products={writeoffProduct ? [writeoffProduct] : data.products} inventory={data.inventory} />
+      <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={activeProducts} inventory={data.inventory} />
+      <WriteoffModal open={Boolean(writeoffProduct)} onClose={() => setWriteoffProduct(null)} products={writeoffProduct ? [writeoffProduct] : activeProducts} inventory={data.inventory} />
+      <ArchiveProductModal
+        product={archiveTarget?.product}
+        stocks={archiveTarget?.allStocks}
+        onClose={() => setArchiveTarget(null)}
+      />
     </div>
   )
 }
 
-function InventoryTable({ rows, data, expiryAlerts = [], onProduct, onReceive, onWriteoff, onEdit }) {
+function InventoryTable({ rows, data, expiryAlerts = [], onProduct, onReceive, onWriteoff, onEdit, onArchive }) {
   if (!rows.length) {
     return <EmptyState icon={<Package size={22} />} title="Остатки не найдены" description="Измените поиск или сбросьте фильтры." />
   }
@@ -353,6 +374,7 @@ function InventoryTable({ rows, data, expiryAlerts = [], onProduct, onReceive, o
                     <IconAction title="Приход" icon={<Download size={15} />} onClick={() => onReceive(product)} />
                     <IconAction title="Списание" icon={<Trash2 size={15} />} onClick={() => onWriteoff(product)} danger />
                     <IconAction title="Изменить" icon={<Pencil size={15} />} onClick={() => onEdit(product)} />
+                    <IconAction title="В архив" icon={<Archive size={15} />} onClick={() => onArchive(row)} />
                   </div>
                 </td>
               </tr>
@@ -364,7 +386,7 @@ function InventoryTable({ rows, data, expiryAlerts = [], onProduct, onReceive, o
   )
 }
 
-function InventoryCard({ row, data, expiryAlerts = [], onProduct, onReceive, onWriteoff, onEdit }) {
+function InventoryCard({ row, data, expiryAlerts = [], onProduct, onReceive, onWriteoff, onEdit, onArchive }) {
   const { inv, product, metrics, nearestExpiry, visibleStocks } = row
   const status = getDerivedStockStatus(metrics, inv)
   const last = getLastMovementForProduct(getId(product), data.movements)
@@ -410,10 +432,11 @@ function InventoryCard({ row, data, expiryAlerts = [], onProduct, onReceive, onW
         <span className="flex items-center gap-1"><Clock size={13} />{last ? fmtDate(last.created_at ?? last.CreatedAt) : 'Нет движений'}</span>
         <span>{fmtMoney(getInventoryFifoValue(inv, data.batches))}</span>
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <Button size="sm" icon={<Download size={14} />} onClick={() => onReceive(product)}>Приход</Button>
         <Button size="sm" variant="danger" icon={<Trash2 size={14} />} onClick={() => onWriteoff(product)}>Списать</Button>
         <Button size="sm" icon={<Pencil size={14} />} onClick={() => onEdit(product)}>Изм.</Button>
+        <Button size="sm" variant="secondary" icon={<Archive size={14} />} onClick={() => onArchive(row)}>В архив</Button>
       </div>
     </article>
   )

@@ -71,6 +71,7 @@ const DispatcherBoardV3       = lazy(() => import('../features/dispatcher/pages/
 // Warehouse
 const WarehouseDashboardPage = lazy(() => import('../features/warehouse/pages/WarehouseDashboard'))
 const WarehouseInventoryPage = lazy(() => import('../features/warehouse/pages/WarehouseInventoryPage'))
+const WarehouseArchivePage   = lazy(() => import('../features/warehouse/pages/WarehouseArchivePage'))
 const WarehouseMovementsPage = lazy(() => import('../features/warehouse/pages/WarehouseMovementsPage'))
 const WarehouseReceivingPage = lazy(() => import('../features/warehouse/pages/WarehouseReceivingPage'))
 const WarehouseProfilePage   = lazy(() => import('../features/warehouse/pages/WarehouseProfilePage'))
@@ -274,6 +275,7 @@ const router = createBrowserRouter([
       children: [
         { index: true,          element: <Lazy><WarehouseDashboardPage /></Lazy> },
         { path: 'inventory',    element: <Lazy><WarehouseInventoryPage /></Lazy> },
+        { path: 'archive',      element: <Lazy><WarehouseArchivePage /></Lazy> },
         { path: 'products',     element: <Navigate to="/warehouse/inventory" replace /> },
         { path: 'movements',    element: <Lazy><WarehouseMovementsPage /></Lazy> },
         { path: 'receiving',    element: <Lazy><WarehouseReceivingPage /></Lazy> },

@@ -6,7 +6,7 @@ import {
   Truck,
   Package, PackagePlus,
   Building2, User, BookUser,
-  PanelLeftClose, PanelLeftOpen,
+  Archive, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import useAuthStore from '../store/authStore'
 import useProfile   from '../hooks/useProfile'
@@ -50,6 +50,7 @@ const NAV = {
   warehouse_manager: [
     { label: 'Рабочий стол', icon: Home,             path: '/warehouse' },
     { label: 'Остатки и товары', icon: Package,      path: '/warehouse/inventory' },
+    { label: 'Архив товаров', icon: Archive,          path: '/warehouse/archive' },
     { label: 'Приёмка и списания', icon: PackagePlus, path: '/warehouse/receiving' },
     { label: 'Аптеки', icon: Building2, path: '/warehouse/pharmacies' },
   ],
