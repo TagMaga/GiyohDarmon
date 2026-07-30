@@ -57,8 +57,9 @@ jobs:
           SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
           ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" "
             set -Eeuo pipefail
-            echo '== pg_dump / curl available? =='
+            echo '== pg_dump / psql / curl available? =='
             command -v pg_dump && pg_dump --version || echo 'pg_dump not found'
+            command -v psql && psql --version || echo 'psql not found'
             command -v curl && curl --version | head -1 || echo 'curl not found'
             echo
             echo '== backup script present? =='

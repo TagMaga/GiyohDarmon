@@ -41,10 +41,10 @@ notify_failure() {
   local reason="$1"
   curl -fsS --max-time 30 \
     --data-urlencode "chat_id=${TELEGRAM_BACKUP_CHAT_ID}" \
-    --data-urlencode "text=⚠️ megamall-crm DB backup FAILED (${timestamp} UTC): ${reason}" \
+    --data-urlencode "text=⚠️ Не удалось создать резервную копию megamall-crm (${timestamp} UTC): ${reason}" \
     "${TELEGRAM_API}/sendMessage" >/dev/null || true
 }
-trap 'notify_failure "unexpected error at line $LINENO"' ERR
+trap 'notify_failure "непредвиденная ошибка в строке $LINENO"' ERR
 
 # TimeZone is a GORM-only DSN param, not a real libpq keyword — pg_dump
 # rejects it as an invalid connection option, so strip it before use.
@@ -60,20 +60,37 @@ mkdir -p "$BACKUP_DIR"
 install -m 0600 "$tmp_file" "${BACKUP_DIR}/${dump_name}"
 
 if (( dump_size > TELEGRAM_MAX_BYTES )); then
-  notify_failure "dump is ${dump_size} bytes, over Telegram's 50MB upload limit — kept locally at ${BACKUP_DIR}/${dump_name} only"
+  notify_failure "размер дампа ${dump_size} байт превышает лимит Telegram в 50MB — копия сохранена только локально: ${BACKUP_DIR}/${dump_name}"
   echo "Dump exceeds Telegram's upload limit; kept local copy only." >&2
   exit 1
 fi
 
+# Counts feed the Telegram caption below so whoever's watching that chat can
+# eyeball "does this look like a normal day" without opening the dump —
+# excludes soft-deleted rows (DeletedAt), matching what the app itself
+# would show as each entity's current total.
+count_rows() {
+  psql "$pg_conninfo" -tAc "SELECT count(*) FROM $1 WHERE deleted_at IS NULL"
+}
+total_orders="$(count_rows orders)"
+total_people="$(count_rows users)"
+total_products="$(count_rows products)"
+
 echo "→ Sending to Telegram..."
+caption="Резервная копия базы данных megamall-crm
+Всего заказов: ${total_orders}
+Всего пользователей: ${total_people}
+Всего товаров: ${total_products}
+Размер файла: ${dump_size} байт
+Дата и время: ${timestamp} UTC"
 response="$(curl -fsS --max-time 120 \
   -F "chat_id=${TELEGRAM_BACKUP_CHAT_ID}" \
-  -F "caption=megamall-crm DB backup — ${timestamp} UTC (${dump_size} bytes)" \
+  -F "caption=${caption}" \
   -F "document=@${BACKUP_DIR}/${dump_name};filename=${dump_name}" \
   "${TELEGRAM_API}/sendDocument")"
 
 if ! grep -q '"ok":true' <<<"$response"; then
-  notify_failure "Telegram sendDocument rejected the upload: ${response}"
+  notify_failure "Telegram отклонил загрузку файла: ${response}"
   echo "Telegram upload failed: ${response}" >&2
   exit 1
 fi

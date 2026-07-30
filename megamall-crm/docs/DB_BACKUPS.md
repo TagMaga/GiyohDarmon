@@ -50,8 +50,12 @@ sudo systemctl start megamall-crm-backup.service
 ```
 
 A successful run posts the `.dump` file to the configured Telegram chat with
-a caption showing the UTC timestamp and byte size; a failed run posts a
-"⚠️ ... FAILED" text message to the same chat instead.
+a caption showing current row totals (`orders`, `users`, `products` —
+excluding soft-deleted rows), the file size, and the UTC timestamp, so
+whoever's watching that chat can eyeball "does this look like a normal day"
+without opening the dump. A failed run posts a "⚠️ ..." text alert to the
+same chat instead. All operator-facing text is in Russian, matching the
+rest of the product.
 
 ## Restoring from a backup
 
