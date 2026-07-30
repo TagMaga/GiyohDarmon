@@ -26,6 +26,78 @@ DOMAIN=${DOMAIN:-giyohdarmon.tj}
 # exist yet, that step is a no-op.
 NGINX_SITE_CONF=${NGINX_SITE_CONF:-/etc/nginx/sites-available/megamall-crm}
 
+# install-backup-timer: installs/refreshes the megamall-crm-backup systemd
+# service+timer (pg_dump -> Telegram, see megamall-crm/docs/DB_BACKUPS.md)
+# and returns immediately, bypassing the ordinary release flow below. This
+# lives here, not in a standalone remote script, because deploy.sh is the
+# ONLY command the deploy account's sudoers NOPASSWD grant covers
+# ((root) NOPASSWD: /var/www/megamall-crm/deploy.sh *) — every other sudo
+# invocation on this host requires an interactive password, so nothing else
+# run over SSH from Actions can write to /etc/systemd/system or reload
+# systemd. Invoked as:
+#   sudo --non-interactive /var/www/megamall-crm/deploy.sh \
+#     install-backup-timer /tmp/<uploaded>-backup_db_telegram.sh
+# by .github/workflows/setup-db-backup.yml, which scp's the script to /tmp
+# first (unprivileged, same as deploy.sh's own self-update mechanism below).
+if [[ "${1:-}" == "install-backup-timer" ]]; then
+  STAGED_BACKUP_SCRIPT=${2:-}
+  BACKUP_SCRIPT_LIVE="$PROJECT/megamall-crm/scripts/backup_db_telegram.sh"
+  BACKUP_ENV_FILE="$PROJECT/megamall-crm/.env"
+  BACKUP_DIR=/var/backups/megamall-crm
+  BACKUP_SERVICE_FILE=/etc/systemd/system/megamall-crm-backup.service
+  BACKUP_TIMER_FILE=/etc/systemd/system/megamall-crm-backup.timer
+
+  if [[ -z "$STAGED_BACKUP_SCRIPT" || ! -f "$STAGED_BACKUP_SCRIPT" ]]; then
+    echo "install-backup-timer: staged script path missing or not found: $STAGED_BACKUP_SCRIPT" >&2
+    exit 2
+  fi
+  if ! grep -q '^TELEGRAM_BACKUP_BOT_TOKEN=.' "$BACKUP_ENV_FILE" || \
+     ! grep -q '^TELEGRAM_BACKUP_CHAT_ID=.' "$BACKUP_ENV_FILE"; then
+    echo "install-backup-timer: $BACKUP_ENV_FILE is missing TELEGRAM_BACKUP_BOT_TOKEN and/or TELEGRAM_BACKUP_CHAT_ID (see .env.example)" >&2
+    exit 2
+  fi
+
+  mkdir -p "$(dirname "$BACKUP_SCRIPT_LIVE")"
+  install -m 0755 -o megamall -g megamall "$STAGED_BACKUP_SCRIPT" "$BACKUP_SCRIPT_LIVE"
+  rm -f "$STAGED_BACKUP_SCRIPT"
+
+  install -d -m 0700 -o megamall -g megamall "$BACKUP_DIR"
+
+  cat > "$BACKUP_SERVICE_FILE" <<SERVICE
+[Unit]
+Description=megamall-crm database backup to Telegram
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=$PROJECT/megamall-crm
+EnvironmentFile=$BACKUP_ENV_FILE
+ExecStart=$BACKUP_SCRIPT_LIVE
+User=megamall
+Group=megamall
+SERVICE
+
+  cat > "$BACKUP_TIMER_FILE" <<TIMER
+[Unit]
+Description=Run megamall-crm database backup twice daily (01:00 and 13:00 UTC)
+
+[Timer]
+OnCalendar=*-*-* 01:00:00 UTC
+OnCalendar=*-*-* 13:00:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+TIMER
+
+  systemctl daemon-reload
+  systemctl enable --now megamall-crm-backup.timer
+  echo "Backup timer installed."
+  systemctl list-timers megamall-crm-backup.timer --no-pager
+  exit 0
+fi
+
 REVISION=${1:-}
 ARTIFACT=${2:-}
 NEW_DEPLOY_SCRIPT=${3:-}

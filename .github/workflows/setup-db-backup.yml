@@ -45,13 +45,52 @@ jobs:
             'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOyShTb8NPuH+bPPBFOjV0e/8PI+Tg0pXPbq/V3dlUmq' \
             > "$HOME/.ssh/known_hosts"
 
-      - name: Run backup timer setup script on server
+      # Read-only: doesn't touch /etc or systemd, so no sudo is needed. Runs
+      # as the plain `deploy` login, which is why the .env check can only
+      # confirm the file exists — that account can't read its contents.
+      - name: Diagnose (read-only)
+        if: ${{ inputs.mode == 'diagnose' }}
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
-          MODE: ${{ inputs.mode }}
+        run: |
+          set -Eeuo pipefail
+          SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
+          ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" "
+            set -Eeuo pipefail
+            echo '== pg_dump / curl available? =='
+            command -v pg_dump && pg_dump --version || echo 'pg_dump not found'
+            command -v curl && curl --version | head -1 || echo 'curl not found'
+            echo
+            echo '== backup script present? =='
+            ls -la '$PROJECT/megamall-crm/scripts/backup_db_telegram.sh' || true
+            echo
+            echo '== .env present? (contents unreadable by this account, by design) =='
+            ls -la '$PROJECT/megamall-crm/.env' || true
+            echo
+            echo '== existing timer? =='
+            systemctl list-timers megamall-crm-backup.timer --no-pager || true
+          "
+
+      # apply uploads the backup script to /tmp (unprivileged scp, same
+      # path deploy.sh's own self-update uses) then hands it to deploy.sh
+      # — the one command the deploy account can run as root without a
+      # password — to install into place and set up the systemd timer.
+      - name: Upload backup script
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          set -Eeuo pipefail
+          SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
+          scp "${SSH_ARGS[@]}" "megamall-crm/scripts/backup_db_telegram.sh" \
+            "$SERVER_USER@$SERVER_HOST:/tmp/megamall-crm-backup_db_telegram.sh"
+
+      - name: Install backup timer via deploy.sh
+        if: ${{ inputs.mode == 'apply' }}
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
         run: |
           set -Eeuo pipefail
           SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
           ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" \
-            "MODE='$MODE' PROJECT='$PROJECT' bash -s" \
-            < scripts/setup_backup_remote.sh
+            "sudo --non-interactive $PROJECT/deploy.sh install-backup-timer /tmp/megamall-crm-backup_db_telegram.sh"
