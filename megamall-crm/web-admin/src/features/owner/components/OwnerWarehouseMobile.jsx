@@ -1,5 +1,5 @@
 import {
-  AlertTriangle, ChevronDown, Download, FilterX, Package, PackagePlus, PackageX, RefreshCw, Search, Trash2,
+  AlertTriangle, Archive, ChevronDown, Download, FilterX, Package, PackagePlus, PackageX, RefreshCw, Search, Trash2,
 } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
 import NotificationBell from '../../../shared/components/NotificationBell'
@@ -7,6 +7,7 @@ import { MovementList } from '../../warehouse/pages/WarehouseMovementsPage'
 import SalesReportPanel from '../../warehouse/pages/WarehouseSalesReportPanel'
 import { ExpiryAlertsList } from '../../warehouse/components/ExpiryAlertsPanel'
 import { CourierWarehouseSummary } from '../../warehouse/components/TransferComponents'
+import ProductArchivePanel from '../../warehouse/components/ProductArchivePanel'
 import {
   DistributionText,
   getDerivedStockStatus,
@@ -40,6 +41,7 @@ const CARD_SHADOW = '0 2px 8px rgba(15,23,42,.05)'
 const TABS = [
   { id: 'dashboard', label: 'Дашборд' },
   { id: 'inventory', label: 'Остатки' },
+  { id: 'archive', label: 'Архив' },
   { id: 'receiving', label: 'Приёмка' },
   { id: 'movements', label: 'Движение' },
   { id: 'reports', label: 'Отчёты' },
@@ -101,14 +103,14 @@ function MobilePillSelect({ value, onChange, options, className = '' }) {
 
 function MobileTabPills({ tab, onChange }) {
   return (
-    <div className="flex gap-1 rounded-[15px] bg-white p-1" style={{ boxShadow: CARD_SHADOW }}>
+    <div className="flex gap-1 overflow-x-auto rounded-[15px] bg-white p-1" style={{ boxShadow: CARD_SHADOW }}>
       {TABS.map((item) => {
         const active = tab === item.id
         return (
           <button
             key={item.id}
             onClick={() => onChange(item.id)}
-            className="flex-1 rounded-[11px] py-2 text-[12.5px] font-bold transition-all"
+            className="min-w-[78px] flex-1 rounded-[11px] px-2 py-2 text-[12.5px] font-bold transition-all"
             style={active ? { background: '#4F46E5', color: '#fff' } : { color: '#64748B' }}
           >
             {item.label}
@@ -179,7 +181,7 @@ function AttentionCard({ inventory, product, onOpen, onReceive }) {
   )
 }
 
-function MobileInventoryCard({ row, movements = [], onReceive, onWriteoff, onEdit }) {
+function MobileInventoryCard({ row, movements = [], onReceive, onWriteoff, onEdit, onArchive }) {
   const { product, inv, metrics, visibleStocks } = row
   const status = getDerivedStockStatus(metrics, inv)
   return (
@@ -218,10 +220,11 @@ function MobileInventoryCard({ row, movements = [], onReceive, onWriteoff, onEdi
         <span>Закупка <b className="text-slate-700">{fmtMoney(getLastPrice(getId(product), movements) ?? getPurchasePrice(product))}</b></span>
         <span>Продажа <b className="text-indigo-700">{fmtMoney(getSalePrice(product))}</b></span>
       </div>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <button onClick={() => onReceive(product)} className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-slate-100 text-[11.5px] font-bold text-slate-700"><Download size={14} />Приход</button>
         <button onClick={() => onWriteoff(product)} className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-rose-50 text-[11.5px] font-bold text-rose-600"><Trash2 size={14} />Списание</button>
         <button onClick={() => onEdit(product)} className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-indigo-50 text-[11.5px] font-bold text-indigo-700"><PackagePlus size={14} />Изменить</button>
+        <button onClick={() => onArchive(row)} className="flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-slate-100 text-[11.5px] font-bold text-slate-700"><Archive size={14} />В архив</button>
       </div>
     </div>
   )
@@ -240,18 +243,22 @@ export default function OwnerWarehouseMobile({
   inventorySearch, onInventorySearch,
   selectedProducts, onProducts, selectedWarehouses, onWarehouses,
   selectedStatuses, onStatuses, selectedExpiry, onExpiry,
-  inventoryLocations, filteredSummary,
+  inventoryLocations, inventoryDistribution, filteredSummary,
   movementSearch, onMovementSearch, movementType, onMovementType, movementProductId, onMovementProductId, clearMovementFilters,
   inventoryRows, stockAlerts, receivingRows, movementRows, validProducts,
-  onReceive, onWriteoff, onEdit, onProduct, onOpenAlert, onRefresh,
+  onReceive, onWriteoff, onEdit, onArchive, onProduct, onOpenAlert, onRefresh,
 }) {
-  const totalUnits = data.inventory.reduce((sum, inv) => sum + getQuantity(inv), 0)
-  const stockValue = data.batches.reduce(
+  const activeProducts = data.products.filter(isProductActive)
+  const activeProductIds = new Set(activeProducts.map((product) => getId(product)))
+  const activeInventory = data.inventory.filter((inv) => activeProductIds.has(inv.product_id ?? inv.ProductID))
+  const activeBatches = data.batches.filter((batch) => activeProductIds.has(batch.product_id ?? batch.ProductID))
+  const totalUnits = activeInventory.reduce((sum, inv) => sum + getQuantity(inv), 0)
+  const stockValue = activeBatches.reduce(
     (sum, batch) => sum + (batch.remaining_quantity ?? batch.RemainingQuantity ?? 0) * (batch.unit_cost ?? batch.UnitCost ?? 0),
     0
   )
-  const lowStock = data.inventory.filter((inv) => getStockStatus(inv) === 'low_stock').length
-  const outStock = data.inventory.filter((inv) => getStockStatus(inv) === 'out_of_stock').length
+  const lowStock = activeInventory.filter((inv) => getStockStatus(inv) === 'low_stock').length
+  const outStock = activeInventory.filter((inv) => getStockStatus(inv) === 'out_of_stock').length
   const { alerts: expiryAlerts, meta: expiryMeta, isLoading: expiryLoading, isError: expiryIsError, error: expiryError } = useExpiryAlerts()
   const today = new Date().toDateString()
   const movementsToday = data.movements.filter((m) => {
@@ -289,7 +296,7 @@ export default function OwnerWarehouseMobile({
               <p className="text-[10.5px] font-bold uppercase tracking-[1px] text-indigo-100/85">Стоимость склада</p>
               <p className="mt-1.5 text-[37px] font-extrabold leading-none tracking-tight">{fmtMoney(stockValue)}</p>
               <div className="mt-4 flex items-center gap-5">
-                <StatMini value={data.products.length} label="товаров" />
+                <StatMini value={activeProducts.length} label="товаров" />
                 <div className="h-[30px] w-px bg-white/20" />
                 <StatMini value={totalUnits} label="единиц" />
                 <div className="h-[30px] w-px bg-white/20" />
@@ -382,7 +389,7 @@ export default function OwnerWarehouseMobile({
           <InventoryFilterBar
             search={inventorySearch}
             onSearch={onInventorySearch}
-            productOptions={data.products.map((product) => ({
+            productOptions={activeProducts.map((product) => ({
               value: getId(product),
               label: getProductName(product),
               description: getProductSku(product),
@@ -408,11 +415,21 @@ export default function OwnerWarehouseMobile({
           ) : (
             <div className="space-y-2.5">
               {inventoryRows.map((row) => (
-                <MobileInventoryCard key={getId(row.product)} row={row} movements={data.movements} onReceive={onReceive} onWriteoff={onWriteoff} onEdit={onEdit} />
+                <MobileInventoryCard key={getId(row.product)} row={row} movements={data.movements} onReceive={onReceive} onWriteoff={onWriteoff} onEdit={onEdit} onArchive={onArchive} />
               ))}
             </div>
           )}
         </div>
+      )}
+
+      {tab === 'archive' && (
+        <ProductArchivePanel
+          products={data.products}
+          inventory={data.inventory}
+          distribution={inventoryDistribution}
+          loading={data.loading}
+          error={data.error}
+        />
       )}
 
       {tab === 'receiving' && (

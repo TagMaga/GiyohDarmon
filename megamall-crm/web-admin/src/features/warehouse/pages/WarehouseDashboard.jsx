@@ -30,6 +30,7 @@ import {
   getProductSku,
   getQuantity,
   getStockStatus,
+  isProductActive,
 } from '../utils/warehouseHelpers'
 
 export default function WarehouseDashboard() {
@@ -40,13 +41,26 @@ export default function WarehouseDashboard() {
   const [receiveProduct, setReceiveProduct] = useState(undefined)
   const [showWriteoff, setShowWriteoff] = useState(false)
   const { data: invSummary } = useInventorySummary()
+  const activeProducts = useMemo(() => data.products.filter(isProductActive), [data.products])
+  const activeProductIds = useMemo(
+    () => new Set(activeProducts.map((product) => getId(product))),
+    [activeProducts],
+  )
+  const activeInventory = useMemo(
+    () => data.inventory.filter((inv) => activeProductIds.has(inv.product_id ?? inv.ProductID)),
+    [activeProductIds, data.inventory],
+  )
+  const activeBatches = useMemo(
+    () => data.batches.filter((batch) => activeProductIds.has(batch.product_id ?? batch.ProductID)),
+    [activeProductIds, data.batches],
+  )
 
-  const stockAlerts = useMemo(() => data.inventory
+  const stockAlerts = useMemo(() => activeInventory
     .filter((inv) => {
       const status = getStockStatus(inv)
       return status === 'low_stock' || status === 'out_of_stock'
     })
-    .slice(0, 6), [data.inventory])
+    .slice(0, 6), [activeInventory])
 
   function submitSearch(e) {
     e.preventDefault()
@@ -103,7 +117,7 @@ export default function WarehouseDashboard() {
         </div>
       </section>
 
-      <MetricsStrip products={data.products} inventory={data.inventory} movements={data.movements} batches={data.batches} loading={data.loading} />
+      <MetricsStrip products={activeProducts} inventory={activeInventory} movements={data.movements} batches={activeBatches} loading={data.loading} />
       <div className="mb-4"><CourierWarehouseSummary summary={invSummary} /></div>
 
       <section className="space-y-4">
@@ -139,8 +153,8 @@ export default function WarehouseDashboard() {
       </section>
 
       <ProductModal open={showProduct} onClose={() => setShowProduct(false)} suppliers={data.suppliers} />
-      <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={data.products} inventory={data.inventory} />
-      <WriteoffModal open={showWriteoff} onClose={() => setShowWriteoff(false)} products={data.products} inventory={data.inventory} />
+      <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={activeProducts} inventory={data.inventory} />
+      <WriteoffModal open={showWriteoff} onClose={() => setShowWriteoff(false)} products={activeProducts} inventory={data.inventory} />
     </div>
   )
 }

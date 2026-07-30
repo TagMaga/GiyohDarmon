@@ -17,7 +17,7 @@ import {
 import useWarehouseData from '../hooks/useWarehouseData'
 import { useTransfers } from '../hooks/useTransfers'
 import { fetchReceivingHistory } from '../api'
-import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getId, getMovementType, getMovementUnitCost, getProductImageSrcSet, getProductImageVariant, getProductName, getProductSku, getSalePrice, getSaleUnitPrice, isUUID } from '../utils/warehouseHelpers'
+import { MOVEMENT_BADGE, MOVEMENT_LABEL, fmtDate, fmtMoney, getId, getMovementType, getMovementUnitCost, getProductImageSrcSet, getProductImageVariant, getProductName, getProductSku, getSalePrice, getSaleUnitPrice, isProductActive, isUUID } from '../utils/warehouseHelpers'
 
 const TYPES = [
   { value: '', label: 'Все типы' },
@@ -37,6 +37,7 @@ export default function WarehouseMovementsPage() {
   const [transferStatus, setTransferStatus] = useState('')
   const { data: transfers = [], isLoading: transfersLoading } = useTransfers({ status: transferStatus })
   const validProducts = data.products.filter((p) => isUUID(getId(p)))
+  const activeProducts = data.products.filter(isProductActive)
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -99,7 +100,7 @@ export default function WarehouseMovementsPage() {
       </section>
 
       <MovementList rows={rows} data={data} />
-      <NewTransferModal open={showNewTransfer} onClose={() => setShowNewTransfer(false)} products={data.products} />
+      <NewTransferModal open={showNewTransfer} onClose={() => setShowNewTransfer(false)} products={activeProducts} />
     </div>
   )
 }
