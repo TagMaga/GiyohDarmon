@@ -65,10 +65,27 @@ if (( dump_size > TELEGRAM_MAX_BYTES )); then
   exit 1
 fi
 
+# Counts feed the Telegram caption below so whoever's watching that chat can
+# eyeball "does this look like a normal day" without opening the dump —
+# excludes soft-deleted rows (DeletedAt), matching what the app itself
+# would show as each entity's current total.
+count_rows() {
+  psql "$pg_conninfo" -tAc "SELECT count(*) FROM $1 WHERE deleted_at IS NULL"
+}
+total_orders="$(count_rows orders)"
+total_people="$(count_rows users)"
+total_products="$(count_rows products)"
+
 echo "→ Sending to Telegram..."
+caption="Резервная копия базы данных megamall-crm
+Всего заказов: ${total_orders}
+Всего пользователей: ${total_people}
+Всего товаров: ${total_products}
+Размер файла: ${dump_size} байт
+Дата и время: ${timestamp} UTC"
 response="$(curl -fsS --max-time 120 \
   -F "chat_id=${TELEGRAM_BACKUP_CHAT_ID}" \
-  -F "caption=Резервная копия базы данных megamall-crm — ${timestamp} UTC (${dump_size} байт)" \
+  -F "caption=${caption}" \
   -F "document=@${BACKUP_DIR}/${dump_name};filename=${dump_name}" \
   "${TELEGRAM_API}/sendDocument")"
 
