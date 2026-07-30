@@ -145,8 +145,8 @@ export function StatusPill({ status }) {
   )
 }
 
-/** Avatar circle with initials */
-export function InitialsAvatar({ name = '', size = 42, radius, palette = 0 }) {
+/** Avatar circle — shows the person's photo when given, else falls back to initials */
+export function InitialsAvatar({ name = '', size = 42, radius, palette = 0, src }) {
   const PALETTES = [
     { bg: '#E7E5FB', color: M.indigoDeep },
     { bg: M.amberBg, color: M.amber },
@@ -156,6 +156,18 @@ export function InitialsAvatar({ name = '', size = 42, radius, palette = 0 }) {
   ]
   const p = PALETTES[palette % PALETTES.length]
   const initials = name.split(' ').map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase() || '·'
+
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        className="flex-shrink-0 object-cover"
+        style={{ width: size, height: size, borderRadius: radius ?? '50%' }}
+      />
+    )
+  }
+
   return (
     <div
       className="flex items-center justify-center flex-shrink-0"

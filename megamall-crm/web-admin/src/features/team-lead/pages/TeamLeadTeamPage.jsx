@@ -63,7 +63,7 @@ function MobileMemberRow({ member, rank, onClick }) {
       style={{ padding: '13px 15px' }}
     >
       <RankBadge rank={rank} />
-      <InitialsAvatar name={member.full_name} size={36} palette={rank - 1} />
+      <InitialsAvatar name={member.full_name} size={36} palette={rank - 1} src={member.avatar_url} />
       <div className="flex-1 min-w-0">
         <div style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>{member.full_name}</div>
         <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>
@@ -81,7 +81,7 @@ function MobileMemberRow({ member, rank, onClick }) {
 function DesktopMemberRow({ member, onClick }) {
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow" onClick={onClick}>
-      <InitialsAvatar name={member.full_name} size={44} radius={16} />
+      <InitialsAvatar name={member.full_name} size={44} radius={16} src={member.avatar_url} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-bold text-slate-900 truncate">{member.full_name}</p>
@@ -147,6 +147,7 @@ export default function TeamLeadTeamPage() {
           payee_id:     u.id,
           full_name:    u.full_name,
           role:         u.role,
+          avatar_url:   u.avatar_url,
           orders_count: d?.ordersCount ?? 0,
           earned:       p?.earned ?? 0,
         }

@@ -14,6 +14,7 @@ function normalizeUser(user) {
     full_name: user.full_name ?? user.FullName ?? user.name ?? 'Участник',
     phone: user.phone ?? user.Phone ?? '',
     role: user.role ?? user.Role ?? '',
+    avatar_url: user.avatar_url ?? user.AvatarURL ?? null,
   }
 }
 
@@ -44,7 +45,7 @@ function CallButton({ phone, size = 32 }) {
 function PersonCard({ person, palette = 0 }) {
   return (
     <Card style={{ borderRadius: 16, padding: '16px 18px' }} className="flex items-center gap-[14px]">
-      <InitialsAvatar name={person.full_name} size={48} palette={palette} />
+      <InitialsAvatar name={person.full_name} size={48} palette={palette} src={person.avatar_url} />
       <div className="flex-1 min-w-0">
         <div className="truncate" style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>{person.full_name}</div>
         <div className="truncate" style={{ fontSize: 12.5, color: M.muted, marginTop: 1 }}>{roleLabel(person.role)}</div>
@@ -65,7 +66,7 @@ function SellerRow({ seller, index }) {
       }}
     >
       <div className="flex items-center gap-3 min-w-0">
-        <InitialsAvatar name={seller.full_name} size={36} palette={index} />
+        <InitialsAvatar name={seller.full_name} size={36} palette={index} src={seller.avatar_url} />
         <span className="truncate" style={{ fontSize: 14, fontWeight: 700, color: M.ink }}>{seller.full_name}</span>
       </div>
       <div style={{ fontSize: 13.5, color: '#76766E', fontWeight: 500 }}>{roleLabel(seller.role)}</div>
@@ -79,7 +80,7 @@ function SellerRow({ seller, index }) {
 function MobileSellerRow({ seller, index }) {
   return (
     <div className="flex items-center gap-3" style={{ padding: '12px 0', borderBottom: `1px solid ${M.bg}` }}>
-      <InitialsAvatar name={seller.full_name} size={36} palette={index} />
+      <InitialsAvatar name={seller.full_name} size={36} palette={index} src={seller.avatar_url} />
       <div className="flex-1 min-w-0">
         <div className="truncate" style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>{seller.full_name}</div>
         <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>{roleLabel(seller.role)}</div>
