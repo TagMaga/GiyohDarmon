@@ -55,6 +55,26 @@ jobs:
             -w "\nTTFB:%{time_starttransfer} Total:%{time_total} HTTP:%{http_code}\n" \
             --max-time 15 "https://giyohdarmon.tj/api/v1/ready" || true
 
+      - name: DNS delegation and per-nameserver timing for giyohdarmon.tj
+        run: |
+          echo "=== NS records (via public resolver 1.1.1.1) ==="
+          dig @1.1.1.1 NS giyohdarmon.tj +time=5 +tries=2
+
+          echo
+          echo "=== A record + TTL (via public resolver 1.1.1.1) ==="
+          dig @1.1.1.1 A giyohdarmon.tj +time=5 +tries=2
+
+          echo
+          echo "=== Direct query timing against each authoritative nameserver ==="
+          for ns in $(dig @1.1.1.1 +short NS giyohdarmon.tj); do
+            echo "--- $ns ---"
+            dig "@$ns" A giyohdarmon.tj +time=5 +tries=1 +stats 2>&1 | grep -E "Query time|SERVER|status|ANSWER SECTION|^giyohdarmon" || echo "(no response / timeout from $ns)"
+          done
+
+          echo
+          echo "=== Default system resolver timing (cold, cache flushed via +norecurse first) ==="
+          time dig giyohdarmon.tj A +time=5 +tries=2
+
       - name: Compression check (Accept-Encoding gzip)
         run: |
           echo "=== HTML with Accept-Encoding: gzip ==="
