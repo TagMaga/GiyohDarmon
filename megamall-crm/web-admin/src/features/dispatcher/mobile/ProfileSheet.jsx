@@ -46,63 +46,73 @@ export default function ProfileSheet({ open, onClose, onLogout }) {
   const canSave = currentPwd.length > 0 && pwd.length >= 8 && pwd === pwd2
 
   return (
-    <Sheet open={open} onClose={onClose} maxHeight="88%" zIndex={44}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 13, marginBottom: 18 }}>
-        <div style={{ width: 56, height: 56, borderRadius: 16, background: C.violet, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 21, fontWeight: 900, flexShrink: 0, boxShadow: '0 6px 16px rgba(99,102,241,.3)' }}>{profile.initials}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 18, fontWeight: 900 }}>{profile.fullName ?? 'Диспетчер'}</div>
-          <div style={{ fontSize: 12, color: C.text4 }}>Диспетчер</div>
+    <Sheet open={open} onClose={onClose} maxHeight="90%" zIndex={44}>
+      <div style={{ background: C.gradient, borderRadius: 20, padding: '28px 20px', marginBottom: 20, color: '#fff', boxShadow: '0 10px 28px rgba(99,102,241,.25)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -40, right: -40, width: 120, height: 120, background: 'rgba(255,255,255,.1)', borderRadius: '50%' }} />
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ width: 72, height: 72, borderRadius: 18, background: 'rgba(255,255,255,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 900, marginBottom: 18, backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,.3)' }}>{profile.initials}</div>
+          <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 4, letterSpacing: '-.01em' }}>{profile.fullName ?? 'Диспетчер'}</div>
+          <div style={{ fontSize: 13, opacity: 0.85, fontWeight: 600 }}>Диспетчер</div>
         </div>
       </div>
 
-      <div style={{ background: '#fff', border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', marginBottom: 18 }}>
-        <InfoRow label="Имя" value={firstName} border />
-        <InfoRow label="Фамилия" value={lastName} border />
-        <InfoRow label="Телефон" value={profile.phone ?? '—'} phone border />
-        <InfoRow label="Должность" value="Диспетчер" />
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: C.text3, padding: '0 4px 12px' }}>Основная информация</div>
+        <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,.04)', border: `1px solid ${C.border}` }}>
+          <InfoRow icon="👤" iconBg={C.violetBg} iconColor={C.violetDk} label="Имя" value={firstName} border />
+          <InfoRow icon="📝" iconBg={C.blueBg} iconColor={C.blue} label="Фамилия" value={lastName} border />
+          <InfoRow icon="📞" iconBg={C.greenBg} iconColor={C.green} label="Телефон" value={profile.phone ?? '—'} phone border />
+          <InfoRow icon="💼" iconBg={C.amberBg} iconColor={C.amber} label="Должность" value="Диспетчер" />
+        </div>
       </div>
 
-      {!passwordOpen ? (
-        <button
-          type="button"
-          onClick={() => setPasswordOpen(true)}
-          style={{ width: '100%', padding: 13, border: `1px solid ${C.border}`, borderRadius: 13, background: '#fff', color: C.text1, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', marginBottom: 9 }}
-        >
-          Изменить пароль
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: C.text3, padding: '0 4px 12px' }}>Безопасность</div>
+
+        {passwordOpen ? (
+          <div style={{ background: '#fff', borderRadius: 16, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,.04)', border: `1px solid ${C.border}` }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+              <PasswordInput value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} placeholder="Текущий пароль" autoComplete="current-password" style={inputStyle} />
+              <PasswordInput value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="Новый пароль (мин. 8 символов)" autoComplete="new-password" style={inputStyle} />
+              <PasswordInput value={pwd2} onChange={(e) => setPwd2(e.target.value)} placeholder="Повторите новый пароль" autoComplete="new-password" style={inputStyle} />
+            </div>
+            <div style={{ display: 'flex', gap: 9 }}>
+              <button
+                type="button"
+                onClick={() => { setPasswordOpen(false); setCurrentPwd(''); setPwd(''); setPwd2('') }}
+                style={{ flex: 1, padding: 12, border: `1px solid ${C.border}`, borderRadius: 12, background: '#fff', color: C.text2, fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={() => canSave && savePassword()}
+                disabled={!canSave || isPending}
+                style={{ flex: 1, padding: 12, border: 'none', borderRadius: 12, fontFamily: 'inherit', fontSize: 13, fontWeight: 700, color: '#fff', cursor: canSave ? 'pointer' : 'default', background: canSave ? C.gradient : '#DDD', opacity: canSave ? 1 : 0.5 }}
+              >
+                {isPending ? '...' : 'Изменить'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setPasswordOpen(true)}
+            style={{ width: '100%', padding: 14, border: `1px solid ${C.border}`, borderRadius: 14, background: '#fff', color: C.text1, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,.04)' }}
+          >
+            🔐 Изменить пароль
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+        <button type="button" onClick={onLogout} style={{ width: '100%', padding: 14, border: `1px solid ${C.redSoft}`, borderRadius: 14, background: '#fff', color: C.red, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+          Выйти из аккаунта
         </button>
-      ) : (
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.07em', color: C.text3, padding: '0 2px 10px' }}>Смена пароля</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 12 }}>
-            <PasswordInput value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} placeholder="Текущий пароль" autoComplete="current-password" style={inputStyle} />
-            <PasswordInput value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="Новый пароль (мин. 8 символов)" autoComplete="new-password" style={inputStyle} />
-            <PasswordInput value={pwd2} onChange={(e) => setPwd2(e.target.value)} placeholder="Повторите новый пароль" autoComplete="new-password" style={inputStyle} />
-          </div>
-          <div style={{ display: 'flex', gap: 9 }}>
-            <button
-              type="button"
-              onClick={() => { setPasswordOpen(false); setCurrentPwd(''); setPwd(''); setPwd2('') }}
-              style={{ flex: 1, padding: 13, border: `1px solid ${C.border}`, borderRadius: 13, background: '#fff', color: C.text2, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}
-            >
-              Отмена
-            </button>
-            <button
-              type="button"
-              onClick={() => canSave && savePassword()}
-              disabled={!canSave || isPending}
-              style={{ flex: 1, padding: 13, border: 'none', borderRadius: 13, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, color: '#fff', cursor: canSave ? 'pointer' : 'default', background: C.gradient, opacity: canSave ? 1 : 0.5 }}
-            >
-              {isPending ? '...' : 'Изменить пароль'}
-            </button>
-          </div>
-        </div>
-      )}
-      <button type="button" onClick={onLogout} style={{ width: '100%', padding: 13, border: `1px solid ${C.redSoft}`, borderRadius: 13, background: '#fff', color: C.red, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', marginBottom: 9 }}>
-        Выйти
-      </button>
-      <button type="button" onClick={onClose} style={{ width: '100%', padding: 13, border: `1px solid ${C.border}`, borderRadius: 13, background: '#fff', color: C.text2, fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>
-        Закрыть
-      </button>
+        <button type="button" onClick={onClose} style={{ width: '100%', padding: 14, border: `1px solid ${C.border}`, borderRadius: 14, background: '#fff', color: C.text2, fontFamily: 'inherit', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+          Закрыть
+        </button>
+      </div>
     </Sheet>
   )
 }
@@ -112,15 +122,20 @@ const inputStyle = {
   width: '100%', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: 13, outline: 'none',
 }
 
-function InfoRow({ label, value, phone, border }) {
+function InfoRow({ icon, iconBg, iconColor, label, value, phone, border }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', borderBottom: border ? `1px solid ${C.border2}` : 'none' }}>
-      <span style={{ fontSize: 12, color: C.text3 }}>{label}</span>
-      {phone ? (
-        <a href={`tel:${value}`} style={{ fontSize: 13, fontWeight: 700, fontFamily: 'monospace', color: C.blue }}>{value}</a>
-      ) : (
-        <span style={{ fontSize: 13, fontWeight: 700 }}>{value}</span>
-      )}
+    <div style={{ padding: '16px 16px', borderBottom: border ? `1px solid ${C.border2}` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor, fontSize: 18, flexShrink: 0 }}>{icon}</div>
+        <div>
+          <div style={{ fontSize: 11, color: C.text3, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 2 }}>{label}</div>
+          {phone ? (
+            <a href={`tel:${value}`} style={{ fontSize: 15, fontWeight: 700, fontFamily: 'monospace', color: C.blue, textDecoration: 'none' }}>{value}</a>
+          ) : (
+            <div style={{ fontSize: 15, fontWeight: 700, color: C.text1 }}>{value}</div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
