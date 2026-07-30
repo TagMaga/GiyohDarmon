@@ -471,6 +471,17 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		return nil, err
 	}
 
+	// Requested delivery date: the date the client asked for, optional,
+	// format "2006-01-02" (already checked by the DTO's validate tag).
+	var requestedDeliveryDate *time.Time
+	if req.RequestedDeliveryDate != nil && *req.RequestedDeliveryDate != "" {
+		d, err := time.Parse("2006-01-02", *req.RequestedDeliveryDate)
+		if err != nil {
+			return nil, apperrors.BadRequest("invalid requested_delivery_date, expected format YYYY-MM-DD")
+		}
+		requestedDeliveryDate = &d
+	}
+
 	// ── Attachments: resolved/attached BEFORE the transaction ──────────────
 	// A media-pipeline attach is a separate service call with its own DB
 	// write (internal/media's own claim-the-asset UPDATE), so it can't
@@ -613,25 +624,26 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		}
 
 		o := &Order{
-			ID:               orderID,
-			CustomerID:       req.CustomerID,
-			SellerID:         effectiveSellerID,
-			ManagerID:        hier.managerID,
-			TeamLeadID:       hier.teamLeadID,
-			ManagerTeamID:    hier.managerTeamID,
-			TeamLeadTeamID:   hier.teamLeadTeamID,
-			OrderType:        req.OrderType,
-			Status:           initialStatus,
-			CityID:           &req.CityID,
-			SnapshotID:       &snap.ID,
-			DeliveryMethod:   deliveryMethod,
-			Subtotal:         subtotal,
-			TotalAmount:      totalAmount,
-			DeliveryFee:      deliveryFee,
-			NetRevenue:       netRevenue,
-			PrepaymentAmount: req.PrepaymentAmount,
-			Notes:            req.Notes,
-			DeliveryAddress:  req.DeliveryAddress,
+			ID:                    orderID,
+			CustomerID:            req.CustomerID,
+			SellerID:              effectiveSellerID,
+			ManagerID:             hier.managerID,
+			TeamLeadID:            hier.teamLeadID,
+			ManagerTeamID:         hier.managerTeamID,
+			TeamLeadTeamID:        hier.teamLeadTeamID,
+			OrderType:             req.OrderType,
+			Status:                initialStatus,
+			CityID:                &req.CityID,
+			SnapshotID:            &snap.ID,
+			DeliveryMethod:        deliveryMethod,
+			Subtotal:              subtotal,
+			TotalAmount:           totalAmount,
+			DeliveryFee:           deliveryFee,
+			NetRevenue:            netRevenue,
+			PrepaymentAmount:      req.PrepaymentAmount,
+			Notes:                 req.Notes,
+			DeliveryAddress:       req.DeliveryAddress,
+			RequestedDeliveryDate: requestedDeliveryDate,
 
 			PrepaymentRequired: req.PrepaymentRequired,
 			PrepaymentType:     autoType,

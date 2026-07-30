@@ -213,11 +213,15 @@ type Order struct {
 	PrepaymentVerifiedAt      *time.Time `gorm:"column:prepayment_verified_at"`
 	PrepaymentRejectionReason *string    `gorm:"column:prepayment_rejection_reason"`
 
-	Notes           *string    `gorm:"type:text"`
-	DeliveryAddress *string    `gorm:"type:text;column:delivery_address"`
-	CreatedAt       time.Time  `gorm:"autoCreateTime"`
-	UpdatedAt       time.Time  `gorm:"autoUpdateTime"`
-	DeletedAt       *time.Time `gorm:"index"`
+	Notes           *string `gorm:"type:text"`
+	DeliveryAddress *string `gorm:"type:text;column:delivery_address"`
+	// RequestedDeliveryDate is the date the client asked for at order-creation time
+	// (set by seller/manager/owner/team-lead). Distinct from ScheduledAt, which the
+	// dispatcher sets later for operational delivery scheduling.
+	RequestedDeliveryDate *time.Time `gorm:"type:date;column:requested_delivery_date"`
+	CreatedAt             time.Time  `gorm:"autoCreateTime"`
+	UpdatedAt             time.Time  `gorm:"autoUpdateTime"`
+	DeletedAt             *time.Time `gorm:"index"`
 
 	// Phase 5: courier assignment cache.
 	// SOURCE OF TRUTH is order_assignments WHERE is_active=true.

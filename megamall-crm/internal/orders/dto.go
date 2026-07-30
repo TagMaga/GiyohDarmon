@@ -34,6 +34,10 @@ type CreateOrderRequest struct {
 	Notes           *string            `json:"notes"`
 	DeliveryAddress *string            `json:"delivery_address"`
 	DeliveryMethod  string             `json:"delivery_method"` // "normal" | "fast" ("express" accepted as legacy alias); defaults to "normal"
+	// RequestedDeliveryDate is the date the client asked for (set by seller/manager/
+	// owner/team-lead at creation), format "2006-01-02". Optional. Distinct from
+	// scheduled_at, which the dispatcher sets later for operational scheduling.
+	RequestedDeliveryDate *string `json:"requested_delivery_date" validate:"omitempty,datetime=2006-01-02"`
 
 	// Dispatcher-only: create order on behalf of a specific seller.
 	SellerID *uuid.UUID `json:"seller_id"`
@@ -291,12 +295,13 @@ type OrderResponse struct {
 	PrepaymentVerifiedAt      *time.Time `json:"prepayment_verified_at"`
 	PrepaymentRejectionReason *string    `json:"prepayment_rejection_reason"`
 
-	Notes           *string              `json:"notes"`
-	DeliveryAddress *string              `json:"delivery_address"`
-	Items           []OrderItemResponse  `json:"items"`
-	Attachments     []AttachmentResponse `json:"attachments"`
-	CreatedAt       time.Time            `json:"created_at"`
-	UpdatedAt       time.Time            `json:"updated_at"`
+	Notes                 *string              `json:"notes"`
+	DeliveryAddress       *string              `json:"delivery_address"`
+	RequestedDeliveryDate *string              `json:"requested_delivery_date"` // "2006-01-02", date the client asked for at creation
+	Items                 []OrderItemResponse  `json:"items"`
+	Attachments           []AttachmentResponse `json:"attachments"`
+	CreatedAt             time.Time            `json:"created_at"`
+	UpdatedAt             time.Time            `json:"updated_at"`
 
 	// ── Courier display (resolved from assignment history, see CourierInfo) ──
 	// current_*  = the courier actively holding the order (assigned/in_delivery).
@@ -409,6 +414,14 @@ func PaymentLabel(prepayment, totalOrderAmount float64) string {
 	return "partial_prepayment"
 }
 
+func formatDateOrNil(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	s := t.Format("2006-01-02")
+	return &s
+}
+
 func ToOrderResponse(o *Order) OrderResponse {
 	items := make([]OrderItemResponse, 0, len(o.Items))
 	for _, it := range o.Items {
@@ -486,12 +499,13 @@ func ToOrderResponse(o *Order) OrderResponse {
 		PrepaymentVerifiedAt:      o.PrepaymentVerifiedAt,
 		PrepaymentRejectionReason: o.PrepaymentRejectionReason,
 
-		Notes:           o.Notes,
-		DeliveryAddress: o.DeliveryAddress,
-		Items:           items,
-		Attachments:     attachments,
-		CreatedAt:       o.CreatedAt,
-		UpdatedAt:       o.UpdatedAt,
+		Notes:                 o.Notes,
+		DeliveryAddress:       o.DeliveryAddress,
+		RequestedDeliveryDate: formatDateOrNil(o.RequestedDeliveryDate),
+		Items:                 items,
+		Attachments:           attachments,
+		CreatedAt:             o.CreatedAt,
+		UpdatedAt:             o.UpdatedAt,
 	}
 }
 
