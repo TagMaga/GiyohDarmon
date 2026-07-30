@@ -1,0 +1,57 @@
+name: Set up database backup-to-Telegram timer
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "diagnose (read-only, safe) or apply (installs the systemd timer)"
+        required: true
+        default: diagnose
+        type: choice
+        options:
+          - diagnose
+          - apply
+
+permissions:
+  contents: read
+
+concurrency:
+  group: megamall-production-db-backup-setup
+  cancel-in-progress: false
+
+jobs:
+  setup-db-backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      SERVER_USER: deploy
+      PROJECT: /var/www/megamall-crm
+
+    steps:
+      - name: Check out the exact revision
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Configure verified SSH access
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$SERVER_SSH_KEY" > "$HOME/.ssh/deploy_key"
+          printf '%s %s\n' "$SERVER_HOST" \
+            'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOyShTb8NPuH+bPPBFOjV0e/8PI+Tg0pXPbq/V3dlUmq' \
+            > "$HOME/.ssh/known_hosts"
+
+      - name: Run backup timer setup script on server
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -Eeuo pipefail
+          SSH_ARGS=(-i "$HOME/.ssh/deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
+          ssh "${SSH_ARGS[@]}" "$SERVER_USER@$SERVER_HOST" \
+            "MODE='$MODE' PROJECT='$PROJECT' bash -s" \
+            < scripts/setup_backup_remote.sh

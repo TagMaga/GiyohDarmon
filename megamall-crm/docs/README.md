@@ -15,6 +15,7 @@ Two client apps share one Go backend:
 | Look up an API endpoint and which roles can call it | [API_REFERENCE.md](API_REFERENCE.md) |
 | Learn backend module conventions (file layout, RBAC pattern, migrations, the financial ledger, the compensation engine) | [`../CLAUDE.md`](../CLAUDE.md) |
 | Set up a staging environment | [STAGING_RUNBOOK.md](STAGING_RUNBOOK.md) |
+| Understand/restore the Telegram database backups | [DB_BACKUPS.md](DB_BACKUPS.md) |
 | See the historical Phase 6 API notes | [API_PHASE_6.md](API_PHASE_6.md) |
 | See the 2026-06-18 full-system audit & modernization plan | [AUDIT_2026-06-18.md](AUDIT_2026-06-18.md) |
 
