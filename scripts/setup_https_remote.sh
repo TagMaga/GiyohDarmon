@@ -61,8 +61,43 @@ server {
     root ${FRONTEND_ROOT};
     index index.html;
 
+    # Compress text-based responses (JS/CSS/JSON/SVG/HTML). Already-compressed
+    # formats (images, video, fonts in woff2) are left alone — recompressing
+    # them wastes CPU for zero size benefit.
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 6;
+    gzip_min_length 256;
+    gzip_proxied any;
+    gzip_types
+        text/plain
+        text/css
+        text/xml
+        text/javascript
+        application/json
+        application/javascript
+        application/xml
+        application/xml+rss
+        application/vnd.ms-fontobject
+        image/svg+xml
+        font/ttf
+        font/otf;
+
+    # Vite emits every JS/CSS/image asset with a content hash in the
+    # filename (dist/assets/*-<hash>.js), so it is safe to cache these
+    # forever — a new deploy always ships new filenames, never mutates an
+    # old one in place.
+    location /assets/ {
+        try_files \$uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+    }
+
     location / {
         try_files \$uri \$uri/ /index.html;
+        # index.html (and the SPA fallback that serves it for client-side
+        # routes) is NOT hashed and must always be revalidated so a deploy
+        # is picked up immediately instead of being served stale from cache.
+        add_header Cache-Control "no-cache" always;
     }
 
     location /api/ {

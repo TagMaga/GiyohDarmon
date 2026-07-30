@@ -42,40 +42,16 @@ export default defineConfig({
           // HTTP client — used everywhere, isolate from feature code.
           'vendor-axios': ['axios'],
 
-          // Feature chunks — paired with lazy() in router.jsx so each role's code
-          // only loads when that role first navigates to their section.
-          'feature-owner': [
-            './src/features/finance/pages/OwnerFinancePage.jsx',
-            './src/features/orders/pages/OwnerOrdersPage.jsx',
-            './src/features/people/pages/TeamProfilePage.jsx',
-          ],
-          'feature-team-lead': [
-            './src/features/team-lead/pages/TeamLeadDashboardPage.jsx',
-            './src/features/team-lead/pages/TeamLeadIncomePage.jsx',
-            './src/features/team-lead/pages/TeamLeadOrdersPage.jsx',
-            './src/features/team-lead/pages/TeamLeadSellersPage.jsx',
-            './src/features/team-lead/pages/TeamLeadManagerPage.jsx',
-            './src/features/team-lead/pages/TeamLeadReportsPage.jsx',
-          ],
-          'feature-manager': [
-            './src/features/manager/pages/ManagerDashboardPage.jsx',
-            './src/features/manager/pages/ManagerIncomePage.jsx',
-            './src/features/manager/pages/ManagerOrdersPage.jsx',
-            './src/features/manager/pages/ManagerSellersPage.jsx',
-            './src/features/manager/pages/ManagerMyOrdersPage.jsx',
-          ],
-          'feature-seller': [
-            './src/features/seller/pages/SellerHome.jsx',
-            './src/features/seller/pages/SellerOrders.jsx',
-            './src/features/seller/pages/CreateOrder.jsx',
-            './src/features/seller/pages/SellerIncomePage.jsx',
-          ],
-          'feature-dispatcher': [
-            './src/features/dispatcher/pages/DispatcherBoardV3.jsx',
-          ],
-          'feature-warehouse': [
-            './src/features/warehouse/pages/WarehouseDashboard.jsx',
-          ],
+          // NOTE: role/feature pages are intentionally NOT grouped into manual
+          // chunks here. Each page is already route-split via lazy() in
+          // router.jsx, which gives Rollup its own async chunk per page.
+          // Manually regrouping several of those async chunks into combined
+          // 'feature-owner' / 'feature-dispatcher' / etc. bundles (as this file
+          // used to do) made Vite treat them as build-time-reachable from the
+          // entry, so it emitted <link rel="modulepreload"> for ALL of them in
+          // index.html — meaning every visitor, including an anonymous user on
+          // /login, downloaded every role's page code and CSS up front. Leave
+          // chunking to Vite's default per-dynamic-import splitting instead.
         },
       },
     },
