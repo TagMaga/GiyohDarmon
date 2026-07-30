@@ -20,11 +20,22 @@ import PaymentModeSelector from '../components/PaymentModeSelector'
 import OrderSuccessScreen from '../components/OrderSuccessScreen'
 import Alert from '../../../shared/components/Alert'
 import EmptyState from '../../../shared/components/EmptyState'
+import DateInput from '../../../shared/components/DateInput'
 import { fmtAmount } from '../../../shared/orderStatusConfig'
 import { M } from '../components/mobileUi'
 
 // ── Draft ──────────────────────────────────────────────────────────────────────
 const DRAFT_KEY = 'seller_create_order_draft_v2'
+
+// Local-time "YYYY-MM-DD" (matches <input type="date"> value format & backend's
+// requested_delivery_date format), so a past-midnight-UTC user isn't defaulted
+// to yesterday.
+function todayDateStr() {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+const isValidDateStr = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)
 
 function normalizeDraft(raw) {
   if (!raw || typeof raw !== 'object') return null
@@ -41,6 +52,7 @@ function normalizeDraft(raw) {
     prepayAmount:    raw.prepayAmount ?? '',
     prepayReceiver:  typeof raw.prepayReceiver === 'string'  ? raw.prepayReceiver  : '',
     comment:         typeof raw.comment === 'string'         ? raw.comment         : '',
+    requestedDate:   isValidDateStr(raw.requestedDate)       ? raw.requestedDate   : todayDateStr(),
   }
 }
 
@@ -56,6 +68,7 @@ const EMPTY_FORM = {
   deliveryMode: 'normal',
   payMode: 'cod',
   prepayAmount: '', prepayReceiver: '', comment: '',
+  requestedDate: todayDateStr(),
 }
 
 // ── Product search ─────────────────────────────────────────────────────────────
@@ -336,6 +349,7 @@ export default function CreateOrder() {
         })),
         city:             form.city || undefined,
         delivery_address: form.address.trim() || undefined,
+        requested_delivery_date: form.requestedDate || undefined,
         notes:            notes ?? null,
         prepayment_required: prepayRequired,
         prepayment_amount:   prepayRequired ? prepayAmt : 0,
@@ -595,6 +609,13 @@ export default function CreateOrder() {
             fastFee={fastFee}
             normalFee={normalFee}
           />
+          <div style={{ marginTop: 12 }}>
+            <DateInput
+              label="Дата доставки"
+              value={form.requestedDate}
+              onChange={(v) => setField('requestedDate', v || todayDateStr())}
+            />
+          </div>
         </div>
 
         {/* ── 4. Payment ── */}
@@ -822,6 +843,11 @@ export default function CreateOrder() {
                 onChange={(v) => setField('deliveryMode', v)}
                 fastFee={fastFee}
                 normalFee={normalFee}
+              />
+              <DateInput
+                label="Дата доставки"
+                value={form.requestedDate}
+                onChange={(v) => setField('requestedDate', v || todayDateStr())}
               />
             </div>
           </div>
