@@ -92,14 +92,14 @@ func (h *Handler) Webhook(c *gin.Context) {
 	}
 
 	if !h.allowedUserIDs[cq.From.ID] {
-		_ = h.client.AnswerCallbackQuery(c.Request.Context(), cq.ID, "Not authorized to approve/reject.")
+		_ = h.client.AnswerCallbackQuery(c.Request.Context(), cq.ID, "Нет прав на подтверждение/отклонение.")
 		c.Status(http.StatusOK)
 		return
 	}
 
 	toast, editedText, err := h.onCallback(c, requestID, action, cq.From.ID)
 	if err != nil {
-		_ = h.client.AnswerCallbackQuery(c.Request.Context(), cq.ID, "Error processing request.")
+		_ = h.client.AnswerCallbackQuery(c.Request.Context(), cq.ID, "Ошибка при обработке запроса.")
 		c.Status(http.StatusOK)
 		return
 	}
