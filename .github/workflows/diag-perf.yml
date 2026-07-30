@@ -1,0 +1,60 @@
+name: Diagnose production perf (temporary)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: HTML document timing + headers
+        run: |
+          echo "=== HTML document (/) ==="
+          curl -sS -D - -o /tmp/index.html \
+            -w "\nDNS:%{time_namelookup} Connect:%{time_connect} TLS:%{time_appconnect} TTFB:%{time_starttransfer} Total:%{time_total} HTTP:%{http_code} SizeDL:%{size_download} SizeHdr:%{size_header}\n" \
+            --max-time 30 "https://giyohdarmon.tj/"
+          echo
+          echo "=== index.html body (first 4000 chars) ==="
+          head -c 4000 /tmp/index.html
+
+      - name: Google Fonts stylesheet timing (as referenced in index.html head)
+        run: |
+          echo "=== fonts.googleapis.com Inter CSS ==="
+          curl -sS -D - -o /tmp/inter.css \
+            -w "\nDNS:%{time_namelookup} Connect:%{time_connect} TLS:%{time_appconnect} TTFB:%{time_starttransfer} Total:%{time_total} HTTP:%{http_code}\n" \
+            --max-time 30 "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" || true
+          echo
+          echo "=== fonts.googleapis.com Golos Text CSS ==="
+          curl -sS -D - -o /tmp/golos.css \
+            -w "\nDNS:%{time_namelookup} Connect:%{time_connect} TLS:%{time_appconnect} TTFB:%{time_starttransfer} Total:%{time_total} HTTP:%{http_code}\n" \
+            --max-time 30 "https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800;900&display=swap" || true
+
+      - name: Extract and time first JS bundle referenced by index.html
+        run: |
+          set -x
+          MAIN_JS=$(grep -oE '/assets/[A-Za-z0-9._-]+\.js' /tmp/index.html | head -1 || true)
+          echo "Main JS asset path: $MAIN_JS"
+          if [ -n "$MAIN_JS" ]; then
+            echo "=== $MAIN_JS timing + headers ==="
+            curl -sS -D - -o /tmp/main.js \
+              -w "\nDNS:%{time_namelookup} Connect:%{time_connect} TLS:%{time_appconnect} TTFB:%{time_starttransfer} Total:%{time_total} HTTP:%{http_code} SizeDL:%{size_download}\n" \
+              --max-time 30 "https://giyohdarmon.tj${MAIN_JS}"
+          fi
+
+      - name: API readiness + auth-adjacent endpoints timing
+        run: |
+          echo "=== /api/v1/ready ==="
+          curl -sS -D - -o /dev/null \
+            -w "\nTTFB:%{time_starttransfer} Total:%{time_total} HTTP:%{http_code}\n" \
+            --max-time 15 "https://giyohdarmon.tj/api/v1/ready" || true
+
+      - name: Compression check (Accept-Encoding gzip)
+        run: |
+          echo "=== HTML with Accept-Encoding: gzip ==="
+          curl -sS -D - -o /dev/null -H "Accept-Encoding: gzip, br" \
+            -w "\nTotal:%{time_total} HTTP:%{http_code} SizeDL:%{size_download}\n" \
+            --max-time 30 "https://giyohdarmon.tj/"
