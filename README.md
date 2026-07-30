@@ -16,6 +16,7 @@ Full technical docs live in [`megamall-crm/docs/`](megamall-crm/docs/README.md):
 - [API reference](megamall-crm/docs/API_REFERENCE.md) — every backend endpoint with role gating
 - [Backend conventions](megamall-crm/CLAUDE.md) — module layout, RBAC pattern, migrations, financial ledger, compensation engine
 - [Staging runbook](megamall-crm/docs/STAGING_RUNBOOK.md) — deploying a staging environment
+- [Database backups](megamall-crm/docs/DB_BACKUPS.md) — twice-daily DB dump sent to Telegram, and how to restore from one
 
 ## Quick start
 
