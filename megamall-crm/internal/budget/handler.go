@@ -285,28 +285,28 @@ func (h *Handler) HandleTelegramDecision(ctx context.Context, requestIDStr, acti
 	case "approve":
 		newBalance, err := h.repo.ApproveWithdrawalRequest(ctx, requestID, telegramUserID)
 		if errors.Is(err, ErrWithdrawalRequestDecided) {
-			return "Already decided.", "", nil
+			return "Уже обработано.", "", nil
 		}
 		if errors.Is(err, ErrWithdrawalRequestNotFound) {
-			return "Request not found.", "", nil
+			return "Запрос не найден.", "", nil
 		}
 		if err != nil {
 			return "", "", err
 		}
-		return "Approved.", fmt.Sprintf("✅ Withdrawal approved.\nNew balance: %.2f", newBalance), nil
+		return "Подтверждено.", fmt.Sprintf("✅ Вывод средств подтверждён.\nНовый баланс: %.2f", newBalance), nil
 
 	case "reject":
 		err := h.repo.RejectWithdrawalRequest(ctx, requestID, telegramUserID)
 		if errors.Is(err, ErrWithdrawalRequestDecided) {
-			return "Already decided.", "", nil
+			return "Уже обработано.", "", nil
 		}
 		if errors.Is(err, ErrWithdrawalRequestNotFound) {
-			return "Request not found.", "", nil
+			return "Запрос не найден.", "", nil
 		}
 		if err != nil {
 			return "", "", err
 		}
-		return "Rejected.", "❌ Withdrawal rejected.", nil
+		return "Отклонено.", "❌ Вывод средств отклонён.", nil
 
 	default:
 		return "", "", fmt.Errorf("unknown action %q", action)

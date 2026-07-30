@@ -89,8 +89,8 @@ func ApprovalButtons(requestID string) inlineKeyboardMarkup {
 	return inlineKeyboardMarkup{
 		InlineKeyboard: [][]inlineKeyboardButton{
 			{
-				{Text: "✅ Approve", CallbackData: "budget_wd:" + requestID + ":approve"},
-				{Text: "❌ Reject", CallbackData: "budget_wd:" + requestID + ":reject"},
+				{Text: "✅ Подтвердить", CallbackData: "budget_wd:" + requestID + ":approve"},
+				{Text: "❌ Отклонить", CallbackData: "budget_wd:" + requestID + ":reject"},
 			},
 		},
 	}

@@ -307,7 +307,7 @@ func main() {
 
 		budgetHandler.SetTelegramApproval(func(ctx context.Context, requestID uuid.UUID, amount float64, note, requestedByName string) (int64, int64, error) {
 			text := fmt.Sprintf(
-				"💰 <b>Budget withdrawal request</b>\n\nRequested by: %s\nAmount: %.2f\nNote: %s\n\nApprove or reject:",
+				"💰 <b>Запрос на вывод средств</b>\n\nЗапросил(а): %s\nСумма: %.2f\nПримечание: %s\n\nПодтвердите или отклоните:",
 				requestedByName, amount, note,
 			)
 			messageID, err := telegramClient.SendMessage(ctx, cfg.Telegram.ApprovalChatID, text, telegram.ApprovalButtons(requestID.String()))
@@ -344,7 +344,7 @@ func main() {
 					if req.TelegramChatID == nil || req.TelegramMessageID == nil {
 						continue
 					}
-					text := fmt.Sprintf("⏱️ Withdrawal request expired (no response within timeout).\nAmount: %.2f", req.Amount)
+					text := fmt.Sprintf("⏱️ Срок запроса на вывод средств истёк (нет ответа в течение таймаута).\nСумма: %.2f", req.Amount)
 					if err := telegramClient.EditMessageText(context.Background(), *req.TelegramChatID, *req.TelegramMessageID, text); err != nil {
 						log.Printf("[telegram] failed to edit expired request %s message: %v", req.ID, err)
 					}
