@@ -113,7 +113,7 @@ export default function SellerTeamPage() {
                 className="flex items-center gap-3"
                 style={{ padding: '14px 15px', borderBottom: i < leadership.length - 1 ? `1px solid ${M.bg}` : 'none' }}
               >
-                <InitialsAvatar name={p.full_name} size={42} palette={i + 1} />
+                <InitialsAvatar name={p.full_name} size={42} palette={i + 1} src={p.avatar_url} />
                 <div className="flex-1 min-w-0">
                   <div className="truncate" style={{ fontSize: 14, fontWeight: 700, color: M.ink }}>{p.full_name}</div>
                   <div style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>{ROLE_LABEL[p.role] ?? p.role}</div>
@@ -126,7 +126,7 @@ export default function SellerTeamPage() {
           <div className="hidden lg:grid grid-cols-2 gap-[14px]" style={{ marginBottom: 4 }}>
             {leadership.map((p, i) => (
               <Card key={p.id} className="flex items-center gap-[14px]" style={{ padding: '16px 18px' }}>
-                <InitialsAvatar name={p.full_name} size={48} palette={i + 1} />
+                <InitialsAvatar name={p.full_name} size={48} palette={i + 1} src={p.avatar_url} />
                 <div className="flex-1 min-w-0">
                   <div className="truncate" style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>{p.full_name}</div>
                   <div style={{ fontSize: 12.5, color: M.muted, marginTop: 1 }}>{ROLE_LABEL[p.role] ?? p.role}</div>
@@ -152,7 +152,7 @@ export default function SellerTeamPage() {
                   className="flex items-center gap-3"
                   style={{ padding: '13px 15px', borderBottom: i < members.length - 1 ? `1px solid ${M.bg}` : 'none' }}
                 >
-                  <InitialsAvatar name={p.full_name} size={36} palette={i} />
+                  <InitialsAvatar name={p.full_name} size={36} palette={i} src={p.avatar_url} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="truncate" style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>{p.full_name}</span>
@@ -186,7 +186,7 @@ export default function SellerTeamPage() {
                   style={{ gridTemplateColumns: '1fr 160px 90px', padding: '13px 20px', borderBottom: i < members.length - 1 ? `1px solid ${M.bg}` : 'none' }}
                 >
                   <div className="flex items-center gap-3">
-                    <InitialsAvatar name={p.full_name} size={36} palette={i} />
+                    <InitialsAvatar name={p.full_name} size={36} palette={i} src={p.avatar_url} />
                     <span style={{ fontSize: 14, fontWeight: 700, color: M.ink }}>{p.full_name}</span>
                     {isMe && (
                       <span style={{ fontSize: 10, fontWeight: 700, color: M.indigoDeep, background: M.indigoBg, padding: '2px 7px', borderRadius: 6 }}>Вы</span>
