@@ -337,7 +337,7 @@ function useDirectory() {
 
   const { data: employees = [], isLoading: empLoading } = useQuery({
     queryKey: ['people'],
-    queryFn: () => fetchEmployees({ limit: 200 }),
+    queryFn: () => fetchEmployees(),
   })
 
   const { data: teams = [], isLoading: teamLoading } = useQuery({

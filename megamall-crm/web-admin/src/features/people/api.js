@@ -16,9 +16,21 @@ const toArray = (data) => (Array.isArray(data) ? data : [])
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 
+// The backend hard-caps every list endpoint at 100 rows per page
+// (pagination.MaxLimit), so a single request can never return the full
+// roster once headcount passes 100 — page through until `meta.total_pages`
+// is exhausted instead of trusting a one-shot `limit`.
 export async function fetchEmployees(params = {}) {
-  const res = await client.get('/users', { params: { limit: 200, ...params } })
-  return toArray(unwrap(res))
+  let page = params.page ?? 1
+  let all = []
+  for (;;) {
+    const res = await client.get('/users', { params: { limit: 100, ...params, page } })
+    all = all.concat(toArray(unwrap(res)))
+    const meta = res.data?.meta
+    if (params.page || !meta || page >= meta.total_pages) break
+    page += 1
+  }
+  return all
 }
 
 export async function fetchEmployee(userId) {
