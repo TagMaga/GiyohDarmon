@@ -31,6 +31,9 @@ TELEGRAM_API="https://api.telegram.org/bot${TELEGRAM_BACKUP_BOT_TOKEN}"
 TELEGRAM_MAX_BYTES=$((50 * 1000 * 1000))
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+# Human-readable form for the Telegram caption — the compact $timestamp
+# above stays as-is since it's also the dump's filename.
+display_datetime="$(date -u +'%d.%m.%Y %H:%M:%S') UTC"
 dump_name="megamall_crm_${timestamp}.dump"
 tmp_file="$(mktemp)"
 
@@ -75,14 +78,15 @@ count_rows() {
 total_orders="$(count_rows orders)"
 total_people="$(count_rows users)"
 total_products="$(count_rows products)"
+dump_size_mb="$(awk -v bytes="$dump_size" 'BEGIN { printf "%.2f", bytes / 1000000 }')"
 
 echo "→ Sending to Telegram..."
 caption="Резервная копия базы данных megamall-crm
 Всего заказов: ${total_orders}
 Всего пользователей: ${total_people}
 Всего товаров: ${total_products}
-Размер файла: ${dump_size} байт
-Дата и время: ${timestamp} UTC"
+Размер файла: ${dump_size_mb} МБ
+Дата и время: ${display_datetime}"
 response="$(curl -fsS --max-time 120 \
   -F "chat_id=${TELEGRAM_BACKUP_CHAT_ID}" \
   -F "caption=${caption}" \
