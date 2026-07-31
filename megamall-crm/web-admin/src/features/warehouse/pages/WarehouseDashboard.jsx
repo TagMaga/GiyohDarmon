@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArrowLeftRight, Download, Package, PackagePlus, RefreshCw, Search, Trash2, Warehouse } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, Download, Package, PackagePlus, PackageX, RefreshCw, Search, Trash2, Warehouse } from 'lucide-react'
 import PageHeader from '../../../shared/components/PageHeader'
 import Button from '../../../shared/components/Button'
 import Alert from '../../../shared/components/Alert'
@@ -9,10 +9,11 @@ import ProductModal from '../components/ProductModal'
 import ReceivingModal from '../components/ReceivingModal'
 import WriteoffModal from '../components/WriteoffModal'
 import { CourierWarehouseSummary } from '../components/TransferComponents'
-import ExpiryAlertsPanel from '../components/ExpiryAlertsPanel'
+import ExpiryAlertsPanel, { ExpiryAlertsList } from '../components/ExpiryAlertsPanel'
 import NotificationBell from '../../../shared/components/NotificationBell'
 import useWarehouseData from '../hooks/useWarehouseData'
 import { useInventorySummary } from '../hooks/useTransfers'
+import useExpiryAlerts from '../hooks/useExpiryAlerts'
 import { MovementList } from './WarehouseMovementsPage'
 import {
   MOVEMENT_BADGE,
@@ -23,6 +24,7 @@ import {
   fmtMoney,
   getAvailableQty,
   getId,
+  getLowStockThreshold,
   getMovementType,
   getProductImageSrcSet,
   getProductImageVariant,
@@ -32,6 +34,11 @@ import {
   getStockStatus,
   isProductActive,
 } from '../utils/warehouseHelpers'
+
+const INK = '#0B1020'
+const MUTED = '#8A91A3'
+const GRADIENT = 'linear-gradient(135deg, #4F46E5, #6D28D9)'
+const CARD_SHADOW = '0 2px 8px rgba(15,23,42,.05)'
 
 export default function WarehouseDashboard() {
   const navigate = useNavigate()
@@ -62,22 +69,152 @@ export default function WarehouseDashboard() {
     })
     .slice(0, 6), [activeInventory])
 
+  const { alerts: expiryAlerts, meta: expiryMeta, isLoading: expiryLoading, isError: expiryIsError, error: expiryError } = useExpiryAlerts()
+  const lowStock = activeInventory.filter((inv) => getStockStatus(inv) === 'low_stock').length
+  const outStock = activeInventory.filter((inv) => getStockStatus(inv) === 'out_of_stock').length
+  const totalUnits = activeInventory.reduce((sum, inv) => sum + getQuantity(inv), 0)
+  const stockValue = activeBatches.reduce(
+    (sum, batch) => sum + (batch.remaining_quantity ?? batch.RemainingQuantity ?? 0) * (batch.unit_cost ?? batch.UnitCost ?? 0),
+    0
+  )
+  const today = new Date().toDateString()
+  const movementsToday = data.movements.filter((m) => {
+    const d = m.created_at ?? m.CreatedAt
+    if (!d) return false
+    try { return new Date(d).toDateString() === today } catch { return false }
+  }).length
+
   function submitSearch(e) {
     e.preventDefault()
     navigate(query.trim() ? `/warehouse/inventory?q=${encodeURIComponent(query.trim())}` : '/warehouse/inventory')
   }
 
   return (
-    <div className="animate-fade-in p-6">
+    <>
+    <div className="space-y-4 p-4 pb-8 lg:hidden" style={{ background: '#F4F5F9' }}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[27px] font-extrabold leading-none tracking-tight" style={{ color: INK, letterSpacing: '-0.7px' }}>Склад</h1>
+          <p className="mt-1.5 text-[12.5px] font-medium" style={{ color: MUTED }}>Обзор остатков и движения</p>
+        </div>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <NotificationBell variant="light" />
+          <button
+            onClick={data.refetchAll}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[14px] border border-[#E7EAF0] bg-white text-slate-600"
+            style={{ boxShadow: CARD_SHADOW }}
+          >
+            <RefreshCw size={17} />
+          </button>
+        </div>
+      </div>
+
+      {data.error && (
+        <Alert variant="error" title="Ошибка загрузки данных">
+          {data.error?.response?.data?.error?.message ?? data.error?.message}
+        </Alert>
+      )}
+
+      <div className="relative overflow-hidden rounded-[24px] p-5 text-white" style={{ background: GRADIENT, boxShadow: '0 14px 34px rgba(79,70,229,.34)' }}>
+        <div className="pointer-events-none absolute -right-10 -top-14 h-[200px] w-[200px] rounded-full bg-white/10" />
+        <div className="relative">
+          <p className="text-[10.5px] font-bold uppercase tracking-[1px] text-indigo-100/85">Стоимость склада</p>
+          <p className="mt-1.5 text-[37px] font-extrabold leading-none tracking-tight">{fmtMoney(stockValue)}</p>
+          <div className="mt-4 flex items-center gap-5">
+            <MobileStat value={activeProducts.length} label="товаров" />
+            <div className="h-[30px] w-px bg-white/20" />
+            <MobileStat value={totalUnits} label="единиц" />
+            <div className="h-[30px] w-px bg-white/20" />
+            <MobileStat value={movementsToday} label="сегодня" />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        <MobileAlertTile icon={<AlertTriangle size={20} />} tone="amber" value={lowStock} label="Мало на складе" />
+        <MobileAlertTile icon={<PackageX size={20} />} tone="rose" value={outStock} label="Нет в наличии" />
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <MobileAlertTile icon={<AlertTriangle size={20} />} tone="rose" value={expiryMeta.expiring_count} label="Скоро истекает" />
+        <MobileAlertTile icon={<AlertTriangle size={20} />} tone="rose" value={expiryMeta.expired_count} label="Просрочено" />
+      </div>
+
+      <div className="space-y-2.5">
+        <button
+          onClick={() => setReceiveProduct(null)}
+          className="flex min-h-14 w-full items-center justify-center gap-2.5 rounded-[18px] text-[15px] font-bold text-white"
+          style={{ background: GRADIENT, boxShadow: '0 8px 20px rgba(79,70,229,.35)' }}
+        >
+          <Download size={20} />Оформить приход
+        </button>
+        <div className="grid grid-cols-2 gap-2.5">
+          <button onClick={() => setShowWriteoff(true)} className="flex min-h-12 items-center justify-center gap-2 rounded-[15px] bg-rose-50 text-[13.5px] font-bold text-rose-700">
+            <Trash2 size={17} />Списание
+          </button>
+          <button onClick={() => setShowProduct(true)} className="flex min-h-12 items-center justify-center gap-2 rounded-[15px] bg-indigo-50 text-[13.5px] font-bold text-indigo-700">
+            <PackagePlus size={17} />Товар
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div className="mb-2.5 flex items-center justify-between px-0.5">
+          <span className="text-[16px] font-extrabold" style={{ color: INK }}>Требует внимания</span>
+          {stockAlerts.length > 0 && (
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">{stockAlerts.length} позиций</span>
+          )}
+        </div>
+        {stockAlerts.length === 0 ? (
+          <MobileEmpty title="Критичных остатков нет" />
+        ) : (
+          <div className="space-y-2.5">
+            {stockAlerts.map((inv) => {
+              const product = data.productMap[inv.product_id ?? inv.ProductID]
+              return (
+                <MobileAttentionCard
+                  key={getId(inv)}
+                  inventory={inv}
+                  product={product}
+                  onOpen={() => navigate(`/warehouse/inventory?q=${encodeURIComponent(getProductSku(product))}`)}
+                  onReceive={() => setReceiveProduct(product ?? null)}
+                />
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="mb-2.5 flex items-center justify-between px-0.5">
+          <span className="text-[16px] font-extrabold" style={{ color: INK }}>Сроки годности</span>
+          {expiryAlerts.length > 0 && (
+            <span className="rounded-full border border-rose-200 bg-rose-50 px-2.5 py-0.5 text-[11px] font-bold text-rose-700">{expiryAlerts.length} партий</span>
+          )}
+        </div>
+        <ExpiryAlertsList
+          alerts={expiryAlerts}
+          loading={expiryLoading}
+          error={expiryIsError ? expiryError : null}
+          onOpenProduct={(a) => navigate(`/warehouse/inventory?q=${encodeURIComponent(a.sku)}`)}
+        />
+      </div>
+
+      <div>
+        <div className="mb-2.5 flex items-center justify-between px-0.5">
+          <span className="text-[16px] font-extrabold" style={{ color: INK }}>Последние движения</span>
+          <button onClick={() => navigate('/warehouse/movements')} className="text-[13px] font-bold text-indigo-600">Все ›</button>
+        </div>
+        <MovementList rows={data.movements.slice(0, 5)} data={data} />
+      </div>
+    </div>
+
+    <div className="hidden animate-fade-in p-6 lg:block">
       <PageHeader
         title="Склад"
         subtitle="Остатки, приход и списания"
         icon={<Warehouse size={20} />}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className="lg:hidden">
-              <NotificationBell variant="light" />
-            </div>
             <button
               onClick={data.refetchAll}
               className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50"
@@ -151,10 +288,81 @@ export default function WarehouseDashboard() {
           <MovementList rows={data.movements} data={data} />
         </section>
       </section>
+    </div>
 
       <ProductModal open={showProduct} onClose={() => setShowProduct(false)} suppliers={data.suppliers} />
       <ReceivingModal open={receiveProduct !== undefined} onClose={() => setReceiveProduct(undefined)} initialProduct={receiveProduct} products={activeProducts} inventory={data.inventory} />
       <WriteoffModal open={showWriteoff} onClose={() => setShowWriteoff(false)} products={activeProducts} inventory={data.inventory} />
+    </>
+  )
+}
+
+function MobileStat({ value, label }) {
+  return (
+    <div>
+      <p className="text-[17px] font-extrabold leading-none">{value}</p>
+      <p className="mt-1 text-[11px] font-semibold text-indigo-100/80">{label}</p>
+    </div>
+  )
+}
+
+function MobileAlertTile({ icon, tone, value, label }) {
+  const tones = {
+    amber: { bg: '#FFFBEB', color: '#D97706' },
+    rose: { bg: '#FFF1F2', color: '#E11D48' },
+  }
+  const t = tones[tone]
+  return (
+    <div className="flex items-center gap-3 rounded-[18px] bg-white p-3.5" style={{ boxShadow: CARD_SHADOW }}>
+      <div className="flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-[13px]" style={{ background: t.bg, color: t.color }}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-[23px] font-extrabold leading-none" style={{ color: INK }}>{value}</p>
+        <p className="mt-1 text-[11.5px] font-semibold" style={{ color: MUTED }}>{label}</p>
+      </div>
+    </div>
+  )
+}
+
+function MobileAttentionCard({ inventory, product, onOpen, onReceive }) {
+  const status = getStockStatus(inventory)
+  const available = getAvailableQty(inventory)
+  const threshold = getLowStockThreshold(inventory)
+  const pct = threshold > 0 ? Math.min(100, Math.round((available / threshold) * 100)) : (status === 'out_of_stock' ? 0 : 100)
+  const accent = status === 'out_of_stock' ? '#E11D48' : '#D97706'
+  return (
+    <div className="rounded-[18px] bg-white p-3.5" style={{ boxShadow: CARD_SHADOW }}>
+      <button onClick={onOpen} className="flex w-full min-w-0 items-center gap-3 text-left">
+        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[13px] bg-slate-100 text-sm font-extrabold text-slate-400">
+          {getProductName(product)?.[0] ?? '•'}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[14px] font-bold" style={{ color: INK }}>{getProductName(product)}</p>
+          <p className="mt-0.5 truncate font-mono text-[11px] text-slate-400">{getProductSku(product)}</p>
+        </div>
+        <Badge variant={STOCK_STATUS_BADGE[status]} dot>{STOCK_STATUS_LABEL[status]}</Badge>
+      </button>
+      <div className="mt-3 flex items-center gap-2.5">
+        <div className="h-[7px] flex-1 overflow-hidden rounded-full bg-[#EEF1F6]">
+          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: accent }} />
+        </div>
+        <span className="flex-shrink-0 text-[11px] font-semibold text-slate-500">{available} / {threshold || '—'}</span>
+      </div>
+      <button
+        onClick={onReceive}
+        className="mt-3 flex min-h-10 w-full items-center justify-center gap-1.5 rounded-[13px] bg-indigo-50 text-[13px] font-bold text-indigo-700"
+      >
+        <PackagePlus size={16} />Пополнить
+      </button>
+    </div>
+  )
+}
+
+function MobileEmpty({ title }) {
+  return (
+    <div className="rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-[12.5px] text-slate-400">
+      {title}
     </div>
   )
 }

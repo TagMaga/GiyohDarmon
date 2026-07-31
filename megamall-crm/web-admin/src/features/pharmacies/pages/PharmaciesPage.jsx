@@ -98,7 +98,7 @@ export default function PharmaciesPage() {
           </select>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white lg:block">
           <div className="hidden grid-cols-[1.5fr_1.1fr_.55fr_.75fr_.75fr_44px] gap-4 border-b border-slate-100 bg-slate-50 px-5 py-3 text-xs font-semibold uppercase text-slate-500 lg:grid">
             <span>Аптека</span><span>Ответственный</span><span>Остаток</span><span>Выдано</span><span>Долг</span><span />
           </div>
@@ -115,6 +115,26 @@ export default function PharmaciesPage() {
                   <Metric label="Выдано" value={money(row.issued_amount)} />
                   <Metric label="Долг" value={money(row.current_debt)} danger={row.current_debt > 0} />
                   <ChevronRight className="hidden text-slate-400 lg:block" />
+                </button>
+              ))}
+        </div>
+
+        <div className="space-y-2.5 lg:hidden">
+          {isLoading ? <div className="rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-[12.5px] text-slate-400">Загрузка…</div>
+            : filtered.length === 0 ? <div className="rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-[12.5px] text-slate-400">Аптеки не найдены</div>
+              : filtered.map(row => (
+                <button key={row.id} onClick={() => setSelectedId(row.id)} className="block w-full rounded-[18px] bg-white p-3.5 text-left" style={{ boxShadow: '0 2px 8px rgba(15,23,42,.05)' }}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[14px] font-bold text-[#0B1020]">{row.name}</p>
+                    <span className="flex-shrink-0"><DebtBadge status={row.status} /></span>
+                  </div>
+                  <p className="mt-1 flex items-center gap-1 text-[12px] text-slate-400"><MapPin size={12} />{row.address}</p>
+                  <p className="mt-0.5 text-[12px] text-slate-500">Ответственный: {row.responsible_seller_name}</p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-100 pt-2.5 text-center">
+                    <div><p className="text-[15px] font-extrabold text-[#0B1020]">{row.stock_quantity} шт.</p><p className="mt-0.5 text-[10px] font-semibold text-slate-400">Остаток</p></div>
+                    <div><p className="text-[15px] font-extrabold text-slate-700">{money(row.issued_amount)}</p><p className="mt-0.5 text-[10px] font-semibold text-slate-400">Выдано</p></div>
+                    <div><p className={`text-[15px] font-extrabold ${row.current_debt > 0 ? 'text-rose-600' : 'text-slate-700'}`}>{money(row.current_debt)}</p><p className="mt-0.5 text-[10px] font-semibold text-slate-400">Долг</p></div>
+                  </div>
                 </button>
               ))}
         </div>
