@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Archive, Clock, Download, Package, PackagePlus, Pencil, Trash2 } from 'lucide-react'
+import { Archive, Clock, Download, Package, PackagePlus, Pencil, Plus, Search, SlidersHorizontal, Trash2 } from 'lucide-react'
 import PageHeader from '../../../shared/components/PageHeader'
 import Button from '../../../shared/components/Button'
 import Badge from '../../../shared/components/Badge'
@@ -23,7 +23,21 @@ import {
   getLocationDisplayName,
   MAIN_WAREHOUSE_ID,
   InventoryFilterBar,
+  MultiSelectFilter,
+  EXPIRY_FILTER_OPTIONS,
 } from '../components/InventoryFilters'
+
+const INK = '#0B1020'
+const MUTED = '#8A91A3'
+const GRADIENT = 'linear-gradient(135deg, #4F46E5, #6D28D9)'
+const CARD_SHADOW = '0 2px 8px rgba(15,23,42,.05)'
+
+const MOBILE_STATUS_PILLS = [
+  { value: '', label: 'Все' },
+  { value: 'in_stock', label: 'В наличии' },
+  { value: 'low_stock', label: 'Мало' },
+  { value: 'out_of_stock', label: 'Нет в наличии' },
+]
 import {
   STOCK_STATUS_BADGE,
   STOCK_STATUS_LABEL,
@@ -57,6 +71,7 @@ export default function WarehouseInventoryPage() {
   const [selectedWarehouses, setSelectedWarehouses] = useState([])
   const [selectedStatuses, setSelectedStatuses] = useState([])
   const [selectedExpiry, setSelectedExpiry] = useState([])
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [drawerProduct, setDrawerProduct] = useState(null)
   const [modalProduct, setModalProduct] = useState(null)
   const [showCreateProduct, setShowCreateProduct] = useState(false)
@@ -190,8 +205,126 @@ export default function WarehouseInventoryPage() {
     return summary
   }, [filteredRows, invSummary])
 
+  const productOptions = activeProducts.map((product) => ({
+    value: getId(product),
+    label: getProductName(product),
+    description: getProductSku(product),
+  }))
+  const locationOptions = locations.map((location) => ({
+    value: location.id,
+    label: getLocationDisplayName(location),
+    description: location.type === 'main' ? 'Главный склад' : 'Склад курьера',
+  }))
+  const mobileStatus = selectedStatuses.find((status) => MOBILE_STATUS_PILLS.some((pill) => pill.value === status)) ?? ''
+  const advancedFilterCount = selectedProducts.length + selectedWarehouses.length + selectedExpiry.length
+
   return (
-    <div className="animate-fade-in p-6 pb-20 lg:pb-6">
+    <div className="animate-fade-in pb-20 lg:pb-6">
+      <div className="space-y-3 p-4 lg:hidden" style={{ background: '#F4F5F9' }}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[22px] font-extrabold leading-none tracking-tight" style={{ color: INK, letterSpacing: '-0.5px' }}>Товары</h1>
+            <p className="mt-1.5 text-[12.5px] font-medium" style={{ color: MUTED }}>Остатки, цены и складские операции</p>
+          </div>
+          <div className="flex flex-shrink-0 gap-2">
+            <button
+              onClick={() => navigate('/warehouse/archive')}
+              aria-label="Архив"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[12px] border border-[#E7EAF0] bg-white text-slate-600"
+              style={{ boxShadow: CARD_SHADOW }}
+            >
+              <Archive size={17} />
+            </button>
+            <button
+              onClick={() => setShowCreateProduct(true)}
+              aria-label="Добавить товар"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[12px] text-white"
+              style={{ background: GRADIENT }}
+            >
+              <Plus size={18} />
+            </button>
+          </div>
+        </div>
+
+        {(data.error || distributionQ.error) && (
+          <Alert variant="error" title="Ошибка загрузки данных">
+            {(data.error || distributionQ.error)?.response?.data?.error?.message ?? (data.error || distributionQ.error)?.message}
+          </Alert>
+        )}
+
+        <label className="flex min-h-11 items-center gap-2 rounded-[15px] border border-[#E7EAF0] bg-white px-3.5" style={{ boxShadow: CARD_SHADOW }}>
+          <Search size={17} className="flex-shrink-0 text-slate-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Товар, SKU или штрихкод…"
+            className="w-full bg-transparent text-[13.5px] outline-none placeholder:text-slate-400"
+          />
+        </label>
+
+        <div className="flex items-center justify-between px-0.5">
+          <span className="text-xs font-semibold text-slate-400">Найдено: {filteredRows.length}</span>
+          <button
+            onClick={() => setMobileFiltersOpen((open) => !open)}
+            className="flex items-center gap-1.5 text-xs font-bold text-indigo-600"
+          >
+            <SlidersHorizontal size={13} />
+            Склад, срок годности{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ''}
+          </button>
+        </div>
+
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+          {MOBILE_STATUS_PILLS.map((pill) => {
+            const active = mobileStatus === pill.value
+            return (
+              <button
+                key={pill.value || 'all'}
+                onClick={() => setSelectedStatuses(pill.value ? [pill.value] : [])}
+                className="flex-shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold"
+                style={active ? { background: '#4F46E5', color: '#fff' } : { background: '#F1F5F9', color: '#475569' }}
+              >
+                {pill.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {mobileFiltersOpen && (
+          <div className="flex flex-wrap gap-2 rounded-[15px] border border-[#E7EAF0] bg-white p-3" style={{ boxShadow: CARD_SHADOW }}>
+            <MultiSelectFilter label="Товары" options={productOptions} value={selectedProducts} onChange={setSelectedProducts} searchable />
+            <MultiSelectFilter label="Склады" options={locationOptions} value={selectedWarehouses} onChange={setSelectedWarehouses} searchable />
+            <MultiSelectFilter label="Срок годности" options={EXPIRY_FILTER_OPTIONS} value={selectedExpiry} onChange={setSelectedExpiry} />
+          </div>
+        )}
+
+        <div className="space-y-2.5 pt-1">
+          {filteredRows.length === 0 ? (
+            <div className="rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-[12.5px] text-slate-400">Остатки не найдены</div>
+          ) : filteredRows.map((row) => (
+            <InventoryCard
+              key={getId(row.product)}
+              row={row}
+              data={data}
+              expiryAlerts={expiryAlerts}
+              onProduct={setDrawerProduct}
+              onReceive={setReceiveProduct}
+              onWriteoff={setWriteoffProduct}
+              onEdit={setModalProduct}
+              onArchive={setArchiveTarget}
+            />
+          ))}
+        </div>
+      </div>
+
+      <button
+        onClick={() => setReceiveProduct(null)}
+        className="fixed bottom-24 right-5 z-30 flex min-h-[56px] items-center gap-2 rounded-full bg-indigo-600 px-5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 lg:hidden"
+      >
+        <Download size={18} />
+        Приход
+      </button>
+
+      <div className="hidden p-6 lg:block">
       <PageHeader
         title="Остатки и товары"
         subtitle="Карточки товаров, цены, доступность и складские операции."
@@ -220,16 +353,8 @@ export default function WarehouseInventoryPage() {
         className="mb-4"
         search={search}
         onSearch={setSearch}
-        productOptions={activeProducts.map((product) => ({
-          value: getId(product),
-          label: getProductName(product),
-          description: getProductSku(product),
-        }))}
-        locationOptions={locations.map((location) => ({
-          value: location.id,
-          label: getLocationDisplayName(location),
-          description: location.type === 'main' ? 'Главный склад' : 'Склад курьера',
-        }))}
+        productOptions={productOptions}
+        locationOptions={locationOptions}
         selectedProducts={selectedProducts}
         onProducts={setSelectedProducts}
         selectedWarehouses={selectedWarehouses}
@@ -243,43 +368,17 @@ export default function WarehouseInventoryPage() {
 
       <div className="mb-4"><CourierWarehouseSummary summary={filteredSummary} detailed /></div>
 
-      <div className="hidden lg:block">
-          <InventoryTable
-          rows={filteredRows}
-          data={data}
-          expiryAlerts={expiryAlerts}
-          onProduct={setDrawerProduct}
-          onReceive={setReceiveProduct}
-          onWriteoff={setWriteoffProduct}
-          onEdit={setModalProduct}
-          onArchive={setArchiveTarget}
-        />
+      <InventoryTable
+        rows={filteredRows}
+        data={data}
+        expiryAlerts={expiryAlerts}
+        onProduct={setDrawerProduct}
+        onReceive={setReceiveProduct}
+        onWriteoff={setWriteoffProduct}
+        onEdit={setModalProduct}
+        onArchive={setArchiveTarget}
+      />
       </div>
-      <div className="space-y-3 lg:hidden">
-        {filteredRows.length === 0 ? (
-          <EmptyState icon={<Package size={22} />} title="Остатки не найдены" description="Измените поиск или сбросьте фильтры." />
-        ) : filteredRows.map((row) => (
-          <InventoryCard
-            key={getId(row.product)}
-            row={row}
-            data={data}
-            expiryAlerts={expiryAlerts}
-            onProduct={setDrawerProduct}
-            onReceive={setReceiveProduct}
-            onWriteoff={setWriteoffProduct}
-            onEdit={setModalProduct}
-            onArchive={setArchiveTarget}
-          />
-        ))}
-      </div>
-
-      <button
-        onClick={() => setReceiveProduct(null)}
-        className="fixed bottom-24 right-5 z-30 flex min-h-[56px] items-center gap-2 rounded-full bg-indigo-600 px-5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 lg:hidden"
-      >
-        <Download size={18} />
-        Приход
-      </button>
 
       <ProductDrawer
         product={drawerProduct}
