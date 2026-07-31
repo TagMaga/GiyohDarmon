@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
-import { Home, ShoppingCart, Plus, Wallet, User, Users, TrendingUp, Package, PackagePlus, BarChart3, LayoutGrid } from 'lucide-react'
+import { Home, ShoppingCart, Plus, Wallet, User, Users, TrendingUp, Package, PackagePlus, Building2, LayoutGrid } from 'lucide-react'
 import Sidebar from './Sidebar'
 import useAuthStore from '../store/authStore'
 import BottomNav from '../../features/seller/components/BottomNav'
@@ -27,7 +27,7 @@ const WAREHOUSE_TABS = [
   { label: 'Главная', icon: Home,        path: '/warehouse',           end: true },
   { label: 'Товары',  icon: Package,     path: '/warehouse/inventory', end: false },
   { label: 'Приёмка', icon: PackagePlus, path: '/warehouse/receiving', end: false },
-  { label: 'Движ.',   icon: BarChart3,   path: '/warehouse/movements', end: false },
+  { label: 'Аптеки',  icon: Building2,   path: '/warehouse/pharmacies', end: false },
   { label: 'Профиль', icon: User,        path: '/warehouse/profile',   end: false },
 ]
 
