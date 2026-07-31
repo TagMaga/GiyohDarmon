@@ -35,6 +35,7 @@ import (
 	logisticsmediabridge "github.com/megamall/crm/internal/logistics/mediabridge"
 	logistics_settings "github.com/megamall/crm/internal/logistics_settings"
 	"github.com/megamall/crm/internal/media"
+	"github.com/megamall/crm/internal/notifications"
 	"github.com/megamall/crm/internal/onboarding"
 	onboardingmediabridge "github.com/megamall/crm/internal/onboarding/mediabridge"
 	"github.com/megamall/crm/internal/orders"
@@ -395,10 +396,89 @@ func main() {
 	}
 	courierHandler := courier.NewHandler(courierSvc)
 
+	// ── Notifications (courier assignment, order comments, cash reminders,
+	// warehouse pickup, available-orders summary) ────────────────────────────
+	// Push tokens live in courier_push_tokens (internal/courier's table);
+	// injected here as narrow functions so notifications doesn't need to
+	// depend on the whole courier module for two lookups.
+	notificationsRepo := notifications.NewRepository(db)
+	expoClient := notifications.NewExpoClient()
+	notificationsSvc := notifications.NewService(
+		notificationsRepo,
+		expoClient,
+		courierRepo.GetPushToken,
+		courierRepo.DeletePushToken,
+	)
+	notificationsHandler := notifications.NewHandler(notificationsSvc)
+	notifyFn := func(ctx context.Context, userID uuid.UUID, notifType, title, body string, orderID *uuid.UUID) error {
+		return notificationsSvc.Notify(ctx, userID, notifications.Type(notifType), title, body, orderID)
+	}
+	warehousesSvc.SetNotifier(notifyFn)
+
 	dispatchRepo := dispatch.NewRepository(db)
 	dispatchSvc := dispatch.NewService(dispatchRepo, orderSvc, activityLogger, db)
 	dispatchSvc.SetWarehouseReservationAdapter(warehousesSvc.ReserveForClaim)
+	dispatchSvc.SetNotifier(notifyFn)
 	dispatchHandler := dispatch.NewHandler(dispatchSvc, courierSvc)
+
+	// ── Daily notification jobs (Asia/Dushanbe) ───────────────────────────────
+	// Same bare-goroutine-with-timer convention as the media quarantine purge
+	// and Telegram expiry sweep above — a daily wall-clock firing (not a
+	// fixed-interval ticker) so a mid-day restart still lands on 21:00/08:00
+	// exactly, not 24h after the restart. No locking/leader-election needed
+	// for this single-instance deployment (same reasoning as those jobs).
+	dushanbe, err := time.LoadLocation("Asia/Dushanbe")
+	if err != nil {
+		log.Fatalf("load Asia/Dushanbe location: %v", err)
+	}
+
+	// 21:00 — remind every courier who currently owes the company money.
+	go runDaily(dushanbe, 21, 0, func() {
+		ctx := context.Background()
+		debts, err := courierRepo.ListCouriersWithOutstandingCash(ctx)
+		if err != nil {
+			log.Printf("[notifications] 21:00 cash reminder query error: %v", err)
+			return
+		}
+		for _, d := range debts {
+			if err := notificationsSvc.Notify(ctx, d.CourierID, notifications.TypeCashReturnDue,
+				"Возврат денежных средств", "Верните все деньги компании до конца дня", nil); err != nil {
+				log.Printf("[notifications] 21:00 cash reminder failed for courier %s: %v", d.CourierID, err)
+			}
+		}
+	})
+
+	// 08:00 — tell every courier how many orders are available to start right
+	// now in their own delivery city/cities.
+	go runDaily(dushanbe, 8, 0, func() {
+		ctx := context.Background()
+		counts, err := courierRepo.ListAvailableOrderCountsByCity(ctx)
+		if err != nil {
+			log.Printf("[notifications] 08:00 available-orders query error: %v", err)
+			return
+		}
+		cityCouriers, err := courierRepo.ActiveCourierCityMap(ctx)
+		if err != nil {
+			log.Printf("[notifications] 08:00 available-orders courier map error: %v", err)
+			return
+		}
+		totals := map[uuid.UUID]int{}
+		for _, c := range counts {
+			for _, courierID := range cityCouriers[c.CityID] {
+				totals[courierID] += c.Count
+			}
+		}
+		for courierID, total := range totals {
+			if total == 0 {
+				continue
+			}
+			body := fmt.Sprintf("Доступно %d заказов для немедленного старта", total)
+			if err := notificationsSvc.Notify(ctx, courierID, notifications.TypeOrdersAvailable,
+				"Доступные заказы", body, nil); err != nil {
+				log.Printf("[notifications] 08:00 available-orders notify failed for courier %s: %v", courierID, err)
+			}
+		}
+	})
 
 	// ── Phase 6: Health checks ────────────────────────────────────────────────
 	healthSvc := health.NewService(db)
@@ -458,6 +538,10 @@ func main() {
 		// Phase 5
 		dispatchHandler.RegisterRoutes(v1.Group("/dispatch"))
 		courierHandler.RegisterRoutes(v1.Group("/courier"))
+
+		// Notifications: courier assignment, order comments, 21:00 cash
+		// reminder, warehouse pickup, 08:00 available-orders summary.
+		notificationsHandler.RegisterRoutes(v1.Group("/notifications"))
 
 		// Courier warehouses: owner/warehouse_manager management + the
 		// courier-facing "My Warehouse" surface (mounted under /courier so it
@@ -633,4 +717,21 @@ func main() {
 		log.Fatalf("server force shutdown: %v", err)
 	}
 	log.Println("server stopped cleanly")
+}
+
+// runDaily calls fn once every day at hour:minute in loc. It recomputes the
+// wait until the next occurrence on every iteration (rather than a fixed
+// 24h ticker) so a late fire or a mid-day process restart still lands on
+// the intended wall-clock time instead of drifting.
+func runDaily(loc *time.Location, hour, minute int, fn func()) {
+	for {
+		now := time.Now().In(loc)
+		next := time.Date(now.Year(), now.Month(), now.Day(), hour, minute, 0, 0, loc)
+		if !next.After(now) {
+			next = next.AddDate(0, 0, 1)
+		}
+		timer := time.NewTimer(next.Sub(now))
+		<-timer.C
+		fn()
+	}
 }

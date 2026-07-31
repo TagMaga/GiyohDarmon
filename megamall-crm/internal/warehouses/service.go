@@ -3,6 +3,7 @@ package warehouses
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,6 +24,7 @@ type Service struct {
 	prodRepo  *products.Repository
 	userRepo  *users.Repository
 	logger    *activity.Logger
+	notify    NotifyFn
 	db        *gorm.DB
 }
 
@@ -36,6 +38,17 @@ func NewService(
 	db *gorm.DB,
 ) *Service {
 	return &Service{repo: repo, invRepo: invRepo, ordersSvc: ordersSvc, prodRepo: prodRepo, userRepo: userRepo, logger: logger, db: db}
+}
+
+// NotifyFn persists and best-effort pushes a notification to userID,
+// injected from internal/notifications to avoid warehouses depending on
+// that whole module for one call — same narrow-function pattern used
+// throughout this codebase (see dispatch.NotifyFn).
+type NotifyFn func(ctx context.Context, userID uuid.UUID, notifType, title, body string, orderID *uuid.UUID) error
+
+// SetNotifier wires the notifications module in without an import cycle.
+func (s *Service) SetNotifier(fn NotifyFn) {
+	s.notify = fn
 }
 
 // AdjustForOrder implements orders.AdjustCourierWarehouseFn: the courier-side
@@ -409,6 +422,13 @@ func (s *Service) decideTransfer(ctx context.Context, courierID, transferID uuid
 		action = "accept_transfer"
 	}
 	s.logger.LogAsync(activity.Entry{ActorID: &courierID, Action: action, EntityType: "inventory_transfer", EntityID: &transferID})
+
+	if accept && s.notify != nil {
+		if err := s.notify(ctx, courierID, "warehouse_pickup", "Товар получен",
+			"Товар получен со склада", nil); err != nil {
+			log.Printf("[warehouses] notify pickup failed (user=%s): %v", courierID, err)
+		}
+	}
 
 	return s.GetTransfer(ctx, transferID)
 }

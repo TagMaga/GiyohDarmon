@@ -3,7 +3,9 @@ import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, A
 import { router } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
+import { Bell } from 'lucide-react-native'
 import { getMyOrders, getCashSummary, getClaimableOrders, updateOrderStatus, updateCourierStatus } from '../../src/api/orders'
+import { getUnreadCount } from '../../src/api/notifications'
 import useAuthStore from '../../src/store/authStore'
 import useCourierStatusStore from '../../src/store/courierStatusStore'
 import { OrderDetailSheet, C } from '../../src/components/OrderDetailSheet'
@@ -28,6 +30,7 @@ export default function DashboardScreen() {
   const setOnline                     = useCourierStatusStore((st) => st.setOnline)
   const [error, setError]             = useState(null)
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
+  const [unreadCount, setUnreadCount]     = useState(0)
   const { T }                         = useGlass()
 
   const fetchAll = async () => {
@@ -39,6 +42,7 @@ export default function DashboardScreen() {
       if (a.status === 'fulfilled') setAvailCount((a.value.data.data || []).length)
       setError(failed ? (failed.reason?.response?.data?.error?.message || 'Не удалось загрузить данные') : null)
     } finally { setLoading(false); setRefreshing(false) }
+    getUnreadCount().then((res) => setUnreadCount(res.data?.data?.count || 0)).catch(() => {})
   }
 
   // useFocusEffect so the KPIs/active-orders refresh whenever this tab
@@ -113,6 +117,17 @@ export default function DashboardScreen() {
               <Text style={[s.name, { color: T.ink }]}>{firstName}</Text>
               <Text style={[s.sub, { color: T.muted }]}>Курьер · MegaMall</Text>
             </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.bellBtn, { backgroundColor: T.card, borderColor: T.cardEdge }]}
+            onPress={() => router.push('/notifications')}
+          >
+            <Bell size={18} color={T.ink} />
+            {unreadCount > 0 && (
+              <View style={s.bellBadge}>
+                <Text style={s.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.onlineBtn, !isOnline && { backgroundColor: T.chip, borderColor: T.chipEdge }]}
@@ -250,6 +265,9 @@ const s = StyleSheet.create({
   profile: { flexDirection: 'row', alignItems: 'center', gap: 13, flex: 1, minWidth: 0 },
   name:    { fontSize: 22, fontWeight: '700', color: C.ink, lineHeight: 26 },
   sub:     { fontSize: 13, color: C.muted, fontWeight: '700', marginTop: 3 },
+  bellBtn:    { width: 40, height: 40, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  bellBadge:  { position: 'absolute', top: -4, right: -4, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: '#ff453a', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  bellBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
   onlineBtn:  { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, paddingVertical: 10, borderRadius: 999, backgroundColor: 'rgba(52,199,89,0.16)', borderWidth: 1, borderColor: 'rgba(52,199,89,0.28)' },
   dot:        { width: 8, height: 8, borderRadius: 4, backgroundColor: C.green },
   dotOff:     { backgroundColor: '#8a93a3' },
