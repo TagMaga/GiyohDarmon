@@ -25,6 +25,7 @@
         "backgroundColor": "#ec4899"
       },
       "package": "tj.megamall.courier",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",

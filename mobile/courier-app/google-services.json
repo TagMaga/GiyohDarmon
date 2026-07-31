@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "403985465167",
+    "project_id": "muhammadnazar-2b7dc",
+    "storage_bucket": "muhammadnazar-2b7dc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:403985465167:android:b7c1c07a89001b26a6cf3a",
+        "android_client_info": {
+          "package_name": "tj.megamall.courier"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA-H95W0F0ddY2jma0P3IPDHmOSGP9HhzE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
