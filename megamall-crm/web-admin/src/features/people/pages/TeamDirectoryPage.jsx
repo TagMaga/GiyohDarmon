@@ -1946,6 +1946,16 @@ export default function TeamDirectoryPage() {
     return map
   }, [teams, teamOrderQueries])
 
+  // Teams sorted by revenue (descending), ties broken alphabetically by name
+  const sortedTeams = useMemo(() => {
+    return [...teams].sort((a, b) => {
+      const revA = (teamOrdersMap[a.id] ?? []).reduce((sum, order) => sum + orderAmount(order), 0)
+      const revB = (teamOrdersMap[b.id] ?? []).reduce((sum, order) => sum + orderAmount(order), 0)
+      if (revB !== revA) return revB - revA
+      return (a.name ?? '').localeCompare(b.name ?? '')
+    })
+  }, [teams, teamOrdersMap])
+
   // Filter employees
   const filtered = useMemo(() => {
     const qLow = q.toLowerCase()
@@ -2121,7 +2131,7 @@ export default function TeamDirectoryPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-4">
-            {teams.map((team, index) => {
+            {sortedTeams.map((team, index) => {
               const members = teamMembersMap[team.id] ?? []
               const leader = team.team_lead_id ? userMap[team.team_lead_id]?.full_name : null
               return (
