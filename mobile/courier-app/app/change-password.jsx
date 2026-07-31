@@ -8,16 +8,9 @@ import useAuthStore from '../src/store/authStore'
 import { changePassword } from '../src/api/auth'
 import { GlassBackdrop, useGlass } from '../src/components/glass'
 
-const C = {
-  bg: '#0b101e', surface: '#1c2438', surface2: '#242e46',
-  border: 'rgba(255,255,255,0.12)', border2: 'rgba(255,255,255,0.20)',
-  text: '#f0f2f8', text2: '#9aa2b8', text3: '#68718a',
-  accent: '#0a84ff', red: '#ff453a',
-}
-
 export default function ChangePasswordScreen() {
   const { user } = useAuthStore()
-  const { dark } = useGlass()
+  const { T, dark } = useGlass()
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -49,51 +42,54 @@ export default function ChangePasswordScreen() {
   }
 
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={[s.safe, { backgroundColor: T.base }]}>
       <GlassBackdrop />
       <StatusBar style={dark ? 'light' : 'dark'} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={s.topbar}>
-          <TouchableOpacity style={s.back} onPress={() => router.back()}>
-            <ChevronLeft size={20} color={C.text} />
+          <TouchableOpacity style={[s.back, { backgroundColor: T.card, borderColor: T.cardEdge }]} onPress={() => router.back()}>
+            <ChevronLeft size={20} color={T.ink} strokeWidth={2} />
           </TouchableOpacity>
-          <Text style={s.title}>Изменить пароль</Text>
+          <Text style={[s.title, { color: T.ink }]}>Изменить пароль</Text>
         </View>
 
         <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-          <View style={s.card}>
-            <Text style={s.cardTitle}>ПАРОЛЬ</Text>
+          <View style={[s.card, { backgroundColor: T.card, borderColor: T.cardEdge }]}>
+            <Text style={[s.cardTitle, { color: T.muted }]}>ПАРОЛЬ</Text>
 
             <View style={s.field}>
-              <Text style={s.label}>Текущий пароль</Text>
+              <Text style={[s.label, { color: T.muted }]}>Текущий пароль</Text>
               <TextInput
-                style={s.input} placeholder="••••••••" placeholderTextColor={C.text3}
+                style={[s.input, { backgroundColor: T.chip, borderColor: T.hairline, color: T.ink }]}
+                placeholder="••••••••" placeholderTextColor={T.muted}
                 value={currentPassword} onChangeText={(v) => { setCurrentPassword(v); setError(null) }}
                 secureTextEntry autoComplete="current-password"
               />
             </View>
             <View style={s.field}>
-              <Text style={s.label}>Новый пароль</Text>
+              <Text style={[s.label, { color: T.muted }]}>Новый пароль</Text>
               <TextInput
-                style={s.input} placeholder="Минимум 8 символов" placeholderTextColor={C.text3}
+                style={[s.input, { backgroundColor: T.chip, borderColor: T.hairline, color: T.ink }]}
+                placeholder="Минимум 8 символов" placeholderTextColor={T.muted}
                 value={newPassword} onChangeText={(v) => { setNewPassword(v); setError(null) }}
                 secureTextEntry autoComplete="new-password"
               />
             </View>
             <View style={[s.field, { marginBottom: 2 }]}>
-              <Text style={s.label}>Повторите новый пароль</Text>
+              <Text style={[s.label, { color: T.muted }]}>Повторите новый пароль</Text>
               <TextInput
-                style={s.input} placeholder="••••••••" placeholderTextColor={C.text3}
+                style={[s.input, { backgroundColor: T.chip, borderColor: T.hairline, color: T.ink }]}
+                placeholder="••••••••" placeholderTextColor={T.muted}
                 value={confirmPassword} onChangeText={(v) => { setConfirmPassword(v); setError(null) }}
                 secureTextEntry autoComplete="new-password"
               />
             </View>
           </View>
 
-          {error && <Text style={s.errorText}>{error}</Text>}
+          {error && <Text style={[s.errorText, { color: T.red }]}>{error}</Text>}
 
           <TouchableOpacity
-            style={[s.saveBtn, !canSave && s.saveBtnDisabled]}
+            style={[s.saveBtn, { backgroundColor: T.blue, shadowColor: T.blue }, !canSave && s.saveBtnDisabled]}
             disabled={!canSave}
             onPress={handleSave}
           >
@@ -106,23 +102,27 @@ export default function ChangePasswordScreen() {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.bg },
+  safe: { flex: 1 },
   topbar: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 14 },
-  back: { width: 32, height: 32, borderRadius: 10, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 17, fontWeight: '700', color: C.text },
+  back: { width: 32, height: 32, borderRadius: 10, borderWidth: 1, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 17, fontWeight: '700' },
   content: { padding: 16, paddingTop: 4, gap: 14, paddingBottom: 60 },
-  card: { backgroundColor: C.surface, borderRadius: 14, borderWidth: 1, borderColor: C.border, padding: 14 },
-  cardTitle: { fontSize: 10, fontWeight: '700', color: C.text3, letterSpacing: 1, marginBottom: 12 },
-  field: { marginBottom: 14 },
-  label: { fontSize: 11, fontWeight: '600', color: C.text3, marginBottom: 6 },
-  input: {
-    height: 46, backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border,
-    borderRadius: 10, paddingHorizontal: 13, fontSize: 14, color: C.text,
+  card: {
+    borderRadius: 14, borderWidth: 1, padding: 14,
+    shadowColor: '#101c38', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
   },
-  errorText: { fontSize: 12.5, fontWeight: '600', color: '#ff6b61', paddingHorizontal: 4 },
+  cardTitle: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 12 },
+  field: { marginBottom: 14 },
+  label: { fontSize: 11, fontWeight: '600', marginBottom: 6 },
+  input: {
+    height: 46, borderWidth: 1,
+    borderRadius: 10, paddingHorizontal: 13, fontSize: 14,
+  },
+  errorText: { fontSize: 12.5, fontWeight: '600', paddingHorizontal: 4 },
   saveBtn: {
-    height: 50, backgroundColor: C.accent, borderRadius: 12,
+    height: 50, borderRadius: 12,
     justifyContent: 'center', alignItems: 'center',
+    shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.28, shadowRadius: 18, elevation: 5,
   },
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText: { color: '#fff', fontSize: 14.5, fontWeight: '700' },
