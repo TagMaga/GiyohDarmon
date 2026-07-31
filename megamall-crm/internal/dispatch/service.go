@@ -16,6 +16,7 @@ package dispatch
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/google/uuid"
@@ -31,11 +32,20 @@ type Service struct {
 	repo              *Repository
 	ordersSvc         *orders.Service
 	reserveForCourier ReserveForCourierFn
+	notify            NotifyFn
 	logger            *activity.Logger
 	db                *gorm.DB
 }
 
 type ReserveForCourierFn func(tx *gorm.DB, ctx context.Context, courierID, orderID uuid.UUID) error
+
+// NotifyFn persists and best-effort pushes a notification to userID,
+// injected from internal/notifications to avoid dispatch depending on that
+// whole module for one call — same narrow-function pattern as
+// ReserveForCourierFn. notifType is a plain string matching one of
+// notifications.Type's values by convention (dispatch intentionally does not
+// import notifications just for that constant).
+type NotifyFn func(ctx context.Context, userID uuid.UUID, notifType, title, body string, orderID *uuid.UUID) error
 
 func NewService(
 	repo *Repository,
@@ -56,6 +66,22 @@ func NewService(
 // import cycle with internal/warehouses.
 func (s *Service) SetWarehouseReservationAdapter(fn ReserveForCourierFn) {
 	s.reserveForCourier = fn
+}
+
+// SetNotifier wires the notifications module in without an import cycle.
+func (s *Service) SetNotifier(fn NotifyFn) {
+	s.notify = fn
+}
+
+// notifyAsync fires a best-effort notification and only logs on failure —
+// a notification delivery problem must never fail the caller's request.
+func (s *Service) notifyAsync(ctx context.Context, userID uuid.UUID, notifType, title, body string, orderID *uuid.UUID) {
+	if s.notify == nil {
+		return
+	}
+	if err := s.notify(ctx, userID, notifType, title, body, orderID); err != nil {
+		log.Printf("[dispatch] notify failed (user=%s type=%s): %v", userID, notifType, err)
+	}
 }
 
 // ─── Board ────────────────────────────────────────────────────────────────────
@@ -180,12 +206,14 @@ func (s *Service) CancelOrder(ctx context.Context, actorID uuid.UUID, orderID uu
 //  6. LogSync activity.
 func (s *Service) AssignCourier(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, req AssignCourierRequest) (*OrderAssignment, error) {
 	var created *OrderAssignment
+	var orderNumber string
 
 	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		o, err := s.repo.GetOrderForUpdate(tx, ctx, orderID)
 		if err != nil {
 			return err
 		}
+		orderNumber = o.OrderNumber
 
 		// Target must be an active courier (H3).
 		isCourier, err := s.repo.CourierExists(tx, ctx, req.CourierID)
@@ -293,6 +321,8 @@ func (s *Service) AssignCourier(ctx context.Context, actorID uuid.UUID, orderID 
 	if txErr != nil {
 		return nil, txErr
 	}
+	s.notifyAsync(ctx, req.CourierID, "courier_assigned", "Новый заказ",
+		fmt.Sprintf("Заказ #%s назначен вам курьером", orderNumber), &orderID)
 	return created, nil
 }
 
@@ -300,12 +330,14 @@ func (s *Service) AssignCourier(ctx context.Context, actorID uuid.UUID, orderID 
 // The order status stays assigned; only the courier changes.
 func (s *Service) ReassignCourier(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, req AssignCourierRequest) (*OrderAssignment, error) {
 	var created *OrderAssignment
+	var orderNumber string
 
 	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		o, err := s.repo.GetOrderForUpdate(tx, ctx, orderID)
 		if err != nil {
 			return err
 		}
+		orderNumber = o.OrderNumber
 
 		// Target must be an active courier (H3).
 		isCourier, err := s.repo.CourierExists(tx, ctx, req.CourierID)
@@ -395,6 +427,8 @@ func (s *Service) ReassignCourier(ctx context.Context, actorID uuid.UUID, orderI
 	if txErr != nil {
 		return nil, txErr
 	}
+	s.notifyAsync(ctx, req.CourierID, "courier_assigned", "Новый заказ",
+		fmt.Sprintf("Заказ #%s назначен вам курьером", orderNumber), &orderID)
 	return created, nil
 }
 
@@ -483,8 +517,9 @@ func (s *Service) AddComment(ctx context.Context, actorID uuid.UUID, orderID uui
 	if !req.Visibility.IsValid() {
 		return nil, apperrors.BadRequest("invalid visibility value")
 	}
-	// Verify order exists.
-	if _, err := s.ordersSvc.GetByID(ctx, orderID); err != nil {
+	// Verify order exists (also used below to notify its stakeholders).
+	o, err := s.ordersSvc.GetByID(ctx, orderID)
+	if err != nil {
 		return nil, err
 	}
 	c := &OrderComment{
@@ -503,6 +538,21 @@ func (s *Service) AddComment(ctx context.Context, actorID uuid.UUID, orderID uui
 		EntityType: "order",
 		EntityID:   &orderID,
 	})
+
+	// Notify the order's two stakeholders — its assigned courier and its
+	// seller/creator — regardless of which role authored the comment,
+	// excluding the author themselves.
+	body := fmt.Sprintf("Новый комментарий к заказу #%s", o.OrderNumber)
+	recipients := map[uuid.UUID]bool{}
+	if o.CourierID != nil {
+		recipients[*o.CourierID] = true
+	}
+	recipients[o.SellerID] = true
+	delete(recipients, actorID)
+	for userID := range recipients {
+		s.notifyAsync(ctx, userID, "order_comment", "Новый комментарий", body, &orderID)
+	}
+
 	return c, nil
 }
 

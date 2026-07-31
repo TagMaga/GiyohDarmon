@@ -134,4 +134,9 @@ export const KEYS = {
     payables: (teamLeadId, params) => ['payouts', 'payables', teamLeadId, params ?? {}],
     byPayee:  (payeeId) => ['payouts', 'payee', payeeId],
   },
+  // ── Notifications (all roles) ─────────────────────────────────────────────
+  notifications: {
+    list:        ['notifications', 'list'],
+    unreadCount: ['notifications', 'unreadCount'],
+  },
 }

@@ -1183,3 +1183,124 @@ func (r *Repository) courierOrderIntakeEnabledTx(db *gorm.DB, ctx context.Contex
 	}
 	return enabled, nil
 }
+
+// ─── Notifications support ──────────────────────────────────────────────────
+// courier_push_tokens is read/written from here (its natural home) and from
+// internal/notifications via narrow injected functions wired in main.go —
+// see internal/notifications.PushTokenLookupFn / DeletePushTokenFn.
+
+// GetPushToken returns the registered Expo push token for userID, or "" if
+// none is registered.
+func (r *Repository) GetPushToken(ctx context.Context, userID uuid.UUID) (string, error) {
+	var token string
+	err := r.db.WithContext(ctx).Raw(
+		`SELECT token FROM courier_push_tokens WHERE user_id = ?`, userID,
+	).Scan(&token).Error
+	if err != nil {
+		return "", fmt.Errorf("get push token: %w", err)
+	}
+	return token, nil
+}
+
+// DeletePushToken removes a stale token once Expo reports it as no longer
+// registered on the device.
+func (r *Repository) DeletePushToken(ctx context.Context, userID uuid.UUID) error {
+	return r.db.WithContext(ctx).Exec(`DELETE FROM courier_push_tokens WHERE user_id = ?`, userID).Error
+}
+
+// CourierDebt is one courier's current uncollected-cash balance, used by the
+// 21:00 "return company money" reminder job.
+type CourierDebt struct {
+	CourierID uuid.UUID `gorm:"column:courier_id"`
+	Debt      float64   `gorm:"column:debt"`
+}
+
+// ListCouriersWithOutstandingCash returns every courier whose current debt
+// (delivered orders' collected cash not yet in a confirmed handover, plus
+// any confirmed-handover shortfall) is greater than zero — the same debt
+// formula GetCashSummary computes per-courier, generalized to all couriers
+// in one query.
+func (r *Repository) ListCouriersWithOutstandingCash(ctx context.Context) ([]CourierDebt, error) {
+	var rows []CourierDebt
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT pending.courier_id AS courier_id,
+		       GREATEST(0, pending.cash_to_handover + COALESCE(shortfall.amount, 0)) AS debt
+		FROM (
+			SELECT courier_id,
+			       COALESCE(SUM(GREATEST(0, total_amount + delivery_fee - prepayment_amount - courier_payout)), 0) AS cash_to_handover
+			FROM orders
+			WHERE status = 'delivered' AND deleted_at IS NULL AND courier_id IS NOT NULL
+			  AND id NOT IN (
+				  SELECT cho.order_id FROM cash_handover_orders cho
+				  JOIN cash_handovers ch ON ch.id = cho.handover_id
+				  WHERE ch.status = 'confirmed'
+			  )
+			GROUP BY courier_id
+		) pending
+		LEFT JOIN (
+			SELECT courier_id, SUM(total_to_return - COALESCE(actual_returned, total_to_return)) AS amount
+			FROM cash_handovers
+			WHERE status = 'confirmed'
+			GROUP BY courier_id
+		) shortfall ON shortfall.courier_id = pending.courier_id
+		WHERE pending.cash_to_handover + COALESCE(shortfall.amount, 0) > 0
+	`).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("list couriers with outstanding cash: %w", err)
+	}
+	return rows, nil
+}
+
+// CityAvailableCount is the number of orders ready for immediate pickup
+// (confirmed, unassigned, not scheduled for later) in one city.
+type CityAvailableCount struct {
+	CityID uuid.UUID `gorm:"column:city_id"`
+	Count  int       `gorm:"column:cnt"`
+}
+
+// ListAvailableOrderCountsByCity mirrors ListAvailableOrders' eligibility
+// filter (confirmed, unassigned, due now) but grouped by city rather than
+// scoped to one courier — used by the 08:00 "orders available" summary.
+func (r *Repository) ListAvailableOrderCountsByCity(ctx context.Context) ([]CityAvailableCount, error) {
+	var rows []CityAvailableCount
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT o.city_id, COUNT(*) AS cnt
+		FROM orders o
+		WHERE o.status = ? AND o.deleted_at IS NULL AND o.city_id IS NOT NULL
+		  AND (o.scheduled_at IS NULL OR o.scheduled_at <= NOW())
+		  AND NOT EXISTS (
+			  SELECT 1 FROM order_assignments oa WHERE oa.order_id = o.id AND oa.is_active = TRUE
+		  )
+		GROUP BY o.city_id
+	`, orders.StatusConfirmed).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("list available order counts by city: %w", err)
+	}
+	return rows, nil
+}
+
+// ActiveCourierCityMap returns city_id -> courier_id[] for every courier
+// currently eligible to take new orders (active, intake enabled), used to
+// route the per-city available-order counts to the right couriers.
+func (r *Repository) ActiveCourierCityMap(ctx context.Context) (map[uuid.UUID][]uuid.UUID, error) {
+	type row struct {
+		CourierID uuid.UUID `gorm:"column:courier_id"`
+		CityID    uuid.UUID `gorm:"column:city_id"`
+	}
+	var rows []row
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT cc.courier_id, cc.city_id
+		FROM courier_cities cc
+		JOIN users u ON u.id = cc.courier_id
+		WHERE u.role = 'courier' AND u.is_active = TRUE AND u.deleted_at IS NULL
+		  AND u.courier_order_intake_enabled = TRUE
+	`).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("active courier city map: %w", err)
+	}
+	out := make(map[uuid.UUID][]uuid.UUID)
+	for _, rw := range rows {
+		out[rw.CityID] = append(out[rw.CityID], rw.CourierID)
+	}
+	return out, nil
+}

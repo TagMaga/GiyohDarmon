@@ -67,6 +67,15 @@ EXPO_PUBLIC_API_URL=http://192.168.1.100:8080
 | /(tabs)/claimable | Claimable | Свободные заказы — взять |
 | /(tabs)/cash | Cash | Сдача наличных + история |
 | /(tabs)/profile | Profile | Инфо + выход |
+| /notifications | Notifications | Список уведомлений (открывается через колокольчик на Dashboard или тап по push) |
+
+## Push notifications
+`expo-notifications` (added for this feature) requires a **new EAS build** —
+it's native code, not an OTA-shippable JS change. `usePushRegistration`
+(`src/hooks/usePushRegistration.js`) requests permission and registers the
+Expo push token via `PUT /courier/push-token` once the courier is
+authenticated; `_layout.jsx` also listens for notification taps and routes
+to `/notifications`.
 
 ## Auth Flow
 1. login.jsx → POST /auth/login → получаем access_token + refresh_token
