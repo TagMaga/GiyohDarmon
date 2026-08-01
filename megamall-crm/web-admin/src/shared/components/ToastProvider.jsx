@@ -30,7 +30,7 @@ const VARIANTS = {
   },
 }
 
-function ToastItem({ id, message, variant = 'success', onDismiss }) {
+function ToastItem({ id, message, variant = 'success', action, onDismiss }) {
   const v = VARIANTS[variant] ?? VARIANTS.success
   return (
     <div
@@ -40,6 +40,14 @@ function ToastItem({ id, message, variant = 'success', onDismiss }) {
     >
       {v.icon}
       <p className={`text-sm font-medium flex-1 leading-snug ${v.text}`}>{message}</p>
+      {action && (
+        <button
+          onClick={() => { action.onClick?.(); onDismiss(id) }}
+          className={`flex-shrink-0 text-xs font-bold underline underline-offset-2 ${v.text}`}
+        >
+          {action.label}
+        </button>
+      )}
       <button
         onClick={() => onDismiss(id)}
         className="flex-shrink-0 p-0.5 rounded-lg opacity-60 hover:opacity-100 transition-opacity"
@@ -61,9 +69,9 @@ export default function ToastProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
-  const push = useCallback((message, variant = 'success', duration = 4000) => {
+  const push = useCallback((message, variant = 'success', duration = 4000, action = null) => {
     const id = ++_nextId
-    setToasts((prev) => [...prev, { id, message, variant }])
+    setToasts((prev) => [...prev, { id, message, variant, action }])
     if (duration > 0) {
       setTimeout(() => dismiss(id), duration)
     }
@@ -71,9 +79,9 @@ export default function ToastProvider({ children }) {
   }, [dismiss])
 
   const toast = {
-    success: (msg, dur)  => push(msg, 'success', dur),
-    error:   (msg, dur)  => push(msg, 'error',   dur ?? 6000),
-    warning: (msg, dur)  => push(msg, 'warning', dur),
+    success: (msg, dur, action)  => push(msg, 'success', dur, action),
+    error:   (msg, dur, action)  => push(msg, 'error',   dur ?? 6000, action),
+    warning: (msg, dur, action)  => push(msg, 'warning', dur, action),
   }
 
   return (

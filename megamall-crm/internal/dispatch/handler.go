@@ -329,6 +329,30 @@ func (h *Handler) cancelOrder(c *gin.Context) {
 	response.OK(c, order)
 }
 
+func (h *Handler) forceStatusOrder(c *gin.Context) {
+	id, err := parseOrderID(c)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	var req orders.ForceChangeStatusRequest
+	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
+		response.HandleError(c, apperrors.BadRequest("invalid request body"))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.HandleError(c, appErr)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	order, svcErr := h.svc.ForceStatus(c.Request.Context(), claims.UserID, id, req)
+	if svcErr != nil {
+		response.HandleError(c, svcErr)
+		return
+	}
+	response.OK(c, order)
+}
+
 // ─── Comments ─────────────────────────────────────────────────────────────────
 
 func (h *Handler) listComments(c *gin.Context) {

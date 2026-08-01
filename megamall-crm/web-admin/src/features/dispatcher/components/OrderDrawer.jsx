@@ -580,55 +580,70 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
         </div>
 
         {/* ── STICKY FOOTER: action buttons ─────────────────────────── */}
-        {actions.length > 0 && (
-          <div
-            className="flex-shrink-0 px-4 py-3 space-y-2"
-            style={{ borderTop: `1px solid ${BORDER}`, background: PANEL }}
+        <div
+          className="flex-shrink-0 px-4 py-3 space-y-2"
+          style={{ borderTop: `1px solid ${BORDER}`, background: PANEL }}
+        >
+          {actions.length > 0 && (
+            <>
+              <div className="flex gap-2">
+                {actions.filter(a => a.primary).map(a => (
+                  <button
+                    key={a.key}
+                    onClick={() => onAction(a.key, order)}
+                    disabled={a.key === 'confirm' && isConfirming}
+                    className="flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+                    style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}
+                  >
+                    {a.key === 'confirm' && isConfirming
+                      ? <Loader2 size={13} className="inline mr-1 animate-spin" />
+                      : null}
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                {actions.filter(a => a.ghost).map(a => (
+                  <button
+                    key={a.key}
+                    onClick={() => onAction(a.key, order)}
+                    className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-colors"
+                    style={{ border: `1px solid ${BORDER}`, color: TEXT2 }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F0EFEA'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+                {actions.filter(a => a.danger).map(a => (
+                  <button
+                    key={a.key}
+                    onClick={() => onAction(a.key, order)}
+                    className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-colors"
+                    style={{ border: `1px solid ${RED}35`, color: RED }}
+                    onMouseEnter={e => e.currentTarget.style.background = `${RED}10`}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Force-status override — always available (even on terminal
+              orders), kept low-key/last so it's not mistaken for a normal
+              workflow action. */}
+          <button
+            onClick={() => onAction('force_status', order)}
+            className="w-full py-1.5 px-3 rounded-xl text-[11px] font-medium transition-colors"
+            style={{ border: `1px dashed ${BORDER}`, color: TEXT3 }}
+            onMouseEnter={e => e.currentTarget.style.background = '#F0EFEA'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
           >
-            <div className="flex gap-2">
-              {actions.filter(a => a.primary).map(a => (
-                <button
-                  key={a.key}
-                  onClick={() => onAction(a.key, order)}
-                  disabled={a.key === 'confirm' && isConfirming}
-                  className="flex-1 py-2.5 px-4 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-                  style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}
-                >
-                  {a.key === 'confirm' && isConfirming
-                    ? <Loader2 size={13} className="inline mr-1 animate-spin" />
-                    : null}
-                  {a.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              {actions.filter(a => a.ghost).map(a => (
-                <button
-                  key={a.key}
-                  onClick={() => onAction(a.key, order)}
-                  className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-colors"
-                  style={{ border: `1px solid ${BORDER}`, color: TEXT2 }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#F0EFEA'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  {a.label}
-                </button>
-              ))}
-              {actions.filter(a => a.danger).map(a => (
-                <button
-                  key={a.key}
-                  onClick={() => onAction(a.key, order)}
-                  className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-colors"
-                  style={{ border: `1px solid ${RED}35`, color: RED }}
-                  onMouseEnter={e => e.currentTarget.style.background = `${RED}10`}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  {a.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+            Изменить статус вручную…
+          </button>
+        </div>
       </div>
     </div>,
     document.body,

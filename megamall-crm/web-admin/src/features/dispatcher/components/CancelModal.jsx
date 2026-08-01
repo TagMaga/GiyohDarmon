@@ -1,11 +1,7 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
 import Modal  from '../../../shared/components/Modal'
 import Button from '../../../shared/components/Button'
 import Alert  from '../../../shared/components/Alert'
-import { useToast } from '../../../shared/components/ToastProvider'
-import { cancelOrder } from '../api'
-import { KEYS } from '../../../shared/queryKeys'
 import { getOrderId, formatOrderLabel } from '../utils/orderHelpers'
 
 const REASONS = [
@@ -16,69 +12,62 @@ const REASONS = [
   'Другое',
 ]
 
-export default function CancelModal({ open, onClose, order }) {
-  const qc    = useQueryClient()
-  const toast = useToast()
-
+/**
+ * CancelModal — collects a reason, then hands the order id(s) + reason to
+ * `onSchedule` and closes immediately. The actual cancelOrder API call is
+ * deferred by the caller (see DispatcherBoardV3.scheduleCancel) behind a
+ * short undo window — nothing is sent to the backend from this component.
+ *
+ * Pass `orders` (array) instead of `order` for a bulk cancel — the same
+ * reason is applied to every order in the array.
+ */
+export default function CancelModal({ open, onClose, order, orders, onSchedule }) {
   const [reason, setReason] = useState('')
   const [custom, setCustom] = useState('')
 
-  const { mutate, isPending, error, reset } = useMutation({
-    mutationFn: () => {
-      const orderId = getOrderId(order)
-      if (!orderId) throw new Error('ID заказа не найден')
-      return cancelOrder(orderId, { reason: reason === 'Другое' ? custom : reason })
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEYS.dispatcher.board })
-      qc.invalidateQueries({ queryKey: KEYS.dispatcher.newOrders })
-      const orderId = getOrderId(order)
-      if (orderId) {
-        qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(orderId) })
-        qc.invalidateQueries({ queryKey: KEYS.dispatcher.timeline(orderId) })
-      }
-      toast.success('Заказ отменён')
-      handleClose()
-    },
-  })
+  const targets = Array.isArray(orders) && orders.length > 0 ? orders : (order ? [order] : [])
+  const finalReason = reason === 'Другое' ? custom : reason
 
   function handleClose() {
-    reset()
     setReason('')
     setCustom('')
     onClose()
   }
 
-  const finalReason = reason === 'Другое' ? custom : reason
-  const errMsg = error?.response?.data?.error?.message ?? error?.message
+  function submit() {
+    const ids = targets.map(getOrderId).filter(Boolean)
+    if (!ids.length || !finalReason.trim()) return
+    onSchedule(ids, finalReason.trim())
+    handleClose()
+  }
+
+  const isBulk = targets.length > 1
 
   return (
     <Modal
       open={open}
       onClose={handleClose}
-      title="Отменить заказ"
-      description={order ? `Заказ ${formatOrderLabel(order)}` : ''}
+      title={isBulk ? `Отменить заказы (${targets.length})` : 'Отменить заказ'}
+      description={!isBulk && targets[0] ? `Заказ ${formatOrderLabel(targets[0])}` : ''}
       footer={
         <>
-          <Button variant="secondary" onClick={handleClose} disabled={isPending}>
+          <Button variant="secondary" onClick={handleClose}>
             Не отменять
           </Button>
           <Button
             variant="danger"
-            onClick={() => finalReason.trim() && mutate()}
-            loading={isPending}
-            disabled={!finalReason.trim()}
+            onClick={submit}
+            disabled={!finalReason.trim() || targets.length === 0}
           >
-            Отменить заказ
+            {isBulk ? `Отменить ${targets.length} заказов` : 'Отменить заказ'}
           </Button>
         </>
       }
     >
-      {errMsg && <Alert variant="error" title="Ошибка" className="mb-4">{errMsg}</Alert>}
-
       <div className="space-y-4">
         <Alert variant="warning">
-          Отмена заказа необратима. Инвентарь будет освобождён.
+          Отмена произойдёт через несколько секунд — в уведомлении будет кнопка
+          «Отменить действие», пока это ещё возможно. Инвентарь будет освобождён.
         </Alert>
 
         <div>

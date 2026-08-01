@@ -213,6 +213,14 @@ export async function resolveIssue(id, { to_status = 'assigned', comment = '' })
   return unwrap(res)
 }
 
+/** POST /dispatch/orders/:id/force-status — owner/dispatcher override that
+ * bypasses the normal transition state machine (can even reopen a terminal
+ * order). `reason` is mandatory server-side. */
+export async function forceOrderStatus(id, { status, reason }) {
+  const res = await client.post(`/dispatch/orders/${id}/force-status`, { status, reason })
+  return unwrap(res)
+}
+
 // ── Prepayment verification ────────────────────────────────────────────────────
 /** POST /orders/:id/prepayment/verify */
 export async function verifyPrepayment(id, { comment } = {}) {

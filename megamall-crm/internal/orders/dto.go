@@ -120,6 +120,16 @@ type ChangeStatusRequest struct {
 	Comment *string     `json:"comment"`
 }
 
+// ForceChangeStatusRequest is the dispatcher/owner "force status" override
+// payload — bypasses the normal state-machine gate (see
+// Service.ForceChangeStatus). Reason is mandatory and required non-empty here
+// AND re-checked (trimmed) in the service, so the audit trail always carries
+// a real explanation for the override.
+type ForceChangeStatusRequest struct {
+	Status OrderStatus `json:"status" validate:"required"`
+	Reason string      `json:"reason" validate:"required,min=3,max=500"`
+}
+
 // ─── Prepayment Verification ──────────────────────────────────────────────────
 
 type VerifyPrepaymentRequest struct {

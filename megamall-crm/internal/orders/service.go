@@ -1363,7 +1363,43 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 	if !req.Status.IsValid() {
 		return nil, apperrors.BadRequest("invalid status value")
 	}
+	return s.changeStatusInternal(ctx, actorID, actorRole, orderID, req.Status, req.Comment, statusChangeOptions{})
+}
 
+// ForceChangeStatus bypasses the CanTransition state-machine gate — used by the
+// dispatcher/owner "force status" override for stuck or corrupted orders (see
+// dispatch.Service.ForceStatus). Unlike ChangeStatus it may re-enter a terminal
+// status (delivered/cancelled/returned) from any source. Reason is mandatory
+// and is recorded on the timeline entry and the audit log so the override is
+// always traceable to who did it and why.
+func (s *Service) ForceChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole string, orderID uuid.UUID, req ForceChangeStatusRequest) (*Order, error) {
+	if !req.Status.IsValid() {
+		return nil, apperrors.BadRequest("invalid status value")
+	}
+	reason := strings.TrimSpace(req.Reason)
+	if reason == "" {
+		return nil, apperrors.BadRequest("reason is required for a forced status change")
+	}
+	comment := fmt.Sprintf("[FORCED] %s", reason)
+	return s.changeStatusInternal(ctx, actorID, actorRole, orderID, req.Status, &comment, statusChangeOptions{
+		force:  true,
+		reason: reason,
+	})
+}
+
+type statusChangeOptions struct {
+	force  bool
+	reason string
+}
+
+// changeStatusInternal is the single implementation shared by the normal,
+// state-machine-gated ChangeStatus and the override-gated ForceChangeStatus.
+//
+// Inventory/financial side effects (releaseInventory, deductInventory,
+// emitFinancialEvents) only run the FIRST time an order ever reaches a given
+// terminal status (tracked via order_timeline), so a forced reopen followed
+// by a normal re-close/re-deliver can never double-fire them.
+func (s *Service) changeStatusInternal(ctx context.Context, actorID uuid.UUID, actorRole string, orderID uuid.UUID, to OrderStatus, comment *string, opts statusChangeOptions) (*Order, error) {
 	var updated *Order
 
 	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -1376,10 +1412,13 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 		}
 
 		from := o.Status
-		to := req.Status
 
-		// ── State machine check ───────────────────────────────────────────────
-		if !CanTransition(from, to) {
+		if opts.force {
+			if from == to {
+				return apperrors.BadRequest("order is already in this status")
+			}
+		} else if !CanTransition(from, to) {
+			// ── State machine check ───────────────────────────────────────────
 			return apperrors.BadRequest(fmt.Sprintf("invalid transition: %s → %s", from, to))
 		}
 
@@ -1388,56 +1427,74 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 			return err
 		}
 
-		// ── Inventory side effects ────────────────────────────────────────────
+		// ── Inventory side effects (first-time-only guard, see doc comment) ───
 		if to == StatusCancelled || to == StatusReturned {
-			movementType := "cancelled"
-			if to == StatusReturned {
-				movementType = "returned"
+			alreadyReached, rerr := s.timelineHasReachedStatus(ctx, tx, orderID, to)
+			if rerr != nil {
+				return rerr
 			}
-			if err := s.releaseInventory(ctx, tx, o, movementType); err != nil {
-				return err
+			if !alreadyReached {
+				movementType := "cancelled"
+				if to == StatusReturned {
+					movementType = "returned"
+				}
+				if err := s.releaseInventory(ctx, tx, o, movementType); err != nil {
+					return err
+				}
 			}
 		} else if to == StatusDelivered {
-			if err := s.deductInventory(ctx, tx, o, actorID); err != nil {
-				return err
+			alreadyReached, rerr := s.timelineHasReachedStatus(ctx, tx, orderID, StatusDelivered)
+			if rerr != nil {
+				return rerr
+			}
+			if !alreadyReached {
+				if err := s.deductInventory(ctx, tx, o, actorID); err != nil {
+					return err
+				}
 			}
 		}
 
-		// ── Financial events on delivery ──────────────────────────────────────
+		// ── Financial events on delivery (first-time-only guard) ──────────────
 		if to == StatusDelivered {
-			snap, err := s.compSvc.GetSnapshotByOrderID(ctx, orderID)
-			if err != nil {
-				return fmt.Errorf("load snapshot: %w", err)
+			alreadyReached, rerr := s.timelineHasReachedStatus(ctx, tx, orderID, StatusDelivered)
+			if rerr != nil {
+				return rerr
 			}
-			// Auto-create snapshot if missing but order has all required data.
-			if snap == nil && o.SnapshotID == nil {
-				hier, herr := s.resolveHierarchy(ctx, o.SellerID)
-				if herr != nil {
-					return apperrors.Unprocessable("order has no financial snapshot and hierarchy resolution failed")
-				}
-				snap, err = s.compSvc.BuildSnapshot(ctx, tx, compensation.SnapshotInput{
-					OrderID:        &orderID,
-					SellerID:       &o.SellerID,
-					ManagerID:      hier.managerID,
-					ManagerTeamID:  hier.managerTeamID,
-					TeamLeadID:     hier.teamLeadID,
-					TeamLeadTeamID: hier.teamLeadTeamID,
-					DeliveryFee:    o.DeliveryFee,
-					ResolvedAt:     time.Now().UTC(),
-				})
+			if !alreadyReached {
+				snap, err := s.compSvc.GetSnapshotByOrderID(ctx, orderID)
 				if err != nil {
-					return apperrors.Unprocessable("order has no financial snapshot and auto-creation failed: " + err.Error())
+					return fmt.Errorf("load snapshot: %w", err)
 				}
-				if err := tx.WithContext(ctx).Model(&Order{}).Where("id = ?", orderID).
-					UpdateColumn("snapshot_id", snap.ID).Error; err != nil {
-					return fmt.Errorf("link auto-created snapshot: %w", err)
+				// Auto-create snapshot if missing but order has all required data.
+				if snap == nil && o.SnapshotID == nil {
+					hier, herr := s.resolveHierarchy(ctx, o.SellerID)
+					if herr != nil {
+						return apperrors.Unprocessable("order has no financial snapshot and hierarchy resolution failed")
+					}
+					snap, err = s.compSvc.BuildSnapshot(ctx, tx, compensation.SnapshotInput{
+						OrderID:        &orderID,
+						SellerID:       &o.SellerID,
+						ManagerID:      hier.managerID,
+						ManagerTeamID:  hier.managerTeamID,
+						TeamLeadID:     hier.teamLeadID,
+						TeamLeadTeamID: hier.teamLeadTeamID,
+						DeliveryFee:    o.DeliveryFee,
+						ResolvedAt:     time.Now().UTC(),
+					})
+					if err != nil {
+						return apperrors.Unprocessable("order has no financial snapshot and auto-creation failed: " + err.Error())
+					}
+					if err := tx.WithContext(ctx).Model(&Order{}).Where("id = ?", orderID).
+						UpdateColumn("snapshot_id", snap.ID).Error; err != nil {
+						return fmt.Errorf("link auto-created snapshot: %w", err)
+					}
 				}
-			}
-			if snap == nil {
-				return apperrors.Unprocessable("order has no financial snapshot — cannot deliver")
-			}
-			if err := s.emitFinancialEvents(ctx, tx, o, snap); err != nil {
-				return err
+				if snap == nil {
+					return apperrors.Unprocessable("order has no financial snapshot — cannot deliver")
+				}
+				if err := s.emitFinancialEvents(ctx, tx, o, snap); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -1479,7 +1536,7 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 			OrderID:    orderID,
 			FromStatus: &from,
 			ToStatus:   to,
-			Comment:    req.Comment,
+			Comment:    comment,
 			CreatedBy:  actorID,
 		}
 		if err := s.repo.CreateTimelineEntry(ctx, tx, tl); err != nil {
@@ -1487,10 +1544,15 @@ func (s *Service) ChangeStatus(ctx context.Context, actorID uuid.UUID, actorRole
 		}
 
 		// ── Activity log ──────────────────────────────────────────────────────
+		action := "status_change"
 		reason := fmt.Sprintf("%s → %s", from, to)
+		if opts.force {
+			action = "status_forced"
+			reason = fmt.Sprintf("%s → %s (forced: %s)", from, to, opts.reason)
+		}
 		if err := s.logger.LogSync(tx, activity.Entry{
 			ActorID:     &actorID,
-			Action:      "status_change",
+			Action:      action,
 			EntityType:  "order",
 			EntityID:    &orderID,
 			BeforeState: map[string]interface{}{"status": from},
@@ -1783,6 +1845,21 @@ type AdjustCourierWarehouseFn func(
 	qtyDelta, reservedDelta int, movementType string,
 	referenceID, actorID uuid.UUID, reason string,
 ) error
+
+// timelineHasReachedStatus reports whether orderID has ever transitioned to
+// `status` before (any source status), per order_timeline. Used to gate
+// one-shot inventory/financial side effects against being re-run when a
+// forced status override reopens a terminal order and it later returns to
+// that same terminal status again.
+func (s *Service) timelineHasReachedStatus(ctx context.Context, tx *gorm.DB, orderID uuid.UUID, status OrderStatus) (bool, error) {
+	var count int64
+	if err := tx.WithContext(ctx).Model(&OrderTimeline{}).
+		Where("order_id = ? AND to_status = ?", orderID, status).
+		Count(&count).Error; err != nil {
+		return false, fmt.Errorf("check timeline history: %w", err)
+	}
+	return count > 0, nil
+}
 
 // releaseInventory decrements reserved_quantity for each item without touching
 // physical quantity. Called when an order is cancelled, returned, refused, or
