@@ -193,6 +193,16 @@ func (s *Service) CancelOrder(ctx context.Context, actorID uuid.UUID, orderID uu
 	})
 }
 
+// ForceStatus forces an order directly to any status, bypassing the normal
+// transition state machine — the dispatcher/owner recovery action for a
+// stuck or corrupted order. A non-empty reason is mandatory; it is stored on
+// the order timeline and the audit log so the override is always traceable.
+// See orders.Service.ForceChangeStatus for the idempotency guards that make
+// reopening a terminal order (delivered/cancelled/returned) safe.
+func (s *Service) ForceStatus(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, req orders.ForceChangeStatusRequest) (*orders.Order, error) {
+	return s.ordersSvc.ForceChangeStatus(ctx, actorID, "dispatcher", orderID, req)
+}
+
 // ─── Assignment (atomic: assignment + cache + status in one tx) ───────────────
 
 // AssignCourier assigns a courier to a confirmed order.

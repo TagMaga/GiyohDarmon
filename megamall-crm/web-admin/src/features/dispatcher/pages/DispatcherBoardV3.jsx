@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -21,6 +21,7 @@ import UnassignModal         from '../components/UnassignModal'
 import ScheduleModal         from '../components/ScheduleModal'
 import IssueModal            from '../components/IssueModal'
 import CancelModal           from '../components/CancelModal'
+import ForceStatusModal      from '../components/ForceStatusModal'
 import CommentsDrawer        from '../components/CommentsDrawer'
 import OrderDrawer           from '../components/OrderDrawer'
 import RejectPrepaymentModal from '../components/RejectPrepaymentModal'
@@ -31,7 +32,7 @@ import {
   fetchBoard, fetchNewOrders, fetchIssueOrders, fetchDeliveredOrders,
   fetchCouriersOverview, fetchHandovers, fetchCashSettlement, fetchCashTransactions, fetchDispatchOrderHistory,
   confirmOrder, markReturn, verifyPrepayment, confirmCashTransaction, rejectCashTransaction,
-  assignCourier, reassignCourier,
+  assignCourier, reassignCourier, cancelOrder,
 } from '../api'
 import { getOrderId, getCourierId, buildCourierMap, resolveCourier, resolveCourierDisplay, formatOrderLabel } from '../utils/orderHelpers'
 import { resolveCustomer, resolveAddress, resolveCity } from '../utils/resolveCustomer'
@@ -53,6 +54,7 @@ const ACTION_MODAL = {
   resolve: 'resolve',
   cancel: 'cancel',
   comment: 'comments',
+  force_status: 'force_status',
 }
 
 const COLUMNS = [
@@ -125,6 +127,19 @@ function DispatcherBoardDesktop() {
     page: 1,
   }))
   const [photoPreview, setPhotoPreview] = useState(null)
+
+  // ── Bulk selection (multi-order confirm / cancel / assign) ──────────────
+  const [bulkMode, setBulkMode] = useState(false)
+  const [bulkIds, setBulkIds] = useState(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+
+  // ── Cancel undo (client-side grace window, single or bulk) ──────────────
+  // Orders in here are optimistically hidden from the board while their
+  // cancel is pending; the actual cancelOrder API call only fires after the
+  // grace window elapses, unless undone first.
+  const [hiddenOrderIds, setHiddenOrderIds] = useState(() => new Set())
+  const pendingCancelsRef = useRef(new Map())
+  const cancelBatchIdRef = useRef(0)
 
   const board = useQuery({ queryKey: KEYS.dispatcher.board, queryFn: fetchBoard, refetchInterval: 30_000, staleTime: 25_000 })
   const news = useQuery({ queryKey: KEYS.dispatcher.newOrders, queryFn: fetchNewOrders, refetchInterval: 30_000, staleTime: 25_000 })
@@ -227,6 +242,7 @@ function DispatcherBoardDesktop() {
 
   const filteredOrders = useMemo(() => {
     return allOrders.filter((order) => {
+      if (hiddenOrderIds.has(getOrderId(order))) return false
       if (filters.courier === 'unassigned') {
         if (order.status !== 'confirmed') return false
         if (getCourierId(order)) return false
@@ -241,7 +257,7 @@ function DispatcherBoardDesktop() {
       }
       return true
     })
-  }, [allOrders, filters.courier, filters.date])
+  }, [allOrders, filters.courier, filters.date, hiddenOrderIds])
 
   const grouped = useMemo(() => {
     const map = Object.fromEntries(COLUMNS.map((col) => [col.key, []]))
@@ -263,6 +279,96 @@ function DispatcherBoardDesktop() {
     (err) => toast.error(err?.response?.data?.error?.message ?? err?.message ?? 'Ошибка'),
     [toast],
   )
+
+  // ── Bulk selection helpers ────────────────────────────────────────────────
+  const bulkOrders = useMemo(
+    () => allOrders.filter((o) => bulkIds.has(getOrderId(o))),
+    [allOrders, bulkIds],
+  )
+
+  const toggleBulk = useCallback((id) => {
+    setBulkIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const clearBulk = useCallback(() => setBulkIds(new Set()), [])
+
+  async function bulkConfirm() {
+    const targets = bulkOrders.filter((o) => o.status === 'new')
+    if (targets.length === 0) { toast.warning('Среди выбранных нет новых заказов'); return }
+    setBulkBusy(true)
+    const results = await Promise.allSettled(targets.map((o) => confirmOrder(requiredOrderId(o))))
+    setBulkBusy(false)
+    const failed = results.filter((r) => r.status === 'rejected').length
+    invalidate()
+    if (failed) toast.error(`Подтверждено: ${targets.length - failed}, ошибок: ${failed}`)
+    else toast.success(`Подтверждено заказов: ${targets.length}`)
+    clearBulk()
+  }
+
+  // ── Cancel undo (client-side grace window) ───────────────────────────────
+  // The actual cancelOrder call is deferred until the grace window elapses;
+  // clicking "Undo" on the toast (or unselecting before it fires) cancels
+  // the timer and the API call never happens. On unmount, any still-pending
+  // cancels are flushed immediately rather than silently dropped.
+  const scheduleCancel = useCallback((orderIds, reason) => {
+    const ids = orderIds.filter(Boolean)
+    if (ids.length === 0) return
+    const batchId = ++cancelBatchIdRef.current
+    setHiddenOrderIds((prev) => new Set([...prev, ...ids]))
+
+    const timer = setTimeout(async () => {
+      pendingCancelsRef.current.delete(batchId)
+      const results = await Promise.allSettled(ids.map((id) => cancelOrder(id, { reason })))
+      const failed = results.filter((r) => r.status === 'rejected').length
+      invalidate()
+      setHiddenOrderIds((prev) => {
+        const next = new Set(prev)
+        ids.forEach((id) => next.delete(id))
+        return next
+      })
+      if (failed) toast.error(`Не удалось отменить: ${failed} из ${ids.length}`)
+      else toast.success(ids.length > 1 ? `Отменено заказов: ${ids.length}` : 'Заказ отменён')
+    }, 6000)
+
+    pendingCancelsRef.current.set(batchId, { ids, reason, timer })
+    toast.warning(
+      ids.length > 1 ? `Отмена ${ids.length} заказов через 6с…` : 'Отмена заказа через 6с…',
+      6500,
+      {
+        label: 'Отменить действие',
+        onClick: () => {
+          const pending = pendingCancelsRef.current.get(batchId)
+          if (!pending) return
+          clearTimeout(pending.timer)
+          pendingCancelsRef.current.delete(batchId)
+          setHiddenOrderIds((prev) => {
+            const next = new Set(prev)
+            pending.ids.forEach((id) => next.delete(id))
+            return next
+          })
+        },
+      },
+    )
+    clearBulk()
+    setSelectedOrder(null)
+  }, [invalidate, toast, clearBulk])
+
+  // Flush any still-pending cancels immediately if the board unmounts —
+  // never silently drop a cancel the dispatcher already confirmed.
+  useEffect(() => {
+    return () => {
+      for (const [, pending] of pendingCancelsRef.current) {
+        clearTimeout(pending.timer)
+        pending.ids.forEach((id) => { cancelOrder(id, { reason: pending.reason }).catch(() => {}) })
+      }
+      pendingCancelsRef.current.clear()
+    }
+  }, [])
 
   const { mutate: doConfirm, isPending: isConfirming } = useMutation({
     mutationFn: (order) => confirmOrder(requiredOrderId(order)),
@@ -503,6 +609,14 @@ function DispatcherBoardDesktop() {
           />
         ) : (
           <section className="dv2-board-wrap">
+            <div className="dv2-board-toolbar">
+              <button
+                className={`dv2-bulk-toggle ${bulkMode ? 'active' : ''}`}
+                onClick={() => { setBulkMode((v) => !v); clearBulk() }}
+              >
+                {bulkMode ? 'Готово' : 'Выбрать несколько'}
+              </button>
+            </div>
             <div className="dv2-board">
               {COLUMNS.map((col) => (
                 <Column
@@ -516,9 +630,22 @@ function DispatcherBoardDesktop() {
                   onSelect={setSelectedOrder}
                   onAction={handleAction}
                   isConfirming={isConfirming}
+                  bulkMode={bulkMode}
+                  bulkIds={bulkIds}
+                  onToggleBulk={toggleBulk}
                 />
               ))}
             </div>
+
+            {/* Bulk action bar — confirm / cancel / assign several orders at once */}
+            <BulkActionBar
+              count={bulkIds.size}
+              busy={bulkBusy}
+              onConfirm={bulkConfirm}
+              onCancel={() => setModal('bulk_cancel')}
+              onAssign={() => setModal('bulk_assign')}
+              onClear={clearBulk}
+            />
 
             {/* V3: Sticky action bar */}
             <StickyActionBar
@@ -591,7 +718,10 @@ function DispatcherBoardDesktop() {
       <ScheduleModal         open={modal === 'schedule'}          onClose={closeModal} order={activeOrder} />
       <IssueModal            open={modal === 'issue'}             onClose={closeModal} order={activeOrder} mode="mark" />
       <IssueModal            open={modal === 'resolve'}           onClose={closeModal} order={activeOrder} mode="resolve" />
-      <CancelModal           open={modal === 'cancel'}            onClose={closeModal} order={activeOrder} />
+      <CancelModal           open={modal === 'cancel'}            onClose={closeModal} order={activeOrder} onSchedule={scheduleCancel} />
+      <CancelModal           open={modal === 'bulk_cancel'}       onClose={closeModal} orders={bulkOrders} onSchedule={scheduleCancel} />
+      <AssignCourierModal    open={modal === 'bulk_assign'}       onClose={closeModal} orders={bulkOrders} onBulkSuccess={clearBulk} />
+      <ForceStatusModal      open={modal === 'force_status'}      onClose={closeModal} order={activeOrder} />
       <CommentsDrawer        open={modal === 'comments'}          onClose={closeModal} order={activeOrder} />
       <RejectPrepaymentModal open={modal === 'reject_prepayment'} onClose={closeModal} order={activeOrder} />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onCommand={(action) => {
@@ -858,7 +988,26 @@ function StickyActionBar({ order, pendingCourierId, pendingCourierName, isMutati
   )
 }
 
-function Column({ col, orders, loading, customerMap, courierMap, selectedOrder, onSelect, onAction, isConfirming }) {
+// Bulk action bar — appears once at least one order is selected via the
+// board's "Выбрать несколько" checkboxes. Confirm/cancel/assign act on the
+// whole selection; per-order eligibility (e.g. only 'new' orders can be
+// bulk-confirmed) is filtered by the caller before hitting the API.
+function BulkActionBar({ count, busy, onConfirm, onCancel, onAssign, onClear }) {
+  if (count === 0) return null
+  return (
+    <div className="dv2-bulk-bar">
+      <div className="dv2-bulk-count">Выбрано: {count}</div>
+      <div className="dv2-bulk-actions">
+        <button disabled={busy} onClick={onConfirm} className="dv2-bulk-btn dv2-bulk-btn--primary">Подтвердить</button>
+        <button disabled={busy} onClick={onAssign} className="dv2-bulk-btn">Назначить курьера</button>
+        <button disabled={busy} onClick={onCancel} className="dv2-bulk-btn dv2-bulk-btn--danger">Отменить</button>
+        <button disabled={busy} onClick={onClear} className="dv2-bulk-btn dv2-bulk-btn--ghost">Снять выбор</button>
+      </div>
+    </div>
+  )
+}
+
+function Column({ col, orders, loading, customerMap, courierMap, selectedOrder, onSelect, onAction, isConfirming, bulkMode, bulkIds, onToggleBulk }) {
   return (
     <section className="dv2-col" style={{ '--col-color': col.color }}>
       <div className="dv2-col-head">
@@ -881,6 +1030,9 @@ function Column({ col, orders, loading, customerMap, courierMap, selectedOrder, 
               onSelect={onSelect}
               onAction={onAction}
               isConfirming={isConfirming}
+              bulkMode={bulkMode}
+              bulkChecked={bulkIds?.has(getOrderId(order))}
+              onToggleBulk={onToggleBulk}
             />
           ))
         )}
@@ -889,7 +1041,7 @@ function Column({ col, orders, loading, customerMap, courierMap, selectedOrder, 
   )
 }
 
-function OrderCard({ order, customerMap, courierMap, selected, onSelect, onAction, isConfirming }) {
+function OrderCard({ order, customerMap, courierMap, selected, onSelect, onAction, isConfirming, bulkMode, bulkChecked, onToggleBulk }) {
   const customer = resolveCustomer(order, customerMap)
   const courierDisp = resolveCourierDisplay(order, courierMap)
   const address = resolveAddress(order) || customer?.address || resolveCity(order) || customer?.city || '—'
@@ -905,16 +1057,26 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
       style={{ '--card-color': cardColor }}
       role="button"
       tabIndex={0}
-      onClick={() => onSelect(order)}
+      onClick={() => bulkMode ? onToggleBulk?.(getOrderId(order)) : onSelect(order)}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
-          onSelect(order)
+          bulkMode ? onToggleBulk?.(getOrderId(order)) : onSelect(order)
         }
       }}
     >
       <div className="dv2-oc-head">
+        {bulkMode && (
+          <input
+            type="checkbox"
+            className="dv2-bulk-checkbox"
+            checked={!!bulkChecked}
+            onChange={() => onToggleBulk?.(getOrderId(order))}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Выбрать заказ"
+          />
+        )}
         <span className="dv2-oc-num">#{formatOrderLabel(order)}</span>
         <span className="dv2-oc-badges">
           {isCash && <span className="dv2-badge cash">нал</span>}

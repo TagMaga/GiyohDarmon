@@ -12,8 +12,14 @@ import { fmt } from '../statusConfig'
  * AssignCourierModal — courier picker.
  * Renders as a bottom sheet on all viewport sizes for touch-friendly UX.
  * Couriers are displayed as tappable cards (not a <select>).
+ *
+ * Pass `orders` (array) instead of `order` for bulk assignment — the picked
+ * courier is applied to every order in the array, using assign or reassign
+ * per order based on its own current status (ignores `mode` in that case),
+ * since a bulk selection can mix confirmed (no courier yet) and
+ * assigned/in_delivery/issue (already has one) orders.
  */
-export default function AssignCourierModal({ open, onClose, order, mode = 'assign' }) {
+export default function AssignCourierModal({ open, onClose, order, orders, mode = 'assign', onBulkSuccess }) {
   const qc    = useQueryClient()
   const toast = useToast()
 
@@ -48,19 +54,38 @@ export default function AssignCourierModal({ open, onClose, order, mode = 'assig
     if (!open) { setCourierId(''); setNote(''); setShowNote(false) }
   }, [open])
 
+  const isBulk = Array.isArray(orders) && orders.length > 0
   const mutFn = mode === 'reassign' ? reassignCourier : assignCourier
-  const title = mode === 'reassign' ? 'Переназначить курьера' : 'Назначить курьера'
+  const title = isBulk ? `Назначить курьера (${orders.length})` : mode === 'reassign' ? 'Переназначить курьера' : 'Назначить курьера'
 
   const { mutate, isPending, error, reset } = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      if (isBulk) {
+        const results = await Promise.allSettled(orders.map((o) => {
+          const orderId = getOrderId(o)
+          const fn = ['assigned', 'in_delivery', 'issue'].includes(o.status) ? reassignCourier : assignCourier
+          return fn(orderId, { courier_id: courierId, note })
+        }))
+        const failed = results.filter((r) => r.status === 'rejected').length
+        if (failed === orders.length) throw new Error('Не удалось назначить курьера ни одному заказу')
+        return { failed, total: orders.length }
+      }
       const orderId = getOrderId(order)
       if (!orderId) throw new Error('ID заказа не найден')
       return mutFn(orderId, { courier_id: courierId, note })
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.board })
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.newOrders })
       qc.invalidateQueries({ queryKey: KEYS.dispatcher.couriers })
+      if (isBulk) {
+        const failed = result?.failed ?? 0
+        const total = result?.total ?? orders.length
+        toast.success(failed ? `Назначено: ${total - failed}, ошибок: ${failed}` : `Курьер назначен ${total} заказам`)
+        onBulkSuccess?.()
+        handleClose()
+        return
+      }
       const orderId = getOrderId(order)
       if (orderId) {
         qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(orderId) })
