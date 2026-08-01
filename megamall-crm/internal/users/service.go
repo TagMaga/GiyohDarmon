@@ -25,6 +25,21 @@ const documentStatusRejected = "rejected"
 // stop working immediately instead of remaining valid until they expire.
 type SessionRevokerFn func(ctx context.Context, userID uuid.UUID) error
 
+// TeamRoleSyncFn keeps a team's manager_id/team_lead_id in step with a
+// user's role, called whenever PATCH /users/:id changes role to or from
+// manager/sales_team_lead. Injected after construction — users.Service
+// can't import internal/teams directly, mirrors SetSessionRevoker's
+// post-construction wiring. Promoting someone who already belongs to a
+// team (via user_hierarchy.team_id) makes them that team's manager/lead;
+// without this, a user promoted after being assigned to a team (rather
+// than assigned to a team after being promoted) has a team that shows a
+// correct name/badge everywhere but never resolves as "their" team for
+// manager_id-scoped reads (team orders, team sellers, team revenue).
+// Demoting them away from either role clears them from any team still
+// pointing at them, so a team doesn't keep pointing at someone who can no
+// longer act as its manager/lead.
+type TeamRoleSyncFn func(ctx context.Context, userID uuid.UUID, oldRole, newRole Role) error
+
 // MediaAssetInfo is what an external media-pipeline integration reports
 // about a freshly-attached media asset (avatar or user document).
 // Deliberately a plain, local struct rather than importing internal/media's
@@ -87,6 +102,7 @@ var (
 type Service struct {
 	repo           *Repository
 	sessionRevoker SessionRevokerFn
+	teamRoleSync   TeamRoleSyncFn
 
 	// attachAvatar/attachUserDocument/releaseMedia/signedMediaURL are nil
 	// when MEDIA_PIPELINE_ENABLED=false — see requireMedia. Every method
@@ -187,6 +203,12 @@ func (s *Service) resolveDocumentURL(ctx context.Context, d *UserDocument) {
 // after all services are constructed.
 func (s *Service) SetSessionRevoker(fn SessionRevokerFn) {
 	s.sessionRevoker = fn
+}
+
+// SetTeamRoleSync injects the team manager_id/team_lead_id sync hook.
+// Called from main.go after all services are constructed.
+func (s *Service) SetTeamRoleSync(fn TeamRoleSyncFn) {
+	s.teamRoleSync = fn
 }
 
 func (s *Service) Create(ctx context.Context, req CreateUserRequest) (*User, error) {
@@ -456,6 +478,14 @@ func (s *Service) Update(ctx context.Context, id uuid.UUID, req UpdateUserReques
 		}
 		if err := s.repo.ClearAsHierarchyParent(ctx, u.ID); err != nil {
 			return nil, apperrors.Internal(err)
+		}
+	}
+
+	// A role change into/out of manager or sales_team_lead can leave a
+	// team's manager_id/team_lead_id stale — see TeamRoleSyncFn.
+	if req.Role != nil && before.Role != u.Role && s.teamRoleSync != nil {
+		if err := s.teamRoleSync(ctx, u.ID, before.Role, u.Role); err != nil {
+			return nil, apperrors.Internal(fmt.Errorf("sync team role: %w", err))
 		}
 	}
 
