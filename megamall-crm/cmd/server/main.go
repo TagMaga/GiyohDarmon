@@ -187,6 +187,53 @@ func main() {
 	// invalidates their existing refresh tokens.
 	userSvc.SetSessionRevoker(authSvc.Logout)
 
+	// Wire team role sync so promoting a user to manager/sales_team_lead
+	// (while they already belong to a team via user_hierarchy.team_id)
+	// makes them that team's manager_id/team_lead_id, and demoting them
+	// away from either role clears any team still pointing at them.
+	userSvc.SetTeamRoleSync(func(ctx context.Context, userID uuid.UUID, oldRole, newRole users.Role) error {
+		becameManager := newRole == users.RoleManager && oldRole != users.RoleManager
+		becameTeamLead := newRole == users.RoleSalesTeamLead && oldRole != users.RoleSalesTeamLead
+		leftManager := oldRole == users.RoleManager && newRole != users.RoleManager
+		leftTeamLead := oldRole == users.RoleSalesTeamLead && newRole != users.RoleSalesTeamLead
+
+		if becameManager || becameTeamLead {
+			h, err := hierarchyRepo.GetByUserID(ctx, userID)
+			if err != nil {
+				return err
+			}
+			if h != nil && h.TeamID != nil {
+				t, err := teamRepo.GetByID(ctx, *h.TeamID)
+				if err != nil {
+					return err
+				}
+				if t != nil {
+					if becameManager {
+						t.ManagerID = &userID
+					}
+					if becameTeamLead {
+						t.TeamLeadID = &userID
+					}
+					if err := teamRepo.Update(ctx, t); err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+		if leftManager {
+			if err := teamRepo.ClearManagerID(ctx, userID); err != nil {
+				return err
+			}
+		}
+		if leftTeamLead {
+			if err := teamRepo.ClearTeamLeadID(ctx, userID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+
 	// ── Inject JWT validator into middleware package ───────────────────────────
 	middleware.SetTokenValidator(func(ctx context.Context, token string) (*middleware.ContextClaims, error) {
 		claims, err := authSvc.ValidateAccessToken(ctx, token)

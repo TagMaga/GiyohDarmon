@@ -105,6 +105,29 @@ func (r *Repository) Update(ctx context.Context, t *Team) error {
 	return nil
 }
 
+// ClearManagerID unsets manager_id on any team currently pointing at
+// userID — used when a manager is demoted away from the manager role, so
+// the team stops pointing at someone who can no longer act as its manager.
+func (r *Repository) ClearManagerID(ctx context.Context, userID uuid.UUID) error {
+	if err := r.db.WithContext(ctx).Model(&Team{}).
+		Where("manager_id = ? AND deleted_at IS NULL", userID).
+		Update("manager_id", nil).Error; err != nil {
+		return fmt.Errorf("clear team manager_id: %w", err)
+	}
+	return nil
+}
+
+// ClearTeamLeadID unsets team_lead_id on any team currently pointing at
+// userID — used when a team lead is demoted away from the sales_team_lead role.
+func (r *Repository) ClearTeamLeadID(ctx context.Context, userID uuid.UUID) error {
+	if err := r.db.WithContext(ctx).Model(&Team{}).
+		Where("team_lead_id = ? AND deleted_at IS NULL", userID).
+		Update("team_lead_id", nil).Error; err != nil {
+		return fmt.Errorf("clear team team_lead_id: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) SoftDelete(ctx context.Context, id uuid.UUID) error {
 	result := r.db.WithContext(ctx).
 		Model(&Team{}).

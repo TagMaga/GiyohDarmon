@@ -285,3 +285,59 @@ func TestUsers_GetByIDs_ExcludesDeactivatedAndDeleted(t *testing.T) {
 		t.Fatal("expected deleted user to be excluded — must not remain visible as a team member")
 	}
 }
+
+// A role change into/out of manager or sales_team_lead must invoke the
+// injected TeamRoleSyncFn with the old and new role — this is what keeps a
+// team's manager_id/team_lead_id in step when someone is promoted after
+// already being assigned to a team (rather than assigned to a team after
+// being promoted), which otherwise leaves the team unresolvable as "theirs"
+// for every manager_id-scoped read (team orders, team sellers, team revenue).
+func TestUsers_Update_RoleChange_InvokesTeamRoleSync(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewRepository(db)
+	svc := NewService(repo)
+	ctx := context.Background()
+
+	seller := createTestUser(t, db, RoleSeller)
+
+	type call struct {
+		userID           uuid.UUID
+		oldRole, newRole Role
+	}
+	var calls []call
+	svc.SetTeamRoleSync(func(_ context.Context, userID uuid.UUID, oldRole, newRole Role) error {
+		calls = append(calls, call{userID, oldRole, newRole})
+		return nil
+	})
+
+	newRole := RoleManager
+	if _, err := svc.Update(ctx, seller.ID, UpdateUserRequest{Role: &newRole}); err != nil {
+		t.Fatalf("promote to manager: %v", err)
+	}
+	if len(calls) != 1 {
+		t.Fatalf("teamRoleSync call count = %d, want 1", len(calls))
+	}
+	if calls[0].userID != seller.ID || calls[0].oldRole != RoleSeller || calls[0].newRole != RoleManager {
+		t.Fatalf("teamRoleSync call = %+v, want {%s seller manager}", calls[0], seller.ID)
+	}
+
+	// A subsequent update that doesn't touch role must not re-invoke the hook.
+	name := "Renamed"
+	if _, err := svc.Update(ctx, seller.ID, UpdateUserRequest{FullName: &name}); err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+	if len(calls) != 1 {
+		t.Fatalf("teamRoleSync call count after non-role update = %d, want still 1", len(calls))
+	}
+
+	backToSeller := RoleSeller
+	if _, err := svc.Update(ctx, seller.ID, UpdateUserRequest{Role: &backToSeller}); err != nil {
+		t.Fatalf("demote back to seller: %v", err)
+	}
+	if len(calls) != 2 {
+		t.Fatalf("teamRoleSync call count after demotion = %d, want 2", len(calls))
+	}
+	if calls[1].oldRole != RoleManager || calls[1].newRole != RoleSeller {
+		t.Fatalf("teamRoleSync demotion call = %+v, want oldRole=manager newRole=seller", calls[1])
+	}
+}
