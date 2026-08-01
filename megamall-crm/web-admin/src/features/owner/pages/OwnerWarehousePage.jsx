@@ -27,6 +27,7 @@ import {
   PendingReturnsPanel,
   TRANSFER_STATUS_FILTERS,
   TransferList,
+  WarehousesPanel,
 } from '../../warehouse/components/TransferComponents'
 import useWarehouseData from '../../warehouse/hooks/useWarehouseData'
 import { useInventoryDistribution, useInventorySummary, useTransfers } from '../../warehouse/hooks/useTransfers'
@@ -475,6 +476,8 @@ export default function OwnerWarehousePage() {
 
       {tab === 'movements' && (
         <div className="animate-fade-in space-y-5">
+          <WarehousesPanel />
+
           <section>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>

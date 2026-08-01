@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { CheckCircle2, Package, Plus, Trash2, Truck, XCircle } from 'lucide-react'
+import { Building2, CheckCircle2, Package, Plus, Trash2, Truck, Warehouse as WarehouseIcon, XCircle } from 'lucide-react'
 import Modal from '../../../shared/components/Modal'
 import Button from '../../../shared/components/Button'
 import Badge from '../../../shared/components/Badge'
 import Alert from '../../../shared/components/Alert'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { fetchWarehouseCouriers } from '../api'
+import { fetchCities } from '../../seller/api'
 import {
   useAcceptReturn,
   useCreateTransfer,
+  useCreateWarehouse,
   useDecideLostReport,
   useLostReports,
   useRejectReturn,
@@ -330,6 +332,102 @@ export function LostReportsPanel() {
           ))}
         </div>
       )}
+    </section>
+  )
+}
+
+// ─── New warehouse modal (owner + warehouse manager) ───────────────────────
+
+export function NewWarehouseModal({ open, onClose }) {
+  const toast = useToast()
+  const { data: cities = [] } = useQuery({ queryKey: ['cities', 'active'], queryFn: fetchCities, enabled: open, staleTime: 5 * 60_000 })
+  const createWarehouse = useCreateWarehouse()
+  const [name, setName] = useState('')
+  const [cityId, setCityId] = useState('')
+  const [error, setError] = useState('')
+
+  function close() {
+    setName('')
+    setCityId('')
+    setError('')
+    onClose()
+  }
+
+  async function submit() {
+    setError('')
+    if (!name.trim()) return setError('Введите название склада')
+    try {
+      await createWarehouse.mutateAsync({ name: name.trim(), city_id: cityId || undefined })
+      toast?.success?.('Склад создан')
+      close()
+    } catch (err) {
+      setError(err?.response?.data?.error?.message ?? err.message ?? 'Не удалось создать склад')
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={close} title="Новый склад" description="Доступно владельцу и заведующему складом."
+      footer={(
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={close}>Отмена</Button>
+          <Button variant="primary" icon={<WarehouseIcon size={15} />} loading={createWarehouse.isPending} onClick={submit}>
+            Создать склад
+          </Button>
+        </div>
+      )}
+    >
+      <div className="space-y-4">
+        {error && <Alert variant="error">{error}</Alert>}
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-slate-500">Название склада</span>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Склад №2" />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-slate-500">Город (необязательно)</span>
+          <select className="input" value={cityId} onChange={(e) => setCityId(e.target.value)}>
+            <option value="">Не указан</option>
+            {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+      </div>
+    </Modal>
+  )
+}
+
+// ─── Warehouses list + create ───────────────────────────────────────────────
+
+export function WarehousesPanel() {
+  const { data: warehouses = [], isLoading } = useWarehouses()
+  const [showNew, setShowNew] = useState(false)
+  const mainWarehouses = useMemo(() => warehouses.filter((w) => w.type === 'main'), [warehouses])
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgb(15_23_42/0.04)]">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-bold text-slate-950">Склады</h2>
+          <p className="mt-1 text-xs text-slate-400">Список складов и создание нового.</p>
+        </div>
+        <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setShowNew(true)}>Новый склад</Button>
+      </div>
+      {isLoading ? (
+        <p className="text-xs text-slate-400">Загрузка…</p>
+      ) : mainWarehouses.length === 0 ? (
+        <p className="text-xs text-slate-400">Складов пока нет.</p>
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-slate-200">
+          {mainWarehouses.map((w) => (
+            <div key={w.id} className="flex items-center justify-between gap-3 border-b border-slate-100 px-3 py-2.5 last:border-b-0">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"><Building2 size={15} /></span>
+                <span className="min-w-0 truncate text-sm font-bold text-slate-950">{w.name}</span>
+              </div>
+              <Badge variant={w.is_active ? 'emerald' : 'slate'} dot>{w.is_active ? 'Активен' : 'Неактивен'}</Badge>
+            </div>
+          ))}
+        </div>
+      )}
+      <NewWarehouseModal open={showNew} onClose={() => setShowNew(false)} />
     </section>
   )
 }
