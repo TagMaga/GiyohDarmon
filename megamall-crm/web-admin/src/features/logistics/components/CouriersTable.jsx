@@ -7,6 +7,7 @@ import { Search, Clock, Pencil, DollarSign, Power } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
 import { KEYS } from '../../../shared/queryKeys'
 import { EditCourierModal, TariffsModal, ToggleOrderIntakeModal } from '../../dispatcher/components/CourierManageModals'
+import { APP_TIMEZONE } from '../../../shared/utils/date'
 
 const fmtMoney = (n) =>
   n == null ? '—' : Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 0 })
@@ -25,6 +26,7 @@ const fmtDate = (iso) => {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('ru-RU', {
     day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+    timeZone: APP_TIMEZONE,
   })
 }
 

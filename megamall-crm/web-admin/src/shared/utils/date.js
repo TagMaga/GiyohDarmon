@@ -1,3 +1,9 @@
+// Timestamps are stored/transmitted as UTC. Display formatting must pin this
+// timezone explicitly instead of relying on the browser/device's timezone
+// (which may be misconfigured, e.g. UTC on some emulators/webviews) — the
+// app's users are in Asia/Dushanbe (UTC+5, no DST).
+export const APP_TIMEZONE = 'Asia/Dushanbe'
+
 // toLocalYMD formats a Date as YYYY-MM-DD using its local calendar fields
 // (getFullYear/getMonth/getDate), not toISOString's UTC conversion. The app's
 // users are in Asia/Dushanbe (UTC+5); toISOString() shifts any local time

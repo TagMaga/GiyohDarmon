@@ -5,6 +5,7 @@
  * (CompanySettlementTab) so the two views render identically.
  */
 import { Eye } from 'lucide-react'
+import { APP_TIMEZONE } from '../utils/date'
 
 export const fmt = (n) => Number(n ?? 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 })
 
@@ -12,6 +13,7 @@ export const fmtDate = (iso) => {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('ru-RU', {
     day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit',
+    timeZone: APP_TIMEZONE,
   })
 }
 

@@ -19,6 +19,7 @@ import useLogisticsCouriers from '../hooks/useLogisticsCouriers'
 import Badge   from '../../../shared/components/Badge'
 import Modal   from '../../../shared/components/Modal'
 import PeriodRangeFilter from '../../../shared/components/PeriodRangeFilter'
+import { APP_TIMEZONE } from '../../../shared/utils/date'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,12 +31,13 @@ const fmtDate = (iso) => {
   return new Date(iso).toLocaleString('ru-RU', {
     day: '2-digit', month: '2-digit', year: '2-digit',
     hour: '2-digit', minute: '2-digit',
+    timeZone: APP_TIMEZONE,
   })
 }
 
 const fmtDateShort = (iso) => {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+  return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', timeZone: APP_TIMEZONE })
 }
 
 const STATUS_CFG = {

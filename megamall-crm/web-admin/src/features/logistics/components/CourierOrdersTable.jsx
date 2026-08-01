@@ -5,11 +5,13 @@ import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import Badge from '../../../shared/components/Badge'
 import { STATUS_LABELS, STATUS_BADGE, fmtAmount } from '../../../shared/orderStatusConfig'
+import { APP_TIMEZONE } from '../../../shared/utils/date'
 
 const fmtDate = (iso) => {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('ru-RU', {
     day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+    timeZone: APP_TIMEZONE,
   })
 }
 
