@@ -11,6 +11,7 @@ import { postBudgetIncome, postBudgetWithdrawal } from '../api'
 import EditBudgetTransactionModal from '../components/EditBudgetTransactionModal'
 import PeriodRangeFilter from '../../../shared/components/PeriodRangeFilter'
 import Alert from '../../../shared/components/Alert'
+import { APP_TIMEZONE } from '../../../shared/utils/date'
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 const fmt = (v) => Number(v || 0).toLocaleString('ru-RU', { maximumFractionDigits: 0 })
@@ -175,7 +176,7 @@ function EditedMarker({ tx }) {
   return (
     <span
       className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200/80 bg-amber-50/90 px-2 py-0.5 text-[10px] font-bold leading-4 text-amber-700"
-      title={tx.last_edited_at ? `Изменено ${new Date(tx.last_edited_at).toLocaleString('ru-RU')}` : 'Изменено'}
+      title={tx.last_edited_at ? `Изменено ${new Date(tx.last_edited_at).toLocaleString('ru-RU', { timeZone: APP_TIMEZONE })}` : 'Изменено'}
     >
       <Pencil size={10} />
       Изменено{edits > 1 ? ` ${edits}` : ''}
@@ -198,8 +199,8 @@ function MobileTxRow({ tx, onClick }) {
   const cfg = TYPE_CFG[tx.transaction_type] ?? TYPE_CFG.manual_income
   const isIncome = tx.transaction_type === 'manual_income'
   const date = new Date(tx.created_at)
-  const timeStr = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-  const dateStr = date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+  const timeStr = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: APP_TIMEZONE })
+  const dateStr = date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', timeZone: APP_TIMEZONE })
   return (
     <button
       onClick={onClick}
@@ -233,7 +234,7 @@ function MobileBudgetView({
   const today = new Date()
   const todayItems = items.filter((t) => isSameDay(new Date(t.created_at), today))
   const earlierItems = items.filter((t) => !isSameDay(new Date(t.created_at), today))
-  const todayLabel = `Сегодня, ${today.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}`
+  const todayLabel = `Сегодня, ${today.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', timeZone: APP_TIMEZONE })}`
 
   return (
     <div className="p-4 pb-8 space-y-3.5" style={{ background: '#F2F4F7' }}>
@@ -583,7 +584,7 @@ export default function BudgetCompanyPage() {
                 items.map((t) => {
                   const cfg = TYPE_CFG[t.transaction_type] ?? TYPE_CFG.manual_income
                   const date = new Date(t.created_at)
-                  const dateStr = date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+                  const dateStr = date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', timeZone: APP_TIMEZONE })
                   return (
                     <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
                       <td className="px-5 sm:px-6 py-4 text-[15px] text-slate-500 whitespace-nowrap tabular-nums">

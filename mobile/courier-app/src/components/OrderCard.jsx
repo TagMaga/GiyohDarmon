@@ -7,6 +7,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-
 import { C, STATUS_LABEL, STATUS_COLOR } from './OrderDetailSheet'
 import { PressScale } from './motion'
 import { Sheen, useGlass } from './glass'
+import { APP_TIMEZONE } from '../utils/date'
 
 const isUrgent = (o) => {
   const m = String(o?.delivery_method ?? o?.DeliveryMethod ?? o?.deliveryMethod ?? '').toLowerCase()
@@ -45,6 +46,7 @@ export function OrderCard({ order, onOpen, onStart, actionLoading }) {
             <Text style={[oc.createdAt, { color: T.muted }]}>
               {new Date(order.created_at).toLocaleString('ru-RU', {
                 day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+                timeZone: APP_TIMEZONE,
               })}
             </Text>
           )}

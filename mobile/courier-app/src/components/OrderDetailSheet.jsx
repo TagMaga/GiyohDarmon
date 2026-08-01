@@ -12,6 +12,7 @@ import { updateOrderStatus, releaseOrder, reportAddressChanged, deferOrder, getO
 import useAuthStore from '../store/authStore'
 import { resolveCreator } from '../lib/creator'
 import Avatar, { resolveMediaUrl } from './Avatar'
+import { APP_TIMEZONE } from '../utils/date'
 
 const { height: SCREEN_H } = Dimensions.get('window')
 export const SHEET_H = SCREEN_H * 0.90
@@ -648,6 +649,7 @@ export function OrderDetailSheet({
                 <Text style={d.personCreatedAt}>
                   {new Date(order.created_at).toLocaleString('ru-RU', {
                     day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                    timeZone: APP_TIMEZONE,
                   })}
                 </Text>
               )}
@@ -686,7 +688,7 @@ export function OrderDetailSheet({
                     </TouchableOpacity>
                   )}
                   <Text style={d.commentTime}>
-                    {c.created_at ? new Date(c.created_at).toLocaleString('ru-RU') : ''}
+                    {c.created_at ? new Date(c.created_at).toLocaleString('ru-RU', { timeZone: APP_TIMEZONE }) : ''}
                   </Text>
                 </View>
               )

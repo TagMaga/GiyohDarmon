@@ -4,6 +4,7 @@
  * Dispatcher's statusConfig.js keeps its own action lists but may import
  * STATUS_LABELS / STATUS_BADGE from here in a future refactor.
  */
+import { APP_TIMEZONE } from './utils/date'
 
 export const STATUS_LABELS = {
   new:                  'Новый',
@@ -59,5 +60,6 @@ export function fmtDate(iso) {
   return new Date(iso).toLocaleString('ru-RU', {
     day: '2-digit', month: '2-digit', year: '2-digit',
     hour: '2-digit', minute: '2-digit',
+    timeZone: APP_TIMEZONE,
   })
 }

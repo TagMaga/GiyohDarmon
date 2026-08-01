@@ -7,6 +7,7 @@
  * (KPI_DEFS / STATUS_TABS / STATUS_BADGE were removed in the v2 redesign —
  *  the KPI cards, tab bar, and table they fed are gone.)
  */
+import { APP_TIMEZONE } from '../../shared/utils/date'
 
 export const STATUS_LABELS = {
   new:         'Новый',
@@ -185,5 +186,6 @@ export function fmtDate(iso) {
   return new Date(iso).toLocaleString('ru-RU', {
     day: '2-digit', month: '2-digit', year: '2-digit',
     hour: '2-digit', minute: '2-digit',
+    timeZone: APP_TIMEZONE,
   })
 }

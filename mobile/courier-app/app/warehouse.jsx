@@ -17,6 +17,7 @@ import {
   reportLostProduct,
   uploadLostProductPhoto,
 } from '../src/api/warehouse'
+import { APP_TIMEZONE } from '../src/utils/date'
 
 // The main warehouse a courier's full return goes to. There is exactly one
 // seeded by migration 00091 (internal/warehouses.DefaultMainWarehouseID);
@@ -26,7 +27,7 @@ import {
 const DEFAULT_MAIN_WAREHOUSE_ID = '00000000-0000-0000-0000-000000000001'
 
 function formatTime(date) {
-  return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: APP_TIMEZONE })
 }
 
 export default function WarehouseScreen() {

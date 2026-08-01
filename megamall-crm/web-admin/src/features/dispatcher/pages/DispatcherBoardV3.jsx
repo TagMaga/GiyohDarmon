@@ -11,6 +11,7 @@ import useAuthStore   from '../../../shared/store/authStore'
 import { useToast }   from '../../../shared/components/ToastProvider'
 import { KEYS }       from '../../../shared/queryKeys'
 import AccountMenu    from '../../../shared/components/AccountMenu'
+import { APP_TIMEZONE } from '../../../shared/utils/date'
 import DesktopDateRangePicker from '../../../shared/components/DesktopDateRangePicker'
 import MobileDateRangeCalendar from '../../../shared/components/MobileDateRangeCalendar'
 
@@ -1683,6 +1684,7 @@ function formatFullDate(value) {
   if (!value) return '—'
   return new Date(value).toLocaleString('ru-RU', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    timeZone: APP_TIMEZONE,
   })
 }
 
