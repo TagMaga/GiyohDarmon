@@ -219,6 +219,39 @@ client.interceptors.response.use(
       return Promise.reject(error)
     }
 
+    // 403 and not already a retry — the access token's `role` claim is
+    // frozen at issuance (internal/auth.ValidateAccessToken never re-checks
+    // the DB), so a role change made server-side while a session is active
+    // doesn't take effect until the access token is refreshed. A 403 here
+    // may just mean the cached role is stale, not that access is actually
+    // denied — force one refresh (which always re-resolves the current role,
+    // see internal/auth.Service.Refresh) and retry before accepting the
+    // error. Unlike 401, a failed refresh or a repeat 403 is NOT treated as
+    // an invalid session — the user stays logged in and just sees the error.
+    if (
+      status === 403 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !url.includes('/auth/login') &&
+      !url.includes('/auth/refresh') &&
+      !authExpired
+    ) {
+      originalRequest._retry = true
+
+      if (!refreshPromise) {
+        refreshPromise = tryRefresh().finally(() => { refreshPromise = null })
+      }
+
+      const newToken = await refreshPromise
+
+      if (newToken) {
+        originalRequest.headers['Authorization'] = `Bearer ${newToken}`
+        return client(originalRequest)
+      }
+
+      return Promise.reject(error)
+    }
+
     // 404 on /users/me — user record deleted
     if (
       status === 404 &&
