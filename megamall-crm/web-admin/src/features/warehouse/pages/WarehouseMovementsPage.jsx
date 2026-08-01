@@ -13,6 +13,7 @@ import {
   NewTransferModal,
   TRANSFER_STATUS_FILTERS,
   TransferList,
+  WarehousesPanel,
 } from '../components/TransferComponents'
 import useWarehouseData from '../hooks/useWarehouseData'
 import { useTransfers } from '../hooks/useTransfers'
@@ -72,6 +73,8 @@ export default function WarehouseMovementsPage() {
         }
       />
       {data.error && <Alert variant="error" title="Ошибка загрузки данных" className="mb-5">{data.error?.message}</Alert>}
+
+      <div className="mb-5"><WarehousesPanel /></div>
 
       <section className="mb-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
