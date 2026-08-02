@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Check, Clock, Pencil } from 'lucide-react'
 import { patchBudgetTransaction, fetchBudgetTransactionHistory } from '../api'
+import { APP_TIMEZONE } from '../../../shared/utils/date'
 
 const fmt = (v) => Number(v || 0).toLocaleString('ru-RU', { maximumFractionDigits: 2 })
 
@@ -20,6 +21,7 @@ function fmtDateTime(iso) {
   return new Date(iso).toLocaleString('ru-RU', {
     day: '2-digit', month: '2-digit', year: '2-digit',
     hour: '2-digit', minute: '2-digit',
+    timeZone: APP_TIMEZONE,
   })
 }
 

@@ -4,17 +4,22 @@
 // app's users are in Asia/Dushanbe (UTC+5, no DST).
 export const APP_TIMEZONE = 'Asia/Dushanbe'
 
-// toLocalYMD formats a Date as YYYY-MM-DD using its local calendar fields
-// (getFullYear/getMonth/getDate), not toISOString's UTC conversion. The app's
-// users are in Asia/Dushanbe (UTC+5); toISOString() shifts any local time
-// before 05:00 back onto the previous UTC day, so a "today" default computed
-// with toISOString().slice(0, 10) shows yesterday's date for roughly the
-// first five hours of every local day — freshly created orders/records then
-// silently fall outside that default filter.
+const ymdFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: APP_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+// toLocalYMD formats a Date as YYYY-MM-DD using its Asia/Dushanbe calendar
+// fields, not the browser/device's own timezone or toISOString's UTC
+// conversion. A device whose clock/timezone defaults to UTC (or anything
+// other than Dushanbe) would otherwise compute the wrong "today" for part of
+// every day — e.g. toISOString().slice(0, 10) shifts any local time before
+// 05:00 back onto the previous UTC day, so freshly created orders/records
+// would silently fall outside a "today" default filter.
 export function toLocalYMD(date) {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, '0'),
-    String(date.getDate()).padStart(2, '0'),
-  ].join('-')
+  const parts = ymdFormatter.formatToParts(date)
+  const get = (type) => parts.find((p) => p.type === type).value
+  return `${get('year')}-${get('month')}-${get('day')}`
 }

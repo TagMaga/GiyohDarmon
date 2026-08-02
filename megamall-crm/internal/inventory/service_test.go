@@ -32,7 +32,7 @@ var dushanbe = time.FixedZone("Asia/Dushanbe", 5*3600)
 
 func buildTestService(t *testing.T, db *gorm.DB) *inventory.Service {
 	t.Helper()
-	repo := inventory.NewRepository(db)
+	repo := inventory.NewRepository(db, dushanbe)
 	logger := activity.NewLogger(activity.NewRepository(db))
 	return inventory.NewService(repo, logger, dushanbe, nil)
 }
@@ -233,7 +233,7 @@ func TestConsumeFEFO_PicksEarliestExpiryOverReceivedOrder(t *testing.T) {
 		t.Fatalf("receive near batch: %v", err)
 	}
 
-	repo := inventory.NewRepository(db)
+	repo := inventory.NewRepository(db, dushanbe)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		mID := insertTestMovement(t, tx, p.ID, actor.ID, 4)
 		_, err := repo.ConsumeFEFO(tx, context.Background(), p.ID, 4, mID)
@@ -283,7 +283,7 @@ func TestConsumeFEFO_SameExpiryFallsBackToFIFO(t *testing.T) {
 		t.Fatalf("receive newer batch: %v", err)
 	}
 
-	repo := inventory.NewRepository(db)
+	repo := inventory.NewRepository(db, dushanbe)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		mID := insertTestMovement(t, tx, p.ID, actor.ID, 4)
 		_, err := repo.ConsumeFEFO(tx, context.Background(), p.ID, 4, mID)
@@ -332,7 +332,7 @@ func TestConsumeFEFO_HistoricalNullExpiryConsumedLast(t *testing.T) {
 		t.Fatalf("receive dated batch: %v", err)
 	}
 
-	repo := inventory.NewRepository(db)
+	repo := inventory.NewRepository(db, dushanbe)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		mID := insertTestMovement(t, tx, p.ID, actor.ID, 4)
 		_, err := repo.ConsumeFEFO(tx, context.Background(), p.ID, 4, mID)
@@ -378,7 +378,7 @@ func TestConsumeFEFO_MultiBatchConsumptionRecords(t *testing.T) {
 	}
 
 	var movementID uuid.UUID
-	repo := inventory.NewRepository(db)
+	repo := inventory.NewRepository(db, dushanbe)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		movementID = insertTestMovement(t, tx, p.ID, actor.ID, 8)
 		_, err := repo.ConsumeFEFO(tx, context.Background(), p.ID, 8, movementID)
@@ -476,7 +476,7 @@ func TestExpiryAlerts_FullyConsumedBatchExcluded(t *testing.T) {
 		t.Fatalf("receive: %v", err)
 	}
 
-	repo := inventory.NewRepository(db)
+	repo := inventory.NewRepository(db, dushanbe)
 	err = db.Transaction(func(tx *gorm.DB) error {
 		mID := insertTestMovement(t, tx, p.ID, actor.ID, 5)
 		_, err := repo.ConsumeFEFO(tx, context.Background(), p.ID, 5, mID)
@@ -618,7 +618,7 @@ func TestInventoryIntegrityCheck_MatchesAfterReceiveAndConsume(t *testing.T) {
 		t.Fatalf("ReceiveBatch: %v", err)
 	}
 
-	repo := inventory.NewRepository(db)
+	repo := inventory.NewRepository(db, dushanbe)
 	err := db.Transaction(func(tx *gorm.DB) error {
 		inv, err := repo.GetOrCreateForUpdate(tx, context.Background(), p.ID)
 		if err != nil {

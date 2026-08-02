@@ -19,6 +19,7 @@ import {
   useWarehouses,
 } from '../hooks/useTransfers'
 import { getId, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
+import { APP_TIMEZONE } from '../../../shared/utils/date'
 
 const STATUS_LABEL = { issued: 'Выдан', accepted: 'Принят', rejected: 'Отклонён' }
 const STATUS_VARIANT = { issued: 'amber', accepted: 'emerald', rejected: 'rose' }
@@ -207,7 +208,7 @@ export function TransferList({ transfers = [], loading }) {
                 <td className="px-3 py-2.5 text-slate-600">{t.from_warehouse_name}</td>
                 <td className="px-3 py-2.5 text-slate-600">{t.items?.length ?? 0} поз. / {t.items?.reduce((s, i) => s + i.quantity, 0) ?? 0} шт.</td>
                 <td className="px-3 py-2.5 text-slate-600">{t.created_by_name}</td>
-                <td className="px-3 py-2.5 text-slate-500">{t.created_at ? new Date(t.created_at).toLocaleString('ru-RU') : '—'}</td>
+                <td className="px-3 py-2.5 text-slate-500">{t.created_at ? new Date(t.created_at).toLocaleString('ru-RU', { timeZone: APP_TIMEZONE }) : '—'}</td>
                 <td className="px-3 py-2.5"><TransferStatusBadge status={t.status} /></td>
               </tr>
             ))}
@@ -262,7 +263,7 @@ export function PendingReturnsPanel() {
             <div key={r.id} className="rounded-lg border border-slate-200 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm font-bold text-slate-950">{r.courier_name}</span>
-                <span className="text-xs text-slate-400">{r.created_at ? new Date(r.created_at).toLocaleString('ru-RU') : ''}</span>
+                <span className="text-xs text-slate-400">{r.created_at ? new Date(r.created_at).toLocaleString('ru-RU', { timeZone: APP_TIMEZONE }) : ''}</span>
               </div>
               <div className="mb-2 flex flex-wrap gap-2 text-xs text-slate-600">
                 {r.items?.map((it) => (

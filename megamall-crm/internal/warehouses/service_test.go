@@ -32,7 +32,7 @@ import (
 // orders.Service, mirroring cmd/server/main.go's construction.
 func buildTestServices(t *testing.T, db *gorm.DB) (*Service, *orders.Service) {
 	t.Helper()
-	invRepo := inventory.NewRepository(db)
+	invRepo := inventory.NewRepository(db, time.UTC)
 	hierRepo := hierarchy.NewRepository(db)
 	teamRepo := teams.NewRepository(db)
 	activityLogger := activity.NewLogger(activity.NewRepository(db))
@@ -790,7 +790,7 @@ func TestRecallAfterTransferMove_MainStockDepleted_StillReleasesCourier(t *testi
 	// Deplete main stock: quantity is now 10 (20-10 transferred), reserved 0
 	// (moved away). Write off down to less than the 3 units the recall will
 	// need to restore.
-	invRepo := inventory.NewRepository(db)
+	invRepo := inventory.NewRepository(db, time.UTC)
 	mainInv, err := invRepo.GetOrCreateForUpdate(db, context.Background(), p.ID)
 	if err != nil {
 		t.Fatalf("lock main inventory: %v", err)

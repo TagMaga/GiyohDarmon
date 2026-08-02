@@ -72,11 +72,17 @@ type ReceivingEditRow struct {
 // Mutation methods that touch inventory_movements must always be called
 // inside a transaction — callers in service.go enforce this contract.
 type Repository struct {
-	db *gorm.DB
+	db  *gorm.DB
+	loc *time.Location
 }
 
-func NewRepository(db *gorm.DB) *Repository {
-	return &Repository{db: db}
+// NewRepository creates an inventory Repository. loc controls how bare
+// YYYY-MM-DD date filter params are interpreted, as local midnight.
+func NewRepository(db *gorm.DB, loc *time.Location) *Repository {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return &Repository{db: db, loc: loc}
 }
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
@@ -231,12 +237,12 @@ func (r *Repository) ListMovements(ctx context.Context, f ListMovementsFilter, p
 		base = base.Where("inventory_movements.movement_type = ?", f.MovementType)
 	}
 	if f.DateFrom != "" {
-		if t, err := time.Parse("2006-01-02", f.DateFrom); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", f.DateFrom, r.loc); err == nil {
 			base = base.Where("inventory_movements.created_at >= ?", t.UTC())
 		}
 	}
 	if f.DateTo != "" {
-		if t, err := time.Parse("2006-01-02", f.DateTo); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", f.DateTo, r.loc); err == nil {
 			// Include the full day by using the start of the next day as exclusive upper bound.
 			base = base.Where("inventory_movements.created_at < ?", t.AddDate(0, 0, 1).UTC())
 		}
@@ -307,12 +313,12 @@ func (r *Repository) SalesByProduct(ctx context.Context, f ListProductSalesFilte
 		Where("inventory_movements.movement_type = ?", MovementSale)
 
 	if f.DateFrom != "" {
-		if t, err := time.Parse("2006-01-02", f.DateFrom); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", f.DateFrom, r.loc); err == nil {
 			base = base.Where("inventory_movements.created_at >= ?", t.UTC())
 		}
 	}
 	if f.DateTo != "" {
-		if t, err := time.Parse("2006-01-02", f.DateTo); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", f.DateTo, r.loc); err == nil {
 			// Include the full day by using the start of the next day as exclusive upper bound.
 			base = base.Where("inventory_movements.created_at < ?", t.AddDate(0, 0, 1).UTC())
 		}
@@ -346,13 +352,13 @@ func (r *Repository) SlowMovingStock(ctx context.Context, f ListSlowMovingFilter
 	saleDateCond := "movement_type = ?"
 	saleArgs := []interface{}{MovementSale}
 	if f.DateFrom != "" {
-		if t, err := time.Parse("2006-01-02", f.DateFrom); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", f.DateFrom, r.loc); err == nil {
 			saleDateCond += " AND created_at >= ?"
 			saleArgs = append(saleArgs, t.UTC())
 		}
 	}
 	if f.DateTo != "" {
-		if t, err := time.Parse("2006-01-02", f.DateTo); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", f.DateTo, r.loc); err == nil {
 			saleDateCond += " AND created_at < ?"
 			saleArgs = append(saleArgs, t.AddDate(0, 0, 1).UTC())
 		}

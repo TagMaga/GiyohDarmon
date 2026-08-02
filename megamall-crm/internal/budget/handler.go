@@ -27,10 +27,16 @@ type Handler struct {
 	repo            *Repository
 	sendApproval    SendApprovalRequestFn
 	approvalTimeout time.Duration
+	loc             *time.Location
 }
 
-func NewHandler(repo *Repository) *Handler {
-	return &Handler{repo: repo, approvalTimeout: 24 * time.Hour}
+// NewHandler creates a budget Handler. loc controls how bare YYYY-MM-DD
+// from/to params are interpreted, as local midnight.
+func NewHandler(repo *Repository, loc *time.Location) *Handler {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return &Handler{repo: repo, approvalTimeout: 24 * time.Hour, loc: loc}
 }
 
 // SetTelegramApproval wires up the Telegram approval gate. When unset (the
@@ -47,7 +53,7 @@ func (h *Handler) SetTelegramApproval(sendFn SendApprovalRequestFn, timeout time
 func (h *Handler) GetSummary(c *gin.Context) {
 	var from, to *time.Time
 	if f := c.Query("from"); f != "" {
-		t, err := time.Parse("2006-01-02", f)
+		t, err := time.ParseInLocation("2006-01-02", f, h.loc)
 		if err != nil {
 			response.Error(c, apperrors.BadRequest("invalid from date"))
 			return
@@ -55,7 +61,7 @@ func (h *Handler) GetSummary(c *gin.Context) {
 		from = &t
 	}
 	if t := c.Query("to"); t != "" {
-		parsed, err := time.Parse("2006-01-02", t)
+		parsed, err := time.ParseInLocation("2006-01-02", t, h.loc)
 		if err != nil {
 			response.Error(c, apperrors.BadRequest("invalid to date"))
 			return
@@ -90,7 +96,7 @@ func (h *Handler) ListTransactions(c *gin.Context) {
 		p.CreatedBy = &id
 	}
 	if f := c.Query("from"); f != "" {
-		t, err := time.Parse("2006-01-02", f)
+		t, err := time.ParseInLocation("2006-01-02", f, h.loc)
 		if err != nil {
 			response.Error(c, apperrors.BadRequest("invalid from date"))
 			return
@@ -98,7 +104,7 @@ func (h *Handler) ListTransactions(c *gin.Context) {
 		p.From = &t
 	}
 	if to := c.Query("to"); to != "" {
-		t, err := time.Parse("2006-01-02", to)
+		t, err := time.ParseInLocation("2006-01-02", to, h.loc)
 		if err != nil {
 			response.Error(c, apperrors.BadRequest("invalid to date"))
 			return

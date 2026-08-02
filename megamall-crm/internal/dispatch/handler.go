@@ -21,10 +21,16 @@ import (
 type Handler struct {
 	svc        *Service
 	courierSvc *courier.Service
+	loc        *time.Location
 }
 
-func NewHandler(svc *Service, courierSvc *courier.Service) *Handler {
-	return &Handler{svc: svc, courierSvc: courierSvc}
+// NewHandler creates a dispatch Handler. loc controls how bare YYYY-MM-DD
+// from/to params are interpreted, as local midnight.
+func NewHandler(svc *Service, courierSvc *courier.Service, loc *time.Location) *Handler {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return &Handler{svc: svc, courierSvc: courierSvc, loc: loc}
 }
 
 // ─── Board ────────────────────────────────────────────────────────────────────
@@ -73,7 +79,7 @@ func (h *Handler) updateCourierOrderIntake(c *gin.Context) {
 }
 
 func (h *Handler) getCashSettlement(c *gin.Context) {
-	filter, err := parseCashSettlementFilter(c)
+	filter, err := h.parseCashSettlementFilter(c)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -88,7 +94,7 @@ func (h *Handler) getCashSettlement(c *gin.Context) {
 
 func (h *Handler) listCashTransactions(c *gin.Context) {
 	p := pagination.ParseFromQuery(c)
-	filter, err := parseCashTransactionFilter(c)
+	filter, err := h.parseCashTransactionFilter(c)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -106,7 +112,7 @@ func (h *Handler) listCashTransactions(c *gin.Context) {
 
 func (h *Handler) listOrderHistory(c *gin.Context) {
 	p := pagination.ParseFromQuery(c)
-	filter, err := parseOrderHistoryFilter(c)
+	filter, err := h.parseOrderHistoryFilter(c)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -534,18 +540,18 @@ func parseHandoverID(c *gin.Context) (uuid.UUID, error) {
 	return id, nil
 }
 
-func parseCashSettlementFilter(c *gin.Context) (CashSettlementFilter, error) {
+func (h *Handler) parseCashSettlementFilter(c *gin.Context) (CashSettlementFilter, error) {
 	var filter CashSettlementFilter
 
 	if fromRaw := c.Query("from"); fromRaw != "" {
-		from, err := parseSettlementTime(fromRaw)
+		from, err := parseSettlementTime(fromRaw, h.loc)
 		if err != nil {
 			return filter, apperrors.BadRequest("invalid from date")
 		}
 		filter.From = &from
 	}
 	if toRaw := c.Query("to"); toRaw != "" {
-		to, err := parseSettlementTime(toRaw)
+		to, err := parseSettlementTime(toRaw, h.loc)
 		if err != nil {
 			return filter, apperrors.BadRequest("invalid to date")
 		}
@@ -566,9 +572,9 @@ func parseCashSettlementFilter(c *gin.Context) (CashSettlementFilter, error) {
 	return filter, nil
 }
 
-func parseCashTransactionFilter(c *gin.Context) (CashTransactionFilter, error) {
+func (h *Handler) parseCashTransactionFilter(c *gin.Context) (CashTransactionFilter, error) {
 	var filter CashTransactionFilter
-	if err := applyDateRange(c, &filter.From, &filter.To); err != nil {
+	if err := applyDateRange(c, h.loc, &filter.From, &filter.To); err != nil {
 		return filter, err
 	}
 	if courierRaw := c.Query("courier_id"); courierRaw != "" {
@@ -603,9 +609,9 @@ func parseCashTransactionFilter(c *gin.Context) (CashTransactionFilter, error) {
 	return filter, nil
 }
 
-func parseOrderHistoryFilter(c *gin.Context) (OrderHistoryFilter, error) {
+func (h *Handler) parseOrderHistoryFilter(c *gin.Context) (OrderHistoryFilter, error) {
 	var filter OrderHistoryFilter
-	if err := applyDateRange(c, &filter.From, &filter.To); err != nil {
+	if err := applyDateRange(c, h.loc, &filter.From, &filter.To); err != nil {
 		return filter, err
 	}
 	if courierRaw := c.Query("courier_id"); courierRaw != "" {
@@ -642,16 +648,16 @@ func parseOrderHistoryFilter(c *gin.Context) (OrderHistoryFilter, error) {
 	return filter, nil
 }
 
-func applyDateRange(c *gin.Context, from, to **time.Time) error {
+func applyDateRange(c *gin.Context, loc *time.Location, from, to **time.Time) error {
 	if fromRaw := c.Query("from"); fromRaw != "" {
-		parsed, err := parseSettlementTime(fromRaw)
+		parsed, err := parseSettlementTime(fromRaw, loc)
 		if err != nil {
 			return apperrors.BadRequest("invalid from date")
 		}
 		*from = &parsed
 	}
 	if toRaw := c.Query("to"); toRaw != "" {
-		parsed, err := parseSettlementTime(toRaw)
+		parsed, err := parseSettlementTime(toRaw, loc)
 		if err != nil {
 			return apperrors.BadRequest("invalid to date")
 		}
@@ -667,14 +673,14 @@ func applyDateRange(c *gin.Context, from, to **time.Time) error {
 	return nil
 }
 
-func parseSettlementTime(raw string) (time.Time, error) {
+func parseSettlementTime(raw string, loc *time.Location) (time.Time, error) {
 	if t, err := time.Parse(time.RFC3339Nano, raw); err == nil {
 		return t.UTC(), nil
 	}
 	if t, err := time.Parse(time.RFC3339, raw); err == nil {
 		return t.UTC(), nil
 	}
-	if t, err := time.Parse("2006-01-02", raw); err == nil {
+	if t, err := time.ParseInLocation("2006-01-02", raw, loc); err == nil {
 		return t.UTC(), nil
 	}
 	return time.Time{}, apperrors.BadRequest("invalid date")

@@ -10,9 +10,10 @@ import SearchableSelect from '../../../shared/components/SearchableSelect'
 import useCurrentUser from '../../../shared/hooks/useCurrentUser'
 import { usePharmacies, usePharmacy, usePharmacyDashboard, usePharmacyMutation } from '../hooks'
 import * as api from '../api'
+import { APP_TIMEZONE } from '../../../shared/utils/date'
 
 const money = value => `${Number(value || 0).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} c`
-const date = value => value ? new Date(value).toLocaleString('ru-RU') : '—'
+const date = value => value ? new Date(value).toLocaleString('ru-RU', { timeZone: APP_TIMEZONE }) : '—'
 const errorText = error => error?.response?.data?.error?.message || error?.message || 'Не удалось выполнить действие'
 
 const field = 'w-full min-h-[44px] rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100'

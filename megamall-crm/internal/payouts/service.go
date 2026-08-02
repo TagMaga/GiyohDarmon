@@ -233,13 +233,9 @@ func (s *Service) CreatePayouts(ctx context.Context, actorID uuid.UUID, actorRol
 		return nil, apperrors.Forbidden("only a team lead or owner can create payouts")
 	}
 
-	periodStart, err := time.Parse("2006-01-02", req.PeriodStart)
+	periodStart, periodEnd, err := s.compSvc.ParsePeriod(req.PeriodStart, req.PeriodEnd)
 	if err != nil {
-		return nil, apperrors.BadRequest("invalid period_start (use YYYY-MM-DD)")
-	}
-	periodEnd, err := time.Parse("2006-01-02", req.PeriodEnd)
-	if err != nil {
-		return nil, apperrors.BadRequest("invalid period_end (use YYYY-MM-DD)")
+		return nil, apperrors.BadRequest(err.Error())
 	}
 	if periodEnd.Before(periodStart) {
 		return nil, apperrors.BadRequest("period_end must not be before period_start")

@@ -11,9 +11,19 @@ import (
 	"github.com/megamall/crm/pkg/validator"
 )
 
-type Handler struct{ svc *Service }
+type Handler struct {
+	svc *Service
+	loc *time.Location
+}
 
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+// NewHandler creates a pharmacies Handler. loc controls how bare YYYY-MM-DD
+// from/to params are interpreted, as local midnight.
+func NewHandler(svc *Service, loc *time.Location) *Handler {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return &Handler{svc: svc, loc: loc}
+}
 
 func actorFrom(c *gin.Context) Actor {
 	claims := middleware.ClaimsFromContext(c)
@@ -52,16 +62,16 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) Dashboard(c *gin.Context) {
-	now := time.Now().UTC()
+	now := time.Now().In(h.loc)
 	from := now.AddDate(0, 0, -30)
 	if v := c.Query("from"); v != "" {
-		if parsed, err := time.Parse("2006-01-02", v); err == nil {
+		if parsed, err := time.ParseInLocation("2006-01-02", v, h.loc); err == nil {
 			from = parsed
 		}
 	}
 	to := now
 	if v := c.Query("to"); v != "" {
-		if parsed, err := time.Parse("2006-01-02", v); err == nil {
+		if parsed, err := time.ParseInLocation("2006-01-02", v, h.loc); err == nil {
 			to = parsed.Add(24*time.Hour - time.Nanosecond)
 		}
 	}

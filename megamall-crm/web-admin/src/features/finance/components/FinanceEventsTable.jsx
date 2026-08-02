@@ -31,6 +31,7 @@ import useOwnerOrders     from '../../orders/hooks/useOwnerOrders'
 import { formatOrderLabel, getOrderId } from '../../dispatcher/utils/orderHelpers'
 import useFinanceEvents   from '../hooks/useFinanceEvents'
 import useFinanceEventTotals from '../hooks/useFinanceEventTotals'
+import { APP_TIMEZONE, toLocalYMD } from '../../../shared/utils/date'
 import {
   fmtMoney,
   fmtDateTime,
@@ -143,15 +144,16 @@ function dayLabel(iso) {
   if (!iso) return 'Без даты'
   const date = new Date(iso)
   const today = new Date()
-  const yesterday = new Date()
-  yesterday.setDate(today.getDate() - 1)
-  const sameDay = (a, b) => a.toDateString() === b.toDateString()
-  if (sameDay(date, today)) return 'Сегодня'
-  if (sameDay(date, yesterday)) return 'Вчера'
+  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
+  if (toLocalYMD(date) === toLocalYMD(today)) return 'Сегодня'
+  if (toLocalYMD(date) === toLocalYMD(yesterday)) return 'Вчера'
+  const currentYear = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIMEZONE, year: 'numeric' }).format(today)
+  const dateYear = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TIMEZONE, year: 'numeric' }).format(date)
   return date.toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'long',
-    year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+    year: dateYear !== currentYear ? 'numeric' : undefined,
+    timeZone: APP_TIMEZONE,
   })
 }
 
