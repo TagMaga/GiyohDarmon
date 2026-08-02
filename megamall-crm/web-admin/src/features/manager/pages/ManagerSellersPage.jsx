@@ -16,7 +16,7 @@ import { STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusCon
 import { formatOrderLabel, getOrderId } from '../../dispatcher/utils/orderHelpers'
 import useCurrentUser         from '../../../shared/hooks/useCurrentUser'
 import useMyManagerTeam       from '../hooks/useMyManagerTeam'
-import useTeamMembers         from '../../people/hooks/useTeamMembers'
+import useTeamMembersForTeams from '../../people/hooks/useTeamMembersForTeams'
 import useEmployeesByIds      from '../../people/hooks/useEmployeesByIds'
 import { buildUserMap }       from '../../people/utils/peopleHelpers'
 import useOwnerOrders         from '../../orders/hooks/useOwnerOrders'
@@ -154,8 +154,8 @@ function PodiumCard({ user, medal, onClick }) {
 export default function ManagerSellersPage() {
   const [selected, setSelected] = useState(null)
   const { userId } = useCurrentUser()
-  const { teamId, isLoading: teamLoading } = useMyManagerTeam()
-  const { data: members = [], isLoading: membersLoading } = useTeamMembers(teamId)
+  const { teamIds, isLoading: teamLoading } = useMyManagerTeam()
+  const { data: members = [], isLoading: membersLoading } = useTeamMembersForTeams(teamIds)
   const memberIds = useMemo(() => members.map(m => m.user_id).filter(Boolean), [members])
   const { data: teamEmployees = [] } = useEmployeesByIds(memberIds)
   const userMap = useMemo(() => buildUserMap(teamEmployees), [teamEmployees])
@@ -168,11 +168,10 @@ export default function ManagerSellersPage() {
   const now = new Date()
   const orderParams = useMemo(() => ({
     manager_id: userId,
-    ...(teamId ? { team_id: teamId } : {}),
     from:  toLocalYMD(new Date(now.getFullYear(), now.getMonth(), 1)),
     to:    toLocalYMD(now),
     limit: 500, page: 1,
-  }), [userId, teamId])
+  }), [userId])
 
   const { items: orders } = useOwnerOrders(orderParams)
   const stats = useMemo(() => buildStats(orders), [orders])
