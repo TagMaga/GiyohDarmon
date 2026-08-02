@@ -896,8 +896,9 @@ func (s *Service) GetSnapshot(ctx context.Context, orderID uuid.UUID) (*compensa
 // Update applies a partial update to an order inside a transaction.
 // Sellers may update notes, delivery_address, delivery_method, customer contact,
 // items (triggers full inventory re-reservation and financial recalculation),
-// and prepayment / attachment fields. Delivered orders are rejected.
-func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req UpdateOrderRequest) (*Order, error) {
+// and prepayment / attachment fields. Delivered orders are rejected, except for
+// owner/dispatcher who may still edit a delivered order.
+func (s *Service) Update(ctx context.Context, actorID uuid.UUID, actorRole string, orderID uuid.UUID, req UpdateOrderRequest) (*Order, error) {
 	// Nil items slice  = "no change to items".
 	// Empty items slice = error; order must always have at least one item.
 	if req.Items != nil && len(req.Items) == 0 {
@@ -940,7 +941,7 @@ func (s *Service) Update(ctx context.Context, actorID, orderID uuid.UUID, req Up
 		if o == nil {
 			return apperrors.NotFound("order")
 		}
-		if o.Status == StatusDelivered {
+		if o.Status == StatusDelivered && actorRole != "owner" && actorRole != "dispatcher" {
 			return apperrors.Unprocessable("Доставленный заказ больше нельзя изменить.")
 		}
 
