@@ -66,7 +66,7 @@ export default function PharmaciesPage() {
     URL.revokeObjectURL(link.href)
   }
 
-  const title = role === 'seller' ? 'Мои аптеки' : 'Аптеки'
+  const title = ['seller', 'manager', 'sales_team_lead'].includes(role) ? 'Мои аптеки' : 'Аптеки'
   return (
     <div className="min-h-screen bg-slate-50 px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:pb-10">
       <div className="mx-auto max-w-[1500px]">
@@ -239,8 +239,8 @@ function PharmacyDetail({ id, role, onClose, onIssue }) {
       </div>
       <div className="mb-4 flex flex-wrap gap-2">
         {(role === 'owner' || role === 'warehouse_manager') && <button className={primary} onClick={() => onIssue(pharmacy)}><PackagePlus size={15} className="mr-1 inline" />Выдать товар</button>}
-        {(role === 'owner' || role === 'seller') && <button className={secondary} onClick={() => setPaymentOpen(true)}><Banknote size={15} className="mr-1 inline" />Добавить оплату</button>}
-        {(role === 'owner' || role === 'seller') && <button className={secondary} onClick={() => setReturnOpen(true)}><Undo2 size={15} className="mr-1 inline" />Запрос возврата</button>}
+        {(role === 'owner' || role === 'seller' || role === 'manager' || role === 'sales_team_lead') && <button className={secondary} onClick={() => setPaymentOpen(true)}><Banknote size={15} className="mr-1 inline" />Добавить оплату</button>}
+        {(role === 'owner' || role === 'seller' || role === 'manager' || role === 'sales_team_lead') && <button className={secondary} onClick={() => setReturnOpen(true)}><Undo2 size={15} className="mr-1 inline" />Запрос возврата</button>}
         <button className={secondary} onClick={() => window.print()}><Printer size={15} className="mr-1 inline" />Печать</button>
         {(role === 'owner' || role === 'warehouse_manager') && <button className={secondary} onClick={() => setTransferOpen(true)}><ArrowRightLeft size={15} className="mr-1 inline" />Ответственный</button>}
         {(role === 'owner' || role === 'warehouse_manager') && <button className={secondary} onClick={() => mutation.mutate({ type: 'archive', id: pharmacy.id })}><Archive size={15} className="mr-1 inline" />Архив</button>}
@@ -253,7 +253,7 @@ function PharmacyDetail({ id, role, onClose, onIssue }) {
         <Row title={row.invoice_number} subtitle={date(row.created_at)} value={money(row.total_amount)} status={row.status} />
         <p className="mt-1 text-xs text-slate-500">{row.items?.map(item => `${item.product_name} × ${item.quantity}`).join(', ')}</p>
         <button className={`${secondary} mt-2`} onClick={() => printInvoice(row, pharmacy)}><Printer size={14} className="mr-1 inline" />PDF-накладная</button>
-        {role === 'seller' && row.status === 'issued' && <div className="mt-2 flex gap-2"><button className={primary} onClick={() => mutation.mutate({ type: 'accept_invoice', id: row.id })}><Check size={14} className="mr-1 inline" />Принять</button><button className={secondary} onClick={() => { const reason = ask('Причина отклонения'); if (reason) mutation.mutate({ type: 'reject_invoice', id: row.id, reason }) }}><X size={14} className="mr-1 inline" />Отклонить</button></div>}
+        {(role === 'seller' || role === 'manager' || role === 'sales_team_lead') && row.status === 'issued' && <div className="mt-2 flex gap-2"><button className={primary} onClick={() => mutation.mutate({ type: 'accept_invoice', id: row.id })}><Check size={14} className="mr-1 inline" />Принять</button><button className={secondary} onClick={() => { const reason = ask('Причина отклонения'); if (reason) mutation.mutate({ type: 'reject_invoice', id: row.id, reason }) }}><X size={14} className="mr-1 inline" />Отклонить</button></div>}
       </div>)}</Rows>}
       {tab === 'payments' && <Rows empty="Оплат нет">{data.payments.map(row => <div key={row.id} className="border-b border-slate-100 py-3 last:border-0">
         <Row title={row.payment_number} subtitle={`${date(row.created_at)} · ${row.method === 'cash' ? 'Наличные' : 'Безналичные'}`} value={money(row.amount)} status={row.status} />

@@ -14,6 +14,30 @@ type Repository struct{ db *gorm.DB }
 func NewRepository(db *gorm.DB) *Repository { return &Repository{db: db} }
 func (r *Repository) DB() *gorm.DB          { return r.db }
 
+// scopeFragment returns a boolean SQL fragment (referencing responsible_seller_id
+// on the given table alias) restricting rows to what actor may see, plus the
+// query args it needs. Owners and other unscoped roles get "TRUE" (no args).
+// Sellers are scoped to their own pharmacies; managers/team leads are scoped
+// to pharmacies whose responsible seller currently reports to their team.
+func scopeFragment(actor Actor, alias string) (string, []interface{}) {
+	switch actor.Role {
+	case "seller":
+		return alias + ".responsible_seller_id = ?", []interface{}{actor.ID}
+	case "manager":
+		return fmt.Sprintf(`EXISTS (
+			SELECT 1 FROM user_hierarchy uh JOIN teams t ON t.id=uh.team_id AND t.deleted_at IS NULL
+			WHERE uh.user_id=%s.responsible_seller_id AND t.manager_id=?
+		)`, alias), []interface{}{actor.ID}
+	case "sales_team_lead":
+		return fmt.Sprintf(`EXISTS (
+			SELECT 1 FROM user_hierarchy uh JOIN teams t ON t.id=uh.team_id AND t.deleted_at IS NULL
+			WHERE uh.user_id=%s.responsible_seller_id AND t.team_lead_id=?
+		)`, alias), []interface{}{actor.ID}
+	default:
+		return "TRUE", nil
+	}
+}
+
 func (r *Repository) List(ctx context.Context, actor Actor, includeArchived bool) ([]PharmacyListRow, error) {
 	q := r.db.WithContext(ctx).Table("pharmacies p").
 		Select(`
@@ -43,8 +67,8 @@ func (r *Repository) List(ctx context.Context, actor Actor, includeArchived bool
 	if !includeArchived {
 		q = q.Where("p.archived_at IS NULL")
 	}
-	if actor.Role == "seller" {
-		q = q.Where("p.responsible_seller_id = ?", actor.ID)
+	if frag, args := scopeFragment(actor, "p"); frag != "TRUE" {
+		q = q.Where(frag, args...)
 	}
 	var rows []PharmacyListRow
 	if err := q.Order("p.created_at DESC").Scan(&rows).Error; err != nil {
@@ -54,30 +78,39 @@ func (r *Repository) List(ctx context.Context, actor Actor, includeArchived bool
 }
 
 func (r *Repository) Dashboard(ctx context.Context, actor Actor, from, to time.Time) (Dashboard, error) {
-	var sellerID *uuid.UUID
-	if actor.Role == "seller" {
-		sellerID = &actor.ID
-	}
-	var out Dashboard
-	err := r.db.WithContext(ctx).Raw(`
+	scopeActive, argsActive := scopeFragment(actor, "p")
+	scopeGoods, argsGoods := scopeFragment(actor, "px")
+	scopeDebt, argsDebt := scopeFragment(actor, "px")
+	scopePaid, argsPaid := scopeFragment(actor, "px")
+
+	query := fmt.Sprintf(`
 		SELECT
 			COUNT(DISTINCT p.id) FILTER (
-				WHERE p.archived_at IS NULL AND (?::uuid IS NULL OR p.responsible_seller_id=?)
+				WHERE p.archived_at IS NULL AND (%s)
 			)::int active_pharmacies,
 			COALESCE((SELECT SUM(ps.quantity) FROM pharmacy_stock ps
 				JOIN pharmacies px ON px.id=ps.pharmacy_id
-				WHERE px.archived_at IS NULL AND (?::uuid IS NULL OR px.responsible_seller_id=?)),0)::int goods_quantity,
+				WHERE px.archived_at IS NULL AND (%s)),0)::int goods_quantity,
 			COALESCE((SELECT SUM(GREATEST(i.total_amount-i.paid_amount-i.returned_amount,0))
 				FROM pharmacy_invoices i JOIN pharmacies px ON px.id=i.pharmacy_id
 				WHERE i.status='accepted' AND px.archived_at IS NULL
-				  AND (?::uuid IS NULL OR px.responsible_seller_id=?)),0) total_debt,
+				  AND (%s)),0) total_debt,
 			COALESCE((SELECT SUM(pp.amount) FROM pharmacy_payments pp
 				JOIN pharmacies px ON px.id=pp.pharmacy_id
 				WHERE pp.status='confirmed' AND pp.confirmed_at>=? AND pp.confirmed_at<=?
-				  AND (?::uuid IS NULL OR px.responsible_seller_id=?)),0) paid_in_period
+				  AND (%s)),0) paid_in_period
 		FROM pharmacies p
-	`, sellerID, sellerID, sellerID, sellerID, sellerID, sellerID, from, to, sellerID, sellerID).Scan(&out).Error
-	if err != nil {
+	`, scopeActive, scopeGoods, scopeDebt, scopePaid)
+
+	var args []interface{}
+	args = append(args, argsActive...)
+	args = append(args, argsGoods...)
+	args = append(args, argsDebt...)
+	args = append(args, from, to)
+	args = append(args, argsPaid...)
+
+	var out Dashboard
+	if err := r.db.WithContext(ctx).Raw(query, args...).Scan(&out).Error; err != nil {
 		return Dashboard{}, fmt.Errorf("pharmacy dashboard: %w", err)
 	}
 	return out, nil
