@@ -317,7 +317,7 @@ func main() {
 	productsSvc := products.NewService(productsRepo, activityLogger, db, attachProductImageFn, releaseMediaFn)
 	productsHandler := products.NewHandler(productsSvc)
 
-	inventoryRepo := inventory.NewRepository(db)
+	inventoryRepo := inventory.NewRepository(db, loc)
 	updateSalePriceFn := func(tx *gorm.DB, ctx context.Context, productID uuid.UUID, price float64) error {
 		return productsRepo.UpdateSalePriceTx(tx, ctx, productID, price)
 	}
@@ -326,7 +326,7 @@ func main() {
 
 	pharmacyRepo := pharmacies.NewRepository(db)
 	pharmacySvc := pharmacies.NewService(pharmacyRepo, inventorySvc, compensationSvc)
-	pharmacyHandler := pharmacies.NewHandler(pharmacySvc)
+	pharmacyHandler := pharmacies.NewHandler(pharmacySvc, loc)
 
 	// ── Phase 4: Customers + Orders ───────────────────────────────────────────
 	customerRepo := customers.NewRepository(db)
@@ -340,7 +340,7 @@ func main() {
 	financeHandler := finance.NewHandler(financeRepo, loc)
 
 	budgetRepo := budget.NewRepository(db, loc, financeRepo)
-	budgetHandler := budget.NewHandler(budgetRepo)
+	budgetHandler := budget.NewHandler(budgetRepo, loc)
 
 	// ── Telegram budget-withdrawal approval gate ──────────────────────────────
 	// Gated behind TELEGRAM_APPROVAL_ENABLED (config.TelegramConfig.Enabled,
@@ -425,7 +425,7 @@ func main() {
 		attachOrderAttachmentFn, attachPrepaymentProofFn, releaseOrderMediaFn, signedOrderMediaURLFn := ordersmediabridge.Adapters(mediaSvc)
 		orderSvc.SetMediaAdapters(attachOrderAttachmentFn, attachPrepaymentProofFn, releaseOrderMediaFn, signedOrderMediaURLFn)
 	}
-	orderHandler := orders.NewHandler(orderSvc)
+	orderHandler := orders.NewHandler(orderSvc, loc)
 
 	// ── Courier warehouses (issuance, self-assign stock gating, returns,
 	// lost-product reports) ───────────────────────────────────────────────────
@@ -466,7 +466,7 @@ func main() {
 	dispatchSvc := dispatch.NewService(dispatchRepo, orderSvc, activityLogger, db)
 	dispatchSvc.SetWarehouseReservationAdapter(warehousesSvc.ReserveForClaim)
 	dispatchSvc.SetNotifier(notifyFn)
-	dispatchHandler := dispatch.NewHandler(dispatchSvc, courierSvc)
+	dispatchHandler := dispatch.NewHandler(dispatchSvc, courierSvc, loc)
 
 	// ── Daily notification jobs (Asia/Dushanbe) ───────────────────────────────
 	// Same bare-goroutine-with-timer convention as the media quarantine purge
@@ -638,7 +638,7 @@ func main() {
 			attachSettlementProofFn, listSettlementProofsFn, releaseSettlementMediaFn, signedSettlementMediaURLFn := dispatchersettlementsmediabridge.Adapters(mediaSvc)
 			dispatcherSettlementsSvc.SetMediaAdapters(attachSettlementProofFn, listSettlementProofsFn, releaseSettlementMediaFn, signedSettlementMediaURLFn)
 		}
-		dispatcherSettlementsHandler := dispatcher_settlements.NewHandler(dispatcherSettlementsSvc)
+		dispatcherSettlementsHandler := dispatcher_settlements.NewHandler(dispatcherSettlementsSvc, loc)
 		dispatcherSettlementsHandler.RegisterRoutes(v1.Group("/settlements"))
 
 		// Phase 1: centralized secure media pipeline (additive alongside the

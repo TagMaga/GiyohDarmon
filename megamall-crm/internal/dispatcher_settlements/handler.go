@@ -14,23 +14,29 @@ import (
 
 type Handler struct {
 	svc *Service
+	loc *time.Location
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+// NewHandler creates a dispatcher_settlements Handler. loc controls how bare
+// YYYY-MM-DD from/to params are interpreted, as local midnight.
+func NewHandler(svc *Service, loc *time.Location) *Handler {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return &Handler{svc: svc, loc: loc}
 }
 
-func parseDateRange(c *gin.Context) (*time.Time, *time.Time, error) {
+func (h *Handler) parseDateRange(c *gin.Context) (*time.Time, *time.Time, error) {
 	var from, to *time.Time
 	if v := c.Query("from"); v != "" {
-		t, err := time.Parse("2006-01-02", v)
+		t, err := time.ParseInLocation("2006-01-02", v, h.loc)
 		if err != nil {
 			return nil, nil, apperrors.BadRequest("invalid from date")
 		}
 		from = &t
 	}
 	if v := c.Query("to"); v != "" {
-		t, err := time.Parse("2006-01-02", v)
+		t, err := time.ParseInLocation("2006-01-02", v, h.loc)
 		if err != nil {
 			return nil, nil, apperrors.BadRequest("invalid to date")
 		}
@@ -43,7 +49,7 @@ func parseDateRange(c *gin.Context) (*time.Time, *time.Time, error) {
 // ─── Owner ────────────────────────────────────────────────────────────────────
 
 func (h *Handler) getOwnerSummary(c *gin.Context) {
-	from, to, err := parseDateRange(c)
+	from, to, err := h.parseDateRange(c)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -66,7 +72,7 @@ func (h *Handler) getOwnerSummary(c *gin.Context) {
 }
 
 func (h *Handler) listOwnerSettlements(c *gin.Context) {
-	from, to, err := parseDateRange(c)
+	from, to, err := h.parseDateRange(c)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -190,7 +196,7 @@ func (h *Handler) listSettlementHistory(c *gin.Context) {
 // ─── Dispatcher ───────────────────────────────────────────────────────────────
 
 func (h *Handler) getMySummary(c *gin.Context) {
-	from, to, err := parseDateRange(c)
+	from, to, err := h.parseDateRange(c)
 	if err != nil {
 		response.HandleError(c, err)
 		return

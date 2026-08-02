@@ -12,6 +12,7 @@ import { useToast }      from './ToastProvider'
 import PasswordInput     from './PasswordInput'
 import { updateEmployee } from '../../features/people/api'
 import { changePassword } from '../../features/seller/api'
+import { APP_TIMEZONE } from '../utils/date'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -216,7 +217,7 @@ function ProfileView({ onBack, fullName, phone, role, employee, userId }) {
   const teamName  = employee?.team_name ?? employee?.team?.name ?? null
   const city      = employee?.city ?? null
   const createdAt = employee?.created_at
-    ? new Date(employee.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric' })
+    ? new Date(employee.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', year: 'numeric', timeZone: APP_TIMEZONE })
     : null
 
   const rows = [

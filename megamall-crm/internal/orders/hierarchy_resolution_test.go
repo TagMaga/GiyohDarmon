@@ -32,7 +32,7 @@ func buildTestOrderService(t *testing.T, db *gorm.DB) (*Service, *hierarchy.Repo
 	t.Helper()
 	hierRepo := hierarchy.NewRepository(db)
 	teamRepo := teams.NewRepository(db)
-	invRepo := inventory.NewRepository(db)
+	invRepo := inventory.NewRepository(db, time.UTC)
 	activityLogger := activity.NewLogger(activity.NewRepository(db))
 	compSvc := compensation.NewService(compensation.NewRepository(db), activityLogger, db, time.UTC)
 	orderRepo := NewRepository(db, time.UTC)

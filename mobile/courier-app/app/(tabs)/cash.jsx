@@ -16,6 +16,7 @@ import CachedImage from '../../src/components/CachedImage'
 import { GlassBackdrop, GlassFill, Sheen, useGlass } from '../../src/components/glass'
 import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
+import { dayjsTZ } from '../../src/utils/date'
 dayjs.locale('ru')
 
 const C = {
@@ -309,8 +310,8 @@ export default function CashScreen() {
 
   const withinPeriod = (dateStr) => {
     if (periodFilter === 'all' || !dateStr) return true
-    const d = dayjs(dateStr)
-    const now = dayjs()
+    const d = dayjsTZ(dateStr)
+    const now = dayjsTZ()
     if (periodFilter === 'today' && !d.isSame(now, 'day')) return false
     if (periodFilter === 'week'  && d.isBefore(now.subtract(7,  'day'))) return false
     if (periodFilter === 'month' && d.isBefore(now.subtract(30, 'day'))) return false
@@ -359,7 +360,7 @@ export default function CashScreen() {
         <View style={s.header}>
           <View>
             <Text style={[s.headTitle, { color: T.ink }]}>Касса</Text>
-            <Text style={[s.headSub, { color: T.muted }]}>{dayjs().format('dddd, D MMMM')}</Text>
+            <Text style={[s.headSub, { color: T.muted }]}>{dayjsTZ().format('dddd, D MMMM')}</Text>
           </View>
         </View>
 
@@ -543,7 +544,7 @@ export default function CashScreen() {
                             </TouchableOpacity>
                           : <View style={[s.receipt, { backgroundColor: T.chip }]} />}
                         <View style={{ flex: 1 }}>
-                          <Text style={[s.cashItemTime, { color: T.muted }]}>{h.created_at ? dayjs(h.created_at).format('HH:mm') : '—'}</Text>
+                          <Text style={[s.cashItemTime, { color: T.muted }]}>{h.created_at ? dayjsTZ(h.created_at).format('HH:mm') : '—'}</Text>
                           <Text style={[s.cashItemTitle, { color: T.ink }]}>Сдано наличными</Text>
                         </View>
                         <View style={{ alignItems: 'flex-end' }}>
@@ -572,7 +573,7 @@ export default function CashScreen() {
                     <View style={s.earnIcon}><Text style={{ fontSize: 20 }}>💰</Text></View>
                     <View style={{ flex: 1 }}>
                       <Text style={[s.cashItemTitle, { color: T.ink }]}>Доставка {e.number}</Text>
-                      <Text style={[s.cashItemTime, { color: T.muted }]}>{e.date ? dayjs(e.date).format('HH:mm') : '—'}</Text>
+                      <Text style={[s.cashItemTime, { color: T.muted }]}>{e.date ? dayjsTZ(e.date).format('HH:mm') : '—'}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text style={s.cashAmount}>{fmt(e.fee)} c</Text>

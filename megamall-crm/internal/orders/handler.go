@@ -13,26 +13,26 @@ import (
 	"github.com/megamall/crm/pkg/validator"
 )
 
-// parseDayStart parses a YYYY-MM-DD string into the start of that UTC day.
+// parseDayStart parses a YYYY-MM-DD string into the start of that day in loc.
 // Empty string → nil (unbounded).
-func parseDayStart(s string) (*time.Time, error) {
+func parseDayStart(s string, loc *time.Location) (*time.Time, error) {
 	if s == "" {
 		return nil, nil
 	}
-	t, err := time.Parse("2006-01-02", s)
+	t, err := time.ParseInLocation("2006-01-02", s, loc)
 	if err != nil {
 		return nil, err
 	}
 	return &t, nil
 }
 
-// parseDayEnd parses a YYYY-MM-DD string into the end of that UTC day (23:59:59.999…).
+// parseDayEnd parses a YYYY-MM-DD string into the end of that day in loc (23:59:59.999…).
 // Empty string → nil (unbounded).
-func parseDayEnd(s string) (*time.Time, error) {
+func parseDayEnd(s string, loc *time.Location) (*time.Time, error) {
 	if s == "" {
 		return nil, nil
 	}
-	t, err := time.Parse("2006-01-02", s)
+	t, err := time.ParseInLocation("2006-01-02", s, loc)
 	if err != nil {
 		return nil, err
 	}
@@ -43,10 +43,16 @@ func parseDayEnd(s string) (*time.Time, error) {
 // Handler wires HTTP routes to the orders service.
 type Handler struct {
 	svc *Service
+	loc *time.Location
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc}
+// NewHandler creates an orders Handler. loc controls how bare YYYY-MM-DD
+// params (e.g. Stats from/to) are interpreted, as local midnight.
+func NewHandler(svc *Service, loc *time.Location) *Handler {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return &Handler{svc: svc, loc: loc}
 }
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
@@ -110,12 +116,12 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 // Stats handles GET /orders/stats?from=&to= — order-health breakdown for the
 // owner dashboard. from/to are optional YYYY-MM-DD (local day) bounds.
 func (h *Handler) Stats(c *gin.Context) {
-	from, err := parseDayStart(c.Query("from"))
+	from, err := parseDayStart(c.Query("from"), h.loc)
 	if err != nil {
 		response.Error(c, apperrors.BadRequest("invalid from date"))
 		return
 	}
-	to, err := parseDayEnd(c.Query("to"))
+	to, err := parseDayEnd(c.Query("to"), h.loc)
 	if err != nil {
 		response.Error(c, apperrors.BadRequest("invalid to date"))
 		return

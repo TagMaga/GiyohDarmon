@@ -2,6 +2,7 @@
  * CourierPerformanceChart — simple CSS bar chart showing delivered/failed per day.
  * No external chart library needed.
  */
+import { APP_TIMEZONE } from '../../../shared/utils/date'
 
 const fmtMin = (n) => {
   if (!n || n === 0) return '—'
@@ -41,7 +42,7 @@ export default function CourierPerformanceChart({ data = [], loading }) {
 
   const fmtLabel = (dateStr) => {
     const d = new Date(dateStr)
-    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', timeZone: APP_TIMEZONE })
   }
 
   return (

@@ -9,6 +9,7 @@ import dayjs from 'dayjs'
 import 'dayjs/locale/ru'
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../src/api/notifications'
 import { useGlass } from '../src/components/glass'
+import { dayjsTZ } from '../src/utils/date'
 dayjs.locale('ru')
 
 const C = {
@@ -103,7 +104,7 @@ export default function NotificationsScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.itemTitle}>{item.title}</Text>
                 <Text style={s.itemBody}>{item.body}</Text>
-                <Text style={s.itemTime}>{dayjs(item.created_at).format('D MMMM, HH:mm')}</Text>
+                <Text style={s.itemTime}>{dayjsTZ(item.created_at).format('D MMMM, HH:mm')}</Text>
               </View>
             </TouchableOpacity>
           )}

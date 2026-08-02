@@ -83,14 +83,14 @@ func main() {
 	}
 
 	// ── Repositories / services (mirrors cmd/server/main.go wiring) ──────────
+	loc := cfg.Server.Location()
+
 	teamRepo := teams.NewRepository(db)
 	hierRepo := hierarchy.NewRepository(db)
 	customerRepo := customers.NewRepository(db)
 	productRepo := products.NewRepository(db)
-	inventoryRepo := inventory.NewRepository(db)
+	inventoryRepo := inventory.NewRepository(db, loc)
 	activityLogger := activity.NewLogger(activity.NewRepository(db))
-
-	loc := cfg.Server.Location()
 
 	compSvc := compensation.NewService(compensation.NewRepository(db), activityLogger, db, loc)
 	orderRepo := orders.NewRepository(db, loc)

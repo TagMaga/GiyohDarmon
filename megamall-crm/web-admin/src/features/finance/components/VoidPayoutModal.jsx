@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react'
 import { X, Undo2 } from 'lucide-react'
 import useVoidPayout from '../../../shared/hooks/useVoidPayout'
 import { fmtMoney } from '../../hr/utils/hrHelpers'
+import { APP_TIMEZONE } from '../../../shared/utils/date'
 
 export default function VoidPayoutModal({ payout, onClose }) {
   const [reason, setReason] = useState('')
@@ -67,7 +68,7 @@ export default function VoidPayoutModal({ payout, onClose }) {
         <div className="px-6 py-5 space-y-4">
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3">
             <p className="text-sm font-black text-slate-900">{fmtMoney(payout.amount)}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{payout.created_at ? new Date(payout.created_at).toLocaleDateString('ru-RU') : ''}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{payout.created_at ? new Date(payout.created_at).toLocaleDateString('ru-RU', { timeZone: APP_TIMEZONE }) : ''}</p>
           </div>
 
           <div>
