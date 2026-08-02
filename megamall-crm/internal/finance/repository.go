@@ -51,23 +51,14 @@ func (r *Repository) GetOrdersSummary(
 					o.id,
 					o.total_amount,
 					o.delivery_fee,
-					o.courier_payout
+					o.courier_payout,
+					o.product_cost
 				FROM orders o
 				JOIN order_timeline tl ON tl.order_id = o.id
 				WHERE o.deleted_at   IS NULL
 				  AND tl.to_status   = 'delivered'
 				  AND tl.created_at >= ?
 				  AND tl.created_at <= ?
-			),
-			product_costs AS (
-				SELECT
-					m.reference_id AS order_id,
-					COALESCE(SUM(bc.quantity * bc.unit_cost), 0) AS product_cost
-				FROM inventory_movements m
-				JOIN inventory_batch_consumptions bc ON bc.movement_id = m.id
-				WHERE m.movement_type = 'sale'
-				  AND m.reference_id IS NOT NULL
-				GROUP BY m.reference_id
 			),
 			pharmacy_payments_period AS (
 				SELECT COALESCE(SUM(amount),0) amount
@@ -100,9 +91,8 @@ func (r *Repository) GetOrdersSummary(
 				COALESCE(SUM(d.courier_payout), 0)                   AS delivery_fees,
 				COALESCE(SUM(d.delivery_fee), 0)                     AS client_delivery_fees,
 				COALESCE(SUM(d.total_amount + d.delivery_fee - d.courier_payout), 0)+MAX(ppp.amount) AS net_revenue,
-				COALESCE(SUM(pc.product_cost), 0)+MAX(ppc.cost)      AS product_cost
+				COALESCE(SUM(d.product_cost), 0)+MAX(ppc.cost)       AS product_cost
 			FROM delivered_orders d
-			LEFT JOIN product_costs pc ON pc.order_id = d.id
 			CROSS JOIN pharmacy_payments_period ppp
 			CROSS JOIN pharmacy_paid_cost ppc
 		`, from, to, from, to, from, to, from, to).Scan(&row).Error
@@ -250,9 +240,13 @@ func (r *Repository) getCompanyGross(ctx context.Context, from, to *time.Time) (
 }
 
 func (r *Repository) getProductCostForPeriod(ctx context.Context, from, to *time.Time) (float64, error) {
+	// DISTINCT ON (o.id) guards against an order with more than one
+	// order_timeline row matching to_status='delivered' in range (e.g.
+	// reopened then redelivered) double-counting its product_cost.
 	query := `
-		WITH delivered_orders AS (
-			SELECT DISTINCT o.id
+		SELECT COALESCE(SUM(product_cost), 0)
+		FROM (
+			SELECT DISTINCT o.id, o.product_cost
 			FROM orders o
 			JOIN order_timeline tl ON tl.order_id = o.id
 			WHERE o.deleted_at IS NULL
@@ -267,12 +261,7 @@ func (r *Repository) getProductCostForPeriod(ctx context.Context, from, to *time
 		args = append(args, *to)
 	}
 	query += `
-		)
-		SELECT COALESCE(SUM(bc.quantity * bc.unit_cost), 0)
-		FROM inventory_movements m
-		JOIN inventory_batch_consumptions bc ON bc.movement_id = m.id
-		WHERE m.movement_type = 'sale'
-		  AND m.reference_id IN (SELECT id FROM delivered_orders)`
+		) d`
 	var total float64
 	err := r.db.WithContext(ctx).Raw(query, args...).Scan(&total).Error
 	return total, err

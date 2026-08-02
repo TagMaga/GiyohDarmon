@@ -116,6 +116,10 @@ type Service struct {
 	// adjustCourierWarehouse is nil until SetWarehouseAdapter is called at
 	// startup (see cmd/server/main.go). See AdjustCourierWarehouseFn.
 	adjustCourierWarehouse AdjustCourierWarehouseFn
+
+	// consumeCourierDelivery is nil until SetWarehouseAdapter is called at
+	// startup. See ConsumeCourierDeliveryFn.
+	consumeCourierDelivery ConsumeCourierDeliveryFn
 }
 
 // NewService wires up the order service and its dependencies.
@@ -1878,6 +1882,18 @@ type AdjustCourierWarehouseFn func(
 	referenceID, actorID uuid.UUID, reason string,
 ) error
 
+// ConsumeCourierDeliveryFn is the courier-side half of finalizing a delivered
+// order item that was fulfilled from a courier warehouse: it deducts the
+// courier's stock/reservation (like AdjustCourierWarehouseFn would for a
+// "delivered" movement) AND FIFO-consumes the courier's cost lots for
+// (warehouseID, productID) in накладная order, returning their total cost so
+// deductInventory can accumulate it into the order's product_cost. See
+// internal/warehouses.Service.DeliverCourierItem.
+type ConsumeCourierDeliveryFn func(
+	ctx context.Context, tx *gorm.DB, warehouseID, productID uuid.UUID,
+	qty int, orderID, actorID uuid.UUID,
+) (float64, error)
+
 // timelineHasReachedStatus reports whether orderID has ever transitioned to
 // `status` before (any source status), per order_timeline. Used to gate
 // one-shot inventory/financial side effects against being re-run when a
@@ -1930,19 +1946,23 @@ func (s *Service) releaseInventory(ctx context.Context, tx *gorm.DB, o *Order, m
 
 // deductInventory decrements both quantity and reserved_quantity and records
 // the sale, consuming FIFO batches when the item is still backed by the
-// legacy main pool. Called ONLY when order is delivered. Items already held
-// by a courier warehouse are deducted there instead (no FIFO batches on that
-// side — cost was already recognized when the transfer left the main
-// warehouse, see internal/warehouses.AcceptTransfer).
+// legacy main pool (or the courier's own FIFO cost lots when it was already
+// transferred out — see internal/warehouses.AcceptTransfer /
+// ConsumeCourierFIFO). Called ONLY when order is delivered. The exact FIFO
+// cost of every item, from either path, is summed and persisted once onto
+// orders.product_cost — the single source of truth internal/finance reads.
 func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, actorID uuid.UUID) error {
+	var totalProductCost float64
 	for _, it := range o.Items {
 		if it.ReservedWarehouseID != MainWarehouseID {
-			if s.adjustCourierWarehouse == nil {
-				return fmt.Errorf("courier warehouse adapter not configured")
+			if s.consumeCourierDelivery == nil {
+				return fmt.Errorf("courier delivery adapter not configured")
 			}
-			if err := s.adjustCourierWarehouse(ctx, tx, it.ReservedWarehouseID, it.ProductID, -it.Quantity, -it.Quantity, "delivered", o.ID, actorID, "order delivered"); err != nil {
+			cost, err := s.consumeCourierDelivery(ctx, tx, it.ReservedWarehouseID, it.ProductID, it.Quantity, o.ID, actorID)
+			if err != nil {
 				return fmt.Errorf("deduct courier inventory: %w", err)
 			}
+			totalProductCost += cost
 			continue
 		}
 
@@ -1989,9 +2009,16 @@ func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, ac
 		if err := s.invRepo.InsertMovement(tx, ctx, m); err != nil {
 			return fmt.Errorf("insert sale movement: %w", err)
 		}
-		if _, err := s.invRepo.ConsumeFEFO(tx, ctx, it.ProductID, it.Quantity, m.ID); err != nil {
+		consumptions, err := s.invRepo.ConsumeFEFO(tx, ctx, it.ProductID, it.Quantity, m.ID)
+		if err != nil {
 			return fmt.Errorf("sale FEFO consume: %w", err)
 		}
+		for _, c := range consumptions {
+			totalProductCost += float64(c.Quantity) * c.UnitCost
+		}
+	}
+	if err := s.repo.UpdateProductCost(ctx, tx, o.ID, totalProductCost); err != nil {
+		return fmt.Errorf("persist order product cost: %w", err)
 	}
 	return nil
 }
@@ -2002,6 +2029,14 @@ func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, ac
 // sites so tests that don't need courier warehouses keep working unmodified.
 func (s *Service) SetWarehouseAdapter(fn AdjustCourierWarehouseFn) {
 	s.adjustCourierWarehouse = fn
+}
+
+// SetCourierDeliveryAdapter wires the courier-warehouse half of FIFO cost
+// consumption at delivery. Must be called once at startup alongside
+// SetWarehouseAdapter (see cmd/server/main.go); nil-checked at its call site
+// so tests that don't need courier warehouses keep working unmodified.
+func (s *Service) SetCourierDeliveryAdapter(fn ConsumeCourierDeliveryFn) {
+	s.consumeCourierDelivery = fn
 }
 
 // LockOrderForWarehouseOp fetches an order (with items) locked FOR UPDATE,

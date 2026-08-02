@@ -113,6 +113,7 @@ func main() {
 		productRepo, seedUserRepo, activityLogger, db,
 	)
 	orderSvc.SetWarehouseAdapter(warehousesSvc.AdjustForOrder)
+	orderSvc.SetCourierDeliveryAdapter(warehousesSvc.DeliverCourierItem)
 	dispatchSvc := dispatch.NewService(dispatch.NewRepository(db), orderSvc, activityLogger, db)
 	dispatchSvc.SetWarehouseReservationAdapter(warehousesSvc.ReserveForClaim)
 

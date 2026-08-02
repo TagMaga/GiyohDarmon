@@ -432,6 +432,7 @@ func main() {
 	warehousesRepo := warehouses.NewRepository(db)
 	warehousesSvc := warehouses.NewService(warehousesRepo, inventoryRepo, orderSvc, productsRepo, userRepo, activityLogger, db)
 	orderSvc.SetWarehouseAdapter(warehousesSvc.AdjustForOrder)
+	orderSvc.SetCourierDeliveryAdapter(warehousesSvc.DeliverCourierItem)
 	warehousesHandler := warehouses.NewHandler(warehousesSvc)
 
 	// ── Phase 5: Dispatch + Courier ───────────────────────────────────────────

@@ -56,6 +56,7 @@ func buildTestServices(t *testing.T, db *gorm.DB) (*Service, *orders.Service) {
 	whRepo := NewRepository(db)
 	whSvc := NewService(whRepo, invRepo, orderSvc, prodRepo, userRepo, activityLogger, db)
 	orderSvc.SetWarehouseAdapter(whSvc.AdjustForOrder)
+	orderSvc.SetCourierDeliveryAdapter(whSvc.DeliverCourierItem)
 
 	// Seed the default main warehouse (normally done by migration 00091;
 	// each test DB is a fresh migrated schema so it already exists — this
@@ -482,6 +483,112 @@ func TestDeliveredOrder_DeductsFromCourierWarehouse(t *testing.T) {
 	}
 	if ci.ReservedQuantity != 0 {
 		t.Errorf("expected courier warehouse reserved_quantity = 0 after delivery, got %d", ci.ReservedQuantity)
+	}
+}
+
+// TestDeliveredOrder_CourierFIFOCost_MatchesInvoiceOrder is the exact
+// scenario from the bug report: batch 1 is 10 units @ 40, batch 2 is 10
+// units @ 50 (two separate накладные). A courier transfers all 20 units,
+// then delivers an order for 12 of them. Product cost must be computed
+// strictly FIFO by накладная order — 10 units from batch 1 (400) + 2 units
+// from batch 2 (100) = 500 — never averaged.
+func TestDeliveredOrder_CourierFIFOCost_MatchesInvoiceOrder(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	whSvc, orderSvc := buildTestServices(t, db)
+	owner := testutil.CreateUser(t, db, users.RoleOwner)
+	seller := createSellerWithTeam(t, db)
+	courier := testutil.CreateUser(t, db, users.RoleCourier)
+	p := testutil.CreateProduct(t, db)
+
+	// Batch 1: 10 units @ 40 (testutil.CreateInventory's fixed unit cost).
+	testutil.CreateInventory(t, db, p.ID, owner.ID, 10)
+
+	// Batch 2: 10 more units @ 50, received strictly after batch 1 so FIFO
+	// order is unambiguous.
+	batch2 := &inventory.Batch{
+		ID:                uuid.New(),
+		ProductID:         p.ID,
+		ReceivedQuantity:  10,
+		RemainingQuantity: 10,
+		UnitCost:          50.0,
+		ReceivedAt:        time.Now().UTC().Add(time.Hour),
+		CreatedBy:         &owner.ID,
+	}
+	if err := db.Create(batch2).Error; err != nil {
+		t.Fatalf("create batch 2: %v", err)
+	}
+	// Batch 3: unrelated buffer stock, received even later, so it's never
+	// touched by the 20-unit transfer below — it exists only so the main
+	// pool still has enough AVAILABLE quantity to reserve the order (12
+	// units) both before and after those exact 20 units leave for the
+	// courier (transfers only check physical availability, not whether
+	// units are already reserved by some other order).
+	batch3 := &inventory.Batch{
+		ID:                uuid.New(),
+		ProductID:         p.ID,
+		ReceivedQuantity:  12,
+		RemainingQuantity: 12,
+		UnitCost:          99.0,
+		ReceivedAt:        time.Now().UTC().Add(2 * time.Hour),
+		CreatedBy:         &owner.ID,
+	}
+	if err := db.Create(batch3).Error; err != nil {
+		t.Fatalf("create batch 3: %v", err)
+	}
+	if err := db.Model(&inventory.Inventory{}).Where("product_id = ?", p.ID).
+		UpdateColumn("quantity", 32).Error; err != nil {
+		t.Fatalf("bump inventory quantity for batches 2+3: %v", err)
+	}
+
+	// Reserve the order against the main pool first (12 of the 32 units),
+	// mirroring real order creation, before any of its stock physically
+	// moves to a courier.
+	order := createOrderForCourier(t, db, orderSvc, seller.ID, p.ID, 12)
+
+	transfer, err := whSvc.CreateTransfer(context.Background(), owner.ID, CreateTransferRequest{
+		FromWarehouseID: DefaultMainWarehouseID, CourierID: courier.ID,
+		Items: []TransferItemRequest{{ProductID: p.ID, Quantity: 20}},
+	})
+	if err != nil {
+		t.Fatalf("create transfer: %v", err)
+	}
+	if _, err := whSvc.AcceptTransfer(context.Background(), courier.ID, transfer.ID); err != nil {
+		t.Fatalf("accept transfer: %v", err)
+	}
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		return whSvc.ReserveForClaim(tx, context.Background(), courier.ID, order.ID)
+	}); err != nil {
+		t.Fatalf("reserve for claim: %v", err)
+	}
+
+	db.Exec(`UPDATE orders SET status = 'assigned', courier_id = ? WHERE id = ?`, courier.ID, order.ID)
+	db.Exec(`INSERT INTO order_assignments (id, order_id, courier_id, assigned_by, is_active) VALUES (?, ?, ?, ?, true)`,
+		uuid.New(), order.ID, courier.ID, courier.ID)
+
+	if _, err := orderSvc.ChangeStatus(context.Background(), courier.ID, "courier", order.ID, orders.ChangeStatusRequest{Status: orders.StatusInDelivery}); err != nil {
+		t.Fatalf("transition to in_delivery: %v", err)
+	}
+	if _, err := orderSvc.ChangeStatus(context.Background(), courier.ID, "courier", order.ID, orders.ChangeStatusRequest{Status: orders.StatusDelivered}); err != nil {
+		t.Fatalf("transition to delivered: %v", err)
+	}
+
+	var productCost float64
+	if err := db.Table("orders").Select("product_cost").Where("id = ?", order.ID).Scan(&productCost).Error; err != nil {
+		t.Fatalf("fetch order product_cost: %v", err)
+	}
+	if productCost != 500 {
+		t.Errorf("expected FIFO product_cost = 500 (10*40 + 2*50), got %v", productCost)
+	}
+
+	var b1Remaining, b2Remaining int
+	db.Table("courier_inventory_batches").Where("unit_cost = 40").Select("remaining_quantity").Scan(&b1Remaining)
+	db.Table("courier_inventory_batches").Where("unit_cost = 50").Select("remaining_quantity").Scan(&b2Remaining)
+	if b1Remaining != 0 {
+		t.Errorf("expected batch-1 (cost 40) courier lot fully consumed, got remaining=%d", b1Remaining)
+	}
+	if b2Remaining != 8 {
+		t.Errorf("expected batch-2 (cost 50) courier lot to have 8 remaining, got %d", b2Remaining)
 	}
 }
 
