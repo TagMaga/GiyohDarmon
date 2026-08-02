@@ -6,6 +6,7 @@ import {
   X, Printer, Download, ArrowRightLeft, Archive,
 } from 'lucide-react'
 import Modal from '../../../shared/components/Modal'
+import SearchableSelect from '../../../shared/components/SearchableSelect'
 import useCurrentUser from '../../../shared/hooks/useCurrentUser'
 import { usePharmacies, usePharmacy, usePharmacyDashboard, usePharmacyMutation } from '../hooks'
 import * as api from '../api'
@@ -183,9 +184,14 @@ function PharmacyForm({ open, onClose }) {
       <Input label="Владелец аптеки" value={form.owner_name} onChange={v => set('owner_name', v)} required />
       <Input label="Телефон владельца" value={form.owner_phone} onChange={v => set('owner_phone', v)} required />
       <label className="text-sm font-medium text-slate-700 sm:col-span-2">Ответственный продавец
-        <select className={`${field} mt-1`} value={form.responsible_seller_id} onChange={e => set('responsible_seller_id', e.target.value)} required>
-          <option value="">Выберите продавца</option>{sellers.map(seller => <option key={seller.id} value={seller.id}>{seller.full_name} · {seller.phone}</option>)}
-        </select>
+        <SearchableSelect
+          className="mt-1"
+          options={sellers.map(seller => ({ value: seller.id, label: `${seller.full_name} · ${seller.phone}` }))}
+          value={form.responsible_seller_id}
+          onChange={value => set('responsible_seller_id', value)}
+          placeholder="Выберите продавца"
+          required
+        />
       </label>
       <Input label="Контактные данные" value={form.contact_details} onChange={v => set('contact_details', v)} />
       <Input label="Комментарий" value={form.comment} onChange={v => set('comment', v)} />
@@ -373,7 +379,13 @@ function TransferForm({ open, pharmacy, onClose }) {
   }
   return <Modal open={open} onClose={onClose} title="Передать ответственность" description="Будущие оплаты будут начисляться новому продавцу. Полная история сохранится.">
     <form onSubmit={submit} className="space-y-4">
-      <select className={field} value={sellerId} onChange={e => setSellerId(e.target.value)} required><option value="">Выберите продавца</option>{sellers.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}</select>
+      <SearchableSelect
+        options={sellers.map(s => ({ value: s.id, label: s.full_name }))}
+        value={sellerId}
+        onChange={setSellerId}
+        placeholder="Выберите продавца"
+        required
+      />
       <Input label="Комментарий" value={comment} onChange={setComment} />
       {mutation.error && <p className="text-sm text-rose-600">{errorText(mutation.error)}</p>}
       <div className="flex justify-end gap-2"><button type="button" className={secondary} onClick={onClose}>Отмена</button><button className={primary}>Передать</button></div>
