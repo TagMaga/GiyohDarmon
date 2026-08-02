@@ -13,7 +13,7 @@
  * for "Заказов" (team orders this period), which is real and in the same spot.
  */
 import { useLocation, Outlet, Link, NavLink } from 'react-router-dom'
-import { Info, Users, ChevronRight, LogOut } from 'lucide-react'
+import { Info, Users, Building2, ChevronRight, LogOut } from 'lucide-react'
 import useCurrentUser from '../../../shared/hooks/useCurrentUser'
 import useProfile from '../../../shared/hooks/useProfile'
 import useAuthStore from '../../../shared/store/authStore'
@@ -143,6 +143,19 @@ export default function TeamLeadProfilePage() {
             </div>
 
             <div>
+              <SectionLabel style={{ margin: '0 0 10px' }}>Аптеки</SectionLabel>
+              <Card style={{ borderRadius: 16, overflow: 'hidden' }}>
+                <NavLink to="/team-lead/pharmacies" className="flex items-center gap-[14px]" style={{ padding: '16px 20px' }}>
+                  <div className="flex items-center justify-center flex-shrink-0" style={{ width: 42, height: 42, borderRadius: 12, background: M.indigoBg, color: M.indigoDeep }}>
+                    <Building2 size={19} />
+                  </div>
+                  <span className="flex-1" style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>Аптеки</span>
+                  <ChevronRight size={18} style={{ color: '#C7C5BC' }} className="flex-shrink-0" />
+                </NavLink>
+              </Card>
+            </div>
+
+            <div>
               <SectionLabel style={{ margin: '0 0 10px' }}>Аккаунт</SectionLabel>
               <Card style={{ borderRadius: 16, overflow: 'hidden' }}>
                 <NavLink to="/team-lead/profile/info" className="flex items-center gap-[14px]" style={{ padding: '15px 20px' }}>
@@ -226,6 +239,18 @@ export default function TeamLeadProfilePage() {
                       {sellerCount} продавцов
                     </div>
                   </div>
+                  <ChevronRight size={17} style={{ color: '#C7C5BC' }} className="flex-shrink-0" />
+                </Link>
+              </Card>
+
+              {/* Pharmacies section */}
+              <SectionLabel style={{ margin: '20px 4px 10px' }}>Аптеки</SectionLabel>
+              <Card className="overflow-hidden">
+                <Link to="/team-lead/pharmacies" className="flex items-center gap-3" style={{ padding: '14px 15px' }}>
+                  <div className="flex items-center justify-center flex-shrink-0" style={{ width: 36, height: 36, borderRadius: 11, background: M.indigoBg, color: M.indigoDeep }}>
+                    <Building2 size={17} />
+                  </div>
+                  <span className="flex-1" style={{ fontSize: 14, fontWeight: 700, color: M.ink }}>Аптеки</span>
                   <ChevronRight size={17} style={{ color: '#C7C5BC' }} className="flex-shrink-0" />
                 </Link>
               </Card>

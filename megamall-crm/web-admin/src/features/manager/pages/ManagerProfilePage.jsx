@@ -1,5 +1,5 @@
 import { useLocation, Outlet, Link, NavLink } from 'react-router-dom'
-import { Info, Users, UserCheck, ChevronRight, LogOut, Percent } from 'lucide-react'
+import { Info, Users, UserCheck, Building2, ChevronRight, LogOut, Percent } from 'lucide-react'
 import { useMemo } from 'react'
 import { useSellerMe, useSellerCompensation } from '../../seller/hooks/useSellerMe'
 import useManagerPersonalOrders from '../hooks/useManagerPersonalOrders'
@@ -141,6 +141,19 @@ export default function ManagerProfilePage() {
             </div>
 
             <div>
+              <SectionLabel style={{ margin: '0 0 10px' }}>Аптеки</SectionLabel>
+              <Card style={{ borderRadius: 16, overflow: 'hidden' }}>
+                <NavLink to="/manager/pharmacies" className="flex items-center gap-[14px]" style={{ padding: '16px 20px' }}>
+                  <div className="flex items-center justify-center flex-shrink-0" style={{ width: 42, height: 42, borderRadius: 12, background: M.indigoBg, color: M.indigoDeep }}>
+                    <Building2 size={19} />
+                  </div>
+                  <span className="flex-1" style={{ fontSize: 15, fontWeight: 700, color: M.ink }}>Аптеки</span>
+                  <ChevronRight size={18} style={{ color: '#C7C5BC' }} className="flex-shrink-0" />
+                </NavLink>
+              </Card>
+            </div>
+
+            <div>
               <SectionLabel style={{ margin: '0 0 10px' }}>Аккаунт</SectionLabel>
               <Card style={{ borderRadius: 16, overflow: 'hidden' }}>
                 <NavLink to="/manager/profile/info" className="flex items-center gap-[14px]" style={{ padding: '15px 20px' }}>
@@ -235,6 +248,18 @@ export default function ManagerProfilePage() {
                     <div style={{ fontSize: 14, fontWeight: 700, color: M.ink }}>Мои продавцы</div>
                     <div className="truncate" style={{ fontSize: 11.5, color: M.muted, marginTop: 1 }}>{teamDesc}</div>
                   </div>
+                  <ChevronRight size={17} style={{ color: '#C7C5BC' }} className="flex-shrink-0" />
+                </Link>
+              </Card>
+
+              {/* Pharmacies section */}
+              <SectionLabel style={{ margin: '20px 4px 10px' }}>Аптеки</SectionLabel>
+              <Card className="overflow-hidden">
+                <Link to="/manager/pharmacies" className="flex items-center gap-3" style={{ padding: '14px 15px' }}>
+                  <div className="flex items-center justify-center flex-shrink-0" style={{ width: 36, height: 36, borderRadius: 11, background: M.indigoBg, color: M.indigoDeep }}>
+                    <Building2 size={17} />
+                  </div>
+                  <span className="flex-1" style={{ fontSize: 14, fontWeight: 700, color: M.ink }}>Аптеки</span>
                   <ChevronRight size={17} style={{ color: '#C7C5BC' }} className="flex-shrink-0" />
                 </Link>
               </Card>
