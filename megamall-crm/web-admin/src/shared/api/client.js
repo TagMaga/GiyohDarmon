@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { jwtDecode } from 'jwt-decode'
 import useAuthStore from '../store/authStore'
 
 const AUTH_STORAGE_KEY = 'megamall-crm-auth'
@@ -171,6 +172,20 @@ async function tryRefresh() {
       token:        access_token,
       refreshToken: newRefresh ?? refreshToken,
     }
+
+    // The server re-resolves the caller's current role/team on every refresh
+    // (see internal/auth.Service.Refresh) and embeds it in the new access
+    // token — decode it here so a role/team change picked up mid-session
+    // doesn't leave the store's cached `role` pointing at the old value
+    // (which drove UI decisions like order-type selection off a stale role
+    // while the bearer token already carried the new one).
+    try {
+      const decoded = jwtDecode(access_token)
+      if (decoded.role) nextAuth.role = decoded.role
+    } catch {
+      // malformed token — leave role untouched, request will fail auth anyway
+    }
+
     persistAuthState(nextAuth)
     syncAuthStore(nextAuth)
     authExpired = false
