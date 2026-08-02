@@ -90,7 +90,7 @@ func TestOwnerOrder_HouseOrder_CommissionRules_NoOneEarnsACut(t *testing.T) {
 	}
 	netRevenue := 1000.0
 
-	breakdown, err := compensation.ApplyCommissionRules(compensation.OrderTypeHouseOrder, netRevenue, snap)
+	breakdown, err := compensation.ApplyCommissionRules(compensation.OrderTypeHouseOrder, netRevenue, snap, true)
 	if err != nil {
 		t.Fatalf("expected house_order commission rules to succeed, got error: %v", err)
 	}

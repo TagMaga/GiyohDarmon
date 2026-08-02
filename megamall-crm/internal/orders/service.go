@@ -585,7 +585,7 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		// Fail-fast: validate rate sums before accepting the order.
 		// Uses the same logic as the Financial Engine so there are no surprises at delivery.
 		if _, err := compensation.ApplyCommissionRules(
-			compensation.OrderType(req.OrderType), netRevenue, snap,
+			compensation.OrderType(req.OrderType), netRevenue, snap, hier.managerID != nil,
 		); err != nil {
 			return apperrors.Unprocessable(err.Error())
 		}

@@ -71,7 +71,7 @@ func (s *Service) recomputeLiveBreakdown(ctx context.Context, row teamEventDetai
 	if err != nil {
 		return CommissionBreakdown{}, err
 	}
-	return ApplyCommissionRules(OrderType(row.OrderType), row.NetRevenue, liveSnap)
+	return ApplyCommissionRules(OrderType(row.OrderType), row.NetRevenue, liveSnap, row.ManagerID != nil)
 }
 
 // GetTeamIncomeLive returns the same shape as GetTeamIncome, except every
