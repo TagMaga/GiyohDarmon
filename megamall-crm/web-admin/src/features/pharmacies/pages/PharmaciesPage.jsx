@@ -306,24 +306,37 @@ function eventLabel(value) {
 
 function InvoiceForm({ pharmacy, onClose }) {
   const { data: products = [] } = useQuery({ queryKey: ['pharmacies', 'product-options'], queryFn: api.fetchProductOptions, enabled: Boolean(pharmacy) })
-  const [items, setItems] = useState([{ product_id: '', quantity: 1, discount_amount: 0 }])
+  const [items, setItems] = useState([{ product_id: '', quantity: 1, unit_price: '' }])
   const [comment, setComment] = useState('')
   const mutation = usePharmacyMutation(api.createPharmacyInvoice, pharmacy?.id)
   const update = (index, key, value) => setItems(current => current.map((item, i) => i === index ? { ...item, [key]: value } : item))
+  const selectProduct = (index, productId) => {
+    const product = products.find(item => item.id === productId)
+    setItems(current => current.map((item, i) => i === index ? { ...item, product_id: productId, unit_price: product?.sale_price ?? item.unit_price } : item))
+  }
+  const grandTotal = items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0), 0)
   async function submit(e) {
     e.preventDefault()
-    await mutation.mutateAsync({ pharmacy_id: pharmacy.id, comment, items: items.map(item => ({ ...item, quantity: Number(item.quantity), discount_amount: Number(item.discount_amount) })) })
-    setItems([{ product_id: '', quantity: 1, discount_amount: 0 }]); setComment(''); onClose()
+    await mutation.mutateAsync({ pharmacy_id: pharmacy.id, comment, items: items.map(item => ({ product_id: item.product_id, quantity: Number(item.quantity), unit_price: Number(item.unit_price), discount_amount: 0 })) })
+    setItems([{ product_id: '', quantity: 1, unit_price: '' }]); setComment(''); onClose()
   }
   return <Modal open={Boolean(pharmacy)} onClose={onClose} title="Выдать товар аптеке" description={pharmacy?.name} size="lg">
     <form onSubmit={submit} className="space-y-3">
-      {items.map((item, index) => <div key={index} className="grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-[1fr_90px_120px_38px]">
-        <select className={field} value={item.product_id} onChange={e => update(index, 'product_id', e.target.value)} required><option value="">Выберите товар</option>{products.map(product => <option key={product.id} value={product.id}>{product.name} · {money(product.sale_price)}</option>)}</select>
-        <input className={field} type="number" min="1" value={item.quantity} onChange={e => update(index, 'quantity', e.target.value)} required />
-        <input className={field} type="number" min="0" step="0.01" title="Скидка за единицу" value={item.discount_amount} onChange={e => update(index, 'discount_amount', e.target.value)} />
-        <button type="button" className="text-rose-500" onClick={() => setItems(current => current.filter((_, i) => i !== index))}><X /></button>
-      </div>)}
-      <button type="button" className={secondary} onClick={() => setItems(current => [...current, { product_id: '', quantity: 1, discount_amount: 0 }])}><Plus size={14} className="mr-1 inline" />Добавить товар</button>
+      <div className="hidden gap-2 px-3 text-xs font-semibold text-slate-500 sm:grid sm:grid-cols-[1fr_90px_120px_120px_38px]">
+        <span>Товар</span><span>Кол-во</span><span>Цена</span><span>Сумма</span><span />
+      </div>
+      {items.map((item, index) => {
+        const lineTotal = Number(item.quantity || 0) * Number(item.unit_price || 0)
+        return <div key={index} className="grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-[1fr_90px_120px_120px_38px]">
+          <select className={field} value={item.product_id} onChange={e => selectProduct(index, e.target.value)} required><option value="">Выберите товар</option>{products.map(product => <option key={product.id} value={product.id}>{product.name} · {money(product.sale_price)}</option>)}</select>
+          <input className={field} type="number" min="1" value={item.quantity} onChange={e => update(index, 'quantity', e.target.value)} required />
+          <input className={field} type="number" min="0" step="0.01" title="Цена за единицу" value={item.unit_price} onChange={e => update(index, 'unit_price', e.target.value)} required />
+          <div className={`${field} flex items-center justify-end bg-slate-100 font-semibold text-slate-700`}>{money(lineTotal)}</div>
+          <button type="button" className="text-rose-500" onClick={() => setItems(current => current.filter((_, i) => i !== index))}><X /></button>
+        </div>
+      })}
+      <button type="button" className={secondary} onClick={() => setItems(current => [...current, { product_id: '', quantity: 1, unit_price: '' }])}><Plus size={14} className="mr-1 inline" />Добавить товар</button>
+      <div className="flex justify-end text-sm font-semibold text-slate-800">Итого: {money(grandTotal)}</div>
       <Input label="Комментарий" value={comment} onChange={setComment} />
       {mutation.error && <p className="text-sm text-rose-600">{errorText(mutation.error)}</p>}
       <div className="flex justify-end gap-2"><button type="button" className={secondary} onClick={onClose}>Отмена</button><button className={primary} disabled={mutation.isPending}>Оформить накладную</button></div>
