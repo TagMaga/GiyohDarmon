@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Wallet, Users, User, Plus, LogOut } from 'lucide-react'
+import { Home, ShoppingCart, Wallet, Users, User, Plus, LogOut, Building2 } from 'lucide-react'
 import useAuthStore from '../../../shared/store/authStore'
 import useProfile from '../../../shared/hooks/useProfile'
 import { M } from '../../seller/components/mobileUi'
@@ -9,6 +9,7 @@ const NAV = [
   { label: 'Заказы',      icon: ShoppingCart, path: '/team-lead/orders' },
   { label: 'Финансы',     icon: Wallet,       path: '/team-lead/finance' },
   { label: 'Моя команда', icon: Users,        path: '/team-lead/team' },
+  { label: 'Аптеки',      icon: Building2,    path: '/team-lead/pharmacies' },
   { label: 'Профиль',     icon: User,         path: '/team-lead/profile' },
 ]
 

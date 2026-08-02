@@ -70,7 +70,35 @@ func (s *Service) getPharmacy(ctx context.Context, tx *gorm.DB, actor Actor, id 
 	if actor.Role == "seller" && p.ResponsibleSellerID != actor.ID {
 		return nil, apperrors.Forbidden("pharmacy is assigned to another seller")
 	}
+	if actor.Role == "manager" || actor.Role == "sales_team_lead" {
+		ok, err := s.actorSupervisesSeller(ctx, tx, actor, p.ResponsibleSellerID)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, apperrors.Forbidden("pharmacy is not under your team")
+		}
+	}
 	return &p, nil
+}
+
+// actorSupervisesSeller reports whether a manager or team lead currently
+// supervises the given seller's team, per user_hierarchy/teams. Used to
+// give managers and team leads the same pharmacy permissions as the
+// responsible seller, scoped to their own team.
+func (s *Service) actorSupervisesSeller(ctx context.Context, tx *gorm.DB, actor Actor, sellerID uuid.UUID) (bool, error) {
+	h, err := s.hierarchy(ctx, tx, sellerID)
+	if err != nil {
+		return false, err
+	}
+	switch actor.Role {
+	case "manager":
+		return h.ManagerID != nil && *h.ManagerID == actor.ID, nil
+	case "sales_team_lead":
+		return h.TeamLeadID != nil && *h.TeamLeadID == actor.ID, nil
+	default:
+		return false, nil
+	}
 }
 
 func (s *Service) List(ctx context.Context, actor Actor, includeArchived bool) ([]PharmacyListRow, error) {
@@ -332,16 +360,26 @@ func (s *Service) CreateInvoice(ctx context.Context, actor Actor, req CreateInvo
 }
 
 func (s *Service) DecideInvoice(ctx context.Context, actor Actor, id uuid.UUID, accept bool, reason string) error {
-	if actor.Role != "seller" {
-		return apperrors.Forbidden("only responsible seller can decide an invoice")
+	if actor.Role != "seller" && actor.Role != "manager" && actor.Role != "sales_team_lead" {
+		return apperrors.Forbidden("only responsible seller, manager or team lead can decide an invoice")
 	}
 	return s.repo.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var inv Invoice
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id=?", id).First(&inv).Error; err != nil {
 			return apperrors.NotFound("invoice")
 		}
-		if inv.ResponsibleSellerID != actor.ID {
-			return apperrors.Forbidden("invoice is assigned to another seller")
+		if actor.Role == "seller" {
+			if inv.ResponsibleSellerID != actor.ID {
+				return apperrors.Forbidden("invoice is assigned to another seller")
+			}
+		} else {
+			ok, err := s.actorSupervisesSeller(ctx, tx, actor, inv.ResponsibleSellerID)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return apperrors.Forbidden("invoice is not under your team")
+			}
 		}
 		if inv.Status != "issued" {
 			return apperrors.Conflict("invoice has already been decided")
@@ -405,7 +443,7 @@ func (s *Service) applyExistingCredit(ctx context.Context, tx *gorm.DB, inv *Inv
 }
 
 func (s *Service) CreatePayment(ctx context.Context, actor Actor, req CreatePaymentRequest) (*Payment, error) {
-	if actor.Role != "owner" && actor.Role != "seller" {
+	if actor.Role != "owner" && actor.Role != "seller" && actor.Role != "manager" && actor.Role != "sales_team_lead" {
 		return nil, apperrors.Forbidden("role cannot create pharmacy payments")
 	}
 	id := uuid.New()
@@ -723,7 +761,7 @@ func (s *Service) CorrectPayment(ctx context.Context, actor Actor, id uuid.UUID,
 }
 
 func (s *Service) CreateReturn(ctx context.Context, actor Actor, req CreateReturnRequest) (*PharmacyReturn, error) {
-	if actor.Role != "owner" && actor.Role != "seller" {
+	if actor.Role != "owner" && actor.Role != "seller" && actor.Role != "manager" && actor.Role != "sales_team_lead" {
 		return nil, apperrors.Forbidden("role cannot create pharmacy returns")
 	}
 	id := uuid.New()

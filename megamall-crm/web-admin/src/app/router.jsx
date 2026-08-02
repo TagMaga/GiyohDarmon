@@ -179,6 +179,7 @@ const router = createBrowserRouter([
         { path: 'team',              element: <Lazy><TeamLeadTeamPage /></Lazy> },
         { path: 'team/:payeeId',     element: <Lazy><TeamLeadSellerFinanceDetailPage /></Lazy> },
         { path: 'finance',  element: <Lazy><TeamLeadFinancePage /></Lazy> },
+        { path: 'pharmacies', element: <Lazy><PharmaciesPage /></Lazy> },
         {
           path: 'profile',
           element: <Lazy><TeamLeadProfilePage /></Lazy>,
@@ -207,6 +208,7 @@ const router = createBrowserRouter([
         { path: 'my-orders',             element: <Lazy><ManagerMyOrdersPage /></Lazy> },
         { path: 'my-orders/create',      element: <Lazy><CreateOrder /></Lazy> },
         { path: 'my-orders/:id/edit',    element: <Lazy><EditOrder /></Lazy> },
+        { path: 'pharmacies', element: <Lazy><PharmaciesPage /></Lazy> },
         {
           path: 'profile',
           element: <Lazy><ManagerProfilePage /></Lazy>,

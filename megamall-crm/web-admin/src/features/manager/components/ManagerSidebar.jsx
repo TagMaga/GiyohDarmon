@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Home, ShoppingCart, Wallet, Users, User, Plus, LogOut, ClipboardList } from 'lucide-react'
+import { Home, ShoppingCart, Wallet, Users, User, Plus, LogOut, ClipboardList, Building2 } from 'lucide-react'
 import useAuthStore from '../../../shared/store/authStore'
 import useProfile from '../../../shared/hooks/useProfile'
 import { M } from '../../seller/components/mobileUi'
@@ -10,6 +10,7 @@ const NAV = [
   { label: 'Продавцы',       icon: Users,         path: '/manager/sellers' },
   { label: 'Личные заказы',  icon: ClipboardList, path: '/manager/my-orders' },
   { label: 'Доходы',         icon: Wallet,        path: '/manager/income' },
+  { label: 'Аптеки',         icon: Building2,     path: '/manager/pharmacies' },
   { label: 'Профиль',        icon: User,          path: '/manager/profile' },
 ]
 
