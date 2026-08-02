@@ -119,7 +119,14 @@ func (r *Repository) List(ctx context.Context, f ListOrdersFilter, actorID uuid.
 	if f.ManagerID != "" && actorRole != "manager" {
 		q = q.Where("manager_id = ?", f.ManagerID)
 	}
-	if f.TeamLeadID != "" {
+	// Same rationale as the ManagerID guard above: a team lead's own role scope
+	// is already "team_lead_id = self OR seller_id = self" (led orders +
+	// personal orders). ANDing a team_lead_id filter on top of that — which the
+	// team-lead-role frontend pages send as their own user ID for
+	// defense-in-depth — would collapse the OR into "team_lead_id = self" only,
+	// silently hiding personal orders whose team_lead_id doesn't resolve to the
+	// team lead themselves (e.g. hierarchy not yet assigned).
+	if f.TeamLeadID != "" && actorRole != "sales_team_lead" {
 		q = q.Where("team_lead_id = ?", f.TeamLeadID)
 	}
 	if f.CustomerID != "" {
