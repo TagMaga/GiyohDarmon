@@ -155,6 +155,59 @@ func (r *Repository) InsertCourierMovement(tx *gorm.DB, ctx context.Context, m *
 	return nil
 }
 
+// ─── Courier inventory batches (cost lots) ─────────────────────────────────────
+
+// InsertCourierInventoryBatches creates one cost lot per batch consumed on
+// the courier's behalf when a transfer is accepted. Must be in a transaction.
+func (r *Repository) InsertCourierInventoryBatches(tx *gorm.DB, ctx context.Context, batches []*CourierInventoryBatch) error {
+	if len(batches) == 0 {
+		return nil
+	}
+	if err := tx.WithContext(ctx).Create(&batches).Error; err != nil {
+		return fmt.Errorf("insert courier inventory batches: %w", err)
+	}
+	return nil
+}
+
+// GetCourierBatchesForFIFO loads all cost lots with remaining_quantity > 0
+// for (warehouseID, productID), oldest first (FIFO), with row-level locks.
+// Must be called inside a transaction.
+func (r *Repository) GetCourierBatchesForFIFO(tx *gorm.DB, ctx context.Context, warehouseID, productID uuid.UUID) ([]*CourierInventoryBatch, error) {
+	var batches []*CourierInventoryBatch
+	err := tx.WithContext(ctx).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("warehouse_id = ? AND product_id = ? AND remaining_quantity > 0", warehouseID, productID).
+		Order("created_at ASC, id ASC").
+		Find(&batches).Error
+	if err != nil {
+		return nil, fmt.Errorf("lock courier batches for fifo: %w", err)
+	}
+	return batches, nil
+}
+
+// UpdateCourierBatchRemaining sets a courier cost lot's remaining_quantity.
+// Must be in a transaction.
+func (r *Repository) UpdateCourierBatchRemaining(tx *gorm.DB, ctx context.Context, batchID uuid.UUID, remaining int) error {
+	res := tx.WithContext(ctx).Model(&CourierInventoryBatch{}).Where("id = ?", batchID).
+		UpdateColumn("remaining_quantity", remaining)
+	if res.Error != nil {
+		return fmt.Errorf("update courier batch remaining: %w", res.Error)
+	}
+	return nil
+}
+
+// InsertCourierBatchConsumptions inserts multiple consumption records in one
+// call. Must be called inside a transaction.
+func (r *Repository) InsertCourierBatchConsumptions(tx *gorm.DB, ctx context.Context, cs []*CourierBatchConsumption) error {
+	if len(cs) == 0 {
+		return nil
+	}
+	if err := tx.WithContext(ctx).Create(&cs).Error; err != nil {
+		return fmt.Errorf("insert courier batch consumptions: %w", err)
+	}
+	return nil
+}
+
 // ─── Transfers ────────────────────────────────────────────────────────────────
 
 func (r *Repository) CreateTransfer(tx *gorm.DB, ctx context.Context, t *InventoryTransfer, items []InventoryTransferItem) error {

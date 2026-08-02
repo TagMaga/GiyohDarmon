@@ -95,6 +95,100 @@ func abs(n int) int {
 	return n
 }
 
+// DeliverCourierItem implements orders.ConsumeCourierDeliveryFn: the
+// courier-side half of finalizing a delivered order's item that was
+// fulfilled from a courier warehouse rather than the main pool (see
+// internal/orders.deductInventory). It performs the same ledger adjustment
+// AdjustForOrder would for a "delivered" movement, then FIFO-consumes the
+// cost lots recorded on this warehouse for productID (see AcceptTransfer) in
+// the exact накладная order they were received, and returns their total
+// cost so the caller can persist it on the order.
+func (s *Service) DeliverCourierItem(
+	ctx context.Context, tx *gorm.DB, warehouseID, productID uuid.UUID,
+	qty int, orderID, actorID uuid.UUID,
+) (float64, error) {
+	ci, err := s.repo.GetOrCreateCourierInventoryForUpdate(tx, ctx, warehouseID, productID)
+	if err != nil {
+		return 0, err
+	}
+	newQty := ci.Quantity - qty
+	newReserved := ci.ReservedQuantity - qty
+	if newQty < 0 {
+		return 0, apperrors.BadRequest("ошибка склада курьера: количество не может стать отрицательным")
+	}
+	if newReserved < 0 {
+		newReserved = 0
+	}
+	if err := s.repo.UpdateCourierInventory(tx, ctx, ci.ID, newQty, newReserved, ci.BlockedQuantity); err != nil {
+		return 0, err
+	}
+	refType := RefTypeOrder
+	reason := "order delivered"
+	mv := &CourierInventoryMovement{
+		ID: uuid.New(), WarehouseID: warehouseID, ProductID: productID,
+		MovementType: CourierMovementDelivered, Quantity: qty,
+		PreviousQuantity: ci.Quantity, NewQuantity: newQty,
+		ReferenceType: &refType, ReferenceID: &orderID, Reason: &reason, CreatedBy: actorID,
+	}
+	if err := s.repo.InsertCourierMovement(tx, ctx, mv); err != nil {
+		return 0, err
+	}
+
+	cost, err := s.ConsumeCourierFIFO(tx, ctx, warehouseID, productID, qty, mv.ID)
+	if err != nil {
+		return 0, err
+	}
+	return cost, nil
+}
+
+// ConsumeCourierFIFO deducts qty units from the courier's cost lots for
+// (warehouseID, productID) in FIFO order (oldest lot — i.e. earliest
+// накладная — first, mirroring inventory.Repository.ConsumeFEFO). It locks
+// the lot rows, updates remaining_quantity, inserts CourierBatchConsumption
+// records, and returns the total cost. Must be called inside a transaction.
+func (s *Service) ConsumeCourierFIFO(tx *gorm.DB, ctx context.Context, warehouseID, productID uuid.UUID, qty int, movementID uuid.UUID) (float64, error) {
+	batches, err := s.repo.GetCourierBatchesForFIFO(tx, ctx, warehouseID, productID)
+	if err != nil {
+		return 0, err
+	}
+
+	remaining := qty
+	var totalCost float64
+	var consumptions []*CourierBatchConsumption
+
+	for _, b := range batches {
+		if remaining == 0 {
+			break
+		}
+		take := remaining
+		if b.RemainingQuantity < take {
+			take = b.RemainingQuantity
+		}
+		consumptions = append(consumptions, &CourierBatchConsumption{
+			ID:         uuid.New(),
+			BatchID:    b.ID,
+			MovementID: movementID,
+			Quantity:   take,
+			UnitCost:   b.UnitCost,
+		})
+		totalCost += float64(take) * b.UnitCost
+		if err := s.repo.UpdateCourierBatchRemaining(tx, ctx, b.ID, b.RemainingQuantity-take); err != nil {
+			return 0, err
+		}
+		remaining -= take
+	}
+
+	if remaining > 0 {
+		return 0, fmt.Errorf("insufficient courier batch stock: need %d more units (FIFO lots exhausted) for warehouse=%s product=%s", remaining, warehouseID, productID)
+	}
+
+	if err := s.repo.InsertCourierBatchConsumptions(tx, ctx, consumptions); err != nil {
+		return 0, err
+	}
+
+	return totalCost, nil
+}
+
 // ─── Warehouses ───────────────────────────────────────────────────────────────
 
 func (s *Service) ListWarehouses(ctx context.Context, typeFilter string) ([]WarehouseResponse, error) {
@@ -344,7 +438,35 @@ func (s *Service) decideTransfer(ctx context.Context, courierID, transferID uuid
 			if err := s.invRepo.InsertMovement(tx, ctx, mv); err != nil {
 				return err
 			}
-			if _, err := s.invRepo.ConsumeFEFO(tx, ctx, it.ProductID, it.Quantity, mv.ID); err != nil {
+			consumptions, err := s.invRepo.ConsumeFEFO(tx, ctx, it.ProductID, it.Quantity, mv.ID)
+			if err != nil {
+				return err
+			}
+
+			// Re-create the exact same cost lots (накладная order + unit
+			// cost) on the courier side, so an order later delivered from
+			// this courier's stock can be FIFO-costed against them — see
+			// deductInventory's courier branch / ConsumeCourierFIFO below.
+			// CreatedAt is set explicitly, strictly increasing per lot, so
+			// FIFO consumption order matches the накладная order ConsumeFEFO
+			// just consumed them in, regardless of clock resolution.
+			now := time.Now()
+			courierBatches := make([]*CourierInventoryBatch, len(consumptions))
+			for i, c := range consumptions {
+				batchID := c.BatchID
+				courierBatches[i] = &CourierInventoryBatch{
+					ID:                uuid.New(),
+					WarehouseID:       courierWh.ID,
+					ProductID:         it.ProductID,
+					SourceBatchID:     &batchID,
+					TransferID:        &t.ID,
+					ReceivedQuantity:  c.Quantity,
+					RemainingQuantity: c.Quantity,
+					UnitCost:          c.UnitCost,
+					CreatedAt:         now.Add(time.Duration(i) * time.Microsecond),
+				}
+			}
+			if err := s.repo.InsertCourierInventoryBatches(tx, ctx, courierBatches); err != nil {
 				return err
 			}
 
