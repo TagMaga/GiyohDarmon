@@ -203,6 +203,7 @@ const router = createBrowserRouter([
         { index: true,        element: <Lazy><ManagerDashboardPage /></Lazy> },
         { path: 'income',     element: <Lazy><ManagerIncomePage /></Lazy> },
         { path: 'orders',     element: <Lazy><ManagerOrdersPage /></Lazy> },
+        { path: 'orders/:id/edit', element: <Lazy><EditOrder /></Lazy> },
         { path: 'sellers',    element: <Lazy><ManagerSellersPage /></Lazy> },
         { path: 'my-orders',             element: <Lazy><ManagerMyOrdersPage /></Lazy> },
         { path: 'my-orders/create',      element: <Lazy><CreateOrder /></Lazy> },
