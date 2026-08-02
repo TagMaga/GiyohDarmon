@@ -14,10 +14,11 @@
  *     If backend supports it, we use the summary. Otherwise derive client-side.
  *   - userMap / teamMap built from /employees and /teams (cached globally).
  *
- * The order list/workflow itself stays read-only (no status edits/deletes
- * from this page) — the one write action is creating a new order (see
- * /owner/orders/create). Owner-created orders are "house orders": no
- * seller/team attribution, no commission paid to anyone.
+ * The owner can change any order's status directly from the table or the
+ * detail drawer (OrderStatusModal, backed by the dispatcher force-status
+ * override) in addition to creating new orders (see /owner/orders/create).
+ * Owner-created orders are "house orders": no seller/team attribution, no
+ * commission paid to anyone.
  */
 import { useState, useMemo }  from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
@@ -29,6 +30,7 @@ import OrdersKpiBar                from '../components/OrdersKpiBar'
 import OrdersFilters               from '../components/OrdersFilters'
 import OrdersTable                 from '../components/OrdersTable'
 import OrderDetailsDrawer          from '../components/OrderDetailsDrawer'
+import OrderStatusModal            from '../components/OrderStatusModal'
 
 import useEmployees  from '../../people/hooks/useEmployees'
 import useTeams      from '../../people/hooks/useTeams'
@@ -61,6 +63,7 @@ export default function OwnerOrdersPage() {
 
   // ── Drawer state ─────────────────────────────────────────────────────────
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [statusOrder, setStatusOrder] = useState(null)
 
   // ── People data ──────────────────────────────────────────────────────────
   const { data: allEmployees = [] } = useEmployees()
@@ -181,6 +184,7 @@ export default function OwnerOrdersPage() {
         userMap={userMap}
         teamMap={teamMap}
         onView={setSelectedOrder}
+        onChangeStatus={setStatusOrder}
       />
 
       {/* ── Detail drawer ───────────────────────────────────────────────── */}
@@ -189,6 +193,14 @@ export default function OwnerOrdersPage() {
         onClose={() => setSelectedOrder(null)}
         userMap={userMap}
         teamMap={teamMap}
+        onChangeStatus={setStatusOrder}
+      />
+
+      {/* ── Status change modal ─────────────────────────────────────────── */}
+      <OrderStatusModal
+        open={!!statusOrder}
+        onClose={() => setStatusOrder(null)}
+        order={statusOrder}
       />
     </div>
   )

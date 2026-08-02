@@ -351,7 +351,7 @@ func (h *Handler) forceStatusOrder(c *gin.Context) {
 		return
 	}
 	claims := middleware.ClaimsFromContext(c)
-	order, svcErr := h.svc.ForceStatus(c.Request.Context(), claims.UserID, id, req)
+	order, svcErr := h.svc.ForceStatus(c.Request.Context(), claims.UserID, claims.Role, id, req)
 	if svcErr != nil {
 		response.HandleError(c, svcErr)
 		return

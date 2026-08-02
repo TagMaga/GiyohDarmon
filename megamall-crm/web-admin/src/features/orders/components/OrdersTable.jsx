@@ -106,7 +106,22 @@ function ProductCell({ product }) {
 
 // ── Desktop row ──────────────────────────────────────────────────────────────
 
-function DesktopRow({ order, userMap, teamMap, onView }) {
+function StatusBadge({ status, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full hover:opacity-80 transition-opacity cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+      title="Изменить статус"
+    >
+      <Badge variant={STATUS_BADGE[status] ?? 'slate'} size="sm">
+        {STATUS_LABELS[status] ?? status}
+      </Badge>
+    </button>
+  )
+}
+
+function DesktopRow({ order, userMap, teamMap, onView, onChangeStatus }) {
   const { name, phone } = resolveCustomer(order)
   const status  = order.status ?? order.Status ?? ''
   const amount  = resolveField(order, 'total_order_amount', 'total_amount', 'amount', 'total', 'Amount') ?? 0
@@ -133,9 +148,7 @@ function DesktopRow({ order, userMap, teamMap, onView }) {
         {delivery ? `${fmtAmount(delivery)} с` : '—'}
       </td>
       <td className="px-4 py-3">
-        <Badge variant={STATUS_BADGE[status] ?? 'slate'} size="sm">
-          {STATUS_LABELS[status] ?? status}
-        </Badge>
+        <StatusBadge status={status} onClick={() => onChangeStatus(order)} />
       </td>
       <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
         {resolveCourierName(order) ?? '—'}
@@ -167,7 +180,7 @@ function DesktopRow({ order, userMap, teamMap, onView }) {
 
 // ── Mobile card ──────────────────────────────────────────────────────────────
 
-function MobileCard({ order, userMap, teamMap, onView }) {
+function MobileCard({ order, userMap, teamMap, onView, onChangeStatus }) {
   const { name, phone } = resolveCustomer(order)
   const status  = order.status ?? order.Status ?? ''
   const amount  = resolveField(order, 'total_order_amount', 'total_amount', 'amount', 'total', 'Amount') ?? 0
@@ -181,9 +194,7 @@ function MobileCard({ order, userMap, teamMap, onView }) {
           <p className="text-sm font-semibold text-slate-800 mt-0.5">{name}</p>
           {phone && <p className="text-xs text-slate-400">{phone}</p>}
         </div>
-        <Badge variant={STATUS_BADGE[status] ?? 'slate'} size="sm">
-          {STATUS_LABELS[status] ?? status}
-        </Badge>
+        <StatusBadge status={status} onClick={() => onChangeStatus(order)} />
       </div>
 
       <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
@@ -254,6 +265,7 @@ export default function OrdersTable({
   userMap  = {},
   teamMap  = {},
   onView,
+  onChangeStatus,
 }) {
   return (
     <div>
@@ -292,6 +304,7 @@ export default function OrdersTable({
                   userMap={userMap}
                   teamMap={teamMap}
                   onView={onView}
+                  onChangeStatus={onChangeStatus}
                 />
               ))}
             </tbody>
@@ -322,6 +335,7 @@ export default function OrdersTable({
             userMap={userMap}
             teamMap={teamMap}
             onView={onView}
+            onChangeStatus={onChangeStatus}
           />
         ))}
       </div>
