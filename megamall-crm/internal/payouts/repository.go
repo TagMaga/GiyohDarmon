@@ -152,6 +152,36 @@ func (r *Repository) SumPaidGroupedByPayee(ctx context.Context, payerID uuid.UUI
 	return out, nil
 }
 
+// GetLatestPayoutTimes returns, for every payee who has ever been paid, the
+// created_at timestamp of their most recent non-voided payout (from any
+// payer). Used by compensation.GetTeamIncomeLive to decide which of a
+// payee's financial_events are already settled (created at/before this
+// timestamp — never touched again) versus still pending (created after —
+// eligible for live commission-rate recomputation). Payouts are always
+// full-balance settlements, so "most recent payout" is a reliable cutoff
+// without needing a per-event paid/unpaid column.
+func (r *Repository) GetLatestPayoutTimes(ctx context.Context) (map[uuid.UUID]time.Time, error) {
+	type row struct {
+		PayeeID    uuid.UUID
+		LastPaidAt time.Time
+	}
+	var rows []row
+	err := r.db.WithContext(ctx).
+		Table("payouts").
+		Select("payee_id, MAX(created_at) AS last_paid_at").
+		Where("status != 'voided'").
+		Group("payee_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("get latest payout times: %w", err)
+	}
+	out := make(map[uuid.UUID]time.Time, len(rows))
+	for _, rw := range rows {
+		out[rw.PayeeID] = rw.LastPaidAt
+	}
+	return out, nil
+}
+
 // orderTotalsRow is one line of the gross-order-value aggregation.
 type orderTotalsRow struct {
 	UserID      uuid.UUID

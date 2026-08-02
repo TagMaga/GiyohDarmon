@@ -304,7 +304,29 @@ func (h *Handler) SetEmployeeCompensation(c *gin.Context) {
 // Returns the authenticated user's own commission rate.
 func (h *Handler) GetMyCompensation(c *gin.Context) {
 	claims := middleware.ClaimsFromContext(c)
-	ec, err := h.svc.GetEmployeeCompensation(c.Request.Context(), claims.UserID)
+	ctx := c.Request.Context()
+
+	// For roles paid a percentage (seller/manager/team lead), the live
+	// CommissionConfig rate — the one HR/owner actually edits via "Ставки
+	// комиссии" on the team directory — must win. A legacy EmployeeCompensation
+	// row (set through the separate salary flow) would otherwise shadow every
+	// rate change made through the current UI forever, since that row is never
+	// touched by PersonalRateModal.
+	if _, ok := roleCommissionType[claims.Role]; ok {
+		resolved, err := h.svc.GetMyResolvedRate(ctx, claims.UserID, claims.TeamID, claims.Role)
+		if err != nil {
+			response.HandleError(c, err)
+			return
+		}
+		if resolved != nil {
+			response.OK(c, ToResolvedRateResponse(resolved))
+			return
+		}
+	}
+
+	// No live CommissionConfig rate applicable/configured — fall back to the
+	// fixed salary/percent record (EmployeeCompensation), if any.
+	ec, err := h.svc.GetEmployeeCompensation(ctx, claims.UserID)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -313,19 +335,7 @@ func (h *Handler) GetMyCompensation(c *gin.Context) {
 		response.OK(c, ToCompensationResponse(ec))
 		return
 	}
-
-	// No fixed salary/percent record set — fall back to the caller's
-	// CommissionConfig rate (the one owners actually set from the team directory).
-	resolved, err := h.svc.GetMyResolvedRate(c.Request.Context(), claims.UserID, claims.TeamID, claims.Role)
-	if err != nil {
-		response.HandleError(c, err)
-		return
-	}
-	if resolved == nil {
-		response.OK(c, nil)
-		return
-	}
-	response.OK(c, ToResolvedRateResponse(resolved))
+	response.OK(c, nil)
 }
 
 // TeamRankResponse is the payload for GET /hr/income/me/team-rank.

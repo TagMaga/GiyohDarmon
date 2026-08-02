@@ -56,10 +56,16 @@ func (s *Service) GetPayablesForTeamLead(
 		return nil, apperrors.BadRequest(err.Error())
 	}
 
-	teamIncome, err := s.compSvc.GetTeamIncome(ctx, actorID, actorRole, teamLeadID, compensation.IncomeQueryParams{
-		From: from.Format("2006-01-02"),
-		To:   to.Format("2006-01-02"),
-	})
+	// Live cutoffs: any of a payee's financial_events created after their
+	// most recent payout are still "unpaid" and get recomputed with today's
+	// commission rates instead of the rate frozen at order creation — see
+	// compensation.GetTeamIncomeLive for the full rationale.
+	paidCutoffs, err := s.repo.GetLatestPayoutTimes(ctx)
+	if err != nil {
+		return nil, apperrors.Internal(err)
+	}
+
+	teamIncome, err := s.compSvc.GetTeamIncomeLive(ctx, actorID, actorRole, teamLeadID, from, to, paidCutoffs)
 	if err != nil {
 		return nil, err // already an *apperrors.AppError with correct RBAC status
 	}

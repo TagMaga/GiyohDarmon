@@ -226,6 +226,60 @@ func (r *Repository) GetTeamIncomeSummary(
 	return rows, nil
 }
 
+// ─── Live team income (unpaid-balance recomputation) ──────────────────────────
+
+// GetTeamFinancialEventsDetailed returns one row per order-based financial_event
+// tied to this team lead's orders, joined with the order fields needed to
+// recompute the commission breakdown live (order_type, net_revenue, and every
+// participant's id/team-id). courier_fee_earned is excluded — the courier's
+// payout is resolved from logistics tariffs, not CommissionConfig, so it is
+// never subject to a commission-rate change and always stays frozen.
+func (r *Repository) GetTeamFinancialEventsDetailed(
+	ctx context.Context,
+	teamLeadID uuid.UUID,
+	from, to time.Time,
+) ([]teamEventDetailRow, error) {
+	var rows []teamEventDetailRow
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT fe.order_id, fe.user_id, fe.event_type::text AS event_type, fe.amount, fe.created_at,
+		       o.order_type::text AS order_type, o.net_revenue,
+		       o.seller_id, o.manager_id, o.manager_team_id, o.team_lead_id, o.team_lead_team_id
+		FROM financial_events fe
+		JOIN orders o ON o.id = fe.order_id AND o.deleted_at IS NULL
+		WHERE o.team_lead_id = ? AND fe.user_id IS NOT NULL
+		  AND fe.event_type != 'courier_fee_earned'
+		  AND fe.created_at >= ? AND fe.created_at <= ?
+	`, teamLeadID, from, to).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("get team financial events detailed: %w", err)
+	}
+	return rows, nil
+}
+
+// GetTeamPharmacyIncomeSummary isolates the pharmacy branch of
+// GetTeamIncomeSummary. Pharmacy commissions are a separate domain not
+// governed by the order-based CommissionConfig rates this fix recomputes
+// live, so they are reported here exactly as before: frozen/historical.
+func (r *Repository) GetTeamPharmacyIncomeSummary(
+	ctx context.Context,
+	teamLeadID uuid.UUID,
+	from, to time.Time,
+) ([]teamMemberIncomeRow, error) {
+	var rows []teamMemberIncomeRow
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT pfe.user_id, pfe.event_type, COALESCE(SUM(pfe.amount), 0) AS total,
+		       COUNT(DISTINCT pfe.payment_id) AS orders_count
+		FROM pharmacy_financial_events pfe
+		WHERE pfe.team_lead_id = ? AND pfe.user_id IS NOT NULL
+		  AND pfe.created_at >= ? AND pfe.created_at <= ?
+		GROUP BY pfe.user_id, pfe.event_type
+	`, teamLeadID, from, to).Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("get team pharmacy income summary: %w", err)
+	}
+	return rows, nil
+}
+
 // ─── Extended events list ─────────────────────────────────────────────────────
 
 // ListFinancialEventsByFilter returns paginated, multi-filter financial events.
