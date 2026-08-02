@@ -279,10 +279,38 @@ func (s *Service) preparePrepaymentProof(ctx context.Context, orderID, actorID u
 
 // orderHierarchy holds the resolved manager + team lead IDs for a seller.
 type orderHierarchy struct {
+	// sellerTeamID is the creating user's own team — captured here (it's
+	// already fetched as a side effect of step 1 below) so callers can
+	// self-attribute manager_personal_order without a second lookup; see
+	// managerAttribution.
+	sellerTeamID   *uuid.UUID
 	managerID      *uuid.UUID
 	managerTeamID  *uuid.UUID
 	teamLeadID     *uuid.UUID
 	teamLeadTeamID *uuid.UUID
+}
+
+// managerAttribution returns the (manager_id, manager_team_id) pair to use
+// for rate resolution and for the order's own manager_id/manager_team_id
+// columns.
+//
+// For a manager_personal_order, the manager IS the creator — per the
+// Financial Engine's own comment (financial.go: "seller_id IS the manager
+// (they created the order)") and per GetTeamOrderGrossTotals' existing
+// assumption that a manager's personal orders have manager_id == seller_id.
+// Using hier.managerID (the team's separately-assigned manager slot) here
+// was a bug: not every manager-role user is assigned to that slot (e.g. a
+// manager with zero sellers under them), so their own employee-level
+// manager_personal_rate override was silently skipped in favor of the
+// global default whenever hier.managerID didn't happen to equal them.
+//
+// Every other order type keeps using hier's team-assigned manager, since
+// there the manager genuinely is a different person overseeing the seller.
+func managerAttribution(orderType OrderType, sellerID uuid.UUID, hier *orderHierarchy) (*uuid.UUID, *uuid.UUID) {
+	if orderType == OrderTypeManagerPersonal {
+		return &sellerID, hier.sellerTeamID
+	}
+	return hier.managerID, hier.managerTeamID
 }
 
 // resolveHierarchy resolves the manager and team lead for a seller by walking
@@ -302,6 +330,7 @@ func (s *Service) resolveHierarchy(ctx context.Context, sellerID uuid.UUID) (*or
 	if sellerH == nil || sellerH.TeamID == nil {
 		return h, nil // no team configured — snapshot will use zero rates for manager/TL
 	}
+	h.sellerTeamID = sellerH.TeamID
 
 	// 2. Get team to find ManagerID and TeamLeadID.
 	team, err := s.teamRepo.GetByID(ctx, *sellerH.TeamID)
@@ -553,6 +582,7 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		if err != nil {
 			return err
 		}
+		rateManagerID, rateManagerTeamID := managerAttribution(OrderType(req.OrderType), effectiveSellerID, hier)
 
 		// ── Delivery fee: product-level first, global fallback ────────────────
 		// If the first product has a per-product fee set, use that; otherwise
@@ -566,8 +596,8 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 		snap, err := s.compSvc.BuildSnapshot(ctx, tx, compensation.SnapshotInput{
 			SellerID:       &effectiveSellerID,
 			SellerTeamID:   nil,
-			ManagerID:      hier.managerID,
-			ManagerTeamID:  hier.managerTeamID,
+			ManagerID:      rateManagerID,
+			ManagerTeamID:  rateManagerTeamID,
 			TeamLeadID:     hier.teamLeadID,
 			TeamLeadTeamID: hier.teamLeadTeamID,
 			DeliveryFee:    deliveryFee,
@@ -627,9 +657,9 @@ func (s *Service) Create(ctx context.Context, actorID uuid.UUID, actorRole strin
 			ID:                    orderID,
 			CustomerID:            req.CustomerID,
 			SellerID:              effectiveSellerID,
-			ManagerID:             hier.managerID,
+			ManagerID:             rateManagerID,
 			TeamLeadID:            hier.teamLeadID,
-			ManagerTeamID:         hier.managerTeamID,
+			ManagerTeamID:         rateManagerTeamID,
 			TeamLeadTeamID:        hier.teamLeadTeamID,
 			OrderType:             req.OrderType,
 			Status:                initialStatus,
@@ -1471,11 +1501,12 @@ func (s *Service) changeStatusInternal(ctx context.Context, actorID uuid.UUID, a
 					if herr != nil {
 						return apperrors.Unprocessable("order has no financial snapshot and hierarchy resolution failed")
 					}
+					legacyManagerID, legacyManagerTeamID := managerAttribution(o.OrderType, o.SellerID, hier)
 					snap, err = s.compSvc.BuildSnapshot(ctx, tx, compensation.SnapshotInput{
 						OrderID:        &orderID,
 						SellerID:       &o.SellerID,
-						ManagerID:      hier.managerID,
-						ManagerTeamID:  hier.managerTeamID,
+						ManagerID:      legacyManagerID,
+						ManagerTeamID:  legacyManagerTeamID,
 						TeamLeadID:     hier.teamLeadID,
 						TeamLeadTeamID: hier.teamLeadTeamID,
 						DeliveryFee:    o.DeliveryFee,
