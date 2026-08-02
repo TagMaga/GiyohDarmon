@@ -22,7 +22,7 @@ import { fetchCities }                 from '../../seller/api'
 import { SELLER_STATUS_FILTERS, STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import useManagerOrders                from '../hooks/useManagerOrders'
 import useMyManagerTeam                from '../hooks/useMyManagerTeam'
-import useTeamMembers                  from '../../people/hooks/useTeamMembers'
+import useTeamMembersForTeams          from '../../people/hooks/useTeamMembersForTeams'
 import useEmployeesByIds               from '../../people/hooks/useEmployeesByIds'
 import { buildUserMap }                from '../../people/utils/peopleHelpers'
 
@@ -239,9 +239,10 @@ export default function ManagerOrdersPage() {
 
   const search = useDebounce(rawSearch, 400)
 
-  // Team data
-  const { teamId } = useMyManagerTeam()
-  const { data: members = [] } = useTeamMembers(teamId)
+  // Team data — a manager can be responsible for more than one team, so
+  // aggregate members/orders across every team they manage, not just one.
+  const { teamIds } = useMyManagerTeam()
+  const { data: members = [] } = useTeamMembersForTeams(teamIds)
   const memberIds = useMemo(() => members.map(m => m.user_id).filter(Boolean), [members])
   const { data: teamEmployees = [] } = useEmployeesByIds(memberIds)
   const userMap = useMemo(() => buildUserMap(teamEmployees), [teamEmployees])
