@@ -347,16 +347,14 @@ function InvoiceForm({ pharmacy, onClose }) {
 
 function PaymentForm({ open, pharmacy, onClose }) {
   const [amount, setAmount] = useState('')
-  const [method, setMethod] = useState('cash')
   const [comment, setComment] = useState('')
   const mutation = usePharmacyMutation(api.createPharmacyPayment, pharmacy?.id)
   async function submit(e) {
-    e.preventDefault(); await mutation.mutateAsync({ pharmacy_id: pharmacy.id, amount: Number(amount), method, comment }); setAmount(''); setComment(''); onClose()
+    e.preventDefault(); await mutation.mutateAsync({ pharmacy_id: pharmacy.id, amount: Number(amount), method: 'cash', comment }); setAmount(''); setComment(''); onClose()
   }
   return <Modal open={open} onClose={onClose} title="Добавить оплату" description="Оплата продавца ожидает подтверждения владельца.">
     <form onSubmit={submit} className="space-y-4">
       <Input label="Сумма" type="number" min="0.01" value={amount} onChange={setAmount} required />
-      <label className="text-sm font-medium text-slate-700">Способ оплаты<select className={`${field} mt-1`} value={method} onChange={e => setMethod(e.target.value)}><option value="cash">Наличные</option><option value="cashless">Безналичные</option></select></label>
       <Input label="Комментарий" value={comment} onChange={setComment} />
       {mutation.error && <p className="text-sm text-rose-600">{errorText(mutation.error)}</p>}
       <div className="flex justify-end gap-2"><button type="button" className={secondary} onClick={onClose}>Отмена</button><button className={primary}>Добавить</button></div>
