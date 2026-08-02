@@ -154,7 +154,7 @@ func (h *Handler) UpdateOrder(c *gin.Context) {
 		return
 	}
 	claims := middleware.ClaimsFromContext(c)
-	o, err := h.svc.Update(c.Request.Context(), claims.UserID, id, req)
+	o, err := h.svc.Update(c.Request.Context(), claims.UserID, claims.Role, id, req)
 	if err != nil {
 		response.HandleError(c, err)
 		return
