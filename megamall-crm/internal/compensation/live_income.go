@@ -22,6 +22,7 @@ package compensation
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -143,6 +144,15 @@ func (s *Service) GetTeamIncomeLive(
 				computed, err := s.recomputeLiveBreakdown(ctx, row, now)
 				if err == nil {
 					b = &computed
+				} else {
+					// Falls back to the frozen historical amount for every event
+					// on this order (below) rather than hiding real money — but
+					// that fallback must never be silent. Most likely cause: a
+					// rate change put seller/manager rate above team_lead_pool_rate
+					// (or another commission_configs gap), the same constraint
+					// ApplyCommissionRules enforces at order-delivery time.
+					log.Printf("[compensation] live income recompute failed for order %s (team_lead=%v): %v — showing frozen amount instead",
+						row.OrderID, row.TeamLeadID, err)
 				}
 				liveCache[row.OrderID] = b
 			}
