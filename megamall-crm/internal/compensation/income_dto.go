@@ -85,6 +85,24 @@ type teamMemberIncomeRow struct {
 	OrdersCount int       `gorm:"column:orders_count"`
 }
 
+// teamEventDetailRow is one order-based financial_event row joined with the
+// order fields needed to recompute its commission live (see
+// GetTeamFinancialEventsDetailed / GetTeamIncomeLive).
+type teamEventDetailRow struct {
+	OrderID        uuid.UUID  `gorm:"column:order_id"`
+	UserID         uuid.UUID  `gorm:"column:user_id"`
+	EventType      string     `gorm:"column:event_type"`
+	Amount         float64    `gorm:"column:amount"`
+	CreatedAt      time.Time  `gorm:"column:created_at"`
+	OrderType      string     `gorm:"column:order_type"`
+	NetRevenue     float64    `gorm:"column:net_revenue"`
+	SellerID       uuid.UUID  `gorm:"column:seller_id"`
+	ManagerID      *uuid.UUID `gorm:"column:manager_id"`
+	ManagerTeamID  *uuid.UUID `gorm:"column:manager_team_id"`
+	TeamLeadID     *uuid.UUID `gorm:"column:team_lead_id"`
+	TeamLeadTeamID *uuid.UUID `gorm:"column:team_lead_team_id"`
+}
+
 // ─── Income response DTOs (serialised as snake_case JSON) ─────────────────────
 
 // IncomeByType maps FinancialEventType string → total amount earned in the period.
