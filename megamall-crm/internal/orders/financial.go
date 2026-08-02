@@ -119,7 +119,7 @@ func (s *Service) emitFinancialEvents(
 	// Compute the full breakdown using the canonical business-rule function.
 	// This is the same function used by the Preview endpoint — single source of truth.
 	breakdown, err := compensation.ApplyCommissionRules(
-		compensation.OrderType(order.OrderType), commissionBase, snap,
+		compensation.OrderType(order.OrderType), commissionBase, snap, order.ManagerID != nil,
 	)
 	if err != nil {
 		return fmt.Errorf("financial engine: %w", err)

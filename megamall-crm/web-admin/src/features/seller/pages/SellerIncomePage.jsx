@@ -91,21 +91,31 @@ function periodOrderTotals(orders = [], from, to) {
   }, { revenue: 0, courierPayout: 0 })
 }
 
-/** Per-row "(order total − courier payout) × rate% = amount" breakdown, using
- *  the seller's current commission rate (from HR settings) rather than a
- *  value reverse-engineered from the stored amount, which produced a
- *  misleading rate whenever net_revenue didn't match the actual commission
- *  math. "Order total" is total_amount + delivery_fee (what the client actually
- *  paid), matching commission_base (internal/orders/financial.go) — using
- *  total_amount alone here under-counted delivery revenue and made the
- *  formula not reconcile with the displayed amount. The deduction is
- *  courier_payout (what MegaMall pays the courier), not delivery_fee (what
- *  the client was charged), which can differ or be unset. */
-function orderBreakdown(ev, fallbackPct) {
-  if (ev.total_amount == null || fallbackPct == null) return null
+/** Per-row "(order total − courier payout) × rate% = amount" breakdown.
+ *
+ *  The rate% shown is derived from this row's own amount, not the account's
+ *  flat resolved commission_rate — a single flat rate cannot describe every
+ *  row for a sales_team_lead, whose take on a given order depends on the
+ *  order type (own order vs. a seller's order) and whether they have a
+ *  manager above them (a manager's cut is deducted from the pool only when
+ *  one is actually assigned — see internal/compensation.ApplyCommissionRules
+ *  hasManager). Reusing one flat percentage for every history row produced
+ *  formulas that didn't reconcile with the paid amount (e.g. showing "× 40%"
+ *  on a row that was actually paid at 37% net of a manager's cut). Deriving
+ *  the percentage from amount/base instead makes the formula always
+ *  reconcile by construction. "Order total" is total_amount + delivery_fee
+ *  (what the client actually paid), matching commission_base
+ *  (internal/orders/financial.go). The deduction is courier_payout (what
+ *  MegaMall pays the courier), not delivery_fee (what the client was
+ *  charged), which can differ or be unset. */
+function orderBreakdown(ev) {
+  if (ev.total_amount == null) return null
   const orderTotal = Number(ev.total_amount) + Number(ev.delivery_fee ?? 0)
   const courierPayout = Number(ev.courier_payout ?? 0)
-  return `(${fmtAmount(orderTotal)} − ${fmtAmount(courierPayout)}) × ${fallbackPct}% = ${fmtAmount(ev.amount)}`
+  const base = orderTotal - courierPayout
+  if (!Number.isFinite(base) || base <= 0) return null
+  const pct = +(Number(ev.amount) / base * 100).toFixed(1)
+  return `(${fmtAmount(orderTotal)} − ${fmtAmount(courierPayout)}) × ${pct}% = ${fmtAmount(ev.amount)}`
 }
 
 function eventOrderTotals(events = []) {
@@ -243,7 +253,7 @@ export default function SellerIncomePage() {
               ) : (
                 <Card style={{ borderRadius: 18, overflow: 'hidden' }}>
                   {events.map((ev, i) => {
-                    const breakdown = orderBreakdown(ev, commissionPct)
+                    const breakdown = orderBreakdown(ev)
                     return (
                       <div
                         key={ev.id ?? i}
@@ -433,12 +443,16 @@ export default function SellerIncomePage() {
                 </Card>
               </div>
 
-              {/* Formula hint */}
+              {/* Formula hint — commissionPct is the account's BASE resolved
+                  rate; the rate actually applied per order can differ (e.g.
+                  net of a manager's cut for a sales_team_lead), so this is
+                  labelled as the base rate, not a promise every row matches
+                  it exactly. Each history row below shows its own real rate. */}
               {commissionPct !== null && (
                 <Card style={{ borderRadius: 13, padding: '10px 14px', marginTop: 14, background: '#F3FBF6', border: '1px solid #D9F0E3' }}>
                   <p style={{ fontSize: 12, color: '#065F46', margin: 0 }}>
                     <span style={{ fontWeight: 700 }}>Формула: </span>
-                    (Сумма заказа − Доставка) × {commissionPct}%
+                    (Сумма заказа − Доставка) × ставка (базовая {commissionPct}%, точная — в каждой строке ниже)
                   </p>
                 </Card>
               )}
@@ -464,7 +478,7 @@ export default function SellerIncomePage() {
               ) : (
                 <Card className="overflow-hidden">
                   {events.map((ev, i) => {
-                    const breakdown = orderBreakdown(ev, commissionPct)
+                    const breakdown = orderBreakdown(ev)
                     return (
                       <div
                         key={ev.id ?? i}

@@ -35,7 +35,7 @@ func sumBreakdown(b CommissionBreakdown) float64 {
 
 func TestApply_SellerOrder_BasicMath(t *testing.T) {
 	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
-	b, err := ApplyCommissionRules(OrderTypeSellerOrder, 80.0, s)
+	b, err := ApplyCommissionRules(OrderTypeSellerOrder, 80.0, s, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestApply_SellerOrder_BasicMath(t *testing.T) {
 func TestApply_SellerOrder_SumEqualsNetRevenue(t *testing.T) {
 	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
 	nr := 123.45
-	b, err := ApplyCommissionRules(OrderTypeSellerOrder, nr, s)
+	b, err := ApplyCommissionRules(OrderTypeSellerOrder, nr, s, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -76,8 +76,8 @@ func TestApply_SellerOrder_CompanyRateIgnored(t *testing.T) {
 	// company is the residual (net_revenue - pool_gross), computed after the fact.
 	s1 := snap(0.10, 0.03, 0.20, 0.40, 0.10) // company=0.10
 	s2 := snap(0.10, 0.03, 0.20, 0.40, 0.90) // company=0.90 (different)
-	b1, _ := ApplyCommissionRules(OrderTypeSellerOrder, 100.0, s1)
-	b2, _ := ApplyCommissionRules(OrderTypeSellerOrder, 100.0, s2)
+	b1, _ := ApplyCommissionRules(OrderTypeSellerOrder, 100.0, s1, true)
+	b2, _ := ApplyCommissionRules(OrderTypeSellerOrder, 100.0, s2, true)
 	if b1.SellerCommission != b2.SellerCommission || b1.ManagerTeamCommission != b2.ManagerTeamCommission || b1.TeamLeadPool != b2.TeamLeadPool {
 		t.Errorf("seller/manager/pool should be identical regardless of company_rate")
 	}
@@ -92,7 +92,7 @@ func TestApply_SellerOrder_CompanyRateIgnored(t *testing.T) {
 func TestApply_SellerOrder_ValidationError(t *testing.T) {
 	// seller(0.30) + mgr_team(0.20) = 0.50 exceeds team_lead_pool_rate(0.40) → must fail
 	s := snap(0.30, 0.20, 0.20, 0.40, 0.60)
-	_, err := ApplyCommissionRules(OrderTypeSellerOrder, 100.0, s)
+	_, err := ApplyCommissionRules(OrderTypeSellerOrder, 100.0, s, true)
 	if err == nil {
 		t.Fatal("expected validation error for seller+manager > team_lead_pool_rate, got nil")
 	}
@@ -101,7 +101,7 @@ func TestApply_SellerOrder_ValidationError(t *testing.T) {
 func TestApply_SellerOrder_ExactlyOne_AllowedNotFailed(t *testing.T) {
 	// seller(0.20) + mgr_team(0.20) = 0.40 == team_lead_pool_rate(0.40) → pool = 0 → allowed
 	s := snap(0.20, 0.20, 0.20, 0.40, 0.60)
-	b, err := ApplyCommissionRules(OrderTypeSellerOrder, 100.0, s)
+	b, err := ApplyCommissionRules(OrderTypeSellerOrder, 100.0, s, true)
 	if err != nil {
 		t.Fatalf("unexpected error at sum=team_lead_pool_rate: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestApply_SellerOrder_ExactlyOne_AllowedNotFailed(t *testing.T) {
 
 func TestApply_ManagerPersonalOrder_BasicMath(t *testing.T) {
 	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
-	b, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 80.0, s)
+	b, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 80.0, s, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestApply_ManagerPersonalOrder_BasicMath(t *testing.T) {
 func TestApply_ManagerPersonalOrder_SumEqualsNetRevenue(t *testing.T) {
 	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
 	nr := 99.99
-	b, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, nr, s)
+	b, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, nr, s, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestApply_ManagerPersonalOrder_SumEqualsNetRevenue(t *testing.T) {
 func TestApply_ManagerPersonalOrder_ValidationError(t *testing.T) {
 	// personal(0.50) exceeds team_lead_pool_rate(0.40) → fail
 	s := snap(0.10, 0.03, 0.50, 0.40, 0.60)
-	_, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 100.0, s)
+	_, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 100.0, s, true)
 	if err == nil {
 		t.Fatal("expected validation error for manager_personal_rate > team_lead_pool_rate, got nil")
 	}
@@ -162,7 +162,7 @@ func TestApply_ManagerPersonalOrder_ValidationError(t *testing.T) {
 
 func TestApply_TeamLeadPersonalOrder_BasicMath(t *testing.T) {
 	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
-	b, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, 80.0, s)
+	b, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, 80.0, s, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestApply_TeamLeadPersonalOrder_BasicMath(t *testing.T) {
 func TestApply_TeamLeadPersonalOrder_SumEqualsNetRevenue(t *testing.T) {
 	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
 	nr := 47.13
-	b, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, nr, s)
+	b, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, nr, s, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -200,9 +200,76 @@ func TestApply_TeamLeadPersonalOrder_SumEqualsNetRevenue(t *testing.T) {
 func TestApply_TeamLeadPersonalOrder_ValidationError(t *testing.T) {
 	// mgr_team(0.50) exceeds team_lead_pool_rate(0.40) → fail
 	s := snap(0.10, 0.50, 0.20, 0.40, 0.60)
-	_, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, 100.0, s)
+	_, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, 100.0, s, true)
 	if err == nil {
 		t.Fatal("expected validation error for manager_team_rate > team_lead_pool_rate, got nil")
+	}
+}
+
+// ─── hasManager=false: no manager attached to the order ───────────────────────
+//
+// RateResolver falls back to the global manager_team_rate even when no real
+// manager exists on the order (nil ManagerID). hasManager=false must zero out
+// manager_team_commission entirely so that money isn't deducted from the team
+// lead's pool and paid to nobody.
+
+func TestApply_TeamLeadPersonalOrder_NoManager_FullPoolToTeamLead(t *testing.T) {
+	// Same scenario as the "Мои доходы" screen: order total 230, delivery 20,
+	// team_lead_pool_rate 40%, manager_team_rate 3% — but this team lead has
+	// no manager assigned, so the full 40% pool must go to them: 210*0.40=84.00.
+	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
+	b, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, 210.0, s, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if b.ManagerTeamCommission != 0 {
+		t.Errorf("ManagerTeamCommission: got %.2f, want 0 (no manager attached)", b.ManagerTeamCommission)
+	}
+	if !near2(b.TeamLeadPool, 84.0) {
+		t.Errorf("TeamLeadPool: got %.2f, want 84.00 (full pool, no manager deduction)", b.TeamLeadPool)
+	}
+}
+
+func TestApply_TeamLeadPersonalOrder_WithManager_PoolNetOfManagerCut(t *testing.T) {
+	// Same order, but this team lead DOES have a manager: 210*(0.40-0.03)=77.70.
+	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
+	b, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, 210.0, s, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !near2(b.ManagerTeamCommission, 6.30) {
+		t.Errorf("ManagerTeamCommission: got %.2f, want 6.30", b.ManagerTeamCommission)
+	}
+	if !near2(b.TeamLeadPool, 77.70) {
+		t.Errorf("TeamLeadPool: got %.2f, want 77.70", b.TeamLeadPool)
+	}
+}
+
+func TestApply_SellerOrder_NoManager_PoolNetOfSellerOnly(t *testing.T) {
+	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
+	b, err := ApplyCommissionRules(OrderTypeSellerOrder, 80.0, s, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if b.ManagerTeamCommission != 0 {
+		t.Errorf("ManagerTeamCommission: got %.2f, want 0 (no manager attached)", b.ManagerTeamCommission)
+	}
+	// pool_gross = 80*0.40 = 32; pool = 32 - 8 (seller only) = 24
+	if !near2(b.TeamLeadPool, 24.0) {
+		t.Errorf("TeamLeadPool: got %.2f, want 24.00 (pool_gross minus seller only)", b.TeamLeadPool)
+	}
+}
+
+func TestApply_NoManager_SumStillEqualsNetRevenue(t *testing.T) {
+	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
+	for _, ot := range []OrderType{OrderTypeSellerOrder, OrderTypeTeamLeadPersonalOrder} {
+		b, err := ApplyCommissionRules(ot, 210.0, s, false)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", ot, err)
+		}
+		if !near2(sumBreakdown(b), 210.0) {
+			t.Errorf("%s: sum of breakdown (%.4f) != net_revenue (210.00)", ot, sumBreakdown(b))
+		}
 	}
 }
 
@@ -230,7 +297,7 @@ func TestApply_SpecExample_AggregateConsistency(t *testing.T) {
 
 	// 8 seller orders, each net=80
 	for i := 0; i < 8; i++ {
-		b, err := ApplyCommissionRules(OrderTypeSellerOrder, 80.0, s)
+		b, err := ApplyCommissionRules(OrderTypeSellerOrder, 80.0, s, true)
 		if err != nil {
 			t.Fatalf("seller order %d: %v", i, err)
 		}
@@ -242,7 +309,7 @@ func TestApply_SpecExample_AggregateConsistency(t *testing.T) {
 
 	// 1 manager_personal order, net=80
 	{
-		b, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 80.0, s)
+		b, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 80.0, s, true)
 		if err != nil {
 			t.Fatalf("manager_personal order: %v", err)
 		}
@@ -253,7 +320,7 @@ func TestApply_SpecExample_AggregateConsistency(t *testing.T) {
 
 	// 1 team_lead_personal order, net=80
 	{
-		b, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, 80.0, s)
+		b, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, 80.0, s, true)
 		if err != nil {
 			t.Fatalf("team_lead_personal order: %v", err)
 		}
@@ -295,7 +362,7 @@ func TestApply_MegaMall23OrderScenario(t *testing.T) {
 	add := func(orderType OrderType, count int) {
 		t.Helper()
 		for i := 0; i < count; i++ {
-			b, err := ApplyCommissionRules(orderType, commissionBasePerOrder, s)
+			b, err := ApplyCommissionRules(orderType, commissionBasePerOrder, s, true)
 			if err != nil {
 				t.Fatalf("%s order %d: %v", orderType, i+1, err)
 			}
@@ -358,7 +425,7 @@ func TestApply_EdgeCaseZeroSellerOrders(t *testing.T) {
 	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
 	var totals CommissionBreakdown
 	for i := 0; i < 3; i++ {
-		b, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 80, s)
+		b, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 80, s, true)
 		if err != nil {
 			t.Fatalf("manager order %d: %v", i+1, err)
 		}
@@ -367,7 +434,7 @@ func TestApply_EdgeCaseZeroSellerOrders(t *testing.T) {
 		totals.TeamLeadPool += b.TeamLeadPool
 	}
 	for i := 0; i < 2; i++ {
-		b, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, 80, s)
+		b, err := ApplyCommissionRules(OrderTypeTeamLeadPersonalOrder, 80, s, true)
 		if err != nil {
 			t.Fatalf("team lead order %d: %v", i+1, err)
 		}
@@ -387,7 +454,7 @@ func TestApply_EdgeCaseZeroManagerOwnOrders(t *testing.T) {
 	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
 	var totals CommissionBreakdown
 	for i := 0; i < 18; i++ {
-		b, err := ApplyCommissionRules(OrderTypeSellerOrder, 80, s)
+		b, err := ApplyCommissionRules(OrderTypeSellerOrder, 80, s, true)
 		if err != nil {
 			t.Fatalf("seller order %d: %v", i+1, err)
 		}
@@ -408,7 +475,7 @@ func TestApply_EdgeCaseOnlySellers(t *testing.T) {
 	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
 	var totals CommissionBreakdown
 	for i := 0; i < 5; i++ {
-		b, err := ApplyCommissionRules(OrderTypeSellerOrder, 80, s)
+		b, err := ApplyCommissionRules(OrderTypeSellerOrder, 80, s, true)
 		if err != nil {
 			t.Fatalf("seller order %d: %v", i+1, err)
 		}
@@ -435,7 +502,7 @@ func TestApply_EdgeCaseOnlyManagerOwnOrders(t *testing.T) {
 	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
 	var totals CommissionBreakdown
 	for i := 0; i < 5; i++ {
-		b, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 80, s)
+		b, err := ApplyCommissionRules(OrderTypeManagerPersonalOrder, 80, s, true)
 		if err != nil {
 			t.Fatalf("manager order %d: %v", i+1, err)
 		}
@@ -464,7 +531,7 @@ func TestApply_EdgeCaseCourierPayoutDeductedBeforeCommission(t *testing.T) {
 	courierPayout := 20.0
 	commissionBase := orderTotal - courierPayout
 
-	b, err := ApplyCommissionRules(OrderTypeSellerOrder, commissionBase, s)
+	b, err := ApplyCommissionRules(OrderTypeSellerOrder, commissionBase, s, true)
 	if err != nil {
 		t.Fatalf("seller order: %v", err)
 	}
@@ -483,7 +550,7 @@ func TestApply_EdgeCaseCourierPayoutDeductedBeforeCommission(t *testing.T) {
 
 func TestApply_UnknownOrderType_ReturnsError(t *testing.T) {
 	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
-	_, err := ApplyCommissionRules("invalid_type", 100.0, s)
+	_, err := ApplyCommissionRules("invalid_type", 100.0, s, true)
 	if err == nil {
 		t.Fatal("expected error for unknown order type, got nil")
 	}
@@ -506,7 +573,7 @@ func TestApply_SellerOrder_SumPreservesRounding(t *testing.T) {
 	// Use amounts that generate awkward fractions.
 	s := snap(0.10, 0.03, 0.20, 0.40, 0.60)
 	for _, nr := range []float64{1.00, 7.77, 33.33, 100.01, 999.99} {
-		b, err := ApplyCommissionRules(OrderTypeSellerOrder, nr, s)
+		b, err := ApplyCommissionRules(OrderTypeSellerOrder, nr, s, true)
 		if err != nil {
 			t.Fatalf("nr=%.2f: %v", nr, err)
 		}

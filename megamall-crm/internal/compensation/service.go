@@ -433,7 +433,10 @@ func (s *Service) Preview(ctx context.Context, req PreviewRequest) (*PreviewResp
 	}
 
 	// Apply order-type commission rules to the amount left after courier payout.
-	breakdown, err := ApplyCommissionRules(req.OrderType, commissionBase, snap)
+	// Preview always simulates a manager being present (ManagerID is set to
+	// req.UserID above purely to resolve any employee-level rate override) —
+	// hasManager=true here matches that simulated scenario.
+	breakdown, err := ApplyCommissionRules(req.OrderType, commissionBase, snap, true)
 	if err != nil {
 		return nil, apperrors.Unprocessable(err.Error())
 	}
@@ -511,6 +514,16 @@ type PreviewRequest struct {
 // company_rate is kept in the snapshot for display/history but is NOT used in
 // the calculation — company's share is whatever remains after the team pool.
 //
+// hasManager reflects whether a real manager is actually attached to this
+// order (order.ManagerID != nil) — NOT merely whether the rate resolver found
+// a manager_team_rate config. RateResolver falls back to the team/global
+// default rate even when no manager exists, so without this flag
+// manager_team_commission would be computed and deducted from the team
+// lead's pool for a manager who doesn't exist, and the resulting ledger
+// event would be written with a nil UserID — money deducted and paid to
+// nobody. When hasManager is false, manager_team_commission is forced to 0
+// and the team lead keeps the full pool.
+//
 // Rate-sum validation (fail-fast, prevents a negative team lead net):
 //
 //	seller_order:              seller_rate + manager_team_rate      <= team_lead_pool_rate
@@ -520,24 +533,30 @@ func ApplyCommissionRules(
 	orderType OrderType,
 	netRevenue float64,
 	snap *OrderFinancialSnapshot,
+	hasManager bool,
 ) (CommissionBreakdown, error) {
 	var b CommissionBreakdown
 
 	poolGross := round2(netRevenue * snap.TeamLeadPoolRate)
 
+	effManagerTeamRate := snap.ManagerTeamRate
+	if !hasManager {
+		effManagerTeamRate = 0
+	}
+
 	switch orderType {
 	case OrderTypeSellerOrder:
-		total := snap.SellerRate + snap.ManagerTeamRate
+		total := snap.SellerRate + effManagerTeamRate
 		if total > snap.TeamLeadPoolRate {
 			return b, fmt.Errorf(
 				"rate configuration error for seller_order: "+
 					"seller_rate(%.5f) + manager_team_rate(%.5f) = %.5f exceeds team_lead_pool_rate(%.5f) — "+
 					"team lead pool cannot go negative",
-				snap.SellerRate, snap.ManagerTeamRate, total, snap.TeamLeadPoolRate,
+				snap.SellerRate, effManagerTeamRate, total, snap.TeamLeadPoolRate,
 			)
 		}
 		b.SellerCommission = round2(netRevenue * snap.SellerRate)
-		b.ManagerTeamCommission = round2(netRevenue * snap.ManagerTeamRate)
+		b.ManagerTeamCommission = round2(netRevenue * effManagerTeamRate)
 		b.ManagerPersonalCommission = 0
 		b.TeamLeadPool = round2(poolGross - b.SellerCommission - b.ManagerTeamCommission)
 		b.CompanyRevenue = round2(netRevenue - poolGross)
@@ -558,16 +577,16 @@ func ApplyCommissionRules(
 		b.CompanyRevenue = round2(netRevenue - poolGross)
 
 	case OrderTypeTeamLeadPersonalOrder:
-		if snap.ManagerTeamRate > snap.TeamLeadPoolRate {
+		if effManagerTeamRate > snap.TeamLeadPoolRate {
 			return b, fmt.Errorf(
 				"rate configuration error for team_lead_personal_order: "+
 					"manager_team_rate(%.5f) exceeds team_lead_pool_rate(%.5f) — "+
 					"team lead pool cannot go negative",
-				snap.ManagerTeamRate, snap.TeamLeadPoolRate,
+				effManagerTeamRate, snap.TeamLeadPoolRate,
 			)
 		}
 		b.SellerCommission = 0
-		b.ManagerTeamCommission = round2(netRevenue * snap.ManagerTeamRate)
+		b.ManagerTeamCommission = round2(netRevenue * effManagerTeamRate)
 		b.ManagerPersonalCommission = 0
 		b.TeamLeadPool = round2(poolGross - b.ManagerTeamCommission)
 		b.CompanyRevenue = round2(netRevenue - poolGross)
