@@ -9,7 +9,8 @@
  *   - Assignment: seller, manager, team lead, team
  *   - Financial breakdown from finance events (if available)
  *
- * Owner read-only — no action buttons for order workflow.
+ * Owner can change the order status from here (opens OrderStatusModal via
+ * onChangeStatus) — otherwise read-only.
  */
 import { useState } from 'react'
 import { X, User2, Package, Users2, TrendingUp, Loader2, MessageCircle, Banknote, Paperclip, ZoomIn, CheckCircle } from 'lucide-react'
@@ -90,7 +91,7 @@ function Row({ label, value, accent }) {
   )
 }
 
-function OrderContent({ orderId, userMap, teamMap }) {
+function OrderContent({ orderId, userMap, teamMap, onChangeStatus }) {
   const { data: order, isLoading: orderLoading } = useOwnerOrder(orderId)
   const { data: events = [], isLoading: eventsLoading } = useOrderFinanceEvents(orderId)
   const { data: cities = [] } = useQuery({
@@ -171,6 +172,13 @@ function OrderContent({ orderId, userMap, teamMap }) {
           {STATUS_LABELS[status] ?? status}
         </Badge>
         <span className="text-xs text-slate-400">{fmtDate(order.created_at ?? order.CreatedAt)}</span>
+        <button
+          type="button"
+          onClick={() => onChangeStatus(order)}
+          className="ml-auto text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+        >
+          Изменить статус
+        </button>
       </div>
 
       {/* Customer */}
@@ -280,7 +288,7 @@ function OrderContent({ orderId, userMap, teamMap }) {
 
 // ── Drawer shell ─────────────────────────────────────────────────────────────
 
-export default function OrderDetailsDrawer({ order, onClose, userMap = {}, teamMap = {} }) {
+export default function OrderDetailsDrawer({ order, onClose, userMap = {}, teamMap = {}, onChangeStatus }) {
   const [tab, setTab] = useState('details')
   const open = !!order
   const orderId = open
@@ -343,7 +351,7 @@ export default function OrderDetailsDrawer({ order, onClose, userMap = {}, teamM
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5">
           {orderId && tab === 'details' && (
-            <OrderContent orderId={orderId} userMap={userMap} teamMap={teamMap} />
+            <OrderContent orderId={orderId} userMap={userMap} teamMap={teamMap} onChangeStatus={onChangeStatus} />
           )}
           {orderId && tab === 'comments' && <OrderCommentsPanel orderId={orderId} compact />}
         </div>

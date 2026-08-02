@@ -63,3 +63,13 @@ export async function fetchOrderFinanceEvents(orderId) {
   const raw  = body?.data ?? body
   return Array.isArray(raw) ? raw : []
 }
+
+/**
+ * POST /dispatch/orders/:id/force-status — owner override that bypasses the
+ * normal transition state machine (can jump to/reopen any status).
+ * `reason` is mandatory server-side.
+ */
+export async function forceOrderStatus(id, { status, reason }) {
+  const res = await client.post(`/dispatch/orders/${id}/force-status`, { status, reason })
+  return unwrap(res)
+}
