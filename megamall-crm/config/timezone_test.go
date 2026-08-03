@@ -45,16 +45,43 @@ func TestLocation_InvalidNameReturnsError(t *testing.T) {
 	}
 }
 
-// An empty APP_TIMEZONE must not quietly resolve to UTC either — envconfig's
-// default only applies when the var is unset, so an explicitly empty value
-// would otherwise reach LoadLocation("") and succeed as UTC.
-func TestLocation_EmptyNameDoesNotSilentlyBecomeUTC(t *testing.T) {
+// An empty APP_TIMEZONE must not quietly resolve to UTC either. envconfig
+// applies the `default` tag only when the variable is *unset*, so a stray
+// `APP_TIMEZONE=` line in a .env bypasses the Asia/Dushanbe default and
+// arrives here as "" — and time.LoadLocation("") returns UTC with a nil
+// error, which would reopen the silent fallback this whole change closes.
+func TestLocation_EmptyNameIsRejected(t *testing.T) {
 	loc, err := ServerConfig{Timezone: ""}.Location()
-	if err != nil {
-		return // acceptable: rejected outright
+	if err == nil {
+		t.Fatalf("expected an error for an empty timezone, got loc=%v", loc)
 	}
-	if loc.String() == "UTC" {
-		t.Log("note: empty APP_TIMEZONE resolves to UTC via time.LoadLocation(\"\"); " +
-			"deployments must set APP_TIMEZONE explicitly or leave it unset to get the default")
+	if loc != nil {
+		t.Errorf("expected nil location alongside the error, got %v", loc)
+	}
+
+	// Whitespace-only is the same mistake wearing a hat.
+	if _, err := (ServerConfig{Timezone: "   "}).Location(); err == nil {
+		t.Error("expected an error for a whitespace-only timezone")
+	}
+}
+
+// The documented default must still resolve when the variable is simply unset,
+// which is how every current deployment runs (APP_TIMEZONE appears in no .env
+// or workflow in this repo).
+func TestLocation_UnsetUsesDushanbeDefault(t *testing.T) {
+	requiredBaseEnv(t)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.Server.Timezone != "Asia/Dushanbe" {
+		t.Fatalf("default Timezone = %q, want Asia/Dushanbe", cfg.Server.Timezone)
+	}
+	loc, err := cfg.Server.Location()
+	if err != nil {
+		t.Fatalf("unexpected error resolving the default: %v", err)
+	}
+	if loc.String() != "Asia/Dushanbe" {
+		t.Errorf("got %q, want Asia/Dushanbe", loc.String())
 	}
 }

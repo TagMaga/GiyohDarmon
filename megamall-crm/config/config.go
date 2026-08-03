@@ -47,6 +47,15 @@ type ServerConfig struct {
 // cmd/server/main.go removes the host dependency; this makes any remaining
 // failure (e.g. a typo in APP_TIMEZONE) loud instead of silent.
 func (s ServerConfig) Location() (*time.Location, error) {
+	// An explicitly empty APP_TIMEZONE is rejected rather than accepted as UTC.
+	// envconfig applies the `default` tag only when the variable is *unset*, so
+	// `APP_TIMEZONE=` in a .env bypasses the Asia/Dushanbe default and reaches
+	// here as "" — which time.LoadLocation happily resolves to UTC with no
+	// error, reopening exactly the silent fallback this function exists to
+	// close. Leave the variable unset to get the default.
+	if strings.TrimSpace(s.Timezone) == "" {
+		return nil, fmt.Errorf("APP_TIMEZONE is set but empty: unset it to use the %q default, or give a valid IANA name", "Asia/Dushanbe")
+	}
 	loc, err := time.LoadLocation(s.Timezone)
 	if err != nil {
 		return nil, fmt.Errorf("invalid APP_TIMEZONE %q: %w", s.Timezone, err)
