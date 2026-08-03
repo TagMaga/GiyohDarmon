@@ -392,6 +392,18 @@ func (r *Repository) UpdatePrepaymentAmount(ctx context.Context, tx *gorm.DB, id
 	return nil
 }
 
+// SetPrepaymentStatus overwrites prepayment_status (inside a transaction).
+func (r *Repository) SetPrepaymentStatus(ctx context.Context, tx *gorm.DB, id uuid.UUID, status string) error {
+	result := tx.WithContext(ctx).
+		Model(&Order{}).
+		Where("id = ?", id).
+		UpdateColumn("prepayment_status", status)
+	if result.Error != nil {
+		return fmt.Errorf("set prepayment status: %w", result.Error)
+	}
+	return nil
+}
+
 // UpdateProductCost sets the order's authoritative FIFO product cost,
 // written once by deductInventory at delivery.
 func (r *Repository) UpdateProductCost(ctx context.Context, tx *gorm.DB, id uuid.UUID, productCost float64) error {

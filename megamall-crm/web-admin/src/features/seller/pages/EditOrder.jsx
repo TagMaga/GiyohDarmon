@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ShoppingCart, ArrowLeft, Check } from 'lucide-react'
+import { ShoppingCart, ArrowLeft, Check, Wallet } from 'lucide-react'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { KEYS } from '../../../shared/queryKeys'
-import { fetchOrder, updateOrder } from '../api'
+import { fetchOrder, updateOrder, addPrepayment } from '../api'
+import { uploadToMedia } from '../../../shared/api/mediaUpload'
 import useProducts from '../hooks/useProducts'
 import useDeliverySettings from '../hooks/useDeliverySettings'
 import useCities from '../hooks/useCities'
@@ -12,8 +13,147 @@ import CartItemRow from '../components/CartItemRow'
 import CartTotalsBreakdown from '../components/CartTotalsBreakdown'
 import DeliveryModeSelector from '../components/DeliveryModeSelector'
 import Alert from '../../../shared/components/Alert'
-import { fmtAmount, isOrderEditable } from '../../../shared/orderStatusConfig'
+import {
+  fmtAmount, isOrderEditable,
+  PREPAYMENT_STATUS_LABELS, PREPAYMENT_STATUS_BADGE,
+} from '../../../shared/orderStatusConfig'
 import { Search, X, Package } from 'lucide-react'
+
+const PREPAY_BADGE_CLASS = {
+  amber:   'bg-amber-50 text-amber-700 border-amber-200',
+  emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  rose:    'bg-rose-50 text-rose-700 border-rose-200',
+}
+
+// ── Add prepayment (seller/manager/team lead, any time after order creation) ──
+function AddPrepaymentCard({ orderId, prepaymentAmount, prepaymentStatus, onAdded }) {
+  const toast = useToast()
+  const [amount, setAmount] = useState('')
+  const [proofFile, setProofFile] = useState(null)
+  const [error, setError] = useState(null)
+
+  const mut = useMutation({
+    mutationFn: async () => {
+      const value = Number(amount)
+      if (!value || value <= 0) throw new Error('Введите сумму предоплаты')
+      let mediaAssetId = null
+      if (proofFile) {
+        const asset = await uploadToMedia(proofFile, 'prepayment_proof')
+        mediaAssetId = asset?.id ?? null
+      }
+      return addPrepayment(orderId, value, mediaAssetId)
+    },
+    onSuccess: () => {
+      toast.success('Предоплата добавлена, отправлена диспетчеру на проверку')
+      setAmount('')
+      setProofFile(null)
+      setError(null)
+      onAdded?.()
+    },
+    onError: (err) => {
+      const msg = err?.response?.data?.error?.message
+        ?? err?.response?.data?.error
+        ?? err?.message
+        ?? 'Не удалось добавить предоплату'
+      setError(String(msg))
+    },
+  })
+
+  const statusLabel = prepaymentStatus ? PREPAYMENT_STATUS_LABELS[prepaymentStatus] : null
+  const statusColor = prepaymentStatus ? PREPAYMENT_STATUS_BADGE[prepaymentStatus] : null
+
+  return (
+    <div className="card p-5 space-y-3">
+      <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+        <Wallet size={15} className="text-amber-500" />
+        Предоплата
+        {statusLabel && (
+          <span className={`ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full border ${PREPAY_BADGE_CLASS[statusColor]}`}>
+            {statusLabel}
+          </span>
+        )}
+      </h3>
+
+      {prepaymentAmount > 0 && (
+        <p className="text-xs text-slate-500">
+          Уже внесено: <b className="text-slate-700">{fmtAmount(prepaymentAmount)} с</b>
+        </p>
+      )}
+
+      <div className="space-y-1">
+        <label className="input-label">Сумма новой предоплаты</label>
+        <div className="relative">
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            min="0.01"
+            step="0.01"
+            className="input pr-8 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none
+                       [&::-webkit-outer-spin-button]:appearance-none"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-medium">с</span>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <label className="input-label">Подтверждение оплаты (необязательно)</label>
+        <div className="flex gap-2">
+          <label className="flex-1 cursor-pointer">
+            <span className="block text-center text-xs font-semibold py-2.5 rounded-xl border border-dashed border-amber-300 bg-amber-50/50 text-amber-700 hover:bg-amber-50 transition-colors">
+              📎 Прикрепить файл / фото
+            </span>
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              onChange={(e) => setProofFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+        </div>
+        {proofFile && (
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-white border border-amber-200 mt-1">
+            {proofFile.type?.startsWith('image/') ? (
+              <img src={URL.createObjectURL(proofFile)} alt="proof"
+                className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-amber-200" />
+            ) : (
+              <div className="w-12 h-12 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 text-amber-700 text-xs font-bold">
+                PDF
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-medium text-slate-700 truncate">{proofFile.name}</p>
+              <p className="text-[10px] text-slate-400">{(proofFile.size / 1024).toFixed(0)} KB</p>
+            </div>
+            <button type="button" onClick={() => setProofFile(null)}
+              className="text-slate-400 hover:text-rose-500 text-xs font-bold px-1">✕</button>
+          </div>
+        )}
+      </div>
+
+      {error && <Alert variant="error" title="Ошибка">{error}</Alert>}
+
+      <button
+        type="button"
+        onClick={() => mut.mutate()}
+        disabled={mut.isPending || !amount}
+        className="w-full flex items-center justify-center gap-2 text-sm font-semibold py-2.5 rounded-xl
+                   bg-amber-500 text-white hover:bg-amber-600 active:scale-[0.98] transition-all
+                   disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {mut.isPending ? (
+          <>
+            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            Добавляем…
+          </>
+        ) : (
+          'Добавить предоплату'
+        )}
+      </button>
+    </div>
+  )
+}
 
 // ── Product search (same as CreateOrder) ──────────────────────────────────────
 function ProductSearch({ products, loading, onAdd }) {
@@ -137,14 +277,16 @@ export default function EditOrder() {
   // Use order passed via navigate state if available, otherwise fetch
   const stateOrder = location.state?.order ?? null
 
-  const { data: fetchedOrder, isLoading: orderLoading } = useQuery({
+  const { data: fetchedOrder, isLoading: orderLoading, refetch: refetchOrder } = useQuery({
     queryKey: ['seller', 'order', id],
     queryFn:  () => fetchOrder(id),
-    enabled:  !stateOrder,
     staleTime: 0,
   })
 
-  const order = stateOrder ?? fetchedOrder
+  // fetchedOrder takes priority once loaded so a prepayment added on this
+  // page (which refetches the order) is reflected immediately — stateOrder
+  // is only a fast first paint, not a source of truth thereafter.
+  const order = fetchedOrder ?? stateOrder
   const [form, setForm] = useState(null)
   const [submitError, setSubmitError] = useState(null)
 
@@ -445,6 +587,22 @@ export default function EditOrder() {
               disabled={isTerminal}
             />
           </div>
+
+          {/* ── Add prepayment — available any time after creation, as long as
+              the order hasn't reached a terminal status (mirrors backend's
+              AddPrepayment/IsTerminal check: delivered/returned/cancelled) ── */}
+          {!['delivered', 'returned', 'cancelled'].includes(order.status) && (
+            <AddPrepaymentCard
+              orderId={id}
+              prepaymentAmount={order.prepayment_amount ?? order.PrepaymentAmount ?? 0}
+              prepaymentStatus={order.prepayment_status ?? order.PrepaymentStatus}
+              onAdded={() => {
+                refetchOrder()
+                qc.invalidateQueries({ queryKey: KEYS.seller.orders })
+                qc.invalidateQueries({ queryKey: ['orders', 'list'] })
+              }}
+            />
+          )}
 
           {cartItems.length > 0 && (
             <CartTotalsBreakdown

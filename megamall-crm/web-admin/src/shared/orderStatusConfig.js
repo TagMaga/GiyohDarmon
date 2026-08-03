@@ -37,6 +37,19 @@ export function isOrderEditable(status) {
   return status !== 'delivered'
 }
 
+/** Labels/badge colors for order.prepayment_status ("none" is intentionally omitted — nothing to show). */
+export const PREPAYMENT_STATUS_LABELS = {
+  pending_verification: 'Ожидает проверки',
+  verified:             'Подтверждена',
+  rejected:             'Отклонена',
+}
+
+export const PREPAYMENT_STATUS_BADGE = {
+  pending_verification: 'amber',
+  verified:             'emerald',
+  rejected:             'rose',
+}
+
 /** Statuses that a seller can filter by in their orders list */
 export const SELLER_STATUS_FILTERS = [
   { key: 'all',        label: 'Все'             },
