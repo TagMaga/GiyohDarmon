@@ -592,6 +592,99 @@ func TestDeliveredOrder_CourierFIFOCost_MatchesInvoiceOrder(t *testing.T) {
 	}
 }
 
+// deliverAsCourier drives an order through the courier's real claim →
+// assigned → in_delivery → delivered path, the sequence the "✓ Доставлен"
+// button triggers. Returns the error from the final transition so callers
+// can assert on it.
+func deliverAsCourier(t *testing.T, db *gorm.DB, whSvc *Service, orderSvc *orders.Service, courierID, orderID uuid.UUID) error {
+	t.Helper()
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		return whSvc.ReserveForClaim(tx, context.Background(), courierID, orderID)
+	}); err != nil {
+		t.Fatalf("reserve for claim: %v", err)
+	}
+	db.Exec(`UPDATE orders SET status = 'assigned', courier_id = ? WHERE id = ?`, courierID, orderID)
+	db.Exec(`INSERT INTO order_assignments (id, order_id, courier_id, assigned_by, is_active) VALUES (?, ?, ?, ?, true)`,
+		uuid.New(), orderID, courierID, courierID)
+
+	if _, err := orderSvc.ChangeStatus(context.Background(), courierID, "courier", orderID, orders.ChangeStatusRequest{Status: orders.StatusInDelivery}); err != nil {
+		t.Fatalf("transition to in_delivery: %v", err)
+	}
+	_, err := orderSvc.ChangeStatus(context.Background(), courierID, "courier", orderID, orders.ChangeStatusRequest{Status: orders.StatusDelivered})
+	return err
+}
+
+// TestDeliveredOrder_LegacyCourierStock_NoCostLots_StillDelivers covers the
+// production incident: courier cost lots are only created by AcceptTransfer,
+// which shipped with migration 00098, so stock couriers were already holding
+// at that moment had none. ConsumeCourierFIFO used to return a bare error
+// when it ran out of lots, which surfaced to the courier as a bare "internal
+// server error" alert and rolled back the whole delivery — leaving the order
+// stuck in "в пути" with no way to complete it.
+//
+// Deleting the lots after AcceptTransfer is how that pre-00098 stock is
+// reproduced: physically present in courier_inventory, with no cost lot
+// behind it. Delivery must succeed, and the uncosted units fall back to the
+// product's purchase_price.
+func TestDeliveredOrder_LegacyCourierStock_NoCostLots_StillDelivers(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	whSvc, orderSvc := buildTestServices(t, db)
+	owner := testutil.CreateUser(t, db, users.RoleOwner)
+	seller := createSellerWithTeam(t, db)
+	courier := testutil.CreateUser(t, db, users.RoleCourier)
+	p := testutil.CreateProduct(t, db) // purchase_price = 40
+	testutil.CreateInventory(t, db, p.ID, owner.ID, 100)
+
+	transfer, err := whSvc.CreateTransfer(context.Background(), owner.ID, CreateTransferRequest{
+		FromWarehouseID: DefaultMainWarehouseID, CourierID: courier.ID,
+		Items: []TransferItemRequest{{ProductID: p.ID, Quantity: 20}},
+	})
+	if err != nil {
+		t.Fatalf("create transfer: %v", err)
+	}
+	if _, err := whSvc.AcceptTransfer(context.Background(), courier.ID, transfer.ID); err != nil {
+		t.Fatalf("accept transfer: %v", err)
+	}
+
+	// Strip the cost lots the accept just created: the courier now holds 20
+	// units with no ledger behind them, exactly like stock received before
+	// 00098.
+	if err := db.Exec(`DELETE FROM courier_inventory_batches`).Error; err != nil {
+		t.Fatalf("clear courier cost lots: %v", err)
+	}
+
+	order := createOrderForCourier(t, db, orderSvc, seller.ID, p.ID, 5)
+	if err := deliverAsCourier(t, db, whSvc, orderSvc, courier.ID, order.ID); err != nil {
+		t.Fatalf("delivery must not fail when courier stock predates the cost ledger: %v", err)
+	}
+
+	var status string
+	db.Table("orders").Select("status").Where("id = ?", order.ID).Scan(&status)
+	if status != string(orders.StatusDelivered) {
+		t.Errorf("expected order status delivered, got %q", status)
+	}
+
+	var productCost float64
+	db.Table("orders").Select("product_cost").Where("id = ?", order.ID).Scan(&productCost)
+	if productCost != 200 {
+		t.Errorf("expected product_cost = 200 (5 units @ purchase_price 40), got %v", productCost)
+	}
+
+	var ci CourierInventory
+	db.Where("product_id = ?", p.ID).First(&ci)
+	if ci.Quantity != 15 {
+		t.Errorf("expected courier quantity = 15 (20-5 delivered), got %d", ci.Quantity)
+	}
+
+	// The fallback must still be auditable: a synthetic lot, fully consumed,
+	// with a consumption row tying it to the delivery movement.
+	var consumed int
+	db.Table("courier_batch_consumptions").Select("COALESCE(SUM(quantity), 0)").Scan(&consumed)
+	if consumed != 5 {
+		t.Errorf("expected 5 units recorded in courier_batch_consumptions, got %d", consumed)
+	}
+}
+
 func TestReturnedOrder_ReleasesReservation_KeepsPhysicalStockWithCourier(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	whSvc, orderSvc := buildTestServices(t, db)

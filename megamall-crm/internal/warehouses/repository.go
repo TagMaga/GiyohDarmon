@@ -2,6 +2,7 @@ package warehouses
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -206,6 +207,27 @@ func (r *Repository) InsertCourierBatchConsumptions(tx *gorm.DB, ctx context.Con
 		return fmt.Errorf("insert courier batch consumptions: %w", err)
 	}
 	return nil
+}
+
+// GetProductPurchasePrice returns a product's purchase_price, or 0 when it
+// is unset. Used as the fallback unit cost for delivered units that have no
+// courier cost lot (see Service.ConsumeCourierFIFO). Runs on the caller's
+// tx rather than the pool: it is called mid-transaction while FIFO row
+// locks are held, and borrowing a second connection there risks blocking on
+// a pool this transaction is itself holding a slot in.
+func (r *Repository) GetProductPurchasePrice(tx *gorm.DB, ctx context.Context, productID uuid.UUID) (float64, error) {
+	var price *float64
+	row := tx.WithContext(ctx).Raw(`SELECT purchase_price FROM products WHERE id = ?`, productID).Row()
+	if err := row.Scan(&price); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("load product purchase price: %w", err)
+	}
+	if price == nil {
+		return 0, nil
+	}
+	return *price, nil
 }
 
 // ─── Transfers ────────────────────────────────────────────────────────────────
