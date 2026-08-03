@@ -131,6 +131,18 @@ func Run(ctx context.Context, db *gorm.DB, cfg *Config) (*Result, error) {
 	}
 	seedInventory(ctx, db, res, productID, ownerID)
 
+	// ── Courier demo warehouse ledger (dev/staging only) ─────────────────────
+	if cfg.seedsAllUsers() {
+		log.Println("--- Courier Demo Warehouse ---")
+		issuedBy := userIDs["warehouse_manager"]
+		if issuedBy == uuid.Nil {
+			issuedBy = ownerID
+		}
+		if err := seedCourierDemo(ctx, db, res, supplierID, issuedBy); err != nil {
+			res.fail("courier demo warehouse", err)
+		}
+	}
+
 	// ── Commission configs ─────────────────────────────────────────────────────
 	log.Println("--- Commission Configs ---")
 	ownerPtr := &ownerID
