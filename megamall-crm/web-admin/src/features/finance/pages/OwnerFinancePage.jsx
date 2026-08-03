@@ -21,8 +21,23 @@ import CommissionsBreakdown      from '../components/CommissionsBreakdown'
 import FinanceEventsTable        from '../components/FinanceEventsTable'
 import useFinanceSummary         from '../hooks/useFinanceSummary'
 
+// "Максимум — no bound" used to be { from: '', to: '' }, but the backend's
+// period parser (internal/finance/handler.go: parsePeriod) treats an empty
+// from/to the same as an *omitted* one and defaults it to the current
+// calendar month — so this page was silently loading "this month" and
+// labelling it "Максимум". MAX_RANGE_FROM predates any real business data,
+// so pairing it with today() reads as "all time" to the backend's inclusive
+// date-range filter while staying unambiguous from an omitted param. Keep
+// in sync with the identical constant in PeriodRangeFilter.jsx /
+// DesktopDateRangePicker.jsx / DateRangeBottomSheet.jsx.
+const MAX_RANGE_FROM = '2000-01-01'
+
+function toYMD(date) {
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
+}
+
 function defaultRange() {
-  return { from: '', to: '' } // Максимум — no bound
+  return { from: MAX_RANGE_FROM, to: toYMD(new Date()) }
 }
 
 const EXPENSE_CATEGORIES = [
