@@ -32,7 +32,7 @@ import {
   fetchBoard, fetchNewOrders, fetchIssueOrders, fetchDeliveredOrders,
   fetchCouriersOverview, fetchHandovers, fetchCashSettlement, fetchCashTransactions, fetchDispatchOrderHistory,
   confirmOrder, markReturn, verifyPrepayment, confirmCashTransaction, rejectCashTransaction,
-  assignCourier, reassignCourier, cancelOrder,
+  assignCourier, reassignCourier, cancelOrder, forceOrderStatus,
 } from '../api'
 import { getOrderId, getCourierId, buildCourierMap, resolveCourier, resolveCourierDisplay, formatOrderLabel } from '../utils/orderHelpers'
 import { resolveCustomer, resolveAddress, resolveCity } from '../utils/resolveCustomer'
@@ -72,6 +72,17 @@ const STATUS_TO_COL = {
   in_delivery: 'delivery',
   delivered: 'done',
   issue: 'issues',
+}
+
+// Drag-and-drop column → target status. The 'delivery' column covers two
+// statuses (assigned/in_delivery); keep whichever one the order is already
+// in if it's dropped back into the same column, otherwise default to
+// 'assigned' (dispatcher still needs to pick a courier separately if none
+// is set — the drop only moves the status, same as the force-status modal).
+function targetStatusForColumn(col, order) {
+  if (col.statuses.includes(order.status)) return order.status
+  if (col.key === 'delivery') return getCourierId(order) ? 'in_delivery' : 'assigned'
+  return col.statuses[0]
 }
 
 const EMPTY_FILTERS = { courier: '', date: 'all', tab: 'dispatch', mobileStatus: 'new' }
@@ -439,6 +450,30 @@ function DispatcherBoardDesktop() {
   })
   const isMutating = isAssigning || isReassigning
 
+  // ── Drag-and-drop status change (kanban columns) ─────────────────────────
+  const [dragOrderId, setDragOrderId] = useState(null)
+  const [dragOverCol, setDragOverCol] = useState(null)
+
+  const { mutate: doForceStatus } = useMutation({
+    mutationFn: ({ orderId, status, reason }) => forceOrderStatus(orderId, { status, reason }),
+    onSuccess: (_, { orderId }) => {
+      invalidate()
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.orderDetail(orderId) })
+      qc.invalidateQueries({ queryKey: KEYS.dispatcher.timeline(orderId) })
+      toast.success('Статус изменён')
+    },
+    onError: onErr,
+  })
+
+  const handleDropOrder = useCallback((orderId, col) => {
+    if (!orderId) return
+    const order = allOrders.find((o) => getOrderId(o) === orderId)
+    if (!order) return
+    const status = targetStatusForColumn(col, order)
+    if (status === order.status) return
+    doForceStatus({ orderId, status, reason: 'Статус изменён перетаскиванием на доске' })
+  }, [allOrders, doForceStatus])
+
   function quickAssign() {
     if (!selectedOrder || !pendingCourierId) return
     const orderId = requiredOrderId(selectedOrder)
@@ -633,6 +668,12 @@ function DispatcherBoardDesktop() {
                   bulkMode={bulkMode}
                   bulkIds={bulkIds}
                   onToggleBulk={toggleBulk}
+                  dragOverCol={dragOverCol}
+                  onDragOverCol={setDragOverCol}
+                  onDropOrder={handleDropOrder}
+                  onCardDragStart={setDragOrderId}
+                  onCardDragEnd={() => { setDragOrderId(null); setDragOverCol(null) }}
+                  draggingOrderId={dragOrderId}
                 />
               ))}
             </div>
@@ -1007,9 +1048,36 @@ function BulkActionBar({ count, busy, onConfirm, onCancel, onAssign, onClear }) 
   )
 }
 
-function Column({ col, orders, loading, customerMap, courierMap, selectedOrder, onSelect, onAction, isConfirming, bulkMode, bulkIds, onToggleBulk }) {
+function Column({
+  col, orders, loading, customerMap, courierMap, selectedOrder, onSelect, onAction, isConfirming,
+  bulkMode, bulkIds, onToggleBulk,
+  dragOverCol, onDragOverCol, onDropOrder, onCardDragStart, onCardDragEnd, draggingOrderId,
+}) {
+  const dragActive = !!draggingOrderId
+  const isOver = dragOverCol === col.key
+
   return (
-    <section className="dv2-col" style={{ '--col-color': col.color }}>
+    <section
+      className={`dv2-col ${dragActive ? 'drag-active' : ''} ${isOver ? 'drag-over' : ''}`}
+      style={{ '--col-color': col.color }}
+      onDragOver={(e) => {
+        if (!dragActive) return
+        e.preventDefault()
+        if (dragOverCol !== col.key) onDragOverCol?.(col.key)
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget)) return
+        if (dragOverCol === col.key) onDragOverCol?.(null)
+      }}
+      onDrop={(e) => {
+        e.preventDefault()
+        const orderId = e.dataTransfer.getData('text/plain')
+        const order = orders.find((o) => getOrderId(o) === orderId) ?? null
+        onDragOverCol?.(null)
+        if (order) return // dropped back into its own column, nothing to do
+        onDropOrder?.(draggingOrderId, col)
+      }}
+    >
       <div className="dv2-col-head">
         <div className="dv2-col-title">{col.label}</div>
         <div className="dv2-col-cnt">{orders.length}</div>
@@ -1033,6 +1101,9 @@ function Column({ col, orders, loading, customerMap, courierMap, selectedOrder, 
               bulkMode={bulkMode}
               bulkChecked={bulkIds?.has(getOrderId(order))}
               onToggleBulk={onToggleBulk}
+              onCardDragStart={onCardDragStart}
+              onCardDragEnd={onCardDragEnd}
+              dragging={draggingOrderId === getOrderId(order)}
             />
           ))
         )}
@@ -1041,7 +1112,7 @@ function Column({ col, orders, loading, customerMap, courierMap, selectedOrder, 
   )
 }
 
-function OrderCard({ order, customerMap, courierMap, selected, onSelect, onAction, isConfirming, bulkMode, bulkChecked, onToggleBulk }) {
+function OrderCard({ order, customerMap, courierMap, selected, onSelect, onAction, isConfirming, bulkMode, bulkChecked, onToggleBulk, onCardDragStart, onCardDragEnd, dragging }) {
   const customer = resolveCustomer(order, customerMap)
   const courierDisp = resolveCourierDisplay(order, courierMap)
   const address = resolveAddress(order) || customer?.address || resolveCity(order) || customer?.city || '—'
@@ -1051,12 +1122,21 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
   const isCash = order.payment_method === 'cash' || order.payment_method === 'наличные'
   const hasPrepay = order.prepayment_status || Number(order.prepayment_amount ?? 0) > 0
 
+  const canDrag = !!onCardDragStart && !bulkMode
+
   return (
     <div
-      className={`dv2-order ${selected ? 'selected' : ''} ${urgentClass}`}
+      className={`dv2-order ${selected ? 'selected' : ''} ${urgentClass} ${dragging ? 'dragging' : ''}`}
       style={{ '--card-color': cardColor }}
       role="button"
       tabIndex={0}
+      draggable={canDrag}
+      onDragStart={canDrag ? (e) => {
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', getOrderId(order))
+        onCardDragStart(getOrderId(order))
+      } : undefined}
+      onDragEnd={canDrag ? () => onCardDragEnd?.() : undefined}
       onClick={() => bulkMode ? onToggleBulk?.(getOrderId(order)) : onSelect(order)}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return
