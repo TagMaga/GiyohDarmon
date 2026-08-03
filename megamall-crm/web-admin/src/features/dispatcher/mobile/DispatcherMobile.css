@@ -5,5 +5,15 @@
 @keyframes dmFade    { from { opacity: 0; } to { opacity: 1; } }
 @keyframes dmCardIn  { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
+/* Prepayment badge on an order still awaiting the dispatcher's confirmation. */
+@keyframes dmPrepayPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, .5); }
+  55%      { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0); }
+}
+.dm-prepay-pulse { animation: dmPrepayPulse 1.9s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .dm-prepay-pulse { animation: none; }
+}
+
 .dm-root * { box-sizing: border-box; }
 .dm-root a { color: #4338CA; text-decoration: none; }
