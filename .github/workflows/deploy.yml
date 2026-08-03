@@ -137,11 +137,32 @@ jobs:
           GOARCH: amd64
         run: go build -trimpath -ldflags="-w -s" -o ../release/megamall-crm ./cmd/server
 
+      # Built for the same GOOS/GOARCH/host as the backend above (this
+      # runner is itself ubuntu-latest, matching the production host — see
+      # the CGO_ENABLED comment at the top of this file), so deploy.sh can
+      # run pending migrations on the server without needing a Go
+      # toolchain, network access, or a manual `make migrate` step — see
+      # deploy.sh's run_migrations(). `go install pkg@version` resolves its
+      # own module graph rather than the backend's go.mod/go.sum, since
+      # goose's cmd/goose main package imports optional drivers (MySQL,
+      # ClickHouse, ...) this project's go.sum has no entries for and has
+      # no reason to carry. The pinned version must match go.mod's
+      # github.com/pressly/goose/v3 line so the CLI and the library the
+      # backend embeds never drift apart.
+      - name: Build goose migration tool
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          GOBIN: ${{ github.workspace }}/release
+        run: go install github.com/pressly/goose/v3/cmd/goose@v3.21.1
+
       - name: Package immutable release
         run: |
           set -Eeuo pipefail
           mkdir -p release/frontend
           cp -a "$FRONTEND_DIR/dist/." release/frontend/
+          cp -a "$BACKEND_DIR/migrations" release/migrations
+          chmod 0755 release/goose
           printf '%s\n' "$GITHUB_SHA" > release/REVISION
           tar -C release -czf "megamall-$GITHUB_SHA.tar.gz" .
           bash -n deploy.sh

@@ -16,6 +16,14 @@ printf 'old-backend\n' > "$PROJECT/megamall-crm/tmp/megamall-crm"
 chmod 0755 "$PROJECT/megamall-crm/tmp/megamall-crm"
 printf 'old-frontend\n' > "$PROJECT/megamall-crm/web-admin/dist/index.html"
 
+# Mirrors the real .env's shape (DB_DSN has spaces — "host=... sslmode=..."),
+# which run_migrations() must parse line-by-line rather than `source`.
+GOOSE_CALLS_LOG="$TEST_ROOT/goose-calls.log"
+cat > "$PROJECT/megamall-crm/.env" <<'EOF'
+# comment line, must be skipped
+DB_DSN=host=localhost user=test password=test dbname=test sslmode=disable
+EOF
+
 cat > "$MOCK_BIN/systemctl" <<'EOF'
 #!/usr/bin/env bash
 case "${1:-}" in
@@ -52,11 +60,25 @@ make_artifact() {
   local source_dir="$TEST_ROOT/source-$revision"
   local artifact="$TEST_ROOT/$revision.tar.gz"
 
-  mkdir -p "$source_dir/frontend"
+  mkdir -p "$source_dir/frontend" "$source_dir/migrations"
   printf '%s\n' "$revision" > "$source_dir/REVISION"
   printf '%s\n' "$backend_content" > "$source_dir/megamall-crm"
   chmod 0755 "$source_dir/megamall-crm"
   printf '%s\n' "frontend-$revision" > "$source_dir/frontend/index.html"
+  printf -- '-- +goose Up\nSELECT 1;\n' > "$source_dir/migrations/00001_dummy.sql"
+
+  # Mock goose: records how it was invoked (mirroring deploy.yml's
+  # statically-built `goose` binary shipped alongside the real backend) so
+  # run_migrations()'s DSN-parsing and argument-passing can be asserted on,
+  # without needing a real Postgres in CI (see deploy.yml's
+  # "must never need a database" contract).
+  cat > "$source_dir/goose" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$GOOSE_CALLS_LOG"
+exit 0
+EOF
+  chmod 0755 "$source_dir/goose"
+
   tar -C "$source_dir" -czf "$artifact" .
   printf '%s\n' "$artifact"
 }
@@ -81,6 +103,12 @@ run_deploy "$GOOD_REVISION" "$GOOD_ARTIFACT"
 grep -q 'healthy-backend' "$PROJECT/megamall-crm/tmp/megamall-crm"
 grep -q "frontend-$GOOD_REVISION" "$PROJECT/megamall-crm/web-admin/dist/index.html"
 grep -q "$GOOD_REVISION" "$PROJECT/releases/CURRENT"
+
+# run_migrations() must have invoked the staged goose binary with the
+# DB_DSN parsed out of .env (spaces intact, comment line skipped).
+grep -qF -- '-dir' "$GOOSE_CALLS_LOG"
+grep -qF 'postgres host=localhost user=test password=test dbname=test sslmode=disable up' "$GOOSE_CALLS_LOG"
+echo "database migration step test passed"
 
 BAD_REVISION=2222222222222222222222222222222222222222
 BAD_ARTIFACT=$(make_artifact "$BAD_REVISION" unhealthy-backend)
