@@ -270,6 +270,33 @@ func (s *Service) CreateWarehouse(ctx context.Context, actorID uuid.UUID, req Cr
 	return &resp, nil
 }
 
+func (s *Service) UpdateWarehouseName(ctx context.Context, actorID, id uuid.UUID, req UpdateWarehouseNameRequest) (*WarehouseResponse, error) {
+	w, err := s.repo.GetWarehouse(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if w == nil {
+		return nil, apperrors.NotFound("warehouse")
+	}
+	if w.Type != WarehouseTypeMain {
+		return nil, apperrors.BadRequest("переименовать можно только главный склад")
+	}
+
+	oldName := w.Name
+	if err := s.repo.UpdateWarehouseName(ctx, id, req.Name); err != nil {
+		return nil, err
+	}
+	w.Name = req.Name
+
+	s.logger.LogAsync(activity.Entry{
+		ActorID: &actorID, Action: "update_warehouse_name", EntityType: "warehouse", EntityID: &w.ID,
+		BeforeState: map[string]interface{}{"name": oldName},
+		AfterState:  map[string]interface{}{"name": w.Name},
+	})
+	resp := ToWarehouseResponse(w)
+	return &resp, nil
+}
+
 // ─── Transfers (main warehouse -> courier issuance) ────────────────────────────
 
 func (s *Service) CreateTransfer(ctx context.Context, actorID uuid.UUID, req CreateTransferRequest) (*TransferResponse, error) {

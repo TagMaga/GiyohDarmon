@@ -12,6 +12,7 @@ import {
   fetchTransfers,
   fetchWarehouses,
   rejectReturn,
+  updateWarehouseName,
 } from '../api'
 
 export function useInventorySummary(options = {}) {
@@ -45,6 +46,14 @@ export function useCreateWarehouse() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: createWarehouse,
+    onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.warehouse.warehouses }),
+  })
+}
+
+export function useUpdateWarehouseName() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ warehouseId, name }) => updateWarehouseName(warehouseId, name),
     onSuccess: () => qc.invalidateQueries({ queryKey: KEYS.warehouse.warehouses }),
   })
 }

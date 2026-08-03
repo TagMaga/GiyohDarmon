@@ -30,6 +30,10 @@ type CreateWarehouseRequest struct {
 	CityID *uuid.UUID `json:"city_id"`
 }
 
+type UpdateWarehouseNameRequest struct {
+	Name string `json:"name" validate:"required,max=150"`
+}
+
 // ─── Inventory distribution ──────────────────────────────────────────────────
 
 // InventoryLocationResponse is a selectable stock location on the inventory

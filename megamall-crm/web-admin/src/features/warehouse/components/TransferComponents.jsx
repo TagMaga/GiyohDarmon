@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Building2, CheckCircle2, Package, Plus, Trash2, Truck, Warehouse as WarehouseIcon, XCircle } from 'lucide-react'
+import { Building2, CheckCircle2, Package, Pencil, Plus, Trash2, Truck, Warehouse as WarehouseIcon, XCircle } from 'lucide-react'
 import Modal from '../../../shared/components/Modal'
 import Button from '../../../shared/components/Button'
 import Badge from '../../../shared/components/Badge'
@@ -16,6 +16,7 @@ import {
   useLostReports,
   useRejectReturn,
   useReturns,
+  useUpdateWarehouseName,
   useWarehouses,
 } from '../hooks/useTransfers'
 import { getId, getProductName, getProductSku, isUUID } from '../utils/warehouseHelpers'
@@ -395,11 +396,66 @@ export function NewWarehouseModal({ open, onClose }) {
   )
 }
 
+// ─── Rename warehouse modal (owner + warehouse manager) ────────────────────
+
+export function RenameWarehouseModal({ open, onClose, warehouse }) {
+  const toast = useToast()
+  const updateName = useUpdateWarehouseName()
+  const [name, setName] = useState(warehouse?.name ?? '')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      setName(warehouse?.name ?? '')
+      setError('')
+    }
+  }, [open, warehouse])
+
+  function close() {
+    setError('')
+    onClose()
+  }
+
+  async function submit() {
+    setError('')
+    if (!name.trim()) return setError('Введите название склада')
+    try {
+      await updateName.mutateAsync({ warehouseId: warehouse.id, name: name.trim() })
+      toast?.success?.('Название склада обновлено')
+      close()
+    } catch (err) {
+      setError(err?.response?.data?.error?.message ?? err.message ?? 'Не удалось обновить название склада')
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={close} title="Переименовать склад" description="Доступно владельцу и заведующему складом."
+      footer={(
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={close}>Отмена</Button>
+          <Button variant="primary" icon={<Pencil size={15} />} loading={updateName.isPending} onClick={submit}>
+            Сохранить
+          </Button>
+        </div>
+      )}
+    >
+      <div className="space-y-4">
+        {error && <Alert variant="error">{error}</Alert>}
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-slate-500">Название склада</span>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Например, Склад №2" />
+        </label>
+      </div>
+    </Modal>
+  )
+}
+
 // ─── Warehouses list + create ───────────────────────────────────────────────
 
 export function WarehousesPanel() {
   const { data: warehouses = [], isLoading } = useWarehouses()
   const [showNew, setShowNew] = useState(false)
+  const [renaming, setRenaming] = useState(null)
   const mainWarehouses = useMemo(() => warehouses.filter((w) => w.type === 'main'), [warehouses])
 
   return (
@@ -423,12 +479,23 @@ export function WarehousesPanel() {
                 <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600"><Building2 size={15} /></span>
                 <span className="min-w-0 truncate text-sm font-bold text-slate-950">{w.name}</span>
               </div>
-              <Badge variant={w.is_active ? 'emerald' : 'slate'} dot>{w.is_active ? 'Активен' : 'Неактивен'}</Badge>
+              <div className="flex flex-shrink-0 items-center gap-2">
+                <Badge variant={w.is_active ? 'emerald' : 'slate'} dot>{w.is_active ? 'Активен' : 'Неактивен'}</Badge>
+                <button
+                  type="button"
+                  onClick={() => setRenaming(w)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Переименовать склад"
+                >
+                  <Pencil size={14} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
       )}
       <NewWarehouseModal open={showNew} onClose={() => setShowNew(false)} />
+      <RenameWarehouseModal open={!!renaming} onClose={() => setRenaming(null)} warehouse={renaming} />
     </section>
   )
 }
