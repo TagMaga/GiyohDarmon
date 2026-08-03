@@ -146,6 +146,19 @@ func (s *Service) DeliverCourierItem(
 // накладная — first, mirroring inventory.Repository.ConsumeFEFO). It locks
 // the lot rows, updates remaining_quantity, inserts CourierBatchConsumption
 // records, and returns the total cost. Must be called inside a transaction.
+//
+// A shortfall — more units delivered than the courier has cost lots for —
+// is NOT an error. Cost lots only exist for stock received through
+// AcceptTransfer after migration 00098 shipped the courier ledger, so
+// stock a courier was already holding at that moment has none, and
+// migration 00099's backfill can only reconstruct lots for receipts that
+// left an auditable trail. A delivery is a physical fact the courier is
+// reporting after it happened: refusing to record it because the books are
+// short a lot would strand the order in "в пути" forever with no way out.
+// Uncosted units are instead costed at the product's purchase_price (0 if
+// unset) and recorded against a synthetic lot, so courier_batch_consumptions
+// stays a complete account of what every delivery cost and the gap is
+// visible in the ledger rather than hidden in a log line.
 func (s *Service) ConsumeCourierFIFO(tx *gorm.DB, ctx context.Context, warehouseID, productID uuid.UUID, qty int, movementID uuid.UUID) (float64, error) {
 	batches, err := s.repo.GetCourierBatchesForFIFO(tx, ctx, warehouseID, productID)
 	if err != nil {
@@ -179,7 +192,36 @@ func (s *Service) ConsumeCourierFIFO(tx *gorm.DB, ctx context.Context, warehouse
 	}
 
 	if remaining > 0 {
-		return 0, fmt.Errorf("insufficient courier batch stock: need %d more units (FIFO lots exhausted) for warehouse=%s product=%s", remaining, warehouseID, productID)
+		fallbackCost, err := s.repo.GetProductPurchasePrice(tx, ctx, productID)
+		if err != nil {
+			return 0, err
+		}
+		// Fully-consumed on creation: it exists to carry the cost of units
+		// that had no lot, not to make phantom stock available to a later
+		// delivery. NULL source_batch_id + transfer_id is what marks it
+		// synthetic (see migration 00099's backfill lots, same convention).
+		synthetic := &CourierInventoryBatch{
+			ID:                uuid.New(),
+			WarehouseID:       warehouseID,
+			ProductID:         productID,
+			ReceivedQuantity:  remaining,
+			RemainingQuantity: 0,
+			UnitCost:          fallbackCost,
+			CreatedAt:         time.Now(),
+		}
+		if err := s.repo.InsertCourierInventoryBatches(tx, ctx, []*CourierInventoryBatch{synthetic}); err != nil {
+			return 0, err
+		}
+		consumptions = append(consumptions, &CourierBatchConsumption{
+			ID:         uuid.New(),
+			BatchID:    synthetic.ID,
+			MovementID: movementID,
+			Quantity:   remaining,
+			UnitCost:   fallbackCost,
+		})
+		totalCost += float64(remaining) * fallbackCost
+		log.Printf("[courier FIFO] no cost lot for %d unit(s): warehouse=%s product=%s movement=%s — costed at purchase_price %.2f",
+			remaining, warehouseID, productID, movementID, fallbackCost)
 	}
 
 	if err := s.repo.InsertCourierBatchConsumptions(tx, ctx, consumptions); err != nil {
