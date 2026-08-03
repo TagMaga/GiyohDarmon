@@ -11,19 +11,27 @@ import (
 // ─── Board ────────────────────────────────────────────────────────────────────
 
 // BoardOrder is the dispatcher board projection: order + current assignment.
+//
+// The prepayment fields mirror the ones GET /orders already returns, so the
+// board's Confirmed / In-delivery columns can render the same prepayment
+// badges as the columns fed by the orders endpoint (notably the
+// "pending_verification" marker that tells the dispatcher a prepayment is
+// still waiting on their confirmation).
 type BoardOrder struct {
-	OrderID      uuid.UUID          `json:"order_id"`
-	OrderNumber  string             `json:"order_number"`
-	Status       orders.OrderStatus `json:"status"`
-	CustomerID   uuid.UUID          `json:"customer_id"`
-	TotalAmount  float64            `json:"total_amount"`
-	DeliveryFee  float64            `json:"delivery_fee"`
-	ScheduledAt  *time.Time         `json:"scheduled_at"`
-	CourierID    *uuid.UUID         `json:"courier_id"`
-	AssignmentID *uuid.UUID         `json:"assignment_id"`
-	AssignedAt   *time.Time         `json:"assigned_at"`
-	Notes        *string            `json:"notes"`
-	CreatedAt    time.Time          `json:"created_at"`
+	OrderID          uuid.UUID          `json:"order_id"`
+	OrderNumber      string             `json:"order_number"`
+	Status           orders.OrderStatus `json:"status"`
+	CustomerID       uuid.UUID          `json:"customer_id"`
+	TotalAmount      float64            `json:"total_amount"`
+	DeliveryFee      float64            `json:"delivery_fee"`
+	PrepaymentAmount float64            `json:"prepayment_amount"`
+	PrepaymentStatus string             `json:"prepayment_status"`
+	ScheduledAt      *time.Time         `json:"scheduled_at"`
+	CourierID        *uuid.UUID         `json:"courier_id"`
+	AssignmentID     *uuid.UUID         `json:"assignment_id"`
+	AssignedAt       *time.Time         `json:"assigned_at"`
+	Notes            *string            `json:"notes"`
+	CreatedAt        time.Time          `json:"created_at"`
 }
 
 // UpdateCourierRequest is the dispatcher payload to edit a courier's profile.

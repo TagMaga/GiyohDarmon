@@ -2,7 +2,7 @@ import { Search, X, Clock, Loader2, Check, AlertTriangle, Truck } from 'lucide-r
 import { C, chipStyle } from './theme'
 import { resolveCustomer, resolveAddress, resolveCity } from '../utils/resolveCustomer'
 import { resolveCourierDisplay, formatOrderLabel, getOrderId } from '../utils/orderHelpers'
-import { fmt, isOverdue, isToday, isTomorrow, orderAge } from '../statusConfig'
+import { fmt, fmtDayTime, isOverdue, isToday, isTomorrow, orderAge } from '../statusConfig'
 
 const DATE_OPTIONS = [
   { value: 'all', label: 'Все' },
@@ -131,15 +131,24 @@ function OrderCard({ order, customerMap, courierMap, onSelect, onAction, isConfi
   const when = order.scheduled_at || order.delivery_date
   const overdue = isOverdue(order)
   const isCash = order.payment_method === 'cash' || order.payment_method === 'наличные'
-  const hasPrepay = order.prepayment_status || Number(order.prepayment_amount ?? 0) > 0
+  const prepayStatus = order.prepayment_status
+  const hasPrepayAmount = Number(order.prepayment_amount ?? 0) > 0
+  // pending_verification = the dispatcher still has to confirm or reject this
+  // prepayment. The card gets an amber ring (the status bar on the left is
+  // already spoken for) plus a pulsing badge.
+  const needsPrepayReview = prepayStatus === 'pending_verification'
   const isExpress = order.delivery_method === 'express'
+  const createdAt = fmtDayTime(order.created_at)
 
   const barColor = order.status === 'new' ? '#6366f1' : order.status === 'confirmed' ? '#0ea5e9'
     : order.status === 'issue' ? '#ef4444' : order.status === 'delivered' ? '#10b981' : '#f59e0b'
   const ageColor = overdue ? C.red : C.text3
 
   const badges = []
-  if (hasPrepay) badges.push({ label: 'предопл', bg: C.amberBg, color: C.amber })
+  if (needsPrepayReview) badges.push({ label: '⏳ предопл', bg: C.amberBg, color: C.amber, pulse: true })
+  else if (prepayStatus === 'verified') badges.push({ label: '✓ предопл', bg: C.greenBg, color: C.green })
+  else if (prepayStatus === 'rejected') badges.push({ label: '✗ предопл', bg: C.redBg, color: C.red })
+  else if (hasPrepayAmount) badges.push({ label: 'предопл', bg: C.amberBg, color: C.amber })
   if (isExpress) badges.push({ label: '⚡ экспр', bg: C.amberBg, color: C.amber })
   if (isToday(when)) badges.push({ label: 'сегодня', bg: C.greenBg, color: C.green })
   if (isTomorrow(when)) badges.push({ label: 'завтра', bg: C.blueBg, color: C.blue })
@@ -148,14 +157,29 @@ function OrderCard({ order, customerMap, courierMap, onSelect, onAction, isConfi
   return (
     <div
       onClick={() => onSelect(order)}
-      style={{ position: 'relative', background: C.card, borderRadius: 15, padding: '13px 14px 13px 16px', cursor: 'pointer', animation: 'dmCardIn .2s ease' }}
+      style={{
+        position: 'relative', background: C.card, borderRadius: 15, padding: '13px 14px 13px 16px',
+        cursor: 'pointer', animation: 'dmCardIn .2s ease',
+        boxShadow: needsPrepayReview ? '0 0 0 1.5px #F0C784, 0 0 0 5px rgba(245,158,11,.12)' : undefined,
+      }}
     >
       <span style={{ position: 'absolute', left: 0, top: 13, bottom: 13, width: 3, borderRadius: '0 3px 3px 0', background: barColor }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
         <span style={{ fontSize: 11, fontWeight: 800, color: C.text3, fontVariantNumeric: 'tabular-nums' }}>#{formatOrderLabel(order)}</span>
+        {createdAt && (
+          <span style={{ fontSize: 10, fontWeight: 600, color: C.text3, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            · {createdAt}
+          </span>
+        )}
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', flex: 1 }}>
           {badges.map((b) => (
-            <span key={b.label} style={{ padding: '2px 7px', borderRadius: 6, fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', background: b.bg, color: b.color }}>{b.label}</span>
+            <span
+              key={b.label}
+              className={b.pulse ? 'dm-prepay-pulse' : undefined}
+              style={{ padding: '2px 7px', borderRadius: 6, fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.04em', background: b.bg, color: b.color }}
+            >
+              {b.label}
+            </span>
           ))}
         </div>
         {age && (

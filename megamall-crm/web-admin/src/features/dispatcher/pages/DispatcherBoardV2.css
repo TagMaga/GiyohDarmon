@@ -571,7 +571,17 @@
 .dv2-order.urgent-red { border-color: #F4C9D4; }
 .dv2-order.urgent-amber { border-color: #F3DCB2; }
 .dv2-oc-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.dv2-oc-num { font-size: 11px; font-weight: 800; color: var(--text2); }
+.dv2-oc-num { font-size: 11px; font-weight: 800; color: var(--text2); font-variant-numeric: tabular-nums; }
+/* Creation date/time, right after the order number: "#ORD-1119 · 03.08 09:14". */
+.dv2-oc-sep { font-size: 10px; color: var(--border2); flex-shrink: 0; }
+.dv2-oc-time {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .dv2-oc-badges { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; min-width: 0; }
 .dv2-badge { padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
 .dv2-badge.cash { background: var(--green-dim); color: var(--green-text); }
@@ -592,6 +602,37 @@
 .dv2-oc-courier { font-size: 10px; color: var(--text2); display: flex; align-items: center; gap: 4px; min-width: 0; }
 .dv2-oc-courier span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dv2-oc-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
+
+/* ── Prepayment waiting on the dispatcher ────────────────────────────────────
+   prepayment_status = 'pending_verification' means someone submitted a
+   prepayment and the dispatcher still has to confirm or reject it. The amber
+   rail + border lift the card out of a full column; the pulsing badge is the
+   marker itself. Purely visual — confirming still happens in the order
+   drawer. Declared after .urgent-* so the amber border wins on a card that is
+   both overdue and awaiting prepayment review. */
+.dv2-order.prepay-alert {
+  border-color: #F0C784;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, .16), var(--sh-card);
+  padding-left: 13px;
+  overflow: hidden;
+}
+.dv2-order.prepay-alert::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--amber);
+}
+.dv2-badge.prepay-pending { animation: dv2PrepayPulse 1.9s ease-in-out infinite; }
+@keyframes dv2PrepayPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, .5); }
+  55%      { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dv2-badge.prepay-pending { animation: none; }
+}
 .dv2-oc-actions { position: absolute; right: 8px; top: 8px; display: none; gap: 4px; }
 .dv2-order:hover .dv2-oc-actions { display: flex; }
 .dv2-oc-action {

@@ -30,18 +30,20 @@ func NewRepository(db *gorm.DB) *Repository {
 // joined with their active assignment (if any).
 func (r *Repository) ListBoardOrders(ctx context.Context, p pagination.Params) ([]BoardOrder, int, error) {
 	type row struct {
-		OrderID      uuid.UUID          `gorm:"column:order_id"`
-		OrderNumber  string             `gorm:"column:order_number"`
-		Status       orders.OrderStatus `gorm:"column:status"`
-		CustomerID   uuid.UUID          `gorm:"column:customer_id"`
-		TotalAmount  float64            `gorm:"column:total_amount"`
-		DeliveryFee  float64            `gorm:"column:delivery_fee"`
-		ScheduledAt  *time.Time         `gorm:"column:scheduled_at"`
-		CourierID    *uuid.UUID         `gorm:"column:courier_id"`
-		AssignmentID *uuid.UUID         `gorm:"column:assignment_id"`
-		AssignedAt   *time.Time         `gorm:"column:assigned_at"`
-		Notes        *string            `gorm:"column:notes"`
-		CreatedAt    time.Time          `gorm:"column:created_at"`
+		OrderID          uuid.UUID          `gorm:"column:order_id"`
+		OrderNumber      string             `gorm:"column:order_number"`
+		Status           orders.OrderStatus `gorm:"column:status"`
+		CustomerID       uuid.UUID          `gorm:"column:customer_id"`
+		TotalAmount      float64            `gorm:"column:total_amount"`
+		DeliveryFee      float64            `gorm:"column:delivery_fee"`
+		PrepaymentAmount float64            `gorm:"column:prepayment_amount"`
+		PrepaymentStatus string             `gorm:"column:prepayment_status"`
+		ScheduledAt      *time.Time         `gorm:"column:scheduled_at"`
+		CourierID        *uuid.UUID         `gorm:"column:courier_id"`
+		AssignmentID     *uuid.UUID         `gorm:"column:assignment_id"`
+		AssignedAt       *time.Time         `gorm:"column:assigned_at"`
+		Notes            *string            `gorm:"column:notes"`
+		CreatedAt        time.Time          `gorm:"column:created_at"`
 	}
 
 	base := r.db.WithContext(ctx).Table("orders o").
@@ -52,6 +54,8 @@ func (r *Repository) ListBoardOrders(ctx context.Context, p pagination.Params) (
 			o.customer_id,
 			o.total_amount,
 			o.delivery_fee,
+			COALESCE(o.prepayment_amount, 0) AS prepayment_amount,
+			o.prepayment_status,
 			o.scheduled_at,
 			o.courier_id,
 			oa.id          AS assignment_id,
@@ -78,18 +82,20 @@ func (r *Repository) ListBoardOrders(ctx context.Context, p pagination.Params) (
 	result := make([]BoardOrder, 0, len(rows))
 	for _, r := range rows {
 		result = append(result, BoardOrder{
-			OrderID:      r.OrderID,
-			OrderNumber:  r.OrderNumber,
-			Status:       r.Status,
-			CustomerID:   r.CustomerID,
-			TotalAmount:  r.TotalAmount,
-			DeliveryFee:  r.DeliveryFee,
-			ScheduledAt:  r.ScheduledAt,
-			CourierID:    r.CourierID,
-			AssignmentID: r.AssignmentID,
-			AssignedAt:   r.AssignedAt,
-			Notes:        r.Notes,
-			CreatedAt:    r.CreatedAt,
+			OrderID:          r.OrderID,
+			OrderNumber:      r.OrderNumber,
+			Status:           r.Status,
+			CustomerID:       r.CustomerID,
+			TotalAmount:      r.TotalAmount,
+			DeliveryFee:      r.DeliveryFee,
+			PrepaymentAmount: r.PrepaymentAmount,
+			PrepaymentStatus: r.PrepaymentStatus,
+			ScheduledAt:      r.ScheduledAt,
+			CourierID:        r.CourierID,
+			AssignmentID:     r.AssignmentID,
+			AssignedAt:       r.AssignedAt,
+			Notes:            r.Notes,
+			CreatedAt:        r.CreatedAt,
 		})
 	}
 	return result, int(total), nil

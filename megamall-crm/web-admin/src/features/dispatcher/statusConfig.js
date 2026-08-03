@@ -189,3 +189,21 @@ export function fmtDate(iso) {
     timeZone: APP_TIMEZONE,
   })
 }
+
+/**
+ * Day + time without the year — "03.08 09:14".
+ *
+ * Used on the board cards, where the year is noise (a card is always a
+ * recent order) and horizontal space is tight. Returns null on a missing
+ * or unparseable date so callers can drop the element entirely.
+ */
+export function fmtDayTime(iso) {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleString('ru-RU', {
+    day: '2-digit', month: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+    timeZone: APP_TIMEZONE,
+  }).replace(',', '')
+}

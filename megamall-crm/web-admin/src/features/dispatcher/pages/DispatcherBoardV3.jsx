@@ -36,7 +36,7 @@ import {
 } from '../api'
 import { getOrderId, getCourierId, buildCourierMap, resolveCourier, resolveCourierDisplay, formatOrderLabel } from '../utils/orderHelpers'
 import { resolveCustomer, resolveAddress, resolveCity } from '../utils/resolveCustomer'
-import { fmt, fmtDate, isOverdue, isToday, isTomorrow, orderAge, orderAgeMinutes, STATUS_LABELS } from '../statusConfig'
+import { fmt, fmtDate, fmtDayTime, isOverdue, isToday, isTomorrow, orderAge, orderAgeMinutes, STATUS_LABELS } from '../statusConfig'
 import useIsMobile from '../../../shared/hooks/useIsMobile'
 import DispatcherMobileApp from './DispatcherMobileApp'
 import CompanySettlementTab from '../components/v2/CompanySettlementTab'
@@ -1122,12 +1122,17 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
   const isCash = order.payment_method === 'cash' || order.payment_method === 'наличные'
   const prepayStatus = order.prepayment_status
   const hasPrepayAmount = Number(order.prepayment_amount ?? 0) > 0
+  // A prepayment sitting in pending_verification is waiting on THIS dispatcher
+  // to confirm or reject it — the card gets an amber accent so it stands out
+  // of a full column at a glance.
+  const needsPrepayReview = prepayStatus === 'pending_verification'
+  const createdAt = fmtDayTime(order.created_at)
 
   const canDrag = !!onCardDragStart && !bulkMode
 
   return (
     <div
-      className={`dv2-order ${selected ? 'selected' : ''} ${urgentClass} ${dragging ? 'dragging' : ''}`}
+      className={`dv2-order ${selected ? 'selected' : ''} ${urgentClass} ${dragging ? 'dragging' : ''} ${needsPrepayReview ? 'prepay-alert' : ''}`}
       style={{ '--card-color': cardColor }}
       role="button"
       tabIndex={0}
@@ -1159,11 +1164,17 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
           />
         )}
         <span className="dv2-oc-num">#{formatOrderLabel(order)}</span>
+        {createdAt && (
+          <>
+            <span className="dv2-oc-sep" aria-hidden="true">·</span>
+            <span className="dv2-oc-time" title="Заказ создан">{createdAt}</span>
+          </>
+        )}
         <span className="dv2-oc-badges">
           {isCash && <span className="dv2-badge cash">нал</span>}
           {!isCash && order.payment_method && <span className="dv2-badge card">карта</span>}
           {prepayStatus === 'pending_verification' && (
-            <span className="dv2-badge prepay-pending" title="Предоплата ждёт проверки">⏳ предопл</span>
+            <span className="dv2-badge prepay-pending" title="Предоплата ждёт подтверждения — проверьте её в карточке заказа">⏳ предопл</span>
           )}
           {prepayStatus === 'verified' && (
             <span className="dv2-badge prepay-verified" title="Предоплата подтверждена">✓ предопл</span>
