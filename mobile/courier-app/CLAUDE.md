@@ -53,9 +53,14 @@ Couriers on a build from the matching channel get the update on next app
 launch — no new APK/store submission needed.
 
 ## Env
-Скопируй `.env.example` → `.env` и замени IP на адрес сервера в локальной сети.
+Скопируй `.env.example` → `.env` и укажи нужный backend. Явный
+`EXPO_PUBLIC_API_URL` имеет приоритет и в Expo Go/эмуляторе; это позволяет
+тестировать production напрямую. Если переменная не задана, dev-сборка
+автоматически использует IP хоста Metro.
 ```
 EXPO_PUBLIC_API_URL=http://192.168.1.100:8080
+# Или для production:
+# EXPO_PUBLIC_API_URL=https://giyohdarmon.tj
 ```
 
 ## Screens

@@ -6,16 +6,18 @@ import { router } from 'expo-router'
 /**
  * Resolve the backend base URL.
  *
- * In dev (Expo Go) the backend runs on the same machine as the Metro bundler, so
- * we derive its LAN IP from the Metro connection (`hostUri`). This means the app
- * always points at the right host even when the laptop's WiFi IP changes — no
- * more editing .env and getting a misleading "wrong password" because the phone
- * couldn't reach a stale IP.
+ * An explicit EXPO_PUBLIC_API_URL always wins, including in development. This
+ * lets an emulator test production/staging instead of being forced to use a
+ * backend on the Metro host. When it is unset in dev (Expo Go), derive the LAN
+ * IP from Metro's connection (`hostUri`) so local development still works when
+ * the laptop's WiFi IP changes.
  *
  * In production builds there is no Metro host, so EXPO_PUBLIC_API_URL must be set.
  */
 function resolveApiUrl() {
-  const envUrl = process.env.EXPO_PUBLIC_API_URL
+  const envUrl = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/+$/, '')
+
+  if (envUrl) return envUrl
 
   if (__DEV__) {
     const hostUri =
@@ -28,7 +30,7 @@ function resolveApiUrl() {
     if (host) return `http://${host}:8080`
   }
 
-  return envUrl || 'https://giyohdarmon.tj'
+  return 'https://giyohdarmon.tj'
 }
 
 export const API_URL = resolveApiUrl()
