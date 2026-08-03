@@ -203,6 +203,14 @@ type Order struct {
 	NetRevenue       float64 `gorm:"type:numeric(12,2);not null;default:0;column:net_revenue"`
 	PrepaymentAmount float64 `gorm:"type:numeric(12,2);not null;default:0;column:prepayment_amount"`
 
+	// ProductCost is the authoritative FIFO cost of goods for this order,
+	// written once by deductInventory at delivery (real batch cost for
+	// main-warehouse items via inventory.ConsumeFEFO; courier-warehouse
+	// items via warehouses.Service.ConsumeCourierFIFO, which replays the
+	// exact накладная/batch order the stock was received in). 0 until
+	// delivered.
+	ProductCost float64 `gorm:"type:numeric(12,2);not null;default:0;column:product_cost"`
+
 	// Prepayment verification flow (Migration 00040)
 	PrepaymentRequired        bool       `gorm:"not null;default:false;column:prepayment_required"`
 	PrepaymentType            *string    `gorm:"column:prepayment_type"`                         // "partial" | "full"

@@ -30,14 +30,14 @@ const (
 var DefaultMainWarehouseID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 type Warehouse struct {
-	ID         uuid.UUID     `gorm:"type:uuid;primaryKey"`
-	Type       WarehouseType `gorm:"type:warehouse_type;not null"`
-	Name       string        `gorm:"not null"`
-	CityID     *uuid.UUID    `gorm:"type:uuid;column:city_id"`
-	CourierID  *uuid.UUID    `gorm:"type:uuid;column:courier_id"`
-	IsActive   bool          `gorm:"column:is_active;not null;default:true"`
-	CreatedAt  time.Time     `gorm:"autoCreateTime"`
-	UpdatedAt  time.Time     `gorm:"autoUpdateTime"`
+	ID        uuid.UUID     `gorm:"type:uuid;primaryKey"`
+	Type      WarehouseType `gorm:"type:warehouse_type;not null"`
+	Name      string        `gorm:"not null"`
+	CityID    *uuid.UUID    `gorm:"type:uuid;column:city_id"`
+	CourierID *uuid.UUID    `gorm:"type:uuid;column:courier_id"`
+	IsActive  bool          `gorm:"column:is_active;not null;default:true"`
+	CreatedAt time.Time     `gorm:"autoCreateTime"`
+	UpdatedAt time.Time     `gorm:"autoUpdateTime"`
 }
 
 func (Warehouse) TableName() string { return "warehouses" }
@@ -99,6 +99,41 @@ type CourierInventoryMovement struct {
 
 func (CourierInventoryMovement) TableName() string { return "courier_inventory_movements" }
 
+// CourierInventoryBatch is a cost lot held by a courier warehouse — the
+// courier-side equivalent of inventory.Batch. One row per batch consumed on
+// the courier's behalf when a transfer is accepted, preserving the exact
+// per-накладная unit cost and FIFO order it was consumed from the main
+// warehouse (see AcceptTransfer). Consumed FIFO (oldest created_at first) at
+// order-delivery time — see Service.ConsumeCourierFIFO.
+type CourierInventoryBatch struct {
+	ID                uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	WarehouseID       uuid.UUID  `gorm:"type:uuid;not null;column:warehouse_id"`
+	ProductID         uuid.UUID  `gorm:"type:uuid;not null;column:product_id"`
+	SourceBatchID     *uuid.UUID `gorm:"type:uuid;column:source_batch_id"`
+	TransferID        *uuid.UUID `gorm:"type:uuid;column:transfer_id"`
+	ReceivedQuantity  int        `gorm:"not null;column:received_quantity"`
+	RemainingQuantity int        `gorm:"not null;column:remaining_quantity"`
+	UnitCost          float64    `gorm:"type:numeric(12,2);not null;column:unit_cost"`
+	CreatedAt         time.Time  `gorm:"autoCreateTime"`
+}
+
+func (CourierInventoryBatch) TableName() string { return "courier_inventory_batches" }
+
+// CourierBatchConsumption records how many units, at what unit cost, were
+// consumed from a specific CourierInventoryBatch by a specific
+// CourierInventoryMovement (always a "delivered" movement in practice).
+// Mirrors inventory.BatchConsumption.
+type CourierBatchConsumption struct {
+	ID         uuid.UUID `gorm:"type:uuid;primaryKey"`
+	BatchID    uuid.UUID `gorm:"type:uuid;not null;column:batch_id"`
+	MovementID uuid.UUID `gorm:"type:uuid;not null;column:movement_id"`
+	Quantity   int       `gorm:"not null"`
+	UnitCost   float64   `gorm:"type:numeric(12,2);not null;column:unit_cost"`
+	CreatedAt  time.Time `gorm:"autoCreateTime"`
+}
+
+func (CourierBatchConsumption) TableName() string { return "courier_batch_consumptions" }
+
 type TransferStatus string
 
 const (
@@ -157,10 +192,10 @@ type CourierReturn struct {
 func (CourierReturn) TableName() string { return "courier_returns" }
 
 type CourierReturnItem struct {
-	ID       uuid.UUID `gorm:"type:uuid;primaryKey"`
-	ReturnID uuid.UUID `gorm:"type:uuid;not null;column:return_id"`
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ReturnID  uuid.UUID `gorm:"type:uuid;not null;column:return_id"`
 	ProductID uuid.UUID `gorm:"type:uuid;not null;column:product_id"`
-	Quantity int        `gorm:"not null"`
+	Quantity  int       `gorm:"not null"`
 }
 
 func (CourierReturnItem) TableName() string { return "courier_return_items" }

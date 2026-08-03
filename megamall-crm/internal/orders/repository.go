@@ -404,6 +404,19 @@ func (r *Repository) SetPrepaymentStatus(ctx context.Context, tx *gorm.DB, id uu
 	return nil
 }
 
+// UpdateProductCost sets the order's authoritative FIFO product cost,
+// written once by deductInventory at delivery.
+func (r *Repository) UpdateProductCost(ctx context.Context, tx *gorm.DB, id uuid.UUID, productCost float64) error {
+	result := tx.WithContext(ctx).
+		Model(&Order{}).
+		Where("id = ?", id).
+		UpdateColumn("product_cost", productCost)
+	if result.Error != nil {
+		return fmt.Errorf("update order product cost: %w", result.Error)
+	}
+	return nil
+}
+
 // UpdateSnapshotID sets snapshot_id and financial fields after snapshot is built.
 func (r *Repository) UpdateFinancials(ctx context.Context, tx *gorm.DB, id uuid.UUID, snapshotID uuid.UUID, deliveryFee, netRevenue float64) error {
 	result := tx.WithContext(ctx).

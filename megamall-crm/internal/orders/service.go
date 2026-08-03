@@ -117,9 +117,40 @@ type Service struct {
 	// startup (see cmd/server/main.go). See AdjustCourierWarehouseFn.
 	adjustCourierWarehouse AdjustCourierWarehouseFn
 
+	// consumeCourierDelivery is nil until SetWarehouseAdapter is called at
+	// startup. See ConsumeCourierDeliveryFn.
+	consumeCourierDelivery ConsumeCourierDeliveryFn
+
+	// notify is nil until SetNotifier is called at startup. See NotifyFn.
+	notify NotifyFn
+
 	// notifyDispatchers is nil until SetDispatcherNotifier is called at
 	// startup (see cmd/server/main.go). See NotifyDispatchersFn.
 	notifyDispatchers NotifyDispatchersFn
+}
+
+// NotifyFn persists and best-effort pushes a notification to userID,
+// injected from internal/notifications to avoid orders depending on that
+// whole module for one call — same narrow-function pattern as
+// SellerLookupFn. notifType is a plain string matching one of
+// notifications.Type's values by convention (orders intentionally does not
+// import notifications just for that constant).
+type NotifyFn func(ctx context.Context, userID uuid.UUID, notifType, title, body string, orderID *uuid.UUID) error
+
+// SetNotifier wires the notifications module in without an import cycle.
+func (s *Service) SetNotifier(fn NotifyFn) {
+	s.notify = fn
+}
+
+// notifyAsync fires a best-effort notification and only logs on failure —
+// a notification delivery problem must never fail the caller's request.
+func (s *Service) notifyAsync(ctx context.Context, userID uuid.UUID, notifType, title, body string, orderID *uuid.UUID) {
+	if s.notify == nil {
+		return
+	}
+	if err := s.notify(ctx, userID, notifType, title, body, orderID); err != nil {
+		log.Printf("[orders] notify failed (user=%s type=%s): %v", userID, notifType, err)
+	}
 }
 
 // NewService wires up the order service and its dependencies.
@@ -1343,6 +1374,10 @@ func (s *Service) AddOrderComment(ctx context.Context, orderID, actorID uuid.UUI
 	if err := s.CanAccessOrder(ctx, orderID, actorID, actorRole); err != nil {
 		return nil, err
 	}
+	o, err := s.GetByID(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
 
 	// Dispatchers and owners write internal-only notes; all other roles write
 	// seller_visible so the seller can see the comment thread.
@@ -1353,7 +1388,7 @@ func (s *Service) AddOrderComment(ctx context.Context, orderID, actorID uuid.UUI
 
 	id := uuid.New()
 	now := time.Now().UTC()
-	err := s.db.WithContext(ctx).Exec(
+	err = s.db.WithContext(ctx).Exec(
 		`INSERT INTO order_comments (id, order_id, user_id, comment, visibility, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?)`,
 		id, orderID, actorID, text, visibility, now,
@@ -1368,6 +1403,20 @@ func (s *Service) AddOrderComment(ctx context.Context, orderID, actorID uuid.UUI
 		Role     string `gorm:"column:role"`
 	}
 	s.db.WithContext(ctx).Raw("SELECT full_name, role::text AS role FROM users WHERE id = ?", actorID).Scan(&authorInfo)
+
+	// Notify the order's two stakeholders — its assigned courier and its
+	// seller/creator — regardless of which role authored the comment,
+	// excluding the author themselves. Mirrors dispatch.Service.AddComment.
+	notifyBody := fmt.Sprintf("Новый комментарий к заказу #%s", o.OrderNumber)
+	notifyRecipients := map[uuid.UUID]bool{}
+	if o.CourierID != nil {
+		notifyRecipients[*o.CourierID] = true
+	}
+	notifyRecipients[o.SellerID] = true
+	delete(notifyRecipients, actorID)
+	for userID := range notifyRecipients {
+		s.notifyAsync(ctx, userID, "order_comment", "Новый комментарий", notifyBody, &orderID)
+	}
 
 	return &OrderCommentResponse{
 		ID:         id,
@@ -1893,6 +1942,18 @@ type AdjustCourierWarehouseFn func(
 	referenceID, actorID uuid.UUID, reason string,
 ) error
 
+// ConsumeCourierDeliveryFn is the courier-side half of finalizing a delivered
+// order item that was fulfilled from a courier warehouse: it deducts the
+// courier's stock/reservation (like AdjustCourierWarehouseFn would for a
+// "delivered" movement) AND FIFO-consumes the courier's cost lots for
+// (warehouseID, productID) in накладная order, returning their total cost so
+// deductInventory can accumulate it into the order's product_cost. See
+// internal/warehouses.Service.DeliverCourierItem.
+type ConsumeCourierDeliveryFn func(
+	ctx context.Context, tx *gorm.DB, warehouseID, productID uuid.UUID,
+	qty int, orderID, actorID uuid.UUID,
+) (float64, error)
+
 // timelineHasReachedStatus reports whether orderID has ever transitioned to
 // `status` before (any source status), per order_timeline. Used to gate
 // one-shot inventory/financial side effects against being re-run when a
@@ -1945,19 +2006,23 @@ func (s *Service) releaseInventory(ctx context.Context, tx *gorm.DB, o *Order, m
 
 // deductInventory decrements both quantity and reserved_quantity and records
 // the sale, consuming FIFO batches when the item is still backed by the
-// legacy main pool. Called ONLY when order is delivered. Items already held
-// by a courier warehouse are deducted there instead (no FIFO batches on that
-// side — cost was already recognized when the transfer left the main
-// warehouse, see internal/warehouses.AcceptTransfer).
+// legacy main pool (or the courier's own FIFO cost lots when it was already
+// transferred out — see internal/warehouses.AcceptTransfer /
+// ConsumeCourierFIFO). Called ONLY when order is delivered. The exact FIFO
+// cost of every item, from either path, is summed and persisted once onto
+// orders.product_cost — the single source of truth internal/finance reads.
 func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, actorID uuid.UUID) error {
+	var totalProductCost float64
 	for _, it := range o.Items {
 		if it.ReservedWarehouseID != MainWarehouseID {
-			if s.adjustCourierWarehouse == nil {
-				return fmt.Errorf("courier warehouse adapter not configured")
+			if s.consumeCourierDelivery == nil {
+				return fmt.Errorf("courier delivery adapter not configured")
 			}
-			if err := s.adjustCourierWarehouse(ctx, tx, it.ReservedWarehouseID, it.ProductID, -it.Quantity, -it.Quantity, "delivered", o.ID, actorID, "order delivered"); err != nil {
+			cost, err := s.consumeCourierDelivery(ctx, tx, it.ReservedWarehouseID, it.ProductID, it.Quantity, o.ID, actorID)
+			if err != nil {
 				return fmt.Errorf("deduct courier inventory: %w", err)
 			}
+			totalProductCost += cost
 			continue
 		}
 
@@ -2004,9 +2069,16 @@ func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, ac
 		if err := s.invRepo.InsertMovement(tx, ctx, m); err != nil {
 			return fmt.Errorf("insert sale movement: %w", err)
 		}
-		if _, err := s.invRepo.ConsumeFEFO(tx, ctx, it.ProductID, it.Quantity, m.ID); err != nil {
+		consumptions, err := s.invRepo.ConsumeFEFO(tx, ctx, it.ProductID, it.Quantity, m.ID)
+		if err != nil {
 			return fmt.Errorf("sale FEFO consume: %w", err)
 		}
+		for _, c := range consumptions {
+			totalProductCost += float64(c.Quantity) * c.UnitCost
+		}
+	}
+	if err := s.repo.UpdateProductCost(ctx, tx, o.ID, totalProductCost); err != nil {
+		return fmt.Errorf("persist order product cost: %w", err)
 	}
 	return nil
 }
@@ -2043,6 +2115,14 @@ func (s *Service) notifyDispatchersAsync(ctx context.Context, orderID uuid.UUID,
 	if err := s.notifyDispatchers(ctx, orderID, title, body); err != nil {
 		log.Printf("[orders] notify dispatchers failed (order=%s): %v", orderID, err)
 	}
+}
+
+// SetCourierDeliveryAdapter wires the courier-warehouse half of FIFO cost
+// consumption at delivery. Must be called once at startup alongside
+// SetWarehouseAdapter (see cmd/server/main.go); nil-checked at its call site
+// so tests that don't need courier warehouses keep working unmodified.
+func (s *Service) SetCourierDeliveryAdapter(fn ConsumeCourierDeliveryFn) {
+	s.consumeCourierDelivery = fn
 }
 
 // LockOrderForWarehouseOp fetches an order (with items) locked FOR UPDATE,

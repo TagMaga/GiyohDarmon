@@ -433,6 +433,7 @@ func main() {
 	warehousesRepo := warehouses.NewRepository(db)
 	warehousesSvc := warehouses.NewService(warehousesRepo, inventoryRepo, orderSvc, productsRepo, userRepo, activityLogger, db)
 	orderSvc.SetWarehouseAdapter(warehousesSvc.AdjustForOrder)
+	orderSvc.SetCourierDeliveryAdapter(warehousesSvc.DeliverCourierItem)
 	warehousesHandler := warehouses.NewHandler(warehousesSvc)
 
 	// ── Phase 5: Dispatch + Courier ───────────────────────────────────────────
@@ -462,6 +463,7 @@ func main() {
 		return notificationsSvc.Notify(ctx, userID, notifications.Type(notifType), title, body, orderID)
 	}
 	warehousesSvc.SetNotifier(notifyFn)
+	orderSvc.SetNotifier(notifyFn)
 
 	// Broadcasts a notification to every dispatcher and owner-level user
 	// (owner, it_specialist) — used when a seller/manager/team lead adds a
