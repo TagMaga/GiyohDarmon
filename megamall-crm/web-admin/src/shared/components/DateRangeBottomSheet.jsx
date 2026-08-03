@@ -50,13 +50,22 @@ function parseDMY(text) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
+// "Максимум" used to send { from: '', to: '' } to mean "no bound", but the
+// backend's period parser (internal/finance/handler.go: parsePeriod) treats
+// an empty from/to the same as an *omitted* one and defaults it to the
+// current calendar month — so the preset was silently narrowing to "this
+// month" instead of all-time. MAX_RANGE_FROM predates any real business
+// data, so pairing it with today() reads as "all time" to the backend's
+// inclusive date-range filter while staying unambiguous from an omitted param.
+const MAX_RANGE_FROM = '2000-01-01'
+
 const DATE_PRESETS = [
   { label: 'Сегодня', get: () => { const t = toYMD(new Date()); return { from: t, to: t } } },
   { label: 'Вчера', get: () => { const y = toYMD(addDays(new Date(), -1)); return { from: y, to: y } } },
   { label: 'Последние 7 дн.', get: () => ({ from: toYMD(addDays(new Date(), -6)), to: toYMD(new Date()) }) },
   { label: 'Последние 30 дн.', get: () => ({ from: toYMD(addDays(new Date(), -29)), to: toYMD(new Date()) }) },
   { label: 'Этот месяц', get: () => ({ from: toYMD(startOfMonth(new Date())), to: toYMD(new Date()) }) },
-  { label: 'Максимум', get: () => ({ from: '', to: '' }) },
+  { label: 'Максимум', get: () => ({ from: MAX_RANGE_FROM, to: toYMD(new Date()) }) },
 ]
 const WEEKDAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС']
 
@@ -97,16 +106,20 @@ export default function DateRangeBottomSheet({ open, onClose, from = '', to = ''
     onClose()
   }
 
-  const baseMonth = useMemo(
-    () => startOfMonth(fromYMD(draft.from) ?? fromYMD(draft.to) ?? addMonths(new Date(), -1)),
-    [draft.from, draft.to],
-  )
+  const baseMonth = useMemo(() => {
+    // For "Максимум" (draft.from = MAX_RANGE_FROM), scrolling the calendar
+    // grid all the way back to that far-past sentinel would be useless —
+    // open on the current month instead.
+    if (draft.from === MAX_RANGE_FROM) return startOfMonth(new Date())
+    return startOfMonth(fromYMD(draft.from) ?? fromYMD(draft.to) ?? addMonths(new Date(), -1))
+  }, [draft.from, draft.to])
   const months = useMemo(
     () => Array.from({ length: monthCount }, (_, i) => addMonths(baseMonth, i)),
     [baseMonth, monthCount],
   )
 
-  const ctaLabel = draft.from
+  const isMaxRange = draft.from === MAX_RANGE_FROM && draft.to === toYMD(new Date())
+  const ctaLabel = draft.from && !isMaxRange
     ? `Показать результаты — ${formatHuman(draft.from)}${draft.to && draft.to !== draft.from ? ` – ${formatHuman(draft.to)}` : ''}`
     : 'Максимум'
 

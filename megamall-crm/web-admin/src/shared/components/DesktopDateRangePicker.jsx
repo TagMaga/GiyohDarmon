@@ -2,6 +2,15 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import FilterChip from './FilterChip'
 
+// "Максимум"/"all" used to send { from: '', to: '' } to mean "no bound", but
+// the backend's period parser (internal/finance/handler.go: parsePeriod)
+// treats an empty from/to the same as an *omitted* one and defaults it to
+// the current calendar month — so the preset was silently narrowing to
+// "this month" instead of all-time. This predates any real business data,
+// so pairing it with today() reads as "all time" to the backend's inclusive
+// date-range filter while staying unambiguous from an omitted param.
+const MAX_RANGE_FROM = '2000-01-01'
+
 function toYMD(date) {
   return [
     date.getFullYear(),
@@ -29,6 +38,13 @@ function addMonths(date, months) {
 
 function startOfMonth(date) {
   return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+
+// Month grid should open on the current month for "Максимум" (from is the
+// far-past sentinel above), not actually scroll back to it.
+function baseMonthFor(value) {
+  if (!value || value === MAX_RANGE_FROM) return startOfMonth(new Date())
+  return startOfMonth(fromYMD(value) ?? new Date())
 }
 
 function endOfMonth(date) {
@@ -88,7 +104,7 @@ function resolvePreset(value) {
     }
     case 'all':
     case 'maximum':
-      return { from: '', to: '' }
+      return { from: MAX_RANGE_FROM, to: ymdToday }
     default:
       return null
   }
@@ -129,7 +145,7 @@ export default function DesktopDateRangePicker({
   const [open, setOpen] = useState(false)
   const [draftFrom, setDraftFrom] = useState(from ?? '')
   const [draftTo, setDraftTo] = useState(to ?? '')
-  const [baseMonth, setBaseMonth] = useState(() => startOfMonth(fromYMD(from) ?? new Date()))
+  const [baseMonth, setBaseMonth] = useState(() => baseMonthFor(from))
   const [panelOffset, setPanelOffset] = useState(0)
   const popoverRef = useRef(null)
   const panelRef = useRef(null)
@@ -172,14 +188,14 @@ export default function DesktopDateRangePicker({
     if (!open) {
       setDraftFrom(from ?? '')
       setDraftTo(to ?? '')
-      setBaseMonth(startOfMonth(fromYMD(from) ?? new Date()))
+      setBaseMonth(baseMonthFor(from))
     }
   }, [from, to, open])
 
   const activePreset = useMemo(() => presetFromRange(draftFrom, draftTo), [draftFrom, draftTo])
   const label = useMemo(() => {
     const preset = DATE_PRESETS.find((item) => item.value === presetFromRange(from, to))
-    if (preset && preset.value !== 'maximum') return preset.label
+    if (preset) return preset.label
     if (from && to) return `${formatShort(from)} - ${formatShort(to)}`
     return 'Максимум'
   }, [from, to])
@@ -197,7 +213,7 @@ export default function DesktopDateRangePicker({
     if (!range) return
     setDraftFrom(range.from)
     setDraftTo(range.to)
-    if (range.from) setBaseMonth(startOfMonth(fromYMD(range.from)))
+    setBaseMonth(baseMonthFor(range.from))
   }
 
   function pickDay(day) {

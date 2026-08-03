@@ -12,7 +12,7 @@
  *     (date inputs, preset pills, scrollable month calendar, apply CTA).
  *
  * Props:
- *   from      {string}  YYYY-MM-DD ('' = no bound / Максимум)
+ *   from      {string}  YYYY-MM-DD (see MAX_RANGE_FROM below for "Максимум")
  *   to        {string}  YYYY-MM-DD
  *   onChange  {fn}      ({ from, to }) => void
  *   align     {'left'|'right'}  desktop popover alignment (default 'left')
@@ -46,6 +46,16 @@ function formatMonthShort(value) {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+// "Максимум" used to send { from: '', to: '' } to mean "no bound", but the
+// backend's period parser (internal/finance/handler.go: parsePeriod) treats
+// an empty from/to the same as an *omitted* one and defaults it to the
+// current calendar month — so "Максимум" was silently narrowing to "this
+// month" instead of returning all-time data. MAX_RANGE_FROM predates any
+// real business data, so pairing it with today() reads as "all time" to the
+// backend's inclusive date-range filter while staying unambiguous from an
+// omitted param.
+const MAX_RANGE_FROM = '2000-01-01'
+
 // Presets mirror DesktopDateRangePicker's popover so the mobile sheet and the
 // desktop popover offer the same choices.
 const DATE_PRESETS = [
@@ -54,7 +64,7 @@ const DATE_PRESETS = [
   { label: 'Последние 7 дн.', get: () => ({ from: toYMD(addDays(new Date(), -6)), to: toYMD(new Date()) }) },
   { label: 'Последние 30 дн.', get: () => ({ from: toYMD(addDays(new Date(), -29)), to: toYMD(new Date()) }) },
   { label: 'Этот месяц', get: () => ({ from: toYMD(startOfMonth(new Date())), to: toYMD(new Date()) }) },
-  { label: 'Максимум', get: () => ({ from: '', to: '' }) },
+  { label: 'Максимум', get: () => ({ from: MAX_RANGE_FROM, to: toYMD(new Date()) }) },
 ]
 
 export default function PeriodRangeFilter({ from = '', to = '', onChange, align = 'left', className = '' }) {
