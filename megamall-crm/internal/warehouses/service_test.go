@@ -123,6 +123,58 @@ func createOrderForCourier(t *testing.T, db *gorm.DB, orderSvc *orders.Service, 
 	return o
 }
 
+// ─── Warehouses ─────────────────────────────────────────────────────────────
+
+func TestUpdateWarehouseName_MainWarehouse_RenamesSuccessfully(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	whSvc, _ := buildTestServices(t, db)
+
+	created, err := whSvc.CreateWarehouse(context.Background(), uuid.New(), CreateWarehouseRequest{Name: "Original Name"})
+	if err != nil {
+		t.Fatalf("create warehouse: %v", err)
+	}
+
+	updated, err := whSvc.UpdateWarehouseName(context.Background(), uuid.New(), created.ID, UpdateWarehouseNameRequest{Name: "Renamed Warehouse"})
+	if err != nil {
+		t.Fatalf("update warehouse name: %v", err)
+	}
+	if updated.Name != "Renamed Warehouse" {
+		t.Fatalf("expected updated name %q, got %q", "Renamed Warehouse", updated.Name)
+	}
+
+	fetched, err := whSvc.repo.GetWarehouse(context.Background(), created.ID)
+	if err != nil {
+		t.Fatalf("get warehouse: %v", err)
+	}
+	if fetched.Name != "Renamed Warehouse" {
+		t.Fatalf("expected persisted name %q, got %q", "Renamed Warehouse", fetched.Name)
+	}
+}
+
+func TestUpdateWarehouseName_CourierWarehouse_Rejected(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	whSvc, _ := buildTestServices(t, db)
+
+	courier := testutil.CreateUser(t, db, users.RoleCourier)
+	courierWh, err := whSvc.repo.GetOrCreateCourierWarehouseForUpdate(db, context.Background(), courier.ID, courier.FullName)
+	if err != nil {
+		t.Fatalf("create courier warehouse: %v", err)
+	}
+
+	if _, err := whSvc.UpdateWarehouseName(context.Background(), uuid.New(), courierWh.ID, UpdateWarehouseNameRequest{Name: "Hijacked Name"}); err == nil {
+		t.Fatal("expected error renaming a courier warehouse, got nil")
+	}
+}
+
+func TestUpdateWarehouseName_UnknownWarehouse_NotFound(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	whSvc, _ := buildTestServices(t, db)
+
+	if _, err := whSvc.UpdateWarehouseName(context.Background(), uuid.New(), uuid.New(), UpdateWarehouseNameRequest{Name: "Doesn't Matter"}); err == nil {
+		t.Fatal("expected not-found error for unknown warehouse id, got nil")
+	}
+}
+
 // ─── Transfers ──────────────────────────────────────────────────────────────
 
 func TestCreateTransfer_MultipleProducts_BlocksMainStock(t *testing.T) {

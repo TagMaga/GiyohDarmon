@@ -67,6 +67,13 @@ func (r *Repository) CreateWarehouse(ctx context.Context, w *Warehouse) error {
 	return nil
 }
 
+func (r *Repository) UpdateWarehouseName(ctx context.Context, id uuid.UUID, name string) error {
+	if err := r.db.WithContext(ctx).Model(&Warehouse{}).Where("id = ?", id).Update("name", name).Error; err != nil {
+		return fmt.Errorf("update warehouse name: %w", err)
+	}
+	return nil
+}
+
 // GetOrCreateCourierWarehouseForUpdate lazily creates a courier's personal
 // warehouse on first use and returns it locked. Must run inside a transaction.
 func (r *Repository) GetOrCreateCourierWarehouseForUpdate(tx *gorm.DB, ctx context.Context, courierID uuid.UUID, courierName string) (*Warehouse, error) {

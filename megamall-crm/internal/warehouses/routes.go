@@ -15,6 +15,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.GET("/couriers", manage, h.ListCouriers)
 	rg.GET("", manage, h.ListWarehouses)
 	rg.POST("", manage, h.CreateWarehouse)
+	rg.PATCH("/:id", manage, h.UpdateWarehouseName)
 
 	rg.POST("/transfers", manage, h.CreateTransfer)
 	rg.GET("/transfers", manage, h.ListTransfers)

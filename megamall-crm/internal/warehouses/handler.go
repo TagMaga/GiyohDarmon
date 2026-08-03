@@ -85,6 +85,29 @@ func (h *Handler) CreateWarehouse(c *gin.Context) {
 	response.Created(c, w)
 }
 
+func (h *Handler) UpdateWarehouseName(c *gin.Context) {
+	id, ok := parseUUID(c, "id")
+	if !ok {
+		return
+	}
+	var req UpdateWarehouseNameRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperrors.BadRequest(err.Error()))
+		return
+	}
+	if appErr := validator.Validate(req); appErr != nil {
+		response.Error(c, appErr)
+		return
+	}
+	claims := middleware.ClaimsFromContext(c)
+	w, err := h.svc.UpdateWarehouseName(c.Request.Context(), claims.UserID, id, req)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.OK(c, w)
+}
+
 // ─── Transfers ────────────────────────────────────────────────────────────────
 
 func (h *Handler) CreateTransfer(c *gin.Context) {

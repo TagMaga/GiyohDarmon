@@ -267,6 +267,11 @@ export async function createWarehouse(payload) {
   return unwrap(res)
 }
 
+export async function updateWarehouseName(warehouseId, name) {
+  const res = await client.patch(`/warehouses/${requireUUID(warehouseId, 'warehouse_id')}`, { name })
+  return unwrap(res)
+}
+
 export async function fetchTransfers(params = {}) {
   const res = await client.get('/warehouses/transfers', { params: { limit: 100, ...cleanParams(params) } })
   return toArray(unwrap(res))
