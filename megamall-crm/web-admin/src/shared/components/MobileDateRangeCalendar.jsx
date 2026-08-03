@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { appToday } from '../utils/date'
 
 function toYMD(date) {
   return [
@@ -44,7 +45,7 @@ function formatShort(value) {
 const WEEKDAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
 export default function MobileDateRangeCalendar({ from, to, onChange, className = '' }) {
-  const today = useMemo(() => new Date(), [])
+  const today = useMemo(() => appToday(), [])
   const fromDate = fromYMD(from)
   const toDate = fromYMD(to)
 
@@ -137,7 +138,7 @@ function MonthSection({ month, from, to, onPick }) {
           const value = toYMD(day)
           const isEdge = value === from || value === to
           const inRange = Boolean(from && to && value > from && value < to)
-          const isToday = value === toYMD(new Date())
+          const isToday = value === toYMD(appToday())
           return (
             <button
               key={value}

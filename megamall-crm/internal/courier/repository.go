@@ -18,10 +18,30 @@ import (
 
 type Repository struct {
 	db *gorm.DB
+	// loc is the business timezone. The DSN pins the Postgres session to UTC,
+	// so CURRENT_DATE / ::date there mean UTC days — five hours off a Dushanbe
+	// business day. Day boundaries are computed in Go against loc instead.
+	loc *time.Location
 }
 
-func NewRepository(db *gorm.DB) *Repository {
-	return &Repository{db: db}
+// NewRepository creates a courier Repository. loc is the business timezone used
+// for "today" boundaries; nil falls back to UTC.
+func NewRepository(db *gorm.DB, loc *time.Location) *Repository {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return &Repository{db: db, loc: loc}
+}
+
+// startOfToday returns midnight of the current day in the business timezone,
+// as a UTC instant for comparison against timestamptz columns.
+func (r *Repository) startOfToday() time.Time {
+	loc := r.loc
+	if loc == nil {
+		loc = time.UTC
+	}
+	now := time.Now().In(loc)
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).UTC()
 }
 
 // ─── Assignment helpers (internal; avoids importing dispatch package) ─────────
@@ -1101,14 +1121,14 @@ func (r *Repository) GetCashSummary(ctx context.Context, courierID uuid.UUID) (*
 	if err := r.db.WithContext(ctx).Raw(`
 		SELECT
 			COALESCE(SUM(total_to_return) FILTER (
-				WHERE status = 'confirmed' AND created_at >= CURRENT_DATE
+				WHERE status = 'confirmed' AND created_at >= ?
 			), 0) AS confirmed,
 			COALESCE(SUM(COALESCE(actual_returned, total_to_return)) FILTER (
 				WHERE status IN ('pending', 'disputed')
 			), 0) AS pending
 		FROM cash_handovers
 		WHERE courier_id = ?
-	`, courierID).Scan(&ht).Error; err != nil {
+	`, r.startOfToday(), courierID).Scan(&ht).Error; err != nil {
 		return nil, fmt.Errorf("handover totals: %w", err)
 	}
 

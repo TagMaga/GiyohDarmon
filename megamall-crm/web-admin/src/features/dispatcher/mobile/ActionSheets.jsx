@@ -7,6 +7,7 @@ import { fmt } from '../statusConfig'
 import { KEYS } from '../../../shared/queryKeys'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { getOrderId, formatOrderLabel } from '../utils/orderHelpers'
+import { toLocalYMD, addDaysYMD, appWallClockToDate } from '../../../shared/utils/date'
 import {
   fetchCouriersOverview, assignCourier, reassignCourier, unassignCourier, cancelOrder, markIssue, resolveIssue, scheduleOrder,
 } from '../api'
@@ -280,11 +281,13 @@ export function ScheduleSheet({ open, order, onClose }) {
   const { mutate, isPending } = useMutation({
     mutationFn: () => {
       const dayOffset = date === 'today' ? 0 : date === 'tomorrow' ? 1 : 2
-      const [hh, mm] = time.split('–')[0].split(':').map(Number)
-      const d = new Date()
-      d.setDate(d.getDate() + dayOffset)
-      d.setHours(hh, mm, 0, 0)
-      return scheduleOrder(getOrderId(order), { scheduled_at: d.toISOString(), comment: `Окно: ${time}` })
+      const [hh, mm] = time.split('–')[0].split(':')
+      // "Сегодня 09:00" means 09:00 in Dushanbe. Resolve the day and the
+      // wall clock in that timezone — `new Date()` + setHours() would use the
+      // browser's, so a browser on UTC scheduled the window 5h late.
+      const ymd = addDaysYMD(toLocalYMD(new Date()), dayOffset)
+      const at = appWallClockToDate(`${ymd}T${hh}:${mm}`)
+      return scheduleOrder(getOrderId(order), { scheduled_at: at.toISOString(), comment: `Окно: ${time}` })
     },
     onSuccess: () => { invalidateBoard(qc); toast.success('Доставка запланирована'); onClose() },
     onError: (err) => toast.error(err?.response?.data?.error?.message ?? err?.message ?? 'Ошибка'),

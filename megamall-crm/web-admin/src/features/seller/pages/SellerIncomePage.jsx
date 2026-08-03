@@ -9,19 +9,16 @@ import { EVENT_TYPE_LABEL } from '../../hr/utils/hrHelpers'
 import { CalendarCheck } from 'lucide-react'
 import { fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import { M, MobileShell, Card, DarkCard, Chip } from '../components/mobileUi'
+import { toLocalYMD, appToday, appWallClockToDate } from '../../../shared/utils/date'
 
-// Local calendar date, not UTC — toISOString() would roll dates back a day
-// for any timezone ahead of UTC (e.g. midnight local on the 1st becomes the
-// 30th/31st in UTC), which threw off the "current month" default range.
-function toDateStr(d) {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
+// Ranges are built on the Asia/Dushanbe calendar, not the browser's. Deriving
+// "today" from the browser (or from toISOString(), which converts to UTC
+// first) rolls the date back a day for part of every day and threw off the
+// default "current month" range and the "Сегодня" preset.
+const toDateStr = toLocalYMD
 
 function currentMonthRange() {
-  const now = new Date()
+  const now = appToday()
   return {
     from: toDateStr(new Date(now.getFullYear(), now.getMonth(), 1)),
     to: toDateStr(now),
@@ -35,7 +32,7 @@ const PERIOD_PRESETS = [
 ]
 
 function presetRange(key) {
-  const now = new Date()
+  const now = appToday()
   if (key === 'today') {
     const t = toDateStr(now)
     return { from: t, to: t }
@@ -50,7 +47,7 @@ function presetRange(key) {
 
 /** Payouts run bi-monthly: periods 1–15 are paid on the 16th, 16–end on the 1st. */
 function nextPayoutDate() {
-  const now = new Date()
+  const now = appToday()
   const d = now.getDate() <= 15
     ? new Date(now.getFullYear(), now.getMonth(), 16)
     : new Date(now.getFullYear(), now.getMonth() + 1, 1)
@@ -67,7 +64,12 @@ function dateInRange(value, from, to) {
   if (!value) return false
   const ts = new Date(value).getTime()
   if (Number.isNaN(ts)) return false
-  return ts >= new Date(`${from}T00:00:00`).getTime() && ts <= new Date(`${to}T23:59:59`).getTime()
+  // Range bounds are Dushanbe wall clocks; `new Date('...T00:00:00')` would
+  // anchor them to the browser's timezone and shift the window by the offset.
+  const start = appWallClockToDate(`${from}T00:00:00`)
+  const end = appWallClockToDate(`${to}T23:59:59`)
+  if (!start || !end) return false
+  return ts >= start.getTime() && ts <= end.getTime()
 }
 
 function periodOrderTotals(orders = [], from, to) {

@@ -83,7 +83,10 @@ func main() {
 	}
 
 	// ── Repositories / services (mirrors cmd/server/main.go wiring) ──────────
-	loc := cfg.Server.Location()
+	loc, err := cfg.Server.Location()
+	if err != nil {
+		log.Fatalf("timezone: %v", err)
+	}
 
 	teamRepo := teams.NewRepository(db)
 	hierRepo := hierarchy.NewRepository(db)

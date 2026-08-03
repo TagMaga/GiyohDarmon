@@ -22,6 +22,7 @@ import { useMemo, useState } from 'react'
 import { CalendarDays, ChevronDown } from 'lucide-react'
 import DateRangeBottomSheet from './DateRangeBottomSheet'
 import DesktopDateRangePicker from './DesktopDateRangePicker'
+import { appToday } from '../utils/date'
 
 function toYMD(date) {
   return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
@@ -59,12 +60,13 @@ const MAX_RANGE_FROM = '2000-01-01'
 // Presets mirror DesktopDateRangePicker's popover so the mobile sheet and the
 // desktop popover offer the same choices.
 const DATE_PRESETS = [
-  { label: 'Сегодня', get: () => { const t = toYMD(new Date()); return { from: t, to: t } } },
-  { label: 'Вчера', get: () => { const y = toYMD(addDays(new Date(), -1)); return { from: y, to: y } } },
-  { label: 'Последние 7 дн.', get: () => ({ from: toYMD(addDays(new Date(), -6)), to: toYMD(new Date()) }) },
-  { label: 'Последние 30 дн.', get: () => ({ from: toYMD(addDays(new Date(), -29)), to: toYMD(new Date()) }) },
-  { label: 'Этот месяц', get: () => ({ from: toYMD(startOfMonth(new Date())), to: toYMD(new Date()) }) },
-  { label: 'Максимум', get: () => ({ from: MAX_RANGE_FROM, to: toYMD(new Date()) }) },
+  // appToday(), not new Date() — "today" must be the Dushanbe calendar day.
+  { label: 'Сегодня', get: () => { const t = toYMD(appToday()); return { from: t, to: t } } },
+  { label: 'Вчера', get: () => { const y = toYMD(addDays(appToday(), -1)); return { from: y, to: y } } },
+  { label: 'Последние 7 дн.', get: () => ({ from: toYMD(addDays(appToday(), -6)), to: toYMD(appToday()) }) },
+  { label: 'Последние 30 дн.', get: () => ({ from: toYMD(addDays(appToday(), -29)), to: toYMD(appToday()) }) },
+  { label: 'Этот месяц', get: () => ({ from: toYMD(startOfMonth(appToday())), to: toYMD(appToday()) }) },
+  { label: 'Максимум', get: () => ({ from: MAX_RANGE_FROM, to: toYMD(appToday()) }) },
 ]
 
 export default function PeriodRangeFilter({ from = '', to = '', onChange, align = 'left', className = '' }) {

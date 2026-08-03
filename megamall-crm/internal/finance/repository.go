@@ -26,11 +26,29 @@ import (
 // Repository wraps *gorm.DB for all finance queries.
 type Repository struct {
 	db *gorm.DB
+	// loc is the business timezone. Timestamps are stored as UTC and the DSN
+	// pins the Postgres session to UTC, so any SQL that buckets a timestamptz
+	// into a calendar day (::date, date_trunc) would otherwise group by UTC
+	// days — splitting a Dushanbe business day at 05:00 local. Queries that
+	// bucket by day must apply `AT TIME ZONE r.tzName()`.
+	loc *time.Location
 }
 
-// NewRepository creates a new finance Repository.
-func NewRepository(db *gorm.DB) *Repository {
-	return &Repository{db: db}
+// NewRepository creates a new finance Repository. loc is the business timezone
+// used for calendar-day bucketing; nil falls back to UTC.
+func NewRepository(db *gorm.DB, loc *time.Location) *Repository {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return &Repository{db: db, loc: loc}
+}
+
+// tzName returns the IANA name Postgres should use for AT TIME ZONE.
+func (r *Repository) tzName() string {
+	if r.loc == nil {
+		return "UTC"
+	}
+	return r.loc.String()
 }
 
 // ─── Summary ──────────────────────────────────────────────────────────────────
@@ -689,6 +707,10 @@ func (r *Repository) ListCashHandovers(
 // GetDailyRevenue returns one DailyPoint per calendar day in [from, to].
 // Anchored on order_timeline.created_at WHERE to_status='delivered' (same as GetOrdersSummary).
 // company_revenue comes from financial_events joined per order.
+//
+// Days are Asia/Dushanbe calendar days (AT TIME ZONE r.tzName()), not UTC ones:
+// the DSN pins the Postgres session to UTC, so a bare ::date cast put every
+// delivery between 00:00 and 05:00 local onto the previous day's bar.
 func (r *Repository) GetDailyRevenue(
 	ctx context.Context,
 	from, to time.Time,
@@ -700,7 +722,7 @@ func (r *Repository) GetDailyRevenue(
 				o.id,
 				o.total_amount,
 				o.delivery_fee,
-				tl.created_at::date AS delivered_date
+				(tl.created_at AT TIME ZONE ?)::date AS delivered_date
 			FROM orders o
 			JOIN order_timeline tl ON tl.order_id = o.id
 			WHERE o.deleted_at  IS NULL
@@ -724,7 +746,7 @@ func (r *Repository) GetDailyRevenue(
 		LEFT JOIN company_events ce ON ce.order_id = d.id
 		GROUP BY d.delivered_date
 		ORDER BY d.delivered_date
-	`, from, to).Scan(&rows).Error
+	`, r.tzName(), from, to).Scan(&rows).Error
 	if err != nil {
 		return nil, fmt.Errorf("get daily revenue: %w", err)
 	}

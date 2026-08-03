@@ -9,13 +9,16 @@ import OrderDetailBottomSheet from '../components/OrderDetailBottomSheet'
 import { M, MobileShell, Card, DarkCard, StatTile, StatusPill, InitialsAvatar, PrimaryButton } from '../components/mobileUi'
 import { fetchCities } from '../api'
 import { KEYS } from '../../../shared/queryKeys'
+import { isSameAppDay } from '../../../shared/utils/date'
 
 function calcStats(orders = []) {
-  const today = new Date().toDateString()
+  // Compared on the Dushanbe calendar day — toDateString() compares the
+  // browser's, so orders placed before 05:00 local fell out of "today".
+  const today = new Date()
   const ACTIVE = new Set(['new', 'confirmed', 'prepayment_pending', 'prepayment_received', 'assigned', 'in_delivery'])
   let todayEarnings = 0, todayCount = 0, activeCount = 0, deliveredCount = 0, prepaymentCount = 0
   for (const o of orders) {
-    if (new Date(o.created_at).toDateString() === today) {
+    if (isSameAppDay(o.created_at, today)) {
       todayCount++
       if (o.status === 'delivered') todayEarnings += o.net_revenue ?? 0
     }

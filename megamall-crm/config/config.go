@@ -34,13 +34,24 @@ type ServerConfig struct {
 	Timezone string `envconfig:"APP_TIMEZONE" default:"Asia/Dushanbe"`
 }
 
-// Location returns the parsed *time.Location for Timezone, falling back to UTC
-// if the name is invalid. Called once at startup; result is safe to cache.
-func (s ServerConfig) Location() *time.Location {
-	if loc, err := time.LoadLocation(s.Timezone); err == nil {
-		return loc
+// Location returns the parsed *time.Location for Timezone. Called once at
+// startup; result is safe to cache.
+//
+// This deliberately returns an error rather than falling back to UTC. Silently
+// degrading to UTC is indistinguishable at runtime from a correct config, and
+// it shifts every business day boundary by the offset (5h for Asia/Dushanbe) —
+// "today" filters, daily revenue buckets and month-to-date commissions all
+// quietly move. Production runs a CGO_ENABLED=0 static binary under systemd
+// (see deploy.sh), so a host without /usr/share/zoneinfo would have hit that
+// fallback with no log line at all. The embedded tzdata import in
+// cmd/server/main.go removes the host dependency; this makes any remaining
+// failure (e.g. a typo in APP_TIMEZONE) loud instead of silent.
+func (s ServerConfig) Location() (*time.Location, error) {
+	loc, err := time.LoadLocation(s.Timezone)
+	if err != nil {
+		return nil, fmt.Errorf("invalid APP_TIMEZONE %q: %w", s.Timezone, err)
 	}
-	return time.UTC
+	return loc, nil
 }
 
 type DatabaseConfig struct {

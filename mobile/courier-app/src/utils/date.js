@@ -18,3 +18,12 @@ export const APP_TIMEZONE = 'Asia/Dushanbe'
 export function dayjsTZ(input) {
   return dayjs(input).tz(APP_TIMEZONE)
 }
+
+// appDayStartISO returns the UTC ISO instant for midnight, `daysFromToday`
+// days from today, in Asia/Dushanbe. Use it when sending a chosen date to the
+// API: building the date with `new Date()` + setHours(0,0,0,0) anchors
+// midnight to the *device's* timezone, so a device on UTC sends 05:00
+// Dushanbe (or the previous day) instead of the day the courier picked.
+export function appDayStartISO(daysFromToday = 0) {
+  return dayjsTZ().add(daysFromToday, 'day').startOf('day').toDate().toISOString()
+}

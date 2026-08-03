@@ -7,6 +7,7 @@ import { useToast } from '../../../shared/components/ToastProvider'
 import { scheduleOrder } from '../api'
 import { KEYS } from '../../../shared/queryKeys'
 import { getOrderId, formatOrderLabel } from '../utils/orderHelpers'
+import { appWallClockToDate, appWallClockNow } from '../../../shared/utils/date'
 
 /**
  * ScheduleModal — set scheduled_at for an order.
@@ -22,8 +23,14 @@ export default function ScheduleModal({ open, onClose, order }) {
     mutationFn: () => {
       const orderId = getOrderId(order)
       if (!orderId) throw new Error('ID заказа не найден')
+      // The datetime-local value is a bare wall clock ("2026-08-05T14:00").
+      // Anchor it to Asia/Dushanbe — `new Date(...)` on it would resolve
+      // against the browser's timezone, so a browser on UTC stored the time
+      // 5h early and it read back as 19:00 for a 14:00 pick.
+      const at = appWallClockToDate(scheduledAt)
+      if (!at) throw new Error('Некорректная дата')
       return scheduleOrder(orderId, {
-        scheduled_at: new Date(scheduledAt).toISOString(),
+        scheduled_at: at.toISOString(),
         comment,
       })
     },
@@ -82,7 +89,7 @@ export default function ScheduleModal({ open, onClose, order }) {
             onChange={(e) => setScheduledAt(e.target.value)}
             className="input"
             required
-            min={new Date().toISOString().slice(0, 16)}
+            min={appWallClockNow()}
           />
         </div>
         <div>

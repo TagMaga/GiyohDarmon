@@ -30,6 +30,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
 import BottomSheet from '../../../shared/components/BottomSheet'
+import { appToday } from '../../../shared/utils/date'
 import { INCOME_EVENT_TYPES, EXPENSE_EVENT_TYPES, EXPENSE_CATEGORY_LABEL } from '../../hr/utils/hrHelpers'
 
 // Base display order of the reorderable chips (Период is pinned before all of
@@ -107,11 +108,11 @@ function parseDMY(text) {
 }
 
 const DATE_PRESETS = [
-  { label: 'Сегодня', get: () => { const t = toYMD(new Date()); return { from: t, to: t } } },
-  { label: 'Вчера', get: () => { const y = toYMD(addDays(new Date(), -1)); return { from: y, to: y } } },
-  { label: '7 дней', get: () => ({ from: toYMD(addDays(new Date(), -6)), to: toYMD(new Date()) }) },
-  { label: '30 дней', get: () => ({ from: toYMD(addDays(new Date(), -29)), to: toYMD(new Date()) }) },
-  { label: 'Этот месяц', get: () => ({ from: toYMD(startOfMonth(new Date())), to: toYMD(new Date()) }) },
+  { label: 'Сегодня', get: () => { const t = toYMD(appToday()); return { from: t, to: t } } },
+  { label: 'Вчера', get: () => { const y = toYMD(addDays(appToday(), -1)); return { from: y, to: y } } },
+  { label: '7 дней', get: () => ({ from: toYMD(addDays(appToday(), -6)), to: toYMD(appToday()) }) },
+  { label: '30 дней', get: () => ({ from: toYMD(addDays(appToday(), -29)), to: toYMD(appToday()) }) },
+  { label: 'Этот месяц', get: () => ({ from: toYMD(startOfMonth(appToday())), to: toYMD(appToday()) }) },
 ]
 const AMOUNT_PRESETS = [
   { label: 'до 100', min: '', max: '100' },
@@ -237,13 +238,13 @@ export default function FinanceFilterBar({
   const [sheet, setSheet] = useState(null) // null | 'period' | 'type' | 'amount' | 'user' | 'order'
   const [draft, setDraft] = useState({})
   const [monthCount, setMonthCount] = useState(2)
-  const [desktopMonth, setDesktopMonth] = useState(() => startOfMonth(new Date()))
+  const [desktopMonth, setDesktopMonth] = useState(() => startOfMonth(appToday()))
 
   function openSheet(kind) {
     if (kind === 'period') {
       setDraft({ from, to, fromTxt: formatDMY(from), toTxt: formatDMY(to) })
       setMonthCount(2)
-      setDesktopMonth(startOfMonth(fromYMD(from) ?? fromYMD(to) ?? new Date()))
+      setDesktopMonth(startOfMonth(fromYMD(from) ?? fromYMD(to) ?? appToday()))
     } else if (kind === 'type') {
       setDraft({ value: eventType, category: expenseCategory })
     } else if (kind === 'amount') {
@@ -287,7 +288,7 @@ export default function FinanceFilterBar({
     patchDraft(value ? { toTxt: text, to: value } : { toTxt: text })
   }
 
-  const baseMonth = useMemo(() => startOfMonth(fromYMD(from) ?? fromYMD(to) ?? addMonths(new Date(), -1)), [from, to])
+  const baseMonth = useMemo(() => startOfMonth(fromYMD(from) ?? fromYMD(to) ?? addMonths(appToday(), -1)), [from, to])
   const months = useMemo(() => Array.from({ length: monthCount }, (_, i) => addMonths(baseMonth, i)), [baseMonth, monthCount])
 
   const scopedTypeOptions = useMemo(() => {
@@ -356,7 +357,7 @@ export default function FinanceFilterBar({
   // active filter: raw dates (or the matched preset's label) + ✕ to clear
   // back to the current month.
   const thisMonthRange = useMemo(() => {
-    const now = new Date()
+    const now = appToday()
     return { from: toYMD(startOfMonth(now)), to: toYMD(now) }
   }, [])
   const isThisMonth = Boolean(from) && from === thisMonthRange.from && (to || from) === thisMonthRange.to

@@ -17,6 +17,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import BottomSheet from './BottomSheet'
+import { appToday } from '../utils/date'
 
 function toYMD(date) {
   return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-')
@@ -60,12 +61,13 @@ function parseDMY(text) {
 const MAX_RANGE_FROM = '2000-01-01'
 
 const DATE_PRESETS = [
-  { label: 'Сегодня', get: () => { const t = toYMD(new Date()); return { from: t, to: t } } },
-  { label: 'Вчера', get: () => { const y = toYMD(addDays(new Date(), -1)); return { from: y, to: y } } },
-  { label: 'Последние 7 дн.', get: () => ({ from: toYMD(addDays(new Date(), -6)), to: toYMD(new Date()) }) },
-  { label: 'Последние 30 дн.', get: () => ({ from: toYMD(addDays(new Date(), -29)), to: toYMD(new Date()) }) },
-  { label: 'Этот месяц', get: () => ({ from: toYMD(startOfMonth(new Date())), to: toYMD(new Date()) }) },
-  { label: 'Максимум', get: () => ({ from: MAX_RANGE_FROM, to: toYMD(new Date()) }) },
+  // appToday(), not new Date() — "today" must be the Dushanbe calendar day.
+  { label: 'Сегодня', get: () => { const t = toYMD(appToday()); return { from: t, to: t } } },
+  { label: 'Вчера', get: () => { const y = toYMD(addDays(appToday(), -1)); return { from: y, to: y } } },
+  { label: 'Последние 7 дн.', get: () => ({ from: toYMD(addDays(appToday(), -6)), to: toYMD(appToday()) }) },
+  { label: 'Последние 30 дн.', get: () => ({ from: toYMD(addDays(appToday(), -29)), to: toYMD(appToday()) }) },
+  { label: 'Этот месяц', get: () => ({ from: toYMD(startOfMonth(appToday())), to: toYMD(appToday()) }) },
+  { label: 'Максимум', get: () => ({ from: MAX_RANGE_FROM, to: toYMD(appToday()) }) },
 ]
 const WEEKDAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС']
 
@@ -110,15 +112,15 @@ export default function DateRangeBottomSheet({ open, onClose, from = '', to = ''
     // For "Максимум" (draft.from = MAX_RANGE_FROM), scrolling the calendar
     // grid all the way back to that far-past sentinel would be useless —
     // open on the current month instead.
-    if (draft.from === MAX_RANGE_FROM) return startOfMonth(new Date())
-    return startOfMonth(fromYMD(draft.from) ?? fromYMD(draft.to) ?? addMonths(new Date(), -1))
+    if (draft.from === MAX_RANGE_FROM) return startOfMonth(appToday())
+    return startOfMonth(fromYMD(draft.from) ?? fromYMD(draft.to) ?? addMonths(appToday(), -1))
   }, [draft.from, draft.to])
   const months = useMemo(
     () => Array.from({ length: monthCount }, (_, i) => addMonths(baseMonth, i)),
     [baseMonth, monthCount],
   )
 
-  const isMaxRange = draft.from === MAX_RANGE_FROM && draft.to === toYMD(new Date())
+  const isMaxRange = draft.from === MAX_RANGE_FROM && draft.to === toYMD(appToday())
   const ctaLabel = draft.from && !isMaxRange
     ? `Показать результаты — ${formatHuman(draft.from)}${draft.to && draft.to !== draft.from ? ` – ${formatHuman(draft.to)}` : ''}`
     : 'Максимум'

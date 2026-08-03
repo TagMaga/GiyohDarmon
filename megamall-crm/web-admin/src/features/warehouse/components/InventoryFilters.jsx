@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Search, SlidersHorizontal, X } from 'lucide-react'
+import { appToday } from '../../../shared/utils/date'
 
 export const MAIN_WAREHOUSE_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -238,7 +239,10 @@ export function getExpiryBucket(expiryDate) {
   if (!expiryDate) return 'unknown'
   const [year, month, day] = String(expiryDate).split('-').map(Number)
   if (!year || !month || !day) return 'unknown'
-  const now = new Date()
+  // expiry_date is a bare calendar date, so "today" must be the Dushanbe
+  // calendar day — the browser's would bucket a batch as expiring a day early
+  // or late for part of every day.
+  const now = appToday()
   const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
   const expiryUtc = Date.UTC(year, month - 1, day)
   const days = Math.round((expiryUtc - todayUtc) / 86_400_000)

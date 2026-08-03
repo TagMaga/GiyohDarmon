@@ -9,6 +9,7 @@ import useSalesReport from '../hooks/useSalesReport'
 import useSlowMovingStock from '../hooks/useSlowMovingStock'
 import useProducts from '../hooks/useProducts'
 import { exportRowsToCsv, fmtDate, fmtMoney, getId, getProductImageSrcSet, getProductImageVariant, getProductName, getProductSku } from '../utils/warehouseHelpers'
+import { appToday } from '../../../shared/utils/date'
 
 function toDateInput(date) {
   const y = date.getFullYear()
@@ -17,18 +18,19 @@ function toDateInput(date) {
   return `${y}-${m}-${d}`
 }
 
+// Anchored on appToday() — the Dushanbe calendar day, not the browser's.
 function daysAgo(n) {
-  const d = new Date()
+  const d = appToday()
   d.setDate(d.getDate() - n)
   return d
 }
 
 const PRESETS = [
-  { id: 'today', label: 'Сегодня', from: () => new Date() },
+  { id: 'today', label: 'Сегодня', from: () => appToday() },
   { id: '7d', label: '7 дней', from: () => daysAgo(6) },
   { id: '30d', label: '30 дней', from: () => daysAgo(29) },
-  { id: 'month', label: 'Этот месяц', from: () => new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
-  { id: 'year', label: 'Этот год', from: () => new Date(new Date().getFullYear(), 0, 1) },
+  { id: 'month', label: 'Этот месяц', from: () => new Date(appToday().getFullYear(), appToday().getMonth(), 1) },
+  { id: 'year', label: 'Этот год', from: () => new Date(appToday().getFullYear(), 0, 1) },
   { id: 'all', label: 'Всё время', from: () => null },
 ]
 
@@ -60,14 +62,14 @@ export default function SalesReportPanel() {
   const [view, setView] = useState('sales')
   const [preset, setPreset] = useState('30d')
   const [dateFrom, setDateFrom] = useState(() => toDateInput(daysAgo(29)))
-  const [dateTo, setDateTo] = useState(() => toDateInput(new Date()))
+  const [dateTo, setDateTo] = useState(() => toDateInput(appToday()))
   const [productIds, setProductIds] = useState([])
 
   function applyPreset(p) {
     setPreset(p.id)
     const from = p.from()
     setDateFrom(from ? toDateInput(from) : '')
-    setDateTo(from ? toDateInput(new Date()) : '')
+    setDateTo(from ? toDateInput(appToday()) : '')
   }
 
   function applyCustomDates(from, to) {

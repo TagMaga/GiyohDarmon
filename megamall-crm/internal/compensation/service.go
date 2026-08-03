@@ -43,6 +43,20 @@ func NewService(repo *Repository, logger *activity.Logger, db *gorm.DB, loc *tim
 	}
 }
 
+// monthStart returns midnight on the 1st of t's month in the service's
+// business timezone, as a UTC instant ready to compare against a timestamptz
+// column. Computing this in Go rather than with date_trunc('month', now())
+// keeps it independent of the Postgres session timezone, which the DSN pins
+// to UTC.
+func (s *Service) monthStart(t time.Time) time.Time {
+	loc := s.loc
+	if loc == nil {
+		loc = time.UTC
+	}
+	local := t.In(loc)
+	return time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, loc).UTC()
+}
+
 // BuildRateSnapshot resolves the canonical commission configuration without
 // persisting an order snapshot. Non-order domains copy the returned immutable
 // rates into their own snapshot table.
@@ -757,12 +771,18 @@ func (s *Service) SetEmployeeCompensation(
 
 // GetSellerTeamRank returns (rank, totalTeamMembers, error) for the requesting seller
 // based on this month's seller_commission_earned financial events. No teammate amounts exposed.
+//
+// "This month" starts at midnight on the 1st in s.loc. It used to be
+// date_trunc('month', now()), which the UTC-pinned Postgres session evaluated
+// as UTC month start — dropping commissions earned in the first 5 hours of the
+// 1st (still the previous month in UTC) from the ranking.
 func (s *Service) GetSellerTeamRank(ctx context.Context, sellerID uuid.UUID) (int, int, error) {
 	type row struct {
 		UserID uuid.UUID `gorm:"column:user_id"`
 		Total  float64   `gorm:"column:total"`
 	}
 	var rows []row
+	monthStart := s.monthStart(time.Now())
 	err := s.db.WithContext(ctx).Raw(`
 		WITH team AS (
 		    SELECT team_id
@@ -781,7 +801,7 @@ func (s *Service) GetSellerTeamRank(ctx context.Context, sellerID uuid.UUID) (in
 		    FROM financial_events fe
 		    JOIN members m ON m.user_id = fe.user_id
 		    WHERE fe.event_type = 'seller_commission_earned'
-		      AND fe.created_at >= date_trunc('month', now())
+		      AND fe.created_at >= ?
 		    GROUP BY fe.user_id
 		),
 		all_members AS (
@@ -795,7 +815,7 @@ func (s *Service) GetSellerTeamRank(ctx context.Context, sellerID uuid.UUID) (in
 		    FROM all_members
 		)
 		SELECT user_id, total FROM ranked ORDER BY rank
-	`, sellerID).Scan(&rows).Error
+	`, sellerID, monthStart).Scan(&rows).Error
 	if err != nil {
 		return 1, 1, apperrors.Internal(err)
 	}
