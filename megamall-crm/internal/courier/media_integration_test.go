@@ -76,7 +76,7 @@ func setupCourierServiceWithMedia(t *testing.T, db *gorm.DB) (*Service, *media.S
 	}
 	ordersSvc := orders.NewService(ordersRepo, nil, nil, nil, nil, activityLogger, db, sellerLookup)
 
-	svc := NewService(NewRepository(db), ordersSvc, nil, activityLogger, db)
+	svc := NewService(NewRepository(db, time.UTC), ordersSvc, nil, activityLogger, db)
 	mediaSvc := media.NewService(media.NewRepository(db), courierTestMediaCfg(t))
 
 	attach := func(ctx context.Context, assetID, handoverID, actorID uuid.UUID) (*MediaAssetInfo, error) {
@@ -440,7 +440,7 @@ func TestSubmitHandover_MediaDisabled_RejectsMediaAssetIDs_NoOrphan(t *testing.T
 	db := testutil.NewTestDB(t)
 	activityLogger := activity.NewLogger(activity.NewRepository(db))
 	ordersRepo := orders.NewRepository(db, time.UTC)
-	svc := NewService(NewRepository(db), orders.NewService(ordersRepo, nil, nil, nil, nil, activityLogger, db, nil), nil, activityLogger, db)
+	svc := NewService(NewRepository(db, time.UTC), orders.NewService(ordersRepo, nil, nil, nil, nil, activityLogger, db, nil), nil, activityLogger, db)
 	c := testutil.CreateUser(t, db, users.RoleCourier)
 	createDeliveredOrderForCourier(t, db, c.ID)
 
@@ -457,7 +457,7 @@ func TestSubmitHandover_MediaDisabled_LegacyFlowUnaffected(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	activityLogger := activity.NewLogger(activity.NewRepository(db))
 	ordersRepo := orders.NewRepository(db, time.UTC)
-	svc := NewService(NewRepository(db), orders.NewService(ordersRepo, nil, nil, nil, nil, activityLogger, db, nil), nil, activityLogger, db)
+	svc := NewService(NewRepository(db, time.UTC), orders.NewService(ordersRepo, nil, nil, nil, nil, activityLogger, db, nil), nil, activityLogger, db)
 	c := testutil.CreateUser(t, db, users.RoleCourier)
 	createDeliveredOrderForCourier(t, db, c.ID)
 

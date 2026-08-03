@@ -45,7 +45,7 @@ func TestGetCashSummary_ConfirmedShortfallStaysInDebt(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	ctx := context.Background()
 	c := testutil.CreateUser(t, db, users.RoleCourier)
-	repo := NewRepository(db)
+	repo := NewRepository(db, time.UTC)
 
 	// Expected 209, owner confirmed only 200 → courier still owes 9.
 	createConfirmedHandover(t, db, c.ID, 209, f64(200))
@@ -69,7 +69,7 @@ func TestGetCashSummary_OverpaymentNetsShortfallOut(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	ctx := context.Background()
 	c := testutil.CreateUser(t, db, users.RoleCourier)
-	repo := NewRepository(db)
+	repo := NewRepository(db, time.UTC)
 
 	// Short 9 on the first handover, 9 extra on the second → settled.
 	createConfirmedHandover(t, db, c.ID, 209, f64(200))
@@ -91,7 +91,7 @@ func TestGetCashSummary_PureOverpaymentNeverGoesNegative(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	ctx := context.Background()
 	c := testutil.CreateUser(t, db, users.RoleCourier)
-	repo := NewRepository(db)
+	repo := NewRepository(db, time.UTC)
 
 	createConfirmedHandover(t, db, c.ID, 100, f64(150))
 
@@ -111,7 +111,7 @@ func TestGetCashSummary_NullActualMeansAcceptedAsDeclared(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	ctx := context.Background()
 	c := testutil.CreateUser(t, db, users.RoleCourier)
-	repo := NewRepository(db)
+	repo := NewRepository(db, time.UTC)
 
 	// Legacy rows confirmed without an explicit actual amount count as paid
 	// in full — no phantom debt.
@@ -130,7 +130,7 @@ func TestGetCashSummary_PendingAmountUsesDeclaredAmountAcrossDays(t *testing.T) 
 	db := testutil.NewTestDB(t)
 	ctx := context.Background()
 	c := testutil.CreateUser(t, db, users.RoleCourier)
-	repo := NewRepository(db)
+	repo := NewRepository(db, time.UTC)
 
 	actual := 1120.0
 	h := &CashHandover{
