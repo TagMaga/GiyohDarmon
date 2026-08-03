@@ -52,6 +52,7 @@ import (
 	"github.com/megamall/crm/internal/warehouses"
 	"github.com/megamall/crm/pkg/database"
 	"github.com/megamall/crm/pkg/middleware"
+	"github.com/megamall/crm/pkg/pagination"
 	"gorm.io/gorm"
 )
 
@@ -461,6 +462,26 @@ func main() {
 		return notificationsSvc.Notify(ctx, userID, notifications.Type(notifType), title, body, orderID)
 	}
 	warehousesSvc.SetNotifier(notifyFn)
+
+	// Broadcasts a notification to every dispatcher and owner-level user
+	// (owner, it_specialist) — used when a seller/manager/team lead adds a
+	// prepayment to an order that needs dispatcher verification.
+	notifyDispatchersFn := func(ctx context.Context, orderID uuid.UUID, title, body string) error {
+		for _, role := range []users.Role{users.RoleDispatcher, users.RoleOwner, users.RoleITSpecialist} {
+			r := role
+			recipients, _, err := userRepo.List(ctx, users.ListUsersFilter{Role: &r}, pagination.Params{Page: 1, Limit: pagination.MaxLimit})
+			if err != nil {
+				return err
+			}
+			for _, u := range recipients {
+				if nErr := notifyFn(ctx, u.ID, string(notifications.TypePrepaymentSubmitted), title, body, &orderID); nErr != nil {
+					log.Printf("[orders] notify dispatcher failed (user=%s): %v", u.ID, nErr)
+				}
+			}
+		}
+		return nil
+	}
+	orderSvc.SetDispatcherNotifier(notifyDispatchersFn)
 
 	dispatchRepo := dispatch.NewRepository(db)
 	dispatchSvc := dispatch.NewService(dispatchRepo, orderSvc, activityLogger, db)

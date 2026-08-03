@@ -35,8 +35,11 @@ export async function createOrder(payload) {
 }
 
 /** POST /orders/:id/prepayments */
-export async function addPrepayment(orderId, amount) {
-  const res = await client.post(`/orders/${orderId}/prepayments`, { amount })
+export async function addPrepayment(orderId, amount, mediaAssetId) {
+  const res = await client.post(`/orders/${orderId}/prepayments`, {
+    amount,
+    media_asset_id: mediaAssetId || undefined,
+  })
   return unwrap(res)
 }
 

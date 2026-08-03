@@ -11,11 +11,12 @@ import (
 type Type string
 
 const (
-	TypeCourierAssigned Type = "courier_assigned"
-	TypeOrderComment    Type = "order_comment"
-	TypeCashReturnDue   Type = "cash_return_due"
-	TypeWarehousePickup Type = "warehouse_pickup"
-	TypeOrdersAvailable Type = "orders_available"
+	TypeCourierAssigned     Type = "courier_assigned"
+	TypeOrderComment        Type = "order_comment"
+	TypeCashReturnDue       Type = "cash_return_due"
+	TypeWarehousePickup     Type = "warehouse_pickup"
+	TypeOrdersAvailable     Type = "orders_available"
+	TypePrepaymentSubmitted Type = "prepayment_submitted"
 )
 
 // Notification is a single persisted, per-user event. Also best-effort

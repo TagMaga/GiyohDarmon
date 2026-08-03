@@ -116,6 +116,10 @@ type Service struct {
 	// adjustCourierWarehouse is nil until SetWarehouseAdapter is called at
 	// startup (see cmd/server/main.go). See AdjustCourierWarehouseFn.
 	adjustCourierWarehouse AdjustCourierWarehouseFn
+
+	// notifyDispatchers is nil until SetDispatcherNotifier is called at
+	// startup (see cmd/server/main.go). See NotifyDispatchersFn.
+	notifyDispatchers NotifyDispatchersFn
 }
 
 // NewService wires up the order service and its dependencies.
@@ -1620,6 +1624,7 @@ func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID 
 	}
 
 	var created *OrderPrepayment
+	var orderNumber string
 
 	txErr := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		o, err := s.repo.GetByIDForUpdate(tx, ctx, orderID)
@@ -1629,6 +1634,7 @@ func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID 
 		if o == nil {
 			return apperrors.NotFound("order")
 		}
+		orderNumber = o.OrderNumber
 		if o.Status.IsTerminal() {
 			return apperrors.BadRequest("cannot add prepayment to a terminal order")
 		}
@@ -1662,6 +1668,12 @@ func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID 
 		if err := s.repo.UpdatePrepaymentAmount(ctx, tx, orderID, req.Amount); err != nil {
 			return err
 		}
+		// A newly submitted prepayment always needs dispatcher review, even
+		// if an earlier prepayment on this order was already verified or
+		// rejected — the new amount/proof hasn't been checked yet.
+		if err := s.repo.SetPrepaymentStatus(ctx, tx, orderID, PrepaymentStatusPendingVerification); err != nil {
+			return err
+		}
 
 		s.logger.LogAsync(activity.Entry{
 			ActorID:    &actorID,
@@ -1682,6 +1694,9 @@ func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID 
 		return nil, txErr
 	}
 	s.resolvePrepaymentURL(ctx, created)
+	s.notifyDispatchersAsync(ctx, orderID,
+		"Новая предоплата на проверку",
+		fmt.Sprintf("Заказ %s: предоплата %.2f c ожидает подтверждения.", orderNumber, req.Amount))
 	return created, nil
 }
 
@@ -2002,6 +2017,32 @@ func (s *Service) deductInventory(ctx context.Context, tx *gorm.DB, o *Order, ac
 // sites so tests that don't need courier warehouses keep working unmodified.
 func (s *Service) SetWarehouseAdapter(fn AdjustCourierWarehouseFn) {
 	s.adjustCourierWarehouse = fn
+}
+
+// NotifyDispatchersFn broadcasts a notification to every dispatcher and
+// owner-level user (owner, it_specialist), injected from cmd/server/main.go
+// so internal/orders doesn't need to depend on internal/users or
+// internal/notifications for one call — same narrow-function pattern as
+// AdjustCourierWarehouseFn / dispatch.NotifyFn.
+type NotifyDispatchersFn func(ctx context.Context, orderID uuid.UUID, title, body string) error
+
+// SetDispatcherNotifier wires the dispatcher-broadcast notifier in without
+// creating an import cycle. Must be called once at startup; nil-checked at
+// call sites so tests that don't need notifications keep working unmodified.
+func (s *Service) SetDispatcherNotifier(fn NotifyDispatchersFn) {
+	s.notifyDispatchers = fn
+}
+
+// notifyDispatchersAsync fires a best-effort broadcast and only logs on
+// failure — a notification delivery problem must never fail the caller's
+// request.
+func (s *Service) notifyDispatchersAsync(ctx context.Context, orderID uuid.UUID, title, body string) {
+	if s.notifyDispatchers == nil {
+		return
+	}
+	if err := s.notifyDispatchers(ctx, orderID, title, body); err != nil {
+		log.Printf("[orders] notify dispatchers failed (order=%s): %v", orderID, err)
+	}
 }
 
 // LockOrderForWarehouseOp fetches an order (with items) locked FOR UPDATE,

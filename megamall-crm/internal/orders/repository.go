@@ -392,6 +392,18 @@ func (r *Repository) UpdatePrepaymentAmount(ctx context.Context, tx *gorm.DB, id
 	return nil
 }
 
+// SetPrepaymentStatus overwrites prepayment_status (inside a transaction).
+func (r *Repository) SetPrepaymentStatus(ctx context.Context, tx *gorm.DB, id uuid.UUID, status string) error {
+	result := tx.WithContext(ctx).
+		Model(&Order{}).
+		Where("id = ?", id).
+		UpdateColumn("prepayment_status", status)
+	if result.Error != nil {
+		return fmt.Errorf("set prepayment status: %w", result.Error)
+	}
+	return nil
+}
+
 // UpdateSnapshotID sets snapshot_id and financial fields after snapshot is built.
 func (r *Repository) UpdateFinancials(ctx context.Context, tx *gorm.DB, id uuid.UUID, snapshotID uuid.UUID, deliveryFee, netRevenue float64) error {
 	result := tx.WithContext(ctx).

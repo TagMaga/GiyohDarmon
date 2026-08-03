@@ -575,6 +575,9 @@
 .dv2-badge.card { background: var(--blue-dim); color: var(--blue-text); }
 .dv2-badge.urgent { background: var(--red-dim); color: var(--red-text); }
 .dv2-badge.claimable { background: var(--amber-dim); color: var(--amber-text); }
+.dv2-badge.prepay-pending { background: var(--amber-dim); color: var(--amber-text); }
+.dv2-badge.prepay-verified { background: var(--green-dim); color: var(--green-text); }
+.dv2-badge.prepay-rejected { background: var(--red-dim); color: var(--red-text); }
 .dv2-badge.today { background: var(--green-dim); color: var(--green-text); }
 .dv2-badge.tomorrow { background: var(--blue-dim); color: var(--blue-text); }
 .dv2-badge.scheduled { background: var(--purple-dim); color: var(--purple-text); }

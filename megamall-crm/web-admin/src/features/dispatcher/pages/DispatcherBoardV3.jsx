@@ -1049,7 +1049,8 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
   const urgentClass = mins >= 60 || order.status === 'issue' || isOverdue(order) ? 'urgent-red' : mins >= 30 ? 'urgent-amber' : ''
   const cardColor = order.status === 'new' ? 'var(--text3)' : order.status === 'confirmed' ? 'var(--blue)' : order.status === 'issue' ? 'var(--red)' : order.status === 'delivered' ? 'var(--green)' : 'var(--amber)'
   const isCash = order.payment_method === 'cash' || order.payment_method === 'наличные'
-  const hasPrepay = order.prepayment_status || Number(order.prepayment_amount ?? 0) > 0
+  const prepayStatus = order.prepayment_status
+  const hasPrepayAmount = Number(order.prepayment_amount ?? 0) > 0
 
   return (
     <div
@@ -1081,7 +1082,18 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
         <span className="dv2-oc-badges">
           {isCash && <span className="dv2-badge cash">нал</span>}
           {!isCash && order.payment_method && <span className="dv2-badge card">карта</span>}
-          {hasPrepay && <span className="dv2-badge claimable">предопл</span>}
+          {prepayStatus === 'pending_verification' && (
+            <span className="dv2-badge prepay-pending" title="Предоплата ждёт проверки">⏳ предопл</span>
+          )}
+          {prepayStatus === 'verified' && (
+            <span className="dv2-badge prepay-verified" title="Предоплата подтверждена">✓ предопл</span>
+          )}
+          {prepayStatus === 'rejected' && (
+            <span className="dv2-badge prepay-rejected" title="Предоплата отклонена">✗ предопл</span>
+          )}
+          {(!prepayStatus || prepayStatus === 'none') && hasPrepayAmount && (
+            <span className="dv2-badge claimable">предопл</span>
+          )}
           {order.status === 'issue' && <span className="dv2-badge issue">проблема</span>}
           {isToday(order.scheduled_at || order.delivery_date) && <span className="dv2-badge today">сегодня</span>}
           {isTomorrow(order.scheduled_at || order.delivery_date) && <span className="dv2-badge tomorrow">завтра</span>}
