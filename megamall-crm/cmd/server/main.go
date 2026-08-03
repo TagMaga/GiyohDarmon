@@ -462,6 +462,7 @@ func main() {
 		return notificationsSvc.Notify(ctx, userID, notifications.Type(notifType), title, body, orderID)
 	}
 	warehousesSvc.SetNotifier(notifyFn)
+	orderSvc.SetNotifier(notifyFn)
 
 	dispatchRepo := dispatch.NewRepository(db)
 	dispatchSvc := dispatch.NewService(dispatchRepo, orderSvc, activityLogger, db)
