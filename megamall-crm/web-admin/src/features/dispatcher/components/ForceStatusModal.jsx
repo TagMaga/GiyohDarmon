@@ -14,7 +14,12 @@ import { STATUS_LABELS } from '../statusConfig'
 // cancelled / returned). The backend re-validates and guards financial /
 // inventory side effects against double-firing; this modal only enforces
 // "pick something else" and "explain why".
-const ALL_STATUSES = ['new', 'confirmed', 'assigned', 'in_delivery', 'delivered', 'issue', 'returned', 'cancelled']
+const ALL_STATUSES = [
+  'new', 'confirmed', 'prepayment_pending', 'prepayment_received',
+  'assigned', 'in_delivery', 'delivered', 'issue', 'returned', 'cancelled',
+]
+
+const TERMINAL_STATUSES = new Set(['delivered', 'cancelled', 'returned'])
 
 export default function ForceStatusModal({ open, onClose, order }) {
   const qc    = useQueryClient()
@@ -51,6 +56,10 @@ export default function ForceStatusModal({ open, onClose, order }) {
 
   const errMsg = error?.response?.data?.error?.message ?? error?.message
   const canSubmit = !!status && status !== order?.status && reason.trim().length >= 3
+
+  // Moving into or out of a terminal status touches inventory and the
+  // financial ledger — surface that before the dispatcher commits.
+  const touchesTerminal = TERMINAL_STATUSES.has(status) || TERMINAL_STATUSES.has(order?.status)
 
   return (
     <Modal
@@ -98,6 +107,22 @@ export default function ForceStatusModal({ open, onClose, order }) {
             ))}
           </select>
         </div>
+
+        {status && status !== order?.status && (
+          <div className="text-sm text-slate-600">
+            {STATUS_LABELS[order?.status] ?? order?.status ?? '—'}
+            {' → '}
+            <strong className="text-slate-900">{STATUS_LABELS[status] ?? status}</strong>
+          </div>
+        )}
+
+        {touchesTerminal && (
+          <Alert variant="warning">
+            Затрагивается финальный статус (доставлен / отменён / возврат):
+            изменение влияет на складские остатки и финансовые начисления по заказу.
+            Убедитесь, что это действительно нужно.
+          </Alert>
+        )}
 
         <div>
           <label className="input-label">Причина *</label>

@@ -12,6 +12,10 @@ import { APP_TIMEZONE } from '../../shared/utils/date'
 export const STATUS_LABELS = {
   new:         'Новый',
   confirmed:   'Подтверждён',
+  // Prepayment states never get their own board column, but orders can sit in
+  // them — the history table and the force-status modal both need the label.
+  prepayment_pending:  'Ожидает предоплату',
+  prepayment_received: 'Предоплата получена',
   assigned:    'Назначен',
   in_delivery: 'В доставке',
   delivered:   'Доставлен',
