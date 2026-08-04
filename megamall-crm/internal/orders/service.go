@@ -2253,6 +2253,8 @@ func (s *Service) validateOrderTypeForRole(role string, ot OrderType) error {
 //
 //	new → confirmed:        dispatcher, owner
 //	new → cancelled:        seller (own order only), dispatcher, owner, manager, sales_team_lead
+//	cancelled → confirmed:  seller (own order), manager (own order or own team's),
+//	                        sales_team_lead (own order or own team's), dispatcher, owner
 //	courier (own order):    assigned → in_delivery, in_delivery → delivered,
 //	                        in_delivery → returned, in_delivery → cancelled (flagging a delivery problem),
 //	                        assigned/in_delivery → confirmed (releasing the order back)
@@ -2265,6 +2267,25 @@ func (s *Service) validateTransitionRole(role string, actorID uuid.UUID, o *Orde
 	// Seller can cancel their OWN order only while it is still new.
 	if role == "seller" && to == StatusCancelled && from == StatusNew && o.SellerID == actorID {
 		return nil
+	}
+
+	// Restoring a cancelled order back to confirmed: sales roles are scoped to
+	// their own orders/team, same visibility rule as CanAccessOrder.
+	if from == StatusCancelled && to == StatusConfirmed {
+		switch role {
+		case "seller":
+			if o.SellerID == actorID {
+				return nil
+			}
+		case "manager":
+			if o.SellerID == actorID || (o.ManagerID != nil && *o.ManagerID == actorID) {
+				return nil
+			}
+		case "sales_team_lead":
+			if o.SellerID == actorID || (o.TeamLeadID != nil && *o.TeamLeadID == actorID) {
+				return nil
+			}
+		}
 	}
 
 	if role == "courier" {
