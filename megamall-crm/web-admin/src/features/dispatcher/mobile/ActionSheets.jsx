@@ -49,7 +49,7 @@ export function AssignSheet({ open, mode, order, onClose }) {
   if (!open) return null
 
   return (
-    <Sheet open={open} onClose={onClose} zIndex={41}>
+    <Sheet open={open} onClose={onClose} zIndex={46}>
       <SheetTitle sub={`Заказ #${order ? formatOrderLabel(order) : ''} · выберите курьера`}>
         {mode === 'reassign' ? 'Переназначить курьера' : 'Назначить курьера'}
       </SheetTitle>
@@ -135,7 +135,7 @@ export function UnassignSheet({ open, order, onClose }) {
   if (!open) return null
 
   return (
-    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={41}>
+    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={46}>
       <SheetTitle sub={`Заказ #${order ? formatOrderLabel(order) : ''} вернётся в «Подтверждённые»`}>
         Снять курьера
       </SheetTitle>
@@ -186,7 +186,7 @@ export function CancelSheet({ open, order, onClose }) {
   const canSubmit = reason || comment.trim()
 
   return (
-    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={41}>
+    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={46}>
       <SheetTitle sub="Укажите причину отмены">Отменить заказ #{order ? formatOrderLabel(order) : ''}</SheetTitle>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
         {CANCEL_REASONS.map((r) => (
@@ -237,7 +237,7 @@ export function IssueSheet({ open, mode, order, onClose }) {
   const canSubmit = isResolve ? comment.trim() : (reason || comment.trim())
 
   return (
-    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={41}>
+    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={46}>
       <SheetTitle sub={`Заказ #${order ? formatOrderLabel(order) : ''}`}>{isResolve ? 'Решить проблему' : 'Отметить проблему'}</SheetTitle>
       {isResolve ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
@@ -296,7 +296,7 @@ export function ScheduleSheet({ open, order, onClose }) {
   if (!open) return null
 
   return (
-    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={41}>
+    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={46}>
       <SheetTitle sub={`Заказ #${order ? formatOrderLabel(order) : ''}`}>Запланировать доставку</SheetTitle>
       <div style={{ fontSize: 11, fontWeight: 700, color: C.text3, padding: '0 4px 8px' }}>Дата</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
