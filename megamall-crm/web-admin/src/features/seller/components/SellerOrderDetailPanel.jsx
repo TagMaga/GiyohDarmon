@@ -18,8 +18,6 @@ const ROLE_BADGE = {
 const TIMELINE_STEPS = [
   { status: 'new',                 label: 'Создан',              role: 'seller' },
   { status: 'confirmed',           label: 'Подтверждён',         role: 'dispatcher' },
-  { status: 'prepayment_pending',  label: 'Ожидает предоплату',  role: 'dispatcher' },
-  { status: 'prepayment_received', label: 'Предоплата получена', role: 'dispatcher' },
   { status: 'assigned',            label: 'Назначен курьер',     role: 'dispatcher' },
   { status: 'in_delivery',         label: 'В доставке',          role: 'courier' },
   { status: 'delivered',           label: 'Доставлен',           role: 'courier' },

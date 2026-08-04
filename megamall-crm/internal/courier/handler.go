@@ -214,7 +214,7 @@ func (h *Handler) deferOrder(c *gin.Context) {
 	response.NoContent(c)
 }
 
-func (h *Handler) markIssue(c *gin.Context) {
+func (h *Handler) markCancelled(c *gin.Context) {
 	orderID, err := parseID(c, "id")
 	if err != nil {
 		response.HandleError(c, err)
@@ -223,7 +223,7 @@ func (h *Handler) markIssue(c *gin.Context) {
 	var req StatusChangeRequest
 	_ = c.ShouldBindJSON(&req)
 	claims := middleware.ClaimsFromContext(c)
-	order, svcErr := h.svc.MarkIssue(c.Request.Context(), claims.UserID, orderID, req)
+	order, svcErr := h.svc.MarkCancelled(c.Request.Context(), claims.UserID, orderID, req)
 	if svcErr != nil {
 		response.HandleError(c, svcErr)
 		return

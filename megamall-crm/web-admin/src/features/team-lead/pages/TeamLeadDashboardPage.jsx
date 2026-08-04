@@ -222,9 +222,6 @@ const STATUS_COLOR = {
   delivered:    'bg-emerald-500',
   cancelled:    'bg-slate-400',
   returned:     'bg-orange-400',
-  issue:        'bg-rose-500',
-  prepayment_pending:  'bg-amber-400',
-  prepayment_received: 'bg-violet-400',
   assigned:     'bg-violet-500',
 }
 

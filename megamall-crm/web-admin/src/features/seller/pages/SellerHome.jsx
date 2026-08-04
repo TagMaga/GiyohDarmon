@@ -15,8 +15,8 @@ function calcStats(orders = []) {
   // Compared on the Dushanbe calendar day — toDateString() compares the
   // browser's, so orders placed before 05:00 local fell out of "today".
   const today = new Date()
-  const ACTIVE = new Set(['new', 'confirmed', 'prepayment_pending', 'prepayment_received', 'assigned', 'in_delivery'])
-  let todayEarnings = 0, todayCount = 0, activeCount = 0, deliveredCount = 0, prepaymentCount = 0
+  const ACTIVE = new Set(['new', 'confirmed', 'assigned', 'in_delivery'])
+  let todayEarnings = 0, todayCount = 0, activeCount = 0, deliveredCount = 0
   for (const o of orders) {
     if (isSameAppDay(o.created_at, today)) {
       todayCount++
@@ -24,9 +24,8 @@ function calcStats(orders = []) {
     }
     if (ACTIVE.has(o.status)) activeCount++
     if (o.status === 'delivered') deliveredCount++
-    if (o.status === 'prepayment_pending') prepaymentCount++
   }
-  return { todayEarnings, todayCount, activeCount, deliveredCount, prepaymentCount }
+  return { todayEarnings, todayCount, activeCount, deliveredCount }
 }
 
 export default function SellerHome() {

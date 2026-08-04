@@ -247,7 +247,7 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 	var noCourierCount int64
 	err = r.db.WithContext(ctx).Raw(`
 		SELECT COUNT(*) FROM orders
-		WHERE status IN ('confirmed','prepayment_received')
+		WHERE status = 'confirmed'
 		  AND courier_id IS NULL AND deleted_at IS NULL
 	`).Scan(&noCourierCount).Error
 	if err != nil {

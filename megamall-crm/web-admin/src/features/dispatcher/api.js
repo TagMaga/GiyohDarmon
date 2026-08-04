@@ -24,9 +24,9 @@ export async function fetchNewOrders() {
   return unwrap(res)
 }
 
-/** GET /orders?status=issue — orders with active issues */
-export async function fetchIssueOrders() {
-  const res = await client.get('/orders', { params: { status: 'issue', limit: 200 } })
+/** GET /orders?status=cancelled — cancelled orders (board's Отмена column) */
+export async function fetchCancelledOrders() {
+  const res = await client.get('/orders', { params: { status: 'cancelled', limit: 200 } })
   return unwrap(res)
 }
 
@@ -189,12 +189,6 @@ export async function scheduleOrder(id, { scheduled_at, comment = '' }) {
   return unwrap(res)
 }
 
-/** POST /dispatch/orders/:id/issue  (in_delivery → issue) */
-export async function markIssue(id, { comment }) {
-  const res = await client.post(`/dispatch/orders/${id}/issue`, { comment })
-  return unwrap(res)
-}
-
 /** POST /dispatch/orders/:id/return */
 export async function markReturn(id) {
   const res = await client.post(`/dispatch/orders/${id}/return`, {})
@@ -204,12 +198,6 @@ export async function markReturn(id) {
 /** POST /dispatch/orders/:id/cancel */
 export async function cancelOrder(id, { reason }) {
   const res = await client.post(`/dispatch/orders/${id}/cancel`, { comment: reason })
-  return unwrap(res)
-}
-
-/** POST /dispatch/orders/:id/resolve-issue */
-export async function resolveIssue(id, { to_status = 'assigned', comment = '' }) {
-  const res = await client.post(`/dispatch/orders/${id}/resolve-issue`, { to_status, comment })
   return unwrap(res)
 }
 

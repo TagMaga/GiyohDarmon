@@ -19,7 +19,6 @@ import CreateOfficeOrderModal from '../components/CreateOfficeOrderModal'
 import AssignCourierModal    from '../components/AssignCourierModal'
 import UnassignModal         from '../components/UnassignModal'
 import ScheduleModal         from '../components/ScheduleModal'
-import IssueModal            from '../components/IssueModal'
 import CancelModal           from '../components/CancelModal'
 import ForceStatusModal      from '../components/ForceStatusModal'
 import CommentsDrawer        from '../components/CommentsDrawer'
@@ -29,7 +28,7 @@ import CommandPalette        from '../components/CommandPalette'
 import useCustomerMap        from '../hooks/useCustomerMap'
 
 import {
-  fetchBoard, fetchNewOrders, fetchIssueOrders, fetchDeliveredOrders,
+  fetchBoard, fetchNewOrders, fetchCancelledOrders, fetchDeliveredOrders,
   fetchCouriersOverview, fetchHandovers, fetchCashSettlement, fetchCashTransactions, fetchDispatchOrderHistory,
   confirmOrder, markReturn, verifyPrepayment, confirmCashTransaction, rejectCashTransaction,
   assignCourier, reassignCourier, cancelOrder, forceOrderStatus,
@@ -50,8 +49,6 @@ const ACTION_MODAL = {
   reassign: 'reassign',
   unassign: 'unassign',
   schedule: 'schedule',
-  issue: 'issue',
-  resolve: 'resolve',
   cancel: 'cancel',
   comment: 'comments',
   force_status: 'force_status',
@@ -62,7 +59,7 @@ const COLUMNS = [
   { key: 'confirmed', label: 'Подтверждены', color: 'var(--blue)', statuses: ['confirmed'] },
   { key: 'delivery', label: 'В доставке', color: 'var(--amber)', statuses: ['assigned', 'in_delivery'] },
   { key: 'done', label: 'Доставлено', color: 'var(--green)', statuses: ['delivered'] },
-  { key: 'issues', label: 'Проблемы', color: 'var(--red)', statuses: ['issue'] },
+  { key: 'cancelled', label: 'Отмена', color: 'var(--red)', statuses: ['cancelled'] },
 ]
 
 const STATUS_TO_COL = {
@@ -71,7 +68,7 @@ const STATUS_TO_COL = {
   assigned: 'delivery',
   in_delivery: 'delivery',
   delivered: 'done',
-  issue: 'issues',
+  cancelled: 'cancelled',
 }
 
 // Drag-and-drop column → target status. The 'delivery' column covers two
@@ -154,7 +151,7 @@ function DispatcherBoardDesktop() {
 
   const board = useQuery({ queryKey: KEYS.dispatcher.board, queryFn: fetchBoard, refetchInterval: 30_000, staleTime: 25_000 })
   const news = useQuery({ queryKey: KEYS.dispatcher.newOrders, queryFn: fetchNewOrders, refetchInterval: 30_000, staleTime: 25_000 })
-  const issues = useQuery({ queryKey: KEYS.dispatcher.issues, queryFn: fetchIssueOrders, refetchInterval: 30_000, staleTime: 25_000 })
+  const cancelled = useQuery({ queryKey: KEYS.dispatcher.cancelled, queryFn: fetchCancelledOrders, refetchInterval: 30_000, staleTime: 25_000 })
   const delivered = useQuery({ queryKey: KEYS.dispatcher.delivered, queryFn: fetchDeliveredOrders, refetchInterval: 60_000, staleTime: 55_000 })
   const couriers = useQuery({ queryKey: KEYS.dispatcher.couriers, queryFn: fetchCouriersOverview, refetchInterval: 30_000, staleTime: 20_000 })
   const handovers = useQuery({ queryKey: KEYS.dispatcher.handovers, queryFn: fetchHandovers, refetchInterval: 60_000, staleTime: 45_000 })
@@ -198,7 +195,7 @@ function DispatcherBoardDesktop() {
   const allOrders = useMemo(() => {
     const seen = new Set()
     const merged = []
-    for (const order of [...arr(news.data), ...arr(board.data), ...arr(issues.data), ...arr(delivered.data)]) {
+    for (const order of [...arr(news.data), ...arr(board.data), ...arr(cancelled.data), ...arr(delivered.data)]) {
       const id = getOrderId(order)
       if (id && !seen.has(id)) {
         seen.add(id)
@@ -206,7 +203,7 @@ function DispatcherBoardDesktop() {
       }
     }
     return merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-  }, [news.data, board.data, issues.data, delivered.data])
+  }, [news.data, board.data, cancelled.data, delivered.data])
 
   const customerMap = useCustomerMap(allOrders)
   const courierList = arr(couriers.data)
@@ -214,7 +211,7 @@ function DispatcherBoardDesktop() {
   const handoverList = arr(handovers.data)
 
   const counts = useMemo(() => {
-    const c = { new: 0, confirmed: 0, delivery: 0, done: 0, issues: 0, overdue: 0, unassigned: 0 }
+    const c = { new: 0, confirmed: 0, delivery: 0, done: 0, cancelled: 0, overdue: 0, unassigned: 0 }
     for (const order of allOrders) {
       const col = STATUS_TO_COL[order.status]
       if (col) c[col] += 1
@@ -282,7 +279,7 @@ function DispatcherBoardDesktop() {
   const invalidate = useCallback(() => {
     qc.invalidateQueries({ queryKey: KEYS.dispatcher.board })
     qc.invalidateQueries({ queryKey: KEYS.dispatcher.newOrders })
-    qc.invalidateQueries({ queryKey: KEYS.dispatcher.issues })
+    qc.invalidateQueries({ queryKey: KEYS.dispatcher.cancelled })
     qc.invalidateQueries({ queryKey: KEYS.dispatcher.couriers })
   }, [qc])
 
@@ -477,7 +474,7 @@ function DispatcherBoardDesktop() {
   function quickAssign() {
     if (!selectedOrder || !pendingCourierId) return
     const orderId = requiredOrderId(selectedOrder)
-    const isReassignable = ['assigned', 'in_delivery', 'issue'].includes(selectedOrder.status)
+    const isReassignable = ['assigned', 'in_delivery'].includes(selectedOrder.status)
     if (isReassignable) doReassign({ orderId, courierId: pendingCourierId })
     else doAssign({ orderId, courierId: pendingCourierId })
   }
@@ -496,9 +493,9 @@ function DispatcherBoardDesktop() {
   }, [doConfirm, doReturn, doVerifyPrepayment, isConfirming, isVerifyingPrepayment, toast])
 
   const handleRefresh = useCallback(async () => {
-    await Promise.all([board.refetch(), news.refetch(), issues.refetch(), delivered.refetch(), couriers.refetch(), handovers.refetch(), cashSettlement.refetch(), cashTransactions.refetch(), orderHistory.refetch()])
+    await Promise.all([board.refetch(), news.refetch(), cancelled.refetch(), delivered.refetch(), couriers.refetch(), handovers.refetch(), cashSettlement.refetch(), cashTransactions.refetch(), orderHistory.refetch()])
     toast.success('Данные обновлены')
-  }, [board, news, issues, delivered, couriers, handovers, cashSettlement, cashTransactions, orderHistory, toast])
+  }, [board, news, cancelled, delivered, couriers, handovers, cashSettlement, cashTransactions, orderHistory, toast])
 
   // V3: extended keyboard handler — ↑↓ navigate, Enter fire primary/assign, Esc cascade
   useEffect(() => {
@@ -758,8 +755,6 @@ function DispatcherBoardDesktop() {
       <AssignCourierModal    open={modal === 'reassign'}          onClose={closeModal} order={activeOrder} mode="reassign" />
       <UnassignModal         open={modal === 'unassign'}          onClose={closeModal} order={activeOrder} courierMap={courierMap} />
       <ScheduleModal         open={modal === 'schedule'}          onClose={closeModal} order={activeOrder} />
-      <IssueModal            open={modal === 'issue'}             onClose={closeModal} order={activeOrder} mode="mark" />
-      <IssueModal            open={modal === 'resolve'}           onClose={closeModal} order={activeOrder} mode="resolve" />
       <CancelModal           open={modal === 'cancel'}            onClose={closeModal} order={activeOrder} onSchedule={scheduleCancel} />
       <CancelModal           open={modal === 'bulk_cancel'}       onClose={closeModal} orders={bulkOrders} onSchedule={scheduleCancel} />
       <AssignCourierModal    open={modal === 'bulk_assign'}       onClose={closeModal} orders={bulkOrders} onBulkSuccess={clearBulk} />
@@ -770,7 +765,7 @@ function DispatcherBoardDesktop() {
         if (action === 'refresh') handleRefresh()
         if (action === 'viewCouriers') setCouriersOpen(true)
         if (action === 'viewCash') setFilters((prev) => ({ ...prev, tab: 'cash' }))
-        if (action === 'viewIssues') setFilters((prev) => ({ ...prev, mobileStatus: 'issues' }))
+        if (action === 'viewCancelled') setFilters((prev) => ({ ...prev, mobileStatus: 'cancelled' }))
       }} orders={allOrders} />
       <ShortcutsToast open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <PhotoPreviewModal url={photoPreview} onClose={() => setPhotoPreview(null)} />
@@ -824,7 +819,7 @@ function Shortcut({ label, keys }) {
 }
 
 function KpiBar({ counts, couriers, setFilters, onCreateOrder }) {
-  const active = counts.new + counts.confirmed + counts.delivery + counts.issues
+  const active = counts.new + counts.confirmed + counts.delivery
 
   return (
     <div className="dv2-kpibar">
@@ -971,7 +966,7 @@ function StickyActionBar({ order, pendingCourierId, pendingCourierName, isMutati
   if (!order) return null
 
   const status = order.status
-  const isReassignable = ['assigned', 'in_delivery', 'issue'].includes(status)
+  const isReassignable = ['assigned', 'in_delivery'].includes(status)
 
   if (pendingCourierId) {
     return (
@@ -1118,8 +1113,8 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
   const courierDisp = resolveCourierDisplay(order, courierMap)
   const address = resolveAddress(order) || customer?.address || resolveCity(order) || customer?.city || '—'
   const mins = orderAgeMinutes(order)
-  const urgentClass = mins >= 60 || order.status === 'issue' || isOverdue(order) ? 'urgent-red' : mins >= 30 ? 'urgent-amber' : ''
-  const cardColor = order.status === 'new' ? 'var(--text3)' : order.status === 'confirmed' ? 'var(--blue)' : order.status === 'issue' ? 'var(--red)' : order.status === 'delivered' ? 'var(--green)' : 'var(--amber)'
+  const urgentClass = mins >= 60 || isOverdue(order) ? 'urgent-red' : mins >= 30 ? 'urgent-amber' : ''
+  const cardColor = order.status === 'new' ? 'var(--text3)' : order.status === 'confirmed' ? 'var(--blue)' : order.status === 'cancelled' ? 'var(--red)' : order.status === 'delivered' ? 'var(--green)' : 'var(--amber)'
   const isCash = order.payment_method === 'cash' || order.payment_method === 'наличные'
   const prepayStatus = order.prepayment_status
   const hasPrepayAmount = Number(order.prepayment_amount ?? 0) > 0
@@ -1186,7 +1181,6 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
           {(!prepayStatus || prepayStatus === 'none') && hasPrepayAmount && (
             <span className="dv2-badge claimable">предопл</span>
           )}
-          {order.status === 'issue' && <span className="dv2-badge issue">проблема</span>}
           {isToday(order.scheduled_at || order.delivery_date) && <span className="dv2-badge today">сегодня</span>}
           {isTomorrow(order.scheduled_at || order.delivery_date) && <span className="dv2-badge tomorrow">завтра</span>}
         </span>
@@ -1209,7 +1203,7 @@ function OrderCard({ order, customerMap, courierMap, selected, onSelect, onActio
           </button>
         )}
         {order.status === 'confirmed' && <button className="dv2-oc-action" aria-label="Назначить курьера" onClick={() => onAction('assign', order)}><Truck size={15} /></button>}
-        {!['delivered', 'cancelled'].includes(order.status) && <button className="dv2-oc-action" aria-label="Проблема" onClick={() => onAction('issue', order)}><AlertTriangle size={15} /></button>}
+        {!['delivered', 'cancelled'].includes(order.status) && <button className="dv2-oc-action" aria-label="Отменить" onClick={() => onAction('cancel', order)}><AlertTriangle size={15} /></button>}
       </div>
     </div>
   )
@@ -1656,14 +1650,11 @@ function DataPanel({ title, count, deliveredCount, totalIncome, rowCount, loadin
 const ORDER_STATUS_OPTIONS = [
   { value: 'new', label: 'Новый' },
   { value: 'confirmed', label: 'Подтверждён' },
-  { value: 'prepayment_pending', label: 'Ожидает предоплату' },
-  { value: 'prepayment_received', label: 'Предоплата получена' },
   { value: 'assigned', label: 'Назначен' },
   { value: 'in_delivery', label: 'В доставке' },
   { value: 'delivered', label: 'Доставлен' },
   { value: 'returned', label: 'Возврат' },
-  { value: 'cancelled', label: 'Отменён' },
-  { value: 'issue', label: 'Проблема' },
+  { value: 'cancelled', label: 'Отмена' },
 ]
 
 function TransactionCourier({ row }) {
@@ -1692,7 +1683,7 @@ function StatusBadge({ status }) {
 // wrong or stuck status (opens ForceStatusModal, which demands a reason).
 function OrderStatusBadge({ status, onClick }) {
   const label = ORDER_STATUS_OPTIONS.find((opt) => opt.value === status)?.label ?? status ?? '—'
-  const tone = status === 'delivered' ? 'settled' : ['cancelled', 'returned', 'issue'].includes(status) ? 'mismatch' : 'pending'
+  const tone = status === 'delivered' ? 'settled' : ['cancelled', 'returned'].includes(status) ? 'mismatch' : 'pending'
   if (!onClick) return <span className={`dv2-cash-status ${tone}`}>{label}</span>
   return (
     <button
@@ -1923,8 +1914,8 @@ function primaryActions(status) {
   if (status === 'new') return [{ key: 'confirm', label: 'Подтвердить', className: 'dv2-btn-primary' }]
   if (status === 'confirmed') return [{ key: 'assign', label: 'Назначить курьера', className: 'dv2-btn-primary' }]
   if (status === 'assigned') return [{ key: 'reassign', label: 'Переназначить', className: 'dv2-btn-ghost' }]
-  if (status === 'issue') return [{ key: 'resolve', label: 'Решить проблему', className: 'dv2-btn-success' }]
-  return [{ key: 'issue', label: 'Отметить проблему', className: 'dv2-btn-danger' }]
+  if (status === 'delivered' || status === 'cancelled') return []
+  return [{ key: 'cancel', label: 'Отменить', className: 'dv2-btn-danger' }]
 }
 
 function dateOptions() {

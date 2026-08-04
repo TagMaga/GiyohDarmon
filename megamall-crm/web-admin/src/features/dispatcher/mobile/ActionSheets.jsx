@@ -9,14 +9,14 @@ import { useToast } from '../../../shared/components/ToastProvider'
 import { getOrderId, formatOrderLabel } from '../utils/orderHelpers'
 import { toLocalYMD, addDaysYMD, appWallClockToDate } from '../../../shared/utils/date'
 import {
-  fetchCouriersOverview, assignCourier, reassignCourier, unassignCourier, cancelOrder, markIssue, resolveIssue, scheduleOrder,
+  fetchCouriersOverview, assignCourier, reassignCourier, unassignCourier, cancelOrder, scheduleOrder,
   forceOrderStatus,
 } from '../api'
 
 const invalidateBoard = (qc) => {
   qc.invalidateQueries({ queryKey: KEYS.dispatcher.board })
   qc.invalidateQueries({ queryKey: KEYS.dispatcher.newOrders })
-  qc.invalidateQueries({ queryKey: KEYS.dispatcher.issues })
+  qc.invalidateQueries({ queryKey: KEYS.dispatcher.cancelled })
   qc.invalidateQueries({ queryKey: KEYS.dispatcher.couriers })
 }
 
@@ -50,7 +50,7 @@ export function AssignSheet({ open, mode, order, onClose }) {
   if (!open) return null
 
   return (
-    <Sheet open={open} onClose={onClose} zIndex={41}>
+    <Sheet open={open} onClose={onClose} zIndex={46}>
       <SheetTitle sub={`Заказ #${order ? formatOrderLabel(order) : ''} · выберите курьера`}>
         {mode === 'reassign' ? 'Переназначить курьера' : 'Назначить курьера'}
       </SheetTitle>
@@ -136,7 +136,7 @@ export function UnassignSheet({ open, order, onClose }) {
   if (!open) return null
 
   return (
-    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={41}>
+    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={46}>
       <SheetTitle sub={`Заказ #${order ? formatOrderLabel(order) : ''} вернётся в «Подтверждённые»`}>
         Снять курьера
       </SheetTitle>
@@ -187,7 +187,7 @@ export function CancelSheet({ open, order, onClose }) {
   const canSubmit = reason || comment.trim()
 
   return (
-    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={41}>
+    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={46}>
       <SheetTitle sub="Укажите причину отмены">Отменить заказ #{order ? formatOrderLabel(order) : ''}</SheetTitle>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
         {CANCEL_REASONS.map((r) => (
@@ -208,76 +208,16 @@ export function CancelSheet({ open, order, onClose }) {
   )
 }
 
-// ── Issue sheet (mark / resolve) ─────────────────────────────────────────────
-const ISSUE_REASONS = ['Клиент не отвечает', 'Неверный адрес', 'Отказ от товара', 'Повреждён товар', 'Нет оплаты']
-const RESOLVE_STATUSES = [['assigned', 'Назначен'], ['confirmed', 'Подтверждён']]
-
-export function IssueSheet({ open, mode, order, onClose }) {
-  const qc = useQueryClient()
-  const toast = useToast()
-  const isResolve = mode === 'resolve'
-  const [reason, setReason] = useState('')
-  const [comment, setComment] = useState('')
-  const [toStatus, setToStatus] = useState('assigned')
-
-  useEffect(() => { if (open) { setReason(''); setComment(''); setToStatus('assigned') } }, [open])
-
-  const { mutate, isPending } = useMutation({
-    mutationFn: () => isResolve
-      ? resolveIssue(getOrderId(order), { to_status: toStatus, comment })
-      : markIssue(getOrderId(order), { comment: comment.trim() || reason }),
-    onSuccess: () => {
-      invalidateBoard(qc)
-      toast.success(isResolve ? 'Проблема решена' : 'Проблема отмечена')
-      onClose()
-    },
-    onError: (err) => toast.error(err?.response?.data?.error?.message ?? err?.message ?? 'Ошибка'),
-  })
-
-  if (!open) return null
-  const canSubmit = isResolve ? comment.trim() : (reason || comment.trim())
-
-  return (
-    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={41}>
-      <SheetTitle sub={`Заказ #${order ? formatOrderLabel(order) : ''}`}>{isResolve ? 'Решить проблему' : 'Отметить проблему'}</SheetTitle>
-      {isResolve ? (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-          {RESOLVE_STATUSES.map(([v, l]) => (
-            <button key={v} onClick={() => setToStatus(v)} style={{ padding: '9px 13px', borderRadius: 11, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, ...chipStyle(toStatus === v, C.green) }}>{l}</button>
-          ))}
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-          {ISSUE_REASONS.map((r) => (
-            <button key={r} onClick={() => setReason(r)} style={{ padding: '9px 13px', borderRadius: 11, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, ...chipStyle(reason === r, C.red) }}>{r}</button>
-          ))}
-        </div>
-      )}
-      <textarea
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        placeholder={isResolve ? 'Как решена проблема…' : 'Опишите проблему'}
-        rows={3}
-        style={{ width: '100%', border: `1px solid ${C.border}`, background: '#fff', borderRadius: 13, padding: 12, fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'none', marginBottom: 14 }}
-      />
-      <SheetPrimaryButton onClick={() => canSubmit && mutate()} disabled={!canSubmit || isPending} background={isResolve ? undefined : '#EF4444'}>
-        {isPending ? '...' : isResolve ? 'Решить проблему' : 'Отметить проблему'}
-      </SheetPrimaryButton>
-    </Sheet>
-  )
-}
-
 // ── Force status sheet ───────────────────────────────────────────────────────
 // Mobile twin of the desktop ForceStatusModal: the recovery path for an order
-// stuck in (or wrongly moved to) the wrong status. Every status is offered,
-// including terminal ones — the backend re-validates and guards the financial
-// and inventory side effects against double-firing. A reason is mandatory and
-// lands on the order timeline + audit log.
-const FORCE_STATUSES = [
-  'new', 'confirmed', 'prepayment_pending', 'prepayment_received',
-  'assigned', 'in_delivery', 'delivered', 'issue', 'returned', 'cancelled',
-]
-const TERMINAL_STATUSES = new Set(['delivered', 'cancelled', 'returned'])
+// stuck in (or wrongly moved to) the wrong status. Every status is offered —
+// all of them are restorable, and the backend re-validates and guards the
+// financial and inventory side effects against double-firing. A reason is
+// mandatory and lands on the order timeline + audit log.
+const FORCE_STATUSES = ['new', 'confirmed', 'assigned', 'in_delivery', 'delivered', 'returned', 'cancelled']
+
+// Statuses whose first entry moves stock and fires the financial events.
+const SETTLING_STATUSES = new Set(['delivered', 'cancelled', 'returned'])
 
 export function ForceStatusSheet({ open, order, onClose }) {
   const qc = useQueryClient()
@@ -303,7 +243,7 @@ export function ForceStatusSheet({ open, order, onClose }) {
 
   const current = order?.status
   const canSubmit = !!status && status !== current && reason.trim().length >= 3
-  const touchesTerminal = TERMINAL_STATUSES.has(status) || TERMINAL_STATUSES.has(current)
+  const touchesSettlement = SETTLING_STATUSES.has(status) || SETTLING_STATUSES.has(current)
 
   return (
     <Sheet open={open} onClose={onClose} zIndex={41}>
@@ -340,10 +280,10 @@ export function ForceStatusSheet({ open, order, onClose }) {
         })}
       </div>
 
-      {touchesTerminal && (
+      {touchesSettlement && (
         <div style={{ background: C.redBg, color: C.red, borderRadius: 13, padding: '11px 13px', fontSize: 12, fontWeight: 600, lineHeight: 1.45, marginBottom: 14 }}>
-          Затрагивается финальный статус (доставлен / отменён / возврат):
-          изменение влияет на складские остатки и финансовые начисления по заказу.
+          Затрагивается статус доставлен / отменён / возврат: изменение
+          влияет на складские остатки и финансовые начисления по заказу.
         </div>
       )}
 
@@ -393,7 +333,7 @@ export function ScheduleSheet({ open, order, onClose }) {
   if (!open) return null
 
   return (
-    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={41}>
+    <Sheet open={open} onClose={onClose} maxHeight="80%" zIndex={46}>
       <SheetTitle sub={`Заказ #${order ? formatOrderLabel(order) : ''}`}>Запланировать доставку</SheetTitle>
       <div style={{ fontSize: 11, fontWeight: 700, color: C.text3, padding: '0 4px 8px' }}>Дата</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>

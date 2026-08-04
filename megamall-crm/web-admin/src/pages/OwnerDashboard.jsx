@@ -26,7 +26,6 @@ import {
 import useFinanceSummary    from '../features/finance/hooks/useFinanceSummary'
 import useLogisticsDashboard from '../features/logistics/hooks/useLogisticsDashboard'
 import useOrderStats        from '../features/owner/hooks/useOrderStats'
-import useOwnerOrders       from '../features/orders/hooks/useOwnerOrders'
 import useInventory         from '../features/warehouse/hooks/useInventory'
 import useFinanceDaily      from '../features/owner/hooks/useFinanceDaily'
 import useSellerLeaderboard from '../features/owner/hooks/useSellerLeaderboard'
@@ -417,8 +416,6 @@ export default function OwnerDashboard() {
   const { data: summary,  isLoading: sumLoading } = useFinanceSummary(range)
   const { data: stats,    isLoading: statsLoading } = useOrderStats(range)
   const { data: logi,     isLoading: logiLoading  } = useLogisticsDashboard()
-  const { meta: prepayMeta, isLoading: prepayLoading } = useOwnerOrders({ status: 'prepayment_pending', limit: 1 })
-  const { meta: issueMeta,  isLoading: issueLoading  } = useOwnerOrders({ status: 'issue', limit: 1 })
   const { data: inventory = [] } = useInventory()
   const { data: dailyData = [], isLoading: dailyLoading } = useFinanceDaily(range)
   const { data: sellers   = [], isLoading: sellersLoading } = useSellerLeaderboard({ ...range, limit: 10 })
@@ -430,17 +427,13 @@ export default function OwnerDashboard() {
   const alerts = []
   if ((stats?.unassigned ?? 0) > 0)
     alerts.push({ key: 'unassigned', dot: 'bg-rose-500', text: `${stats.unassigned} заказов без курьера`, action: 'Назначить', to: '/owner/orders' })
-  if ((prepayMeta?.total ?? 0) > 0)
-    alerts.push({ key: 'prepay', dot: 'bg-amber-500', text: `${prepayMeta.total} заказов ждут проверки предоплаты`, action: 'Проверить', to: '/owner/orders?status=prepayment_pending' })
-  if ((issueMeta?.total ?? 0) > 0)
-    alerts.push({ key: 'issue', dot: 'bg-rose-500', text: `${issueMeta.total} проблемных заказов`, action: 'Открыть', to: '/owner/orders?status=issue' })
   if ((summary?.cash?.handovers_pending ?? 0) > 0)
     alerts.push({ key: 'handovers', dot: 'bg-amber-500', text: `${summary.cash.handovers_pending} передачи кассы на проверке`, action: 'Проверить', to: '/owner/finance' })
   if (logi?.biggest_debt_courier?.cash_debt > 1000)
     alerts.push({ key: 'debt', dot: 'bg-orange-500', text: `Долг по кассе: ${logi.biggest_debt_courier.full_name} (${fmtMoney(logi.biggest_debt_courier.cash_debt)} с)`, action: 'Проверить', to: '/owner/logistics' })
   if (lowStockCount > 0)
     alerts.push({ key: 'stock', dot: 'bg-amber-500', text: `${lowStockCount} позиций заканчиваются на складе`, action: 'Склад', to: '/owner/warehouse' })
-  const alertsLoading = statsLoading || prepayLoading || issueLoading || logiLoading
+  const alertsLoading = statsLoading || logiLoading
   const delivered = stats?.by_status?.delivered ?? 0
   const successRate = stats?.total > 0 ? `${((delivered / stats.total) * 100).toFixed(0)}%` : (logi?.success_rate > 0 ? `${logi.success_rate.toFixed(0)}%` : '—')
 

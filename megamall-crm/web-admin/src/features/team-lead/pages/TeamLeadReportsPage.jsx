@@ -103,7 +103,7 @@ function RevenueTrend({ orders }) {
 
 const STATUS_COLOR = {
   new:'bg-indigo-500', confirmed:'bg-sky-500', in_delivery:'bg-amber-500',
-  delivered:'bg-emerald-500', cancelled:'bg-slate-400', returned:'bg-orange-400', issue:'bg-rose-500',
+  delivered:'bg-emerald-500', cancelled:'bg-slate-400', returned:'bg-orange-400',
 }
 
 function StatusChart({ orders }) {

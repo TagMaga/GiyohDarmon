@@ -38,88 +38,60 @@ func (t OrderType) IsValid() bool {
 type OrderStatus string
 
 const (
-	StatusNew                OrderStatus = "new"
-	StatusConfirmed          OrderStatus = "confirmed"
-	StatusPrepaymentPending  OrderStatus = "prepayment_pending"
-	StatusPrepaymentReceived OrderStatus = "prepayment_received"
-	StatusAssigned           OrderStatus = "assigned"
-	StatusInDelivery         OrderStatus = "in_delivery"
-	StatusDelivered          OrderStatus = "delivered"
-	StatusReturned           OrderStatus = "returned"
-	StatusCancelled          OrderStatus = "cancelled"
-	StatusIssue              OrderStatus = "issue"
+	StatusNew        OrderStatus = "new"
+	StatusConfirmed  OrderStatus = "confirmed"
+	StatusAssigned   OrderStatus = "assigned"
+	StatusInDelivery OrderStatus = "in_delivery"
+	StatusDelivered  OrderStatus = "delivered"
+	StatusReturned   OrderStatus = "returned"
+	StatusCancelled  OrderStatus = "cancelled"
 )
 
 func (s OrderStatus) IsValid() bool {
 	switch s {
-	case StatusNew, StatusConfirmed, StatusPrepaymentPending, StatusPrepaymentReceived,
-		StatusAssigned, StatusInDelivery, StatusDelivered, StatusReturned,
-		StatusCancelled, StatusIssue:
+	case StatusNew, StatusConfirmed, StatusAssigned, StatusInDelivery,
+		StatusDelivered, StatusReturned, StatusCancelled:
 		return true
 	}
 	return false
 }
 
-// IsTerminal returns true for statuses from which no transitions are allowed.
-func (s OrderStatus) IsTerminal() bool {
+// IsOutcome returns true for statuses representing a completed/closed order
+// (delivered, returned, cancelled). Unlike the old IsTerminal, these are
+// still restorable via ChangeStatus (see allowedTransitions below) — this
+// flag is only used to block unrelated actions that don't make sense on an
+// already-closed order (e.g. adding a prepayment, scheduling a delivery).
+func (s OrderStatus) IsOutcome() bool {
 	return s == StatusDelivered || s == StatusReturned || s == StatusCancelled
+}
+
+// allStatuses lists every status once, used to build the fully-connected
+// transition graph below (every status is restorable to every other one).
+var allStatuses = []OrderStatus{
+	StatusNew, StatusConfirmed, StatusAssigned, StatusInDelivery,
+	StatusDelivered, StatusReturned, StatusCancelled,
 }
 
 // allowedTransitions defines which target statuses are reachable from each source.
 // This map is the single source of truth for the status engine.
 //
-// Correction 7 applied:
-//
-//	new → confirmed:  dispatcher / owner ONLY
-//	new → cancelled:  creator / dispatcher / owner (enforced in service)
-var allowedTransitions = map[OrderStatus][]OrderStatus{
-	StatusNew: {
-		StatusConfirmed,
-		StatusCancelled,
-	},
-	StatusConfirmed: {
-		StatusPrepaymentPending,
-		StatusAssigned,
-		StatusCancelled,
-		StatusIssue,
-	},
-	StatusPrepaymentPending: {
-		StatusPrepaymentReceived,
-		StatusCancelled,
-		StatusIssue,
-	},
-	StatusPrepaymentReceived: {
-		StatusAssigned,
-		StatusCancelled,
-		StatusIssue,
-	},
-	StatusAssigned: {
-		StatusInDelivery,
-		StatusCancelled,
-		StatusIssue,
-		// Backward "unassign / recall" edge: dispatcher pulls the order back to the
-		// confirmed pool. ChangeStatus releases the active assignment atomically (C1).
-		StatusConfirmed,
-	},
-	StatusInDelivery: {
-		StatusDelivered,
-		StatusReturned,
-		StatusIssue,
-		// Backward "recall" edge (also legitimises legacy in_delivery→confirmed data).
-		// Assignment is released atomically by ChangeStatus (C1).
-		StatusConfirmed,
-	},
-	StatusIssue: {
-		StatusConfirmed,
-		StatusPrepaymentPending,
-		StatusAssigned,
-		StatusCancelled,
-	},
-	// Terminal states — no outbound transitions.
-	StatusDelivered: {},
-	StatusReturned:  {},
-	StatusCancelled: {},
-}
+// Every status can move to every other status ("all restorable" — no dead
+// ends, e.g. a delivered or cancelled order can be moved back into active
+// delivery to fix a mistake). validateTransitionRole is what actually gates
+// who may perform a given transition; this graph only says it is possible.
+var allowedTransitions = func() map[OrderStatus][]OrderStatus {
+	m := make(map[OrderStatus][]OrderStatus, len(allStatuses))
+	for _, from := range allStatuses {
+		targets := make([]OrderStatus, 0, len(allStatuses)-1)
+		for _, to := range allStatuses {
+			if to != from {
+				targets = append(targets, to)
+			}
+		}
+		m[from] = targets
+	}
+	return m
+}()
 
 // CanTransition returns true if moving from → to is a valid state machine step.
 func CanTransition(from, to OrderStatus) bool {
@@ -299,8 +271,11 @@ func (OrderItem) TableName() string { return "order_items" }
 type OrderTimeline struct {
 	ID         uuid.UUID    `gorm:"type:uuid;primaryKey"`
 	OrderID    uuid.UUID    `gorm:"type:uuid;not null;column:order_id"`
-	FromStatus *OrderStatus `gorm:"type:order_status;column:from_status"` // nil for initial entry
-	ToStatus   OrderStatus  `gorm:"type:order_status;not null;column:to_status"`
+	// TEXT, not the order_status enum: this is an immutable audit trail and must
+	// keep recording historical values (e.g. 'issue', 'prepayment_pending') even
+	// after they are retired from the live status enum (migration 00100).
+	FromStatus *OrderStatus `gorm:"type:text;column:from_status"` // nil for initial entry
+	ToStatus   OrderStatus  `gorm:"type:text;not null;column:to_status"`
 	Comment    *string
 	CreatedBy  uuid.UUID `gorm:"type:uuid;not null;column:created_by"`
 	CreatedAt  time.Time `gorm:"autoCreateTime"`

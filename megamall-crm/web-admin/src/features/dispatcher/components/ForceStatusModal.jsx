@@ -9,17 +9,15 @@ import { KEYS } from '../../../shared/queryKeys'
 import { getOrderId, formatOrderLabel } from '../utils/orderHelpers'
 import { STATUS_LABELS } from '../statusConfig'
 
-// All statuses are offered — the override exists specifically to recover
-// stuck/corrupted orders, including reopening a terminal one (delivered /
-// cancelled / returned). The backend re-validates and guards financial /
-// inventory side effects against double-firing; this modal only enforces
-// "pick something else" and "explain why".
-const ALL_STATUSES = [
-  'new', 'confirmed', 'prepayment_pending', 'prepayment_received',
-  'assigned', 'in_delivery', 'delivered', 'issue', 'returned', 'cancelled',
-]
+// All statuses are offered — every status is restorable by design (see
+// orders.allowedTransitions), including moving a delivered/cancelled/returned
+// order back into active delivery. The backend re-validates and guards
+// financial/inventory side effects against double-firing; this modal only
+// enforces "pick something else" and "explain why".
+const ALL_STATUSES = ['new', 'confirmed', 'assigned', 'in_delivery', 'delivered', 'returned', 'cancelled']
 
-const TERMINAL_STATUSES = new Set(['delivered', 'cancelled', 'returned'])
+// Statuses whose first entry moves stock and fires the financial events.
+const SETTLING_STATUSES = new Set(['delivered', 'cancelled', 'returned'])
 
 export default function ForceStatusModal({ open, onClose, order }) {
   const qc    = useQueryClient()
@@ -57,9 +55,9 @@ export default function ForceStatusModal({ open, onClose, order }) {
   const errMsg = error?.response?.data?.error?.message ?? error?.message
   const canSubmit = !!status && status !== order?.status && reason.trim().length >= 3
 
-  // Moving into or out of a terminal status touches inventory and the
-  // financial ledger — surface that before the dispatcher commits.
-  const touchesTerminal = TERMINAL_STATUSES.has(status) || TERMINAL_STATUSES.has(order?.status)
+  // Moving into or out of one of these touches inventory and the financial
+  // ledger — surface that before the dispatcher commits.
+  const touchesSettlement = SETTLING_STATUSES.has(status) || SETTLING_STATUSES.has(order?.status)
 
   return (
     <Modal
@@ -116,10 +114,10 @@ export default function ForceStatusModal({ open, onClose, order }) {
           </div>
         )}
 
-        {touchesTerminal && (
+        {touchesSettlement && (
           <Alert variant="warning">
-            Затрагивается финальный статус (доставлен / отменён / возврат):
-            изменение влияет на складские остатки и финансовые начисления по заказу.
+            Затрагивается статус доставлен / отменён / возврат: изменение
+            влияет на складские остатки и финансовые начисления по заказу.
             Убедитесь, что это действительно нужно.
           </Alert>
         )}

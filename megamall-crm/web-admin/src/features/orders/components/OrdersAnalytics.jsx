@@ -17,14 +17,11 @@ import { STATUS_LABELS, STATUS_BADGE, fmtAmount } from '../../../shared/orderSta
 const STATUS_COLOR = {
   new:                  'bg-indigo-500',
   confirmed:            'bg-sky-500',
-  prepayment_pending:   'bg-amber-400',
-  prepayment_received:  'bg-violet-500',
   assigned:             'bg-violet-400',
   in_delivery:          'bg-amber-500',
   delivered:            'bg-emerald-500',
   returned:             'bg-orange-400',
   cancelled:            'bg-slate-400',
-  issue:                'bg-rose-500',
 }
 
 function SectionCard({ icon, title, children }) {

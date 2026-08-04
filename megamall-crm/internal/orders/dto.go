@@ -347,7 +347,7 @@ type CourierInfo struct {
 //
 // Display rules by order status:
 //   - delivered            → delivered_by = last courier, status "delivered_by"
-//   - assigned/in_delivery/issue → current = active|last courier, status "assigned"
+//   - assigned/in_delivery → current = active|last courier, status "assigned"
 //   - returned/cancelled    → last courier (if any), status "former"
 //   - new/confirmed/prepay  → active courier if present (defensive), else "unassigned"
 func (r *OrderResponse) applyCourierDisplay(info CourierInfo, fallbackCourierID *uuid.UUID) {
@@ -369,7 +369,7 @@ func (r *OrderResponse) applyCourierDisplay(info CourierInfo, fallbackCourierID 
 			r.CourierDisplayStatus = "delivered_by"
 		}
 
-	case StatusAssigned, StatusInDelivery, StatusIssue:
+	case StatusAssigned, StatusInDelivery:
 		name := info.ActiveCourierName
 		if name == nil {
 			name = info.LastCourierName
@@ -388,7 +388,7 @@ func (r *OrderResponse) applyCourierDisplay(info CourierInfo, fallbackCourierID 
 			r.CourierDisplayStatus = "former"
 		}
 
-	default: // new, confirmed, prepayment_*
+	default: // new, confirmed
 		if info.ActiveCourierName != nil {
 			r.CourierDisplayName = info.ActiveCourierName
 			r.CourierDisplayStatus = "assigned"
@@ -400,7 +400,7 @@ func (r *OrderResponse) applyCourierDisplay(info CourierInfo, fallbackCourierID 
 	// at least expose the id so the UI can resolve a name from its courier map.
 	if r.CourierDisplayName == nil && fallbackCourierID != nil &&
 		(r.Status == StatusDelivered || r.Status == StatusAssigned ||
-			r.Status == StatusInDelivery || r.Status == StatusIssue) {
+			r.Status == StatusInDelivery) {
 		if r.CurrentCourierID == nil {
 			r.CurrentCourierID = fallbackCourierID
 		}

@@ -12,16 +12,11 @@ import { APP_TIMEZONE } from '../../shared/utils/date'
 export const STATUS_LABELS = {
   new:         'Новый',
   confirmed:   'Подтверждён',
-  // Prepayment states never get their own board column, but orders can sit in
-  // them — the history table and the force-status modal both need the label.
-  prepayment_pending:  'Ожидает предоплату',
-  prepayment_received: 'Предоплата получена',
   assigned:    'Назначен',
   in_delivery: 'В доставке',
   delivered:   'Доставлен',
   returned:    'Возврат',
-  cancelled:   'Отменён',
-  issue:       'Проблема',
+  cancelled:   'Отмена',
 }
 
 /** One hex per status — used by board columns, cards, drawer dots. */
@@ -31,22 +26,22 @@ export const STATUS_HEX = {
   assigned:    '#8b5cf6',
   in_delivery: '#f59e0b',
   delivered:   '#10b981',
-  issue:       '#ef4444',
   returned:    '#f97316',
   cancelled:   '#64748b',
 }
 
 /**
  * Board columns, left → right, in operational flow order.
- * `terminal: true` columns are read-only outcomes (collapsed by default).
+ * Every status is restorable (no terminal states) — a dispatcher can move a
+ * card into any column, including moving delivered/cancelled orders back.
  */
 export const BOARD_COLUMNS = [
-  { key: 'new',         label: 'Новые',      hint: 'Ждут подтверждения' },
+  { key: 'new',         label: 'Новые',       hint: 'Ждут подтверждения' },
   { key: 'confirmed',   label: 'Подтверждён', hint: 'Готовы к назначению' },
-  { key: 'assigned',    label: 'Назначен',   hint: 'Курьер выбран' },
-  { key: 'in_delivery', label: 'В доставке', hint: 'В пути' },
-  { key: 'issue',       label: 'Проблемы',   hint: 'Требуют решения' },
-  { key: 'delivered',   label: 'Доставлено', hint: 'Сегодня', terminal: true },
+  { key: 'assigned',    label: 'Назначен',    hint: 'Курьер выбран' },
+  { key: 'in_delivery', label: 'В доставке',  hint: 'В пути' },
+  { key: 'delivered',   label: 'Доставлено',  hint: 'Сегодня' },
+  { key: 'cancelled',   label: 'Отмена',      hint: 'Отменённые заказы' },
 ]
 
 /**
@@ -68,17 +63,10 @@ export const STATUS_ACTIONS = {
   assigned: [
     { key: 'reassign', label: 'Переназначить', variant: 'secondary' },
     { key: 'unassign', label: 'Снять курьера',  variant: 'secondary' },
-    { key: 'issue',    label: 'Проблема',     variant: 'danger'    },
-    { key: 'comment',  label: 'Комментарий',  variant: 'secondary' },
+    { key: 'cancel',   label: 'Отменить',      variant: 'danger'    },
+    { key: 'comment',  label: 'Комментарий',   variant: 'secondary' },
   ],
   in_delivery: [
-    { key: 'unassign', label: 'Снять курьера', variant: 'secondary' },
-    { key: 'issue',    label: 'Проблема',    variant: 'danger'    },
-    { key: 'return',   label: 'Возврат',     variant: 'secondary' },
-    { key: 'comment',  label: 'Комментарий', variant: 'secondary' },
-  ],
-  issue: [
-    { key: 'resolve',  label: 'Решить',      variant: 'primary'   },
     { key: 'unassign', label: 'Снять курьера', variant: 'secondary' },
     { key: 'return',   label: 'Возврат',     variant: 'secondary' },
     { key: 'cancel',   label: 'Отменить',    variant: 'danger'    },

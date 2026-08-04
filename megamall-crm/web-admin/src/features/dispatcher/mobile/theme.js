@@ -51,15 +51,10 @@ export function initialsOf(name = '') {
 export const STATUS_PILL = {
   new:         { label: 'Новый',       color: '#57534E', bg: '#F0EFEA', dot: '#6366f1' },
   confirmed:   { label: 'Подтверждён', color: '#0369A1', bg: '#DCEEFB', dot: '#0ea5e9' },
-  // No board column of their own, but orders do sit in these — the history
-  // list would otherwise fall back to the "Новый" pill and mislabel them.
-  prepayment_pending:  { label: 'Ожидает предоплату',  color: '#B45309', bg: '#FBEFD6', dot: '#f59e0b' },
-  prepayment_received: { label: 'Предоплата получена', color: '#6D28D9', bg: '#EDE9FE', dot: '#8b5cf6' },
   assigned:    { label: 'Назначен',    color: '#6D28D9', bg: '#EDE9FE', dot: '#8b5cf6' },
   in_delivery: { label: 'В доставке',  color: '#B45309', bg: '#FBEFD6', dot: '#f59e0b' },
   delivered:   { label: 'Доставлен',   color: '#047857', bg: '#DDF3E7', dot: '#10b981' },
-  issue:       { label: 'Проблема',    color: '#BE123C', bg: '#FDE7EC', dot: '#ef4444' },
-  cancelled:   { label: 'Отменён',     color: '#475569', bg: '#F0EFEA', dot: '#64748b' },
+  cancelled:   { label: 'Отмена',      color: '#475569', bg: '#F0EFEA', dot: '#64748b' },
   returned:    { label: 'Возврат',     color: '#C2410C', bg: '#FFEDD5', dot: '#f97316' },
 }
 
@@ -72,13 +67,13 @@ export const MOBILE_COLUMNS = [
   { key: 'new',       label: 'Новые',      hint: 'Ждут подтверждения',  color: '#6366f1', statuses: ['new'] },
   { key: 'confirmed', label: 'Подтв.',     hint: 'Готовы к назначению', color: '#0ea5e9', statuses: ['confirmed'] },
   { key: 'delivery',  label: 'В доставке', hint: 'В пути',              color: '#f59e0b', statuses: ['assigned', 'in_delivery'] },
-  { key: 'issues',    label: 'Проблемы',   hint: 'Требуют решения',     color: '#ef4444', statuses: ['issue'] },
   { key: 'done',      label: 'Готово',     hint: 'Сегодня',             color: '#10b981', statuses: ['delivered'] },
+  { key: 'cancelled', label: 'Отмена',     hint: 'Отменённые заказы',   color: '#ef4444', statuses: ['cancelled'] },
 ]
 
 export const MOBILE_STATUS_TO_COL = {
   new: 'new', confirmed: 'confirmed', assigned: 'delivery', in_delivery: 'delivery',
-  delivered: 'done', issue: 'issues',
+  delivered: 'done', cancelled: 'cancelled',
 }
 
 export function chipStyle(active, color) {
