@@ -71,6 +71,54 @@ func TestTransition_CourierScopedToOwnOrder(t *testing.T) {
 	}
 }
 
+// TestTransition_RestoreCancelledScopedToOwnOrderOrTeam locks down who may
+// move a cancelled order back to confirmed: seller/manager/sales_team_lead
+// are scoped to their own order or own team, same as CanAccessOrder.
+func TestTransition_RestoreCancelledScopedToOwnOrderOrTeam(t *testing.T) {
+	svc := &Service{}
+	sellerID := uuid.New()
+	managerID := uuid.New()
+	teamLeadID := uuid.New()
+	strangerID := uuid.New()
+
+	order := &Order{
+		Status:     StatusCancelled,
+		SellerID:   sellerID,
+		ManagerID:  &managerID,
+		TeamLeadID: &teamLeadID,
+	}
+
+	allowed := []struct {
+		role  string
+		actor uuid.UUID
+	}{
+		{"seller", sellerID},
+		{"manager", sellerID},
+		{"manager", managerID},
+		{"sales_team_lead", sellerID},
+		{"sales_team_lead", teamLeadID},
+	}
+	for _, c := range allowed {
+		if err := svc.validateTransitionRole(c.role, c.actor, order, StatusCancelled, StatusConfirmed); err != nil {
+			t.Errorf("%s should be able to restore this order: %v", c.role, err)
+		}
+	}
+
+	denied := []struct {
+		role  string
+		actor uuid.UUID
+	}{
+		{"seller", strangerID},
+		{"manager", strangerID},
+		{"sales_team_lead", strangerID},
+	}
+	for _, c := range denied {
+		if err := svc.validateTransitionRole(c.role, c.actor, order, StatusCancelled, StatusConfirmed); err == nil {
+			t.Errorf("%s (stranger) must not be able to restore this order", c.role)
+		}
+	}
+}
+
 // TestTransition_DeliveredIsRestorable confirms the "all restorable"
 // requirement: even the delivered/cancelled outcome statuses can be moved
 // back into active delivery.
