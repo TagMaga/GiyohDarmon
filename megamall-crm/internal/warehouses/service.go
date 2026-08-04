@@ -111,13 +111,24 @@ func (s *Service) DeliverCourierItem(
 	if err != nil {
 		return 0, err
 	}
+	// Mirror internal/orders.deductInventory's main-pool check: a delivery
+	// must never be allowed to silently proceed without an actual reservation
+	// backing it. Clamping this to zero instead of erroring is what let a
+	// broken reservation (e.g. an order edited mid-flow that lost its
+	// courier-warehouse reservation) reach "delivered" without ever
+	// deducting the courier's stock — surfacing later as a physical/ledger
+	// mismatch nobody could trace. Fail loudly instead so the order gets
+	// fixed before being marked delivered.
+	if ci.ReservedQuantity < qty {
+		return 0, apperrors.Unprocessable(fmt.Sprintf(
+			"резерв курьера повреждён: заказ помечается доставленным на %d ед., но зарезервировано только %d — требуется проверка заказа перед доставкой",
+			qty, ci.ReservedQuantity,
+		))
+	}
 	newQty := ci.Quantity - qty
 	newReserved := ci.ReservedQuantity - qty
 	if newQty < 0 {
 		return 0, apperrors.BadRequest("ошибка склада курьера: количество не может стать отрицательным")
-	}
-	if newReserved < 0 {
-		newReserved = 0
 	}
 	if err := s.repo.UpdateCourierInventory(tx, ctx, ci.ID, newQty, newReserved, ci.BlockedQuantity); err != nil {
 		return 0, err
