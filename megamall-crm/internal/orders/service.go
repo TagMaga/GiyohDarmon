@@ -1052,12 +1052,29 @@ func (s *Service) Update(ctx context.Context, actorID uuid.UUID, actorRole strin
 				return fmt.Errorf("delete old items: %w", err)
 			}
 
-			// 3. Build new items + subtotal.
+			// 3. Build new items + subtotal. A product that was already reserved
+			// on a courier's warehouse before this edit stays reserved on that
+			// SAME warehouse — otherwise step 1's release (which correctly frees
+			// the courier's reservation) would be immediately followed by a
+			// re-reserve against the legacy main pool, silently detaching the
+			// order from the courier's physical stock while leaving it assigned
+			// to him and free to keep progressing toward "delivered" (see
+			// oldWarehouseByProduct below; this fixed a real production
+			// incident where exactly that happened).
+			oldWarehouseByProduct := make(map[uuid.UUID]uuid.UUID, len(oldItems))
+			for _, it := range oldItems {
+				oldWarehouseByProduct[it.ProductID] = it.ReservedWarehouseID
+			}
+
 			subtotal := 0.0
 			newItems := make([]OrderItem, 0, len(req.Items))
 			for _, it := range req.Items {
 				total := float64(it.Quantity) * it.UnitPrice
 				subtotal += total
+				warehouseID := MainWarehouseID
+				if wid, ok := oldWarehouseByProduct[it.ProductID]; ok && wid != MainWarehouseID {
+					warehouseID = wid
+				}
 				newItems = append(newItems, OrderItem{
 					ID:                  uuid.New(),
 					OrderID:             o.ID,
@@ -1065,12 +1082,26 @@ func (s *Service) Update(ctx context.Context, actorID uuid.UUID, actorRole strin
 					Quantity:            it.Quantity,
 					UnitPrice:           it.UnitPrice,
 					TotalPrice:          total,
-					ReservedWarehouseID: MainWarehouseID,
+					ReservedWarehouseID: warehouseID,
 				})
 			}
 
-			// 4. Reserve new inventory.
+			// 4. Reserve new inventory, on whichever warehouse each item landed
+			// on above.
 			for _, it := range newItems {
+				if it.ReservedWarehouseID != MainWarehouseID {
+					if s.adjustCourierWarehouse == nil {
+						return fmt.Errorf("courier warehouse adapter not configured")
+					}
+					actor := o.SellerID
+					if o.CourierID != nil {
+						actor = *o.CourierID
+					}
+					if err := s.adjustCourierWarehouse(ctx, tx, it.ReservedWarehouseID, it.ProductID, 0, it.Quantity, "claim_reserve", o.ID, actor, "order items updated"); err != nil {
+						return fmt.Errorf("reserve courier inventory: %w", err)
+					}
+					continue
+				}
 				inv, err := s.invRepo.GetOrCreateForUpdate(tx, ctx, it.ProductID)
 				if err != nil {
 					return fmt.Errorf("reserve inventory: %w", err)

@@ -1251,3 +1251,137 @@ func TestListLostReports_FiltersByStatus(t *testing.T) {
 		t.Fatalf("expected 2 reports with no status filter, got total=%d rows=%d", allTotal, len(allRows))
 	}
 }
+
+// ─── Editing an assigned order must not detach it from courier stock ───────
+//
+// Regression for a production incident (ORD-1126): editing an order's items
+// while it was already `assigned` to a courier released the courier's
+// reservation (correctly) but then re-reserved the new items against the
+// legacy main pool instead of the courier's own warehouse. The order stayed
+// assigned and free to progress to `in_delivery`/`delivered` with nothing
+// checking that its reservation still matched where the physical stock
+// actually was — so the delivery deducted from (or attempted against) the
+// wrong warehouse, and the courier's own stock ledger never recorded the
+// unit leaving his hands at all.
+
+func TestUpdateOrderItems_PreservesCourierWarehouseReservation(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	whSvc, orderSvc := buildTestServices(t, db)
+	owner := testutil.CreateUser(t, db, users.RoleOwner)
+	seller := createSellerWithTeam(t, db)
+	courier := testutil.CreateUser(t, db, users.RoleCourier)
+	p := testutil.CreateProduct(t, db)
+	testutil.CreateInventory(t, db, p.ID, owner.ID, 100)
+
+	transfer, err := whSvc.CreateTransfer(context.Background(), owner.ID, CreateTransferRequest{
+		FromWarehouseID: DefaultMainWarehouseID, CourierID: courier.ID,
+		Items: []TransferItemRequest{{ProductID: p.ID, Quantity: 20}},
+	})
+	if err != nil {
+		t.Fatalf("create transfer: %v", err)
+	}
+	if _, err := whSvc.AcceptTransfer(context.Background(), courier.ID, transfer.ID); err != nil {
+		t.Fatalf("accept transfer: %v", err)
+	}
+
+	order := createOrderForCourier(t, db, orderSvc, seller.ID, p.ID, 5)
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		return whSvc.ReserveForClaim(tx, context.Background(), courier.ID, order.ID)
+	}); err != nil {
+		t.Fatalf("reserve for claim: %v", err)
+	}
+	db.Exec(`UPDATE orders SET status = 'assigned', courier_id = ? WHERE id = ?`, courier.ID, order.ID)
+	db.Exec(`INSERT INTO order_assignments (id, order_id, courier_id, assigned_by, is_active) VALUES (?, ?, ?, ?, true)`,
+		uuid.New(), order.ID, courier.ID, courier.ID)
+
+	// Owner/dispatcher re-saves the order's items (same product/quantity —
+	// mirrors the common "resend full item list on any edit" UI pattern
+	// that triggered the real incident).
+	if _, err := orderSvc.Update(context.Background(), owner.ID, "owner", order.ID, orders.UpdateOrderRequest{
+		Items: []orders.OrderItemRequest{{ProductID: p.ID, Quantity: 5, UnitPrice: 100}},
+	}); err != nil {
+		t.Fatalf("update order items: %v", err)
+	}
+
+	var item orders.OrderItem
+	db.Where("order_id = ?", order.ID).First(&item)
+	if item.ReservedWarehouseID == orders.MainWarehouseID {
+		t.Fatal("expected the reservation to stay on the courier's warehouse after editing items")
+	}
+
+	var ci CourierInventory
+	db.Where("product_id = ?", p.ID).First(&ci)
+	if ci.ReservedQuantity != 5 {
+		t.Errorf("expected courier warehouse reserved_quantity to remain 5 after item edit, got %d", ci.ReservedQuantity)
+	}
+
+	var mainInv inventory.Inventory
+	db.Where("product_id = ?", p.ID).First(&mainInv)
+	if mainInv.ReservedQuantity != 0 {
+		t.Errorf("expected main pool reserved_quantity to stay 0 (never touched by this edit), got %d", mainInv.ReservedQuantity)
+	}
+
+	// Deliver: must actually deduct from the courier's own warehouse,
+	// proving the reservation genuinely followed the physical stock rather
+	// than merely looking correct in order_items.
+	if _, err := orderSvc.ChangeStatus(context.Background(), courier.ID, "courier", order.ID, orders.ChangeStatusRequest{Status: orders.StatusInDelivery}); err != nil {
+		t.Fatalf("transition to in_delivery: %v", err)
+	}
+	if _, err := orderSvc.ChangeStatus(context.Background(), courier.ID, "courier", order.ID, orders.ChangeStatusRequest{Status: orders.StatusDelivered}); err != nil {
+		t.Fatalf("transition to delivered: %v", err)
+	}
+
+	db.Where("product_id = ?", p.ID).First(&ci)
+	if ci.Quantity != 15 {
+		t.Errorf("expected courier warehouse quantity = 15 (20-5 delivered), got %d", ci.Quantity)
+	}
+	if ci.ReservedQuantity != 0 {
+		t.Errorf("expected courier warehouse reserved_quantity = 0 after delivery, got %d", ci.ReservedQuantity)
+	}
+}
+
+// TestDeliverCourierItem_MissingReservation_FailsInsteadOfSilentlyDelivering
+// covers the delivery-side half of the same incident class from a different
+// angle: no matter what causes a courier's reservation to go missing (this
+// bug, a future one, manual data surgery), DeliverCourierItem itself must
+// refuse to proceed rather than clamp the shortfall to zero and pretend the
+// delivery was backed by real reserved stock.
+func TestDeliverCourierItem_MissingReservation_FailsInsteadOfSilentlyDelivering(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	whSvc, _ := buildTestServices(t, db)
+	owner := testutil.CreateUser(t, db, users.RoleOwner)
+	courier := testutil.CreateUser(t, db, users.RoleCourier)
+	p := testutil.CreateProduct(t, db)
+	testutil.CreateInventory(t, db, p.ID, owner.ID, 50)
+
+	transfer, err := whSvc.CreateTransfer(context.Background(), owner.ID, CreateTransferRequest{
+		FromWarehouseID: DefaultMainWarehouseID, CourierID: courier.ID,
+		Items: []TransferItemRequest{{ProductID: p.ID, Quantity: 20}},
+	})
+	if err != nil {
+		t.Fatalf("create transfer: %v", err)
+	}
+	if _, err := whSvc.AcceptTransfer(context.Background(), courier.ID, transfer.ID); err != nil {
+		t.Fatalf("accept transfer: %v", err)
+	}
+
+	var whCourier Warehouse
+	db.Where("courier_id = ?", courier.ID).First(&whCourier)
+
+	// The courier physically holds 20 units but none are reserved for any
+	// order — the exact state ORD-1126 ended up in after its reservation was
+	// released mid-flow.
+	err = db.Transaction(func(tx *gorm.DB) error {
+		_, err := whSvc.DeliverCourierItem(context.Background(), tx, whCourier.ID, p.ID, 5, uuid.New(), courier.ID)
+		return err
+	})
+	if err == nil {
+		t.Fatal("expected delivery to fail when the courier has no active reservation for this product")
+	}
+
+	var ci CourierInventory
+	db.Where("product_id = ?", p.ID).First(&ci)
+	if ci.Quantity != 20 {
+		t.Errorf("expected quantity to remain untouched (20) after the rejected delivery, got %d", ci.Quantity)
+	}
+}
