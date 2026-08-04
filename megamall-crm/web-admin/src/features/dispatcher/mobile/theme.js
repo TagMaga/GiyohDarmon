@@ -51,6 +51,10 @@ export function initialsOf(name = '') {
 export const STATUS_PILL = {
   new:         { label: 'Новый',       color: '#57534E', bg: '#F0EFEA', dot: '#6366f1' },
   confirmed:   { label: 'Подтверждён', color: '#0369A1', bg: '#DCEEFB', dot: '#0ea5e9' },
+  // No board column of their own, but orders do sit in these — the history
+  // list would otherwise fall back to the "Новый" pill and mislabel them.
+  prepayment_pending:  { label: 'Ожидает предоплату',  color: '#B45309', bg: '#FBEFD6', dot: '#f59e0b' },
+  prepayment_received: { label: 'Предоплата получена', color: '#6D28D9', bg: '#EDE9FE', dot: '#8b5cf6' },
   assigned:    { label: 'Назначен',    color: '#6D28D9', bg: '#EDE9FE', dot: '#8b5cf6' },
   in_delivery: { label: 'В доставке',  color: '#B45309', bg: '#FBEFD6', dot: '#f59e0b' },
   delivered:   { label: 'Доставлен',   color: '#047857', bg: '#DDF3E7', dot: '#10b981' },

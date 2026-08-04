@@ -24,7 +24,7 @@ import CouriersTab from '../mobile/CouriersTab'
 import HistoryTab from '../mobile/HistoryTab'
 import CompanySettlementTab from '../components/v2/CompanySettlementTab'
 import OrderDetailSheet from '../mobile/OrderDetailSheet'
-import { AssignSheet, UnassignSheet, CancelSheet, IssueSheet, ScheduleSheet } from '../mobile/ActionSheets'
+import { AssignSheet, UnassignSheet, CancelSheet, IssueSheet, ScheduleSheet, ForceStatusSheet } from '../mobile/ActionSheets'
 import CreateOrderSheet from '../mobile/CreateOrderSheet'
 import { CourierDetailSheet } from '../mobile/CourierSheets'
 import ProfileSheet from '../mobile/ProfileSheet'
@@ -162,7 +162,7 @@ export default function DispatcherMobileApp() {
   const handleOrderAction = useCallback((action, order) => {
     if (action === 'confirm') { if (!isConfirming) doConfirm(order); return }
     if (action === 'return') { doReturn(order); return }
-    if (['assign', 'reassign', 'unassign', 'cancel', 'issue', 'resolve', 'schedule'].includes(action)) {
+    if (['assign', 'reassign', 'unassign', 'cancel', 'issue', 'resolve', 'schedule', 'force_status'].includes(action)) {
       setActionSheet({ type: action, order })
       return
     }
@@ -257,7 +257,12 @@ export default function DispatcherMobileApp() {
             <CompanySettlementTab />
           </div>
         )}
-        {tab === 'history' && <HistoryTab couriers={courierList} />}
+        {tab === 'history' && (
+          <HistoryTab
+            couriers={courierList}
+            onChangeStatus={(row) => setActionSheet({ type: 'force_status', order: row })}
+          />
+        )}
       </div>
 
       {/* FAB — create office order (dispatch tab only) */}
@@ -311,6 +316,11 @@ export default function DispatcherMobileApp() {
       />
       <ScheduleSheet
         open={actionSheet?.type === 'schedule'}
+        order={actionSheet?.order}
+        onClose={() => setActionSheet(null)}
+      />
+      <ForceStatusSheet
+        open={actionSheet?.type === 'force_status'}
         order={actionSheet?.order}
         onClose={() => setActionSheet(null)}
       />
