@@ -594,7 +594,6 @@
 .dv2-badge.today { background: var(--green-dim); color: var(--green-text); }
 .dv2-badge.tomorrow { background: var(--blue-dim); color: var(--blue-text); }
 .dv2-badge.scheduled { background: var(--purple-dim); color: var(--purple-text); }
-.dv2-badge.issue { background: var(--red-dim); color: var(--red-text); }
 .dv2-oc-name { font-size: 13px; font-weight: 700; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dv2-oc-addr { font-size: 11px; color: var(--text2); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dv2-oc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

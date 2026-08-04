@@ -14,11 +14,11 @@ import { KEYS } from '../../../shared/queryKeys'
 import { STATUS_LABELS } from '../../../shared/orderStatusConfig'
 import { getOrderId, formatOrderLabel } from '../../dispatcher/utils/orderHelpers'
 
-// All statuses are offered — as owner this is meant to freely move an order
-// to any status, including reopening a terminal one (delivered / cancelled /
-// returned). The backend re-validates and guards financial/inventory side
-// effects against double-firing.
-const ALL_STATUSES = ['new', 'confirmed', 'assigned', 'in_delivery', 'delivered', 'issue', 'returned', 'cancelled']
+// All statuses are offered — every status is restorable by design, including
+// moving a delivered/cancelled/returned order back into active delivery. The
+// backend re-validates and guards financial/inventory side effects against
+// double-firing.
+const ALL_STATUSES = ['new', 'confirmed', 'assigned', 'in_delivery', 'delivered', 'returned', 'cancelled']
 
 export default function OrderStatusModal({ open, onClose, order }) {
   const qc    = useQueryClient()

@@ -14,7 +14,7 @@ export const KEYS = {
     comments:    (orderId) => ['dispatcher', 'comments', orderId],
     settlementsSummary: (params) => ['dispatcher', 'settlements', 'summary', params ?? {}],
     settlements: (params) => ['dispatcher', 'settlements', 'list', params ?? {}],
-    issues:      ['dispatcher', 'issues'],
+    cancelled:   ['dispatcher', 'cancelled'],
     returns:     ['dispatcher', 'returns'],
     delivered:   ['dispatcher', 'delivered'],
     orderDetail: (id) => ['dispatcher', 'order', id],

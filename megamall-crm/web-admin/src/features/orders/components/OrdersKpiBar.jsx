@@ -7,8 +7,7 @@
 import { CardSkeleton } from '../../../shared/components/Skeleton'
 
 const IN_PROGRESS_STATUSES = new Set([
-  'confirmed', 'prepayment_pending', 'prepayment_received',
-  'assigned', 'in_delivery',
+  'confirmed', 'assigned', 'in_delivery',
 ])
 
 function KpiTile({ label, value, accent = 'default', loading, hideOnMobile = false }) {

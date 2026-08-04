@@ -1517,7 +1517,14 @@ func (s *Service) changeStatusInternal(ctx context.Context, actorID uuid.UUID, a
 			if rerr != nil {
 				return rerr
 			}
-			if !alreadyReached {
+			// Statuses are fully restorable, but inventory is not: once an order has
+			// been delivered, the goods physically left the warehouse. A later
+			// cancel/return move must not release stock that was already deducted.
+			everDelivered, derr := s.timelineHasReachedStatus(ctx, tx, orderID, StatusDelivered)
+			if derr != nil {
+				return derr
+			}
+			if !alreadyReached && !everDelivered {
 				movementType := "cancelled"
 				if to == StatusReturned {
 					movementType = "returned"
@@ -1684,7 +1691,7 @@ func (s *Service) AddPrepayment(ctx context.Context, actorID uuid.UUID, orderID 
 			return apperrors.NotFound("order")
 		}
 		orderNumber = o.OrderNumber
-		if o.Status.IsTerminal() {
+		if o.Status.IsOutcome() {
 			return apperrors.BadRequest("cannot add prepayment to a terminal order")
 		}
 
@@ -2210,14 +2217,15 @@ func (s *Service) validateOrderTypeForRole(role string, ot OrderType) error {
 
 // validateTransitionRole checks that the actor's role permits the specific transition.
 //
-// Corrections 6 & 7 applied:
+// All statuses are mutually reachable (see allowedTransitions) — this function is
+// the actual gate on who may perform a given move:
 //
-//	new → confirmed:   dispatcher, owner
-//	new → cancelled:   seller (own order only), dispatcher, owner, manager, sales_team_lead
-//	confirmed → *:     dispatcher, owner
-//	* → cancelled:     dispatcher, owner
-//	in_delivery → *:   dispatcher, owner  (courier added in Phase 5)
-//	owner:             override all
+//	new → confirmed:        dispatcher, owner
+//	new → cancelled:        seller (own order only), dispatcher, owner, manager, sales_team_lead
+//	courier (own order):    assigned → in_delivery, in_delivery → delivered,
+//	                        in_delivery → returned, in_delivery → cancelled (flagging a delivery problem),
+//	                        assigned/in_delivery → confirmed (releasing the order back)
+//	everything else:        dispatcher, owner
 func (s *Service) validateTransitionRole(role string, actorID uuid.UUID, o *Order, from, to OrderStatus) error {
 	if rbac.IsOwnerLevel(role) {
 		return nil // owner overrides everything
@@ -2228,59 +2236,37 @@ func (s *Service) validateTransitionRole(role string, actorID uuid.UUID, o *Orde
 		return nil
 	}
 
-	switch from {
-	case StatusNew:
+	if role == "courier" {
+		if o.CourierID == nil || *o.CourierID != actorID {
+			return apperrors.Forbidden("you are not the assigned courier for this order")
+		}
+		if (from == StatusAssigned && to == StatusInDelivery) ||
+			(from == StatusInDelivery && to == StatusDelivered) ||
+			(from == StatusInDelivery && to == StatusReturned) ||
+			(from == StatusInDelivery && to == StatusCancelled) ||
+			((from == StatusAssigned || from == StatusInDelivery) && to == StatusConfirmed) {
+			return nil
+		}
+		return apperrors.Forbidden("courier cannot perform this transition")
+	}
+
+	if from == StatusNew {
 		switch to {
 		case StatusConfirmed:
 			if role != "dispatcher" {
 				return apperrors.Forbidden("only dispatcher or owner can confirm orders")
 			}
+			return nil
 		case StatusCancelled:
 			if role != "dispatcher" && role != "manager" && role != "sales_team_lead" {
 				return apperrors.Forbidden("you do not have permission to cancel this order")
 			}
-		}
-
-	case StatusConfirmed, StatusPrepaymentPending, StatusPrepaymentReceived:
-		if role != "dispatcher" {
-			return apperrors.Forbidden("only dispatcher or owner can advance order from " + string(from))
-		}
-
-	case StatusAssigned:
-		// Courier may start delivery only if they hold the active assignment (verified via cache).
-		if role == "courier" {
-			if o.CourierID == nil || *o.CourierID != actorID {
-				return apperrors.Forbidden("you are not the assigned courier for this order")
-			}
 			return nil
-		}
-		if role != "dispatcher" {
-			return apperrors.Forbidden("only dispatcher, assigned courier, or owner can advance from assigned")
-		}
-
-	case StatusInDelivery:
-		// Courier may mark delivered / returned / issue only for their own assigned order.
-		if role == "courier" {
-			if o.CourierID == nil || *o.CourierID != actorID {
-				return apperrors.Forbidden("you are not the assigned courier for this order")
-			}
-			return nil
-		}
-		if role != "dispatcher" {
-			return apperrors.Forbidden("only dispatcher, assigned courier, or owner can transition in-delivery orders")
-		}
-
-	case StatusIssue:
-		if role == "courier" && to == StatusConfirmed {
-			if o.CourierID == nil || *o.CourierID != actorID {
-				return apperrors.Forbidden("you are not the assigned courier for this order")
-			}
-			return nil
-		}
-		if role != "dispatcher" {
-			return apperrors.Forbidden("only dispatcher or owner can resolve issue status")
 		}
 	}
 
+	if role != "dispatcher" {
+		return apperrors.Forbidden("only dispatcher or owner can perform this transition")
+	}
 	return nil
 }

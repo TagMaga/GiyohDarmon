@@ -28,7 +28,7 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/orders/:id/release", auth, courierRoles, h.releaseOrder)
 	rg.POST("/orders/:id/delivered", auth, courierRoles, h.markDelivered)
 	rg.POST("/orders/:id/returned", auth, courierRoles, h.markReturned)
-	rg.POST("/orders/:id/issue", auth, courierRoles, h.markIssue)
+	rg.POST("/orders/:id/cancel", auth, courierRoles, h.markCancelled)
 	rg.POST("/orders/:id/address-changed", auth, courierRoles, h.addressChanged)
 	rg.POST("/orders/:id/defer", auth, courierRoles, h.deferOrder)
 	rg.GET("/orders/:id/notes", auth, courierRoles, h.listNotes)

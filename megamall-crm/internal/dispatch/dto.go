@@ -41,7 +41,7 @@ type UpdateCourierRequest struct {
 	Phone    string      `json:"phone"     validate:"required"`
 	Password *string     `json:"password"` // empty = keep existing
 	CityIDs  []uuid.UUID `json:"city_ids"` // nil = unchanged; empty slice = remove all
-	// MaxActiveOrders caps how many orders (assigned/in_delivery/issue) this
+	// MaxActiveOrders caps how many orders (assigned/in_delivery) this
 	// courier may hold at once. Nil = no limit. Always applied when present
 	// in the request (the edit-courier form is a full save, not a patch).
 	MaxActiveOrders *int `json:"max_active_orders" validate:"omitempty,min=1"`
@@ -70,8 +70,7 @@ type CourierProfileResponse struct {
 //
 //	AssignedOrders = orders in status 'assigned'      (accepted, not yet started)
 //	InDelivery     = orders in status 'in_delivery'   (en route)
-//	IssueOrders    = orders in status 'issue'         (held by courier, flagged)
-//	ActiveOrders   = AssignedOrders + InDelivery + IssueOrders
+//	ActiveOrders   = AssignedOrders + InDelivery
 //	               = every order the courier currently holds and has not yet
 //	                 delivered/returned. Used for the N/max capacity gauge so a
 //	                 courier with held orders never shows as free.
@@ -81,10 +80,9 @@ type CourierOverview struct {
 	Surname              *string     `json:"surname,omitempty"`
 	Phone                string      `json:"phone"`
 	IsActive             bool        `json:"is_active"`
-	ActiveOrders         int         `json:"active_orders"`   // assigned + in_delivery + issue
+	ActiveOrders         int         `json:"active_orders"`   // assigned + in_delivery
 	AssignedOrders       int         `json:"assigned_orders"` // status = assigned
 	InDelivery           int         `json:"in_delivery"`     // status = in_delivery
-	IssueOrders          int         `json:"issue_orders"`    // status = issue
 	CashOwed             float64     `json:"cash_owed"`       // sum of (total_amount - prepayment) for delivered, not-yet-handovered
 	OrderIntakeEnabled   bool        `json:"order_intake_enabled"`
 	OrderIntakeReason    *string     `json:"order_intake_reason,omitempty"`
@@ -205,11 +203,6 @@ type ScheduleOrderRequest struct {
 type AddCommentRequest struct {
 	Comment    string            `json:"comment"    validate:"required,min=1"`
 	Visibility CommentVisibility `json:"visibility" validate:"required"`
-}
-
-type ResolveIssueRequest struct {
-	ToStatus orders.OrderStatus `json:"to_status" validate:"required"`
-	Comment  *string            `json:"comment"`
 }
 
 type StatusChangeRequest struct {

@@ -9,7 +9,7 @@ import useAuthStore from '../../../shared/store/authStore'
 import useProfile from '../../../shared/hooks/useProfile'
 
 import {
-  fetchBoard, fetchNewOrders, fetchIssueOrders, fetchDeliveredOrders,
+  fetchBoard, fetchNewOrders, fetchCancelledOrders, fetchDeliveredOrders,
   fetchCouriersOverview, confirmOrder, markReturn,
 } from '../api'
 import { getOrderId, getCourierId, buildCourierMap } from '../utils/orderHelpers'
@@ -24,7 +24,7 @@ import CouriersTab from '../mobile/CouriersTab'
 import HistoryTab from '../mobile/HistoryTab'
 import CompanySettlementTab from '../components/v2/CompanySettlementTab'
 import OrderDetailSheet from '../mobile/OrderDetailSheet'
-import { AssignSheet, UnassignSheet, CancelSheet, IssueSheet, ScheduleSheet } from '../mobile/ActionSheets'
+import { AssignSheet, UnassignSheet, CancelSheet, ScheduleSheet } from '../mobile/ActionSheets'
 import CreateOrderSheet from '../mobile/CreateOrderSheet'
 import { CourierDetailSheet } from '../mobile/CourierSheets'
 import ProfileSheet from '../mobile/ProfileSheet'
@@ -58,26 +58,26 @@ export default function DispatcherMobileApp() {
 
   const board = useQuery({ queryKey: KEYS.dispatcher.board, queryFn: fetchBoard, refetchInterval: 30_000, staleTime: 25_000 })
   const news = useQuery({ queryKey: KEYS.dispatcher.newOrders, queryFn: fetchNewOrders, refetchInterval: 30_000, staleTime: 25_000 })
-  const issues = useQuery({ queryKey: KEYS.dispatcher.issues, queryFn: fetchIssueOrders, refetchInterval: 30_000, staleTime: 25_000 })
+  const cancelled = useQuery({ queryKey: KEYS.dispatcher.cancelled, queryFn: fetchCancelledOrders, refetchInterval: 30_000, staleTime: 25_000 })
   const delivered = useQuery({ queryKey: KEYS.dispatcher.delivered, queryFn: fetchDeliveredOrders, refetchInterval: 60_000, staleTime: 55_000 })
   const couriersQ = useQuery({ queryKey: KEYS.dispatcher.couriers, queryFn: fetchCouriersOverview, refetchInterval: 30_000, staleTime: 20_000 })
 
   const allOrders = useMemo(() => {
     const seen = new Set()
     const merged = []
-    for (const order of [...arr(news.data), ...arr(board.data), ...arr(issues.data), ...arr(delivered.data)]) {
+    for (const order of [...arr(news.data), ...arr(board.data), ...arr(cancelled.data), ...arr(delivered.data)]) {
       const id = getOrderId(order)
       if (id && !seen.has(id)) { seen.add(id); merged.push(order) }
     }
     return merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-  }, [news.data, board.data, issues.data, delivered.data])
+  }, [news.data, board.data, cancelled.data, delivered.data])
 
   const customerMap = useCustomerMap(allOrders)
   const courierList = arr(couriersQ.data)
   const courierMap = useMemo(() => buildCourierMap(courierList), [courierList])
 
   const counts = useMemo(() => {
-    const c = { new: 0, confirmed: 0, delivery: 0, done: 0, issues: 0, unassigned: 0 }
+    const c = { new: 0, confirmed: 0, delivery: 0, done: 0, cancelled: 0, unassigned: 0 }
     for (const order of allOrders) {
       const col = MOBILE_STATUS_TO_COL[order.status]
       if (col) c[col] += 1
@@ -139,7 +139,7 @@ export default function DispatcherMobileApp() {
   const invalidate = useCallback(() => {
     qc.invalidateQueries({ queryKey: KEYS.dispatcher.board })
     qc.invalidateQueries({ queryKey: KEYS.dispatcher.newOrders })
-    qc.invalidateQueries({ queryKey: KEYS.dispatcher.issues })
+    qc.invalidateQueries({ queryKey: KEYS.dispatcher.cancelled })
     qc.invalidateQueries({ queryKey: KEYS.dispatcher.couriers })
   }, [qc])
 
@@ -162,7 +162,7 @@ export default function DispatcherMobileApp() {
   const handleOrderAction = useCallback((action, order) => {
     if (action === 'confirm') { if (!isConfirming) doConfirm(order); return }
     if (action === 'return') { doReturn(order); return }
-    if (['assign', 'reassign', 'unassign', 'cancel', 'issue', 'resolve', 'schedule'].includes(action)) {
+    if (['assign', 'reassign', 'unassign', 'cancel', 'schedule'].includes(action)) {
       setActionSheet({ type: action, order })
       return
     }
@@ -208,7 +208,7 @@ export default function DispatcherMobileApp() {
       {tab === 'dispatch' && (
         <div className="dm-scroll" style={{ display: 'flex', gap: 10, padding: '0 18px 14px', overflowX: 'auto' }}>
           <Kpi icon={<Truck size={17} />} iconBg={C.violetBg} iconColor={C.violetDk} value={courierList.length} label="Курьеров" />
-          <Kpi icon={<Package size={17} />} iconBg={C.blueBg} iconColor={C.blue} value={counts.new + counts.confirmed + counts.delivery + counts.issues} label="Активные" />
+          <Kpi icon={<Package size={17} />} iconBg={C.blueBg} iconColor={C.blue} value={counts.new + counts.confirmed + counts.delivery} label="Активные" />
           <button
             onClick={() => setCourierFilter((prev) => prev === 'unassigned' ? '' : 'unassigned')}
             style={{
@@ -300,12 +300,6 @@ export default function DispatcherMobileApp() {
       />
       <CancelSheet
         open={actionSheet?.type === 'cancel'}
-        order={actionSheet?.order}
-        onClose={() => setActionSheet(null)}
-      />
-      <IssueSheet
-        open={actionSheet?.type === 'issue' || actionSheet?.type === 'resolve'}
-        mode={actionSheet?.type === 'resolve' ? 'resolve' : 'mark'}
         order={actionSheet?.order}
         onClose={() => setActionSheet(null)}
       />

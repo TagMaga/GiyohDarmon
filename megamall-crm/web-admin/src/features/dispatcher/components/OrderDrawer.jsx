@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   X, Phone, MapPin, User, Truck, Package, Clock,
-  Banknote, CheckCircle, XCircle, AlertCircle, ZoomIn,
+  Banknote, CheckCircle, XCircle, ZoomIn,
   ChevronDown, ChevronUp, Users, MessageSquare, Send, Loader2, Paperclip,
 } from 'lucide-react'
 import { KEYS } from '../../../shared/queryKeys'
@@ -32,8 +32,7 @@ const VIOLET  = '#4338CA'
 const STATUS_LABELS = {
   new: 'Новый', confirmed: 'Подтверждён', assigned: 'Назначен',
   in_delivery: 'В пути', delivered: 'Доставлен',
-  returned: 'Возврат', issue: 'Проблема', cancelled: 'Отменён',
-  prepayment_pending: 'Ожидает предоплату', prepayment_received: 'Предоплата получена',
+  returned: 'Возврат', cancelled: 'Отмена',
 }
 
 const PREPAY_STATUS = {
@@ -59,10 +58,8 @@ const TIMELINE_LABELS = {
 const ACTIONS = {
   new:                [{ key: 'confirm',  label: 'Подтвердить',      primary: true }, { key: 'cancel', label: 'Отменить', danger: true }],
   confirmed:          [{ key: 'assign',   label: 'Назначить курьера', primary: true }, { key: 'cancel', label: 'Отменить', danger: true }],
-  prepayment_pending: [{ key: 'cancel',   label: 'Отменить',         danger: true }],
   assigned:           [{ key: 'reassign', label: 'Переназначить',    primary: true }, { key: 'unassign', label: 'Снять курьера', ghost: true }, { key: 'cancel', label: 'Отменить', danger: true }],
-  in_delivery:        [{ key: 'unassign', label: 'Снять курьера',    ghost: true }, { key: 'issue', label: 'Проблема', ghost: true }, { key: 'cancel', label: 'Отменить', danger: true }],
-  issue:              [{ key: 'resolve',  label: 'Решить проблему',  primary: true }, { key: 'unassign', label: 'Снять курьера', ghost: true }, { key: 'cancel', label: 'Отменить', danger: true }],
+  in_delivery:        [{ key: 'unassign', label: 'Снять курьера',    ghost: true }, { key: 'cancel', label: 'Отменить', danger: true }],
   returned:           [],
   delivered:          [],
   cancelled:          [],
@@ -486,18 +483,6 @@ export default function OrderDrawer({ order, open, onClose, onAction, customerMa
               </div>
             ) : null}
           </div>
-
-          {/* ── Issue reason ─────────────────────────────────────────── */}
-          {o.status === 'issue' && (o.issue_comment ?? o.issue_reason) && (
-            <div style={{ borderBottom: `1px solid ${BORDER2}` }}>
-              <SectionHeader icon={<AlertCircle size={10} />} title="Причина проблемы" color={RED} />
-              <div className="mx-4 mb-3 rounded-xl p-2.5" style={{ background: `${RED}09`, border: `1px solid ${RED}22` }}>
-                <div className="text-xs leading-relaxed" style={{ color: `${RED}cc` }}>
-                  {o.issue_comment ?? o.issue_reason}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* ── ИСТОРИЯ (collapsed by default) ─────────────────────── */}
           <CollapsibleSection

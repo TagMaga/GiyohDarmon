@@ -10,7 +10,7 @@ const STATUS_ENDPOINT = {
   in_delivery:     'start',
   delivered:       'delivered',
   returned:        'returned',
-  issue:           'issue',
+  cancelled:       'cancel',
   address_changed: 'address-changed',
 }
 export const updateOrderStatus = (id, status, data = {}) => {

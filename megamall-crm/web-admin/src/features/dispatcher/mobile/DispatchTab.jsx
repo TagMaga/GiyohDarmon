@@ -141,7 +141,7 @@ function OrderCard({ order, customerMap, courierMap, onSelect, onAction, isConfi
   const createdAt = fmtDayTime(order.created_at)
 
   const barColor = order.status === 'new' ? '#6366f1' : order.status === 'confirmed' ? '#0ea5e9'
-    : order.status === 'issue' ? '#ef4444' : order.status === 'delivered' ? '#10b981' : '#f59e0b'
+    : order.status === 'cancelled' ? '#ef4444' : order.status === 'delivered' ? '#10b981' : '#f59e0b'
   const ageColor = overdue ? C.red : C.text3
 
   const badges = []
@@ -211,7 +211,7 @@ function OrderCard({ order, customerMap, courierMap, onSelect, onAction, isConfi
           </QuickAction>
         )}
         {!['delivered', 'cancelled'].includes(order.status) && (
-          <QuickAction label="Проблема" onClick={() => onAction('issue', order)} tone="danger">
+          <QuickAction label="Отменить" onClick={() => onAction('cancel', order)} tone="danger">
             <AlertTriangle size={13} />
           </QuickAction>
         )}

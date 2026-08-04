@@ -130,7 +130,7 @@ func (r *Repository) GetOrderStatus(ctx context.Context, orderID uuid.UUID) (ord
 // ─── My Orders ────────────────────────────────────────────────────────────────
 
 // ListMyOrders returns orders assigned to courierID across all relevant statuses:
-// assigned, in_delivery, delivered, returned, issue.
+// assigned, in_delivery, delivered, returned.
 // Cancelled orders are excluded.
 //
 // Strategy: use orders.courier_id (the cache column set by both the dispatcher

@@ -112,7 +112,6 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 		IsActive             bool       `gorm:"column:is_active"`
 		AssignedOrders       int        `gorm:"column:assigned_orders"`
 		InDelivery           int        `gorm:"column:in_delivery"`
-		IssueOrders          int        `gorm:"column:issue_orders"`
 		CashOwed             float64    `gorm:"column:cash_owed"`
 		OrderIntakeEnabled   bool       `gorm:"column:order_intake_enabled"`
 		OrderIntakeReason    *string    `gorm:"column:order_intake_reason"`
@@ -134,7 +133,6 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 			u.courier_max_active_orders                                      AS max_active_orders,
 			COUNT(*) FILTER (WHERE o.status = 'assigned')                   AS assigned_orders,
 			COUNT(*) FILTER (WHERE o.status = 'in_delivery')                AS in_delivery,
-			COUNT(*) FILTER (WHERE o.status = 'issue')                      AS issue_orders,
 			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.status = 'delivered'
 				     AND o.id NOT IN (
@@ -175,10 +173,9 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 			Surname:              row.Surname,
 			Phone:                row.Phone,
 			IsActive:             row.IsActive,
-			ActiveOrders:         row.AssignedOrders + row.InDelivery + row.IssueOrders,
+			ActiveOrders:         row.AssignedOrders + row.InDelivery,
 			AssignedOrders:       row.AssignedOrders,
 			InDelivery:           row.InDelivery,
-			IssueOrders:          row.IssueOrders,
 			CashOwed:             row.CashOwed,
 			OrderIntakeEnabled:   row.OrderIntakeEnabled,
 			OrderIntakeReason:    row.OrderIntakeReason,
@@ -286,7 +283,7 @@ func (r *Repository) GetCashSettlement(ctx context.Context, filter CashSettlemen
 			FROM orders
 			WHERE deleted_at IS NULL
 			  AND courier_id IS NOT NULL
-			  AND status IN ('assigned','in_delivery','issue')
+			  AND status IN ('assigned','in_delivery')
 			GROUP BY courier_id
 		),
 		metrics_cte AS (
@@ -801,12 +798,12 @@ func (r *Repository) CourierMaxActiveOrders(tx *gorm.DB, ctx context.Context, co
 }
 
 // CountActiveOrdersForCourier counts orders the courier currently holds
-// (assigned/in_delivery/issue) — same definition as CourierOverview.ActiveOrders.
+// (assigned/in_delivery) — same definition as CourierOverview.ActiveOrders.
 func (r *Repository) CountActiveOrdersForCourier(tx *gorm.DB, ctx context.Context, courierID uuid.UUID) (int, error) {
 	var count int64
 	err := tx.WithContext(ctx).
 		Table("orders").
-		Where("courier_id = ? AND status IN ('assigned','in_delivery','issue') AND deleted_at IS NULL", courierID).
+		Where("courier_id = ? AND status IN ('assigned','in_delivery') AND deleted_at IS NULL", courierID).
 		Count(&count).Error
 	if err != nil {
 		return 0, fmt.Errorf("count active orders for courier: %w", err)

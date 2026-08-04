@@ -17,7 +17,7 @@ import { fmt } from '../statusConfig'
  * courier is applied to every order in the array, using assign or reassign
  * per order based on its own current status (ignores `mode` in that case),
  * since a bulk selection can mix confirmed (no courier yet) and
- * assigned/in_delivery/issue (already has one) orders.
+ * assigned/in_delivery (already has one) orders.
  */
 export default function AssignCourierModal({ open, onClose, order, orders, mode = 'assign', onBulkSuccess }) {
   const qc    = useQueryClient()
@@ -63,7 +63,7 @@ export default function AssignCourierModal({ open, onClose, order, orders, mode 
       if (isBulk) {
         const results = await Promise.allSettled(orders.map((o) => {
           const orderId = getOrderId(o)
-          const fn = ['assigned', 'in_delivery', 'issue'].includes(o.status) ? reassignCourier : assignCourier
+          const fn = ['assigned', 'in_delivery'].includes(o.status) ? reassignCourier : assignCourier
           return fn(orderId, { courier_id: courierId, note })
         }))
         const failed = results.filter((r) => r.status === 'rejected').length

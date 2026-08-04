@@ -5,7 +5,7 @@ import { Search, Truck, Wallet, AlertTriangle, RefreshCw, X } from 'lucide-react
 const COMMANDS = [
   { key: 'couriers',   label: 'Управление курьерами', icon: <Truck size={14} />,         action: 'viewCouriers', kbd: 'C' },
   { key: 'cash',       label: 'Касса / Инкассация',   icon: <Wallet size={14} />,        action: 'viewCash',     kbd: 'W' },
-  { key: 'issues',     label: 'Показать проблемные',  icon: <AlertTriangle size={14} />, action: 'viewIssues',   kbd: 'I' },
+  { key: 'cancelled',  label: 'Показать отменённые',  icon: <AlertTriangle size={14} />, action: 'viewCancelled', kbd: 'I' },
   { key: 'refresh',    label: 'Обновить данные',       icon: <RefreshCw size={14} />,    action: 'refresh',      kbd: 'R' },
 ]
 

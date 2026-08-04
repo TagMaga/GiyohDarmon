@@ -5,7 +5,7 @@ package courier
 // Design rules:
 //  1. Claim (confirmed→assigned) runs as a single atomic transaction in the
 //     repository because it must create an assignment AND change status.
-//  2. All other status transitions (start, delivered, returned, issue) delegate
+//  2. All other status transitions (start, delivered, returned, cancelled) delegate
 //     to orders.Service.ChangeStatus with role="courier".
 //  3. The orders.Service.validateTransitionRole checks orders.courier_id cache
 //     to enforce ownership; the cache is kept in sync by ClaimOrder.
@@ -312,9 +312,9 @@ func (s *Service) StartDelivery(ctx context.Context, courierID uuid.UUID, orderI
 // ReleaseOrder lets the assigned courier give an active order back to the
 // confirmed pool when they can no longer complete the delivery. Unlike
 // UnclaimOrder, this is an explicit operational action: it is available after
-// the short undo window and while the courier is already en route or has
-// reported an issue. The reason is mandatory and is stored in the order
-// timeline; ChangeStatus atomically releases inventory and the assignment.
+// the short undo window and while the courier is already en route. The
+// reason is mandatory and is stored in the order timeline; ChangeStatus
+// atomically releases inventory and the assignment.
 func (s *Service) ReleaseOrder(ctx context.Context, courierID uuid.UUID, orderID uuid.UUID, req ReleaseOrderRequest) (*orders.Order, error) {
 	reason := strings.TrimSpace(req.Reason)
 	if reason == "" {
@@ -326,7 +326,7 @@ func (s *Service) ReleaseOrder(ctx context.Context, courierID uuid.UUID, orderID
 		return nil, err
 	}
 	switch status {
-	case orders.StatusAssigned, orders.StatusInDelivery, orders.StatusIssue:
+	case orders.StatusAssigned, orders.StatusInDelivery:
 	default:
 		return nil, apperrors.BadRequest("заказ нельзя освободить в текущем статусе")
 	}
@@ -405,10 +405,12 @@ func (s *Service) DeferOrder(ctx context.Context, courierID uuid.UUID, orderID u
 	return nil
 }
 
-// MarkIssue transitions in_delivery → issue.
-func (s *Service) MarkIssue(ctx context.Context, courierID uuid.UUID, orderID uuid.UUID, req StatusChangeRequest) (*orders.Order, error) {
+// MarkCancelled transitions in_delivery → cancelled — the courier flagging a
+// delivery problem (customer unreachable, wrong address, etc.) that ends the
+// order outright rather than leaving it in a recoverable "issue" state.
+func (s *Service) MarkCancelled(ctx context.Context, courierID uuid.UUID, orderID uuid.UUID, req StatusChangeRequest) (*orders.Order, error) {
 	return s.ordersSvc.ChangeStatus(ctx, courierID, "courier", orderID, orders.ChangeStatusRequest{
-		Status:  orders.StatusIssue,
+		Status:  orders.StatusCancelled,
 		Comment: req.Comment,
 	})
 }

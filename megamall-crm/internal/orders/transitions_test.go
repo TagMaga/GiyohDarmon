@@ -2,10 +2,11 @@ package orders
 
 // transitions_test.go — Pure unit tests for the order status state machine.
 //
-// Focus: the backward "recall / unassign" edges added as part of the C1 fix
-// (zombie orders). When an order moves backward into `confirmed`, the service
-// layer releases the courier assignment; the state machine must therefore PERMIT
-// these transitions. These tests lock that contract. No database required.
+// The status set is fully connected: every status can transition to every
+// other status ("all restorable" — no dead ends, e.g. a delivered or
+// cancelled order can be moved back into active delivery to fix a mistake).
+// validateTransitionRole is the real gate on who may perform a given move;
+// these tests lock the graph shape and the role gate's edge cases.
 //
 // Run with: go test ./internal/orders/ -v -run TestTransition
 
@@ -15,89 +16,73 @@ import (
 	"github.com/google/uuid"
 )
 
-// TestTransition_BackwardRecallEdges asserts the recovery transitions a dispatcher
-// relies on are valid. Each of these triggers assignment release in ChangeStatus.
-func TestTransition_BackwardRecallEdges(t *testing.T) {
-	cases := []struct {
-		name string
-		from OrderStatus
-		to   OrderStatus
-	}{
-		{"issue → confirmed (resolve issue)", StatusIssue, StatusConfirmed},
-		{"assigned → confirmed (unassign)", StatusAssigned, StatusConfirmed},
-		{"in_delivery → confirmed (recall)", StatusInDelivery, StatusConfirmed},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if !CanTransition(c.from, c.to) {
-				t.Fatalf("expected %s → %s to be a valid transition, but it was rejected", c.from, c.to)
+// TestTransition_FullyConnected asserts every status can reach every other
+// status directly.
+func TestTransition_FullyConnected(t *testing.T) {
+	for _, from := range allStatuses {
+		for _, to := range allStatuses {
+			if from == to {
+				continue
 			}
-		})
-	}
-}
-
-// TestTransition_TerminalStatesStayClosed guards against accidentally opening
-// transitions out of terminal states while editing the map.
-func TestTransition_TerminalStatesStayClosed(t *testing.T) {
-	terminals := []OrderStatus{StatusDelivered, StatusReturned, StatusCancelled}
-	allTargets := []OrderStatus{
-		StatusNew, StatusConfirmed, StatusPrepaymentPending, StatusPrepaymentReceived,
-		StatusAssigned, StatusInDelivery, StatusIssue, StatusDelivered, StatusReturned, StatusCancelled,
-	}
-	for _, from := range terminals {
-		if !from.IsTerminal() {
-			t.Fatalf("%s should be terminal", from)
-		}
-		for _, to := range allTargets {
-			if CanTransition(from, to) {
-				t.Errorf("terminal %s must not transition to %s", from, to)
+			if !CanTransition(from, to) {
+				t.Errorf("expected %s → %s to be a valid transition, but it was rejected", from, to)
 			}
 		}
 	}
 }
 
-// TestTransition_ForwardHappyPathIntact ensures the recall edges did not disturb
-// the normal forward delivery lifecycle.
-func TestTransition_ForwardHappyPathIntact(t *testing.T) {
-	forward := [][2]OrderStatus{
-		{StatusNew, StatusConfirmed},
-		{StatusConfirmed, StatusAssigned},
-		{StatusAssigned, StatusInDelivery},
-		{StatusInDelivery, StatusDelivered},
-	}
-	for _, step := range forward {
-		if !CanTransition(step[0], step[1]) {
-			t.Errorf("forward lifecycle broken: %s → %s should be valid", step[0], step[1])
+// TestTransition_NoSelfLoop documents that a status cannot transition to itself.
+func TestTransition_NoSelfLoop(t *testing.T) {
+	for _, s := range allStatuses {
+		if CanTransition(s, s) {
+			t.Errorf("%s → %s must not be a valid state-machine transition", s, s)
 		}
 	}
 }
 
-// TestTransition_NoSelfLoopToConfirmed documents that a plain confirmed order
-// cannot transition to itself (the Unassign service guard handles the
-// "nothing to unassign" case with a clear 400 instead).
-func TestTransition_NoSelfLoopToConfirmed(t *testing.T) {
-	if CanTransition(StatusConfirmed, StatusConfirmed) {
-		t.Fatal("confirmed → confirmed must not be a valid state-machine transition")
-	}
-}
-
-func TestTransition_CourierMayReleaseOwnActiveOrderOnlyToConfirmed(t *testing.T) {
+// TestTransition_CourierScopedToOwnOrder locks down which transitions a
+// courier may perform, and only on their own assigned order.
+func TestTransition_CourierScopedToOwnOrder(t *testing.T) {
 	courierID := uuid.New()
 	otherCourierID := uuid.New()
 	svc := &Service{}
 
-	for _, from := range []OrderStatus{StatusAssigned, StatusInDelivery, StatusIssue} {
-		order := &Order{Status: from, CourierID: &courierID}
-		if err := svc.validateTransitionRole("courier", courierID, order, from, StatusConfirmed); err != nil {
-			t.Fatalf("assigned courier should be able to release their %s order: %v", from, err)
+	allowed := [][2]OrderStatus{
+		{StatusAssigned, StatusInDelivery},
+		{StatusInDelivery, StatusDelivered},
+		{StatusInDelivery, StatusCancelled},
+		{StatusAssigned, StatusConfirmed},
+		{StatusInDelivery, StatusConfirmed},
+	}
+	for _, step := range allowed {
+		order := &Order{Status: step[0], CourierID: &courierID}
+		if err := svc.validateTransitionRole("courier", courierID, order, step[0], step[1]); err != nil {
+			t.Errorf("assigned courier should be able to move %s → %s: %v", step[0], step[1], err)
 		}
-		if err := svc.validateTransitionRole("courier", otherCourierID, order, from, StatusConfirmed); err == nil {
-			t.Fatalf("another courier must not be able to release a %s order", from)
+		if err := svc.validateTransitionRole("courier", otherCourierID, order, step[0], step[1]); err == nil {
+			t.Errorf("another courier must not be able to move %s → %s", step[0], step[1])
 		}
 	}
 
-	order := &Order{Status: StatusIssue, CourierID: &courierID}
-	if err := svc.validateTransitionRole("courier", courierID, order, StatusIssue, StatusAssigned); err == nil {
-		t.Fatal("courier must not resolve an issue into assigned; only the release edge is allowed")
+	// Backward/unrelated moves stay dispatcher/owner-only.
+	order := &Order{Status: StatusDelivered, CourierID: &courierID}
+	if err := svc.validateTransitionRole("courier", courierID, order, StatusDelivered, StatusInDelivery); err == nil {
+		t.Fatal("courier must not be able to reopen a delivered order")
+	}
+}
+
+// TestTransition_DeliveredIsRestorable confirms the "all restorable"
+// requirement: even the delivered/cancelled outcome statuses can be moved
+// back into active delivery.
+func TestTransition_DeliveredIsRestorable(t *testing.T) {
+	cases := [][2]OrderStatus{
+		{StatusDelivered, StatusInDelivery},
+		{StatusCancelled, StatusNew},
+		{StatusReturned, StatusConfirmed},
+	}
+	for _, c := range cases {
+		if !CanTransition(c[0], c[1]) {
+			t.Errorf("expected outcome status %s to be restorable to %s", c[0], c[1])
+		}
 	}
 }

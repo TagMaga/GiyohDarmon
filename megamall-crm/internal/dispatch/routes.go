@@ -34,8 +34,6 @@ func (h *Handler) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/orders/:id/reassign", auth, dispatcherRoles, h.reassignCourier)
 	rg.POST("/orders/:id/unassign", auth, dispatcherRoles, h.unassignCourier)
 	rg.POST("/orders/:id/schedule", auth, dispatcherRoles, h.scheduleOrder)
-	rg.POST("/orders/:id/issue", auth, dispatcherRoles, h.issueOrder)
-	rg.POST("/orders/:id/resolve-issue", auth, dispatcherRoles, h.resolveIssue)
 	rg.POST("/orders/:id/return", auth, dispatcherRoles, h.returnOrder)
 	rg.POST("/orders/:id/cancel", auth, dispatcherRoles, h.cancelOrder)
 	rg.POST("/orders/:id/force-status", auth, dispatcherRoles, h.forceStatusOrder)

@@ -4,7 +4,7 @@ package dispatch
 //
 // Design rules:
 //   1. Assignment creation and cache sync always run inside a single transaction.
-//   2. Pure status changes (confirm, issue, return, cancel, resolve-issue) are
+//   2. Pure status changes (confirm, return, cancel) are
 //      delegated to orders.Service.ChangeStatus — no status logic is re-implemented here.
 //   3. Assign and Reassign must atomically: create/deactivate assignments +
 //      update courier cache + change status.  Because orders.Service.ChangeStatus
@@ -158,25 +158,6 @@ func (s *Service) ConfirmOrder(ctx context.Context, actorID uuid.UUID, orderID u
 	})
 }
 
-// IssueOrder transitions in_delivery → issue.
-func (s *Service) IssueOrder(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, req StatusChangeRequest) (*orders.Order, error) {
-	return s.ordersSvc.ChangeStatus(ctx, actorID, "dispatcher", orderID, orders.ChangeStatusRequest{
-		Status:  orders.StatusIssue,
-		Comment: req.Comment,
-	})
-}
-
-// ResolveIssue transitions issue → confirmed / assigned / returned / cancelled.
-func (s *Service) ResolveIssue(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, req ResolveIssueRequest) (*orders.Order, error) {
-	if !req.ToStatus.IsValid() {
-		return nil, apperrors.BadRequest("invalid to_status")
-	}
-	return s.ordersSvc.ChangeStatus(ctx, actorID, "dispatcher", orderID, orders.ChangeStatusRequest{
-		Status:  req.ToStatus,
-		Comment: req.Comment,
-	})
-}
-
 // ReturnOrder transitions in_delivery → returned.
 func (s *Service) ReturnOrder(ctx context.Context, actorID uuid.UUID, orderID uuid.UUID, req StatusChangeRequest) (*orders.Order, error) {
 	return s.ordersSvc.ChangeStatus(ctx, actorID, "dispatcher", orderID, orders.ChangeStatusRequest{
@@ -244,11 +225,9 @@ func (s *Service) AssignCourier(ctx context.Context, actorID uuid.UUID, orderID 
 			return err
 		}
 
-		// Only confirmed orders (or prepayment states) can be assigned.
+		// Only confirmed orders can be assigned.
 		assignableStatuses := map[orders.OrderStatus]bool{
-			orders.StatusConfirmed:          true,
-			orders.StatusPrepaymentPending:  true,
-			orders.StatusPrepaymentReceived: true,
+			orders.StatusConfirmed: true,
 		}
 		if !assignableStatuses[o.Status] {
 			return apperrors.BadRequest(fmt.Sprintf("cannot assign courier to order in status %q", o.Status))
@@ -443,7 +422,7 @@ func (s *Service) ReassignCourier(ctx context.Context, actorID uuid.UUID, orderI
 }
 
 // checkCourierCapacity rejects assignment when the courier is already holding
-// their configured maximum of active orders (assigned/in_delivery/issue).
+// their configured maximum of active orders (assigned/in_delivery).
 // A nil limit means unlimited. Must run inside the caller's transaction.
 func (s *Service) checkCourierCapacity(tx *gorm.DB, ctx context.Context, courierID uuid.UUID) error {
 	maxOrders, err := s.repo.CourierMaxActiveOrders(tx, ctx, courierID)
@@ -469,7 +448,7 @@ func (s *Service) checkCourierCapacity(tx *gorm.DB, ctx context.Context, courier
 // deactivates the active assignment, clears the courier_id cache, writes the
 // timeline entry and the audit log (C1). This is the explicit recovery action a
 // dispatcher uses to free a courier from an order that has been assigned, picked
-// up, or flagged with an issue.
+// up.
 //
 // Returns BadRequest when the order is not in a courier-holding state, so the UI
 // can hide / disable the action and surface a clear message.
@@ -483,8 +462,7 @@ func (s *Service) UnassignCourier(ctx context.Context, actorID uuid.UUID, orderI
 		return nil, err
 	}
 	holding := o.Status == orders.StatusAssigned ||
-		o.Status == orders.StatusInDelivery ||
-		o.Status == orders.StatusIssue
+		o.Status == orders.StatusInDelivery
 	if !holding || o.CourierID == nil {
 		return nil, apperrors.BadRequest("order has no active courier to unassign")
 	}
@@ -503,7 +481,7 @@ func (s *Service) ScheduleOrder(ctx context.Context, actorID uuid.UUID, orderID 
 		if err != nil {
 			return err
 		}
-		if o.Status.IsTerminal() {
+		if o.Status.IsOutcome() {
 			return apperrors.BadRequest("cannot schedule a terminal order")
 		}
 		if err := s.repo.SetScheduledAt(tx, ctx, orderID, req.ScheduledAt); err != nil {
