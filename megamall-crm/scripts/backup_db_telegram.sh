@@ -31,9 +31,14 @@ TELEGRAM_API="https://api.telegram.org/bot${TELEGRAM_BACKUP_BOT_TOKEN}"
 TELEGRAM_MAX_BYTES=$((50 * 1000 * 1000))
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-# Human-readable form for the Telegram caption — the compact $timestamp
-# above stays as-is since it's also the dump's filename.
-display_datetime="$(date -u +'%d.%m.%Y %H:%M:%S') UTC"
+# Human-readable form for the Telegram caption. Rendered in the business
+# timezone, not UTC: whoever reads that chat is in Dushanbe, and a UTC caption
+# reads five hours behind their own clock (06:24 for a backup they watch
+# arrive at 11:24). The compact $timestamp above stays UTC — it is the dump's
+# filename, where the explicit Z suffix keeps it unambiguous and sortable, and
+# docs/DB_BACKUPS.md documents that form.
+BACKUP_DISPLAY_TZ="${BACKUP_DISPLAY_TZ:-Asia/Dushanbe}"
+display_datetime="$(TZ="$BACKUP_DISPLAY_TZ" date +'%d.%m.%Y %H:%M:%S') ($BACKUP_DISPLAY_TZ)"
 dump_name="megamall_crm_${timestamp}.dump"
 tmp_file="$(mktemp)"
 
@@ -44,7 +49,7 @@ notify_failure() {
   local reason="$1"
   curl -fsS --max-time 30 \
     --data-urlencode "chat_id=${TELEGRAM_BACKUP_CHAT_ID}" \
-    --data-urlencode "text=⚠️ Не удалось создать резервную копию megamall-crm (${timestamp} UTC): ${reason}" \
+    --data-urlencode "text=⚠️ Не удалось создать резервную копию megamall-crm (${display_datetime}): ${reason}" \
     "${TELEGRAM_API}/sendMessage" >/dev/null || true
 }
 trap 'notify_failure "непредвиденная ошибка в строке $LINENO"' ERR

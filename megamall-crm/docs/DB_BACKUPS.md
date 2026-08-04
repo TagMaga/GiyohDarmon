@@ -51,9 +51,16 @@ sudo systemctl start megamall-crm-backup.service
 
 A successful run posts the `.dump` file to the configured Telegram chat with
 a caption showing current row totals (`orders`, `users`, `products` —
-excluding soft-deleted rows), the file size, and the UTC timestamp, so
+excluding soft-deleted rows), the file size, and the timestamp, so
 whoever's watching that chat can eyeball "does this look like a normal day"
-without opening the dump. A failed run posts a "⚠️ ..." text alert to the
+without opening the dump.
+
+The caption's timestamp is rendered in `Asia/Dushanbe` (override with
+`BACKUP_DISPLAY_TZ`) so it matches the clock of whoever is reading the chat —
+it previously printed UTC, which read five hours behind. The **filename**
+(`megamall_crm_20260804T062400Z.dump`) stays UTC, where the explicit `Z`
+suffix keeps it unambiguous and lexically sortable. So a dump whose filename
+says `T062400Z` is captioned `11:24`; both describe the same moment. A failed run posts a "⚠️ ..." text alert to the
 same chat instead. All operator-facing text is in Russian, matching the
 rest of the product.
 
