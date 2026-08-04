@@ -39,6 +39,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -422,7 +423,7 @@ func TestSchema76Compat_CashHandoverFlow_UnaffectedByThisPR(t *testing.T) {
 	ctx := context.Background()
 
 	courierUser := testutil.CreateUser(t, db, users.RoleCourier)
-	repo := courier.NewRepository(db)
+	repo := courier.NewRepository(db, time.UTC)
 
 	var handoverID uuid.UUID
 	t.Run("create_cash_handover", func(t *testing.T) {

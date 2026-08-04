@@ -12,7 +12,7 @@ import { updateOrderStatus, releaseOrder, reportAddressChanged, deferOrder, getO
 import useAuthStore from '../store/authStore'
 import { resolveCreator } from '../lib/creator'
 import Avatar, { resolveMediaUrl } from './Avatar'
-import { APP_TIMEZONE } from '../utils/date'
+import { APP_TIMEZONE, dayjsTZ, appDayStartISO } from '../utils/date'
 
 const { height: SCREEN_H } = Dimensions.get('window')
 export const SHEET_H = SCREEN_H * 0.90
@@ -60,8 +60,10 @@ const ROLE_LABEL = {
   courier: 'Курьер',
 }
 
+// Day offsets resolve against Asia/Dushanbe, not the device's timezone, so
+// the date the courier sees on the button is the date the API is sent.
 function addDays(n) {
-  const d = new Date(); d.setDate(d.getDate() + n); return d
+  return dayjsTZ().add(n, 'day')
 }
 
 // ── Bottom sheet wrapper ────────────────────────────────────────────────────
@@ -324,10 +326,9 @@ export function OrderDetailSheet({
   const doDefer = async () => {
     const opt = DEFER_OPTIONS.find(o => o.key === laterDate)
     if (!opt) return
-    const date = addDays(opt.days); date.setHours(0, 0, 0, 0)
     setStepLoading(true)
     try {
-      await deferOrder(order.id, date.toISOString())
+      await deferOrder(order.id, appDayStartISO(opt.days))
       handleClose(); onRefresh?.()
     } catch (e) {
       Alert.alert('Ошибка', e?.response?.data?.error?.message || 'Что-то пошло не так')
@@ -422,7 +423,9 @@ export function OrderDetailSheet({
               <Text style={ps.stepSub}>Выберите дату. Заказ вернётся в очередь.</Text>
               {DEFER_OPTIONS.map(opt => {
                 const dd = addDays(opt.days)
-                const dateLabel = dd.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+                const dateLabel = dd.toDate().toLocaleDateString('ru-RU', {
+                  day: 'numeric', month: 'long', timeZone: APP_TIMEZONE,
+                })
                 return (
                   <TouchableOpacity key={opt.key} style={[ps.reasonRow, laterDate === opt.key && ps.reasonRowActive]} onPress={() => setLaterDate(opt.key)}>
                     <View style={[ps.radio, laterDate === opt.key && ps.radioActive]} />

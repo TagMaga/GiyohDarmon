@@ -12,6 +12,12 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	// Embeds the IANA timezone database in the binary. The production build is
+	// CGO_ENABLED=0 and deployed as a bare static binary under systemd
+	// (deploy.sh), so time.LoadLocation("Asia/Dushanbe") would otherwise depend
+	// on the host shipping /usr/share/zoneinfo. Without it a host missing tzdata
+	// silently pushed every business-day boundary onto UTC.
+	_ "time/tzdata"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -249,7 +255,12 @@ func main() {
 	})
 
 	// ── Compensation module ───────────────────────────────────────────────────
-	loc := cfg.Server.Location()
+	// Fail fast: every business-day boundary in the app is derived from loc, so
+	// starting up with a silent UTC fallback would quietly shift them by 5h.
+	loc, err := cfg.Server.Location()
+	if err != nil {
+		log.Fatalf("timezone: %v", err)
+	}
 	compensationRepo := compensation.NewRepository(db)
 	compensationSvc := compensation.NewService(compensationRepo, activityLogger, db, loc)
 	compensationHandler := compensation.NewHandler(compensationSvc)
@@ -337,7 +348,7 @@ func main() {
 	// Finance is constructed before Budget: Budget's live balance formula reads
 	// Finance's accumulated net profit (internal/finance.Repository.GetNetProfit)
 	// instead of storing a per-order profit transfer.
-	financeRepo := finance.NewRepository(db)
+	financeRepo := finance.NewRepository(db, loc)
 	financeHandler := finance.NewHandler(financeRepo, loc)
 
 	budgetRepo := budget.NewRepository(db, loc, financeRepo)
@@ -437,7 +448,7 @@ func main() {
 	warehousesHandler := warehouses.NewHandler(warehousesSvc)
 
 	// ── Phase 5: Dispatch + Courier ───────────────────────────────────────────
-	courierRepo := courier.NewRepository(db)
+	courierRepo := courier.NewRepository(db, loc)
 	courierSvc := courier.NewService(courierRepo, orderSvc, warehousesSvc, activityLogger, db)
 	if cfg.Media.Enabled {
 		attachCashHandoverProofFn, listCashHandoverProofsFn, releaseCourierMediaFn, signedCourierMediaURLFn := couriermediabridge.Adapters(mediaSvc)

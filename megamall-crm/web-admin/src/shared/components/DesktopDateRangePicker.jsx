@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import FilterChip from './FilterChip'
+import { appToday } from '../utils/date'
 
 // "Максимум"/"all" used to send { from: '', to: '' } to mean "no bound", but
 // the backend's period parser (internal/finance/handler.go: parsePeriod)
@@ -43,8 +44,8 @@ function startOfMonth(date) {
 // Month grid should open on the current month for "Максимум" (from is the
 // far-past sentinel above), not actually scroll back to it.
 function baseMonthFor(value) {
-  if (!value || value === MAX_RANGE_FROM) return startOfMonth(new Date())
-  return startOfMonth(fromYMD(value) ?? new Date())
+  if (!value || value === MAX_RANGE_FROM) return startOfMonth(appToday())
+  return startOfMonth(fromYMD(value) ?? appToday())
 }
 
 function endOfMonth(date) {
@@ -77,7 +78,8 @@ function formatMonthShort(value) {
 }
 
 function resolvePreset(value) {
-  const today = new Date()
+  // Dushanbe calendar day, not the browser's.
+  const today = appToday()
   const ymdToday = toYMD(today)
   const yesterday = toYMD(addDays(today, -1))
 
@@ -437,7 +439,7 @@ function MonthGrid({ month, from, to, onPick }) {
           const value = toYMD(day)
           const selected = value === from || value === to
           const inRange = from && to && value > from && value < to
-          const today = value === toYMD(new Date())
+          const today = value === toYMD(appToday())
           return (
             <button
               key={value}

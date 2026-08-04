@@ -6,6 +6,7 @@ import Button from '../../../shared/components/Button'
 import Alert from '../../../shared/components/Alert'
 import Badge from '../../../shared/components/Badge'
 import ProductModal from '../components/ProductModal'
+import { isSameAppDay } from '../../../shared/utils/date'
 import ReceivingModal from '../components/ReceivingModal'
 import WriteoffModal from '../components/WriteoffModal'
 import { CourierWarehouseSummary } from '../components/TransferComponents'
@@ -77,11 +78,11 @@ export default function WarehouseDashboard() {
     (sum, batch) => sum + (batch.remaining_quantity ?? batch.RemainingQuantity ?? 0) * (batch.unit_cost ?? batch.UnitCost ?? 0),
     0
   )
-  const today = new Date().toDateString()
+  const today = new Date()
   const movementsToday = data.movements.filter((m) => {
     const d = m.created_at ?? m.CreatedAt
     if (!d) return false
-    try { return new Date(d).toDateString() === today } catch { return false }
+    return isSameAppDay(d, today)
   }).length
 
   function submitSearch(e) {
@@ -399,11 +400,11 @@ function MetricsStrip({ products = [], inventory = [], movements = [], batches =
   )
   const lowStock = inventory.filter((inv) => getStockStatus(inv) === 'low_stock').length
   const outStock = inventory.filter((inv) => getStockStatus(inv) === 'out_of_stock').length
-  const today = new Date().toDateString()
+  const today = new Date()
   const movementsToday = movements.filter((m) => {
     const d = m.created_at ?? m.CreatedAt
     if (!d) return false
-    try { return new Date(d).toDateString() === today } catch { return false }
+    return isSameAppDay(d, today)
   }).length
 
   const items = [
