@@ -522,15 +522,12 @@ func runOrders(
 // rate, and a pipeline of orders at every other stage.
 func buildStatusPlan() []string {
 	counts := map[string]int{
-		"delivered":           630,
-		"cancelled":           140,
-		"new":                 40,
-		"confirmed":           50,
-		"prepayment_pending":  20,
-		"prepayment_received": 20,
-		"assigned":            30,
-		"in_delivery":         30,
-		"issue":               40,
+		"delivered":   630,
+		"cancelled":   180,
+		"new":         40,
+		"confirmed":   90,
+		"assigned":    30,
+		"in_delivery": 30,
 	}
 	plan := make([]string, 0, numOrders)
 	for status, n := range counts {
@@ -577,15 +574,6 @@ func advanceOrder(
 	case "new", "confirmed":
 		return nil // already there after Create
 
-	case "prepayment_pending":
-		return changeStatus(orders.StatusPrepaymentPending)
-
-	case "prepayment_received":
-		if err := changeStatus(orders.StatusPrepaymentPending); err != nil {
-			return err
-		}
-		return changeStatus(orders.StatusPrepaymentReceived)
-
 	case "assigned":
 		return assign()
 
@@ -594,15 +582,6 @@ func advanceOrder(
 			return err
 		}
 		return changeStatus(orders.StatusInDelivery)
-
-	case "issue":
-		if err := assign(); err != nil {
-			return err
-		}
-		if err := changeStatus(orders.StatusInDelivery); err != nil {
-			return err
-		}
-		return changeStatus(orders.StatusIssue)
 
 	case "delivered":
 		if err := assign(); err != nil {
@@ -614,24 +593,14 @@ func advanceOrder(
 		return changeStatus(orders.StatusDelivered)
 
 	case "cancelled":
-		switch rng.Intn(3) {
+		switch rng.Intn(2) {
 		case 0:
 			return changeStatus(orders.StatusCancelled)
-		case 1:
+		default:
 			if err := assign(); err != nil {
 				return changeStatus(orders.StatusCancelled) // no courier coverage — cancel from confirmed instead
 			}
-			return changeStatus(orders.StatusCancelled)
-		default:
-			// in_delivery has no direct edge to cancelled — go through issue first
-			// (matches the real dispatcher workflow for a failed delivery).
-			if err := assign(); err != nil {
-				return changeStatus(orders.StatusCancelled)
-			}
 			if err := changeStatus(orders.StatusInDelivery); err != nil {
-				return err
-			}
-			if err := changeStatus(orders.StatusIssue); err != nil {
 				return err
 			}
 			return changeStatus(orders.StatusCancelled)

@@ -260,47 +260,6 @@ func (h *Handler) scheduleOrder(c *gin.Context) {
 	response.NoContent(c)
 }
 
-func (h *Handler) issueOrder(c *gin.Context) {
-	id, err := parseOrderID(c)
-	if err != nil {
-		response.HandleError(c, err)
-		return
-	}
-	var req StatusChangeRequest
-	_ = c.ShouldBindJSON(&req)
-	claims := middleware.ClaimsFromContext(c)
-	order, svcErr := h.svc.IssueOrder(c.Request.Context(), claims.UserID, id, req)
-	if svcErr != nil {
-		response.HandleError(c, svcErr)
-		return
-	}
-	response.OK(c, order)
-}
-
-func (h *Handler) resolveIssue(c *gin.Context) {
-	id, err := parseOrderID(c)
-	if err != nil {
-		response.HandleError(c, err)
-		return
-	}
-	var req ResolveIssueRequest
-	if bindErr := c.ShouldBindJSON(&req); bindErr != nil {
-		response.HandleError(c, apperrors.BadRequest("invalid request body"))
-		return
-	}
-	if appErr := validator.Validate(req); appErr != nil {
-		response.HandleError(c, appErr)
-		return
-	}
-	claims := middleware.ClaimsFromContext(c)
-	order, svcErr := h.svc.ResolveIssue(c.Request.Context(), claims.UserID, id, req)
-	if svcErr != nil {
-		response.HandleError(c, svcErr)
-		return
-	}
-	response.OK(c, order)
-}
-
 func (h *Handler) returnOrder(c *gin.Context) {
 	id, err := parseOrderID(c)
 	if err != nil {

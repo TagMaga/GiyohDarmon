@@ -3,7 +3,7 @@ import { C } from './theme'
 
 /**
  * Sheet — bottom-sheet shell shared by every mobile dispatcher overlay
- * (order detail, assign/cancel/issue/schedule, create order, courier detail,
+ * (order detail, assign/cancel/schedule, create order, courier detail,
  * fleet, profile). Matches the design's backdrop + drag-handle + slide-in.
  */
 export default function Sheet({ open, onClose, maxHeight = '86%', zIndex = 40, children }) {

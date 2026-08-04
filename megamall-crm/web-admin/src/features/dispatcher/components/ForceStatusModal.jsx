@@ -9,12 +9,12 @@ import { KEYS } from '../../../shared/queryKeys'
 import { getOrderId, formatOrderLabel } from '../utils/orderHelpers'
 import { STATUS_LABELS } from '../statusConfig'
 
-// All statuses are offered — the override exists specifically to recover
-// stuck/corrupted orders, including reopening a terminal one (delivered /
-// cancelled / returned). The backend re-validates and guards financial /
-// inventory side effects against double-firing; this modal only enforces
-// "pick something else" and "explain why".
-const ALL_STATUSES = ['new', 'confirmed', 'assigned', 'in_delivery', 'delivered', 'issue', 'returned', 'cancelled']
+// All statuses are offered — every status is restorable by design (see
+// orders.allowedTransitions), including moving a delivered/cancelled/returned
+// order back into active delivery. The backend re-validates and guards
+// financial/inventory side effects against double-firing; this modal only
+// enforces "pick something else" and "explain why".
+const ALL_STATUSES = ['new', 'confirmed', 'assigned', 'in_delivery', 'delivered', 'returned', 'cancelled']
 
 export default function ForceStatusModal({ open, onClose, order }) {
   const qc    = useQueryClient()

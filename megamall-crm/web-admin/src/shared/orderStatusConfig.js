@@ -7,29 +7,23 @@
 import { APP_TIMEZONE } from './utils/date'
 
 export const STATUS_LABELS = {
-  new:                  'Новый',
-  confirmed:            'Подтверждён',
-  prepayment_pending:   'Ожидает предоплату',
-  prepayment_received:  'Предоплата получена',
-  assigned:             'Назначен',
-  in_delivery:          'В пути',
-  delivered:            'Доставлен',
-  returned:             'Возврат',
-  cancelled:            'Отменён',
-  issue:                'Проблема',
+  new:          'Новый',
+  confirmed:    'Подтверждён',
+  assigned:     'Назначен',
+  in_delivery:  'В пути',
+  delivered:    'Доставлен',
+  returned:     'Возврат',
+  cancelled:    'Отмена',
 }
 
 export const STATUS_BADGE = {
-  new:                  'indigo',
-  confirmed:            'sky',
-  prepayment_pending:   'amber',
-  prepayment_received:  'violet',
-  assigned:             'violet',
-  in_delivery:          'amber',
-  delivered:            'emerald',
-  returned:             'orange',
-  cancelled:            'slate',
-  issue:                'rose',
+  new:          'indigo',
+  confirmed:    'sky',
+  assigned:     'violet',
+  in_delivery:  'amber',
+  delivered:    'emerald',
+  returned:     'orange',
+  cancelled:    'slate',
 }
 
 /** An order can be edited (by seller/manager/team lead) unless it's already delivered. */
