@@ -1,0 +1,17 @@
+{
+  "name": "seedance-mcp",
+  "version": "1.0.0",
+  "description": "MCP server exposing ByteDance Seedance video generation as Claude tools",
+  "main": "src/index.js",
+  "type": "module",
+  "bin": {
+    "seedance-mcp": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  }
+}

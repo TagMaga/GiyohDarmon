@@ -33,3 +33,5 @@ megamall-crm/web-admin/ds-bundle/
 megamall-crm/.claude/
 megamall-crm/web-admin/.claude/
 .codex-screens/
+tools/seedance-mcp/node_modules/
+tools/seedance-mcp/.env
