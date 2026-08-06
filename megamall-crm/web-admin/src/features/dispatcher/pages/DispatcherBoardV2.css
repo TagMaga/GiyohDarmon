@@ -1051,6 +1051,18 @@
 .dv2-cash-status.pending { background: var(--amber-dim); color: var(--amber-text); }
 .dv2-cash-status.settled { background: var(--green-dim); color: var(--green-text); }
 .dv2-cash-status.mismatch { background: var(--red-dim); color: var(--red-text); }
+/* Status pill that opens the manual status override (history table/cards). */
+.dv2-status-editable {
+  border: 1px dashed currentColor;
+  font-family: inherit;
+  cursor: pointer;
+  transition: filter .15s ease, transform .15s ease;
+}
+.dv2-status-editable svg { opacity: .6; }
+.dv2-status-editable:hover { filter: brightness(.94); }
+.dv2-status-editable:hover svg { opacity: 1; }
+.dv2-status-editable:active { transform: scale(.97); }
+.dv2-status-editable:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .dv2-muted { color: var(--text3); }
 .dv2-note-cell {
   max-width: 260px;

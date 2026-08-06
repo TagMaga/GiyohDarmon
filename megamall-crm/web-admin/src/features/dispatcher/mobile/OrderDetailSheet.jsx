@@ -69,7 +69,13 @@ export default function OrderDetailSheet({ order, open, onClose, customerMap, co
 
   const actions = (STATUS_ACTIONS[o.status] ?? []).filter((a) => a.key !== 'comment')
   const primary = actions.filter((a) => a.variant === 'primary')
-  const others = actions.filter((a) => a.variant !== 'primary')
+  // The manual override is available in every status (that is the point of it),
+  // so it is appended here rather than repeated in each STATUS_ACTIONS entry —
+  // the desktop OrderDrawer does the same.
+  const others = [
+    ...actions.filter((a) => a.variant !== 'primary'),
+    { key: 'force_status', label: 'Изменить статус', variant: 'secondary' },
+  ]
 
   return (
     <Sheet open={open} onClose={onClose} maxHeight="90%" zIndex={45}>

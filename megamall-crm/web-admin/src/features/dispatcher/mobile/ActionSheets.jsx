@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check } from 'lucide-react'
 import Sheet, { SheetTitle, SheetPrimaryButton } from './Sheet'
-import { C, avatarStyle, initialsOf, chipStyle } from './theme'
-import { fmt } from '../statusConfig'
+import { C, avatarStyle, initialsOf, chipStyle, statusPill } from './theme'
+import { fmt, STATUS_LABELS } from '../statusConfig'
 import { KEYS } from '../../../shared/queryKeys'
 import { useToast } from '../../../shared/components/ToastProvider'
 import { getOrderId, formatOrderLabel } from '../utils/orderHelpers'
 import { toLocalYMD, addDaysYMD, appWallClockToDate } from '../../../shared/utils/date'
 import {
   fetchCouriersOverview, assignCourier, reassignCourier, unassignCourier, cancelOrder, scheduleOrder,
+  forceOrderStatus,
 } from '../api'
 
 const invalidateBoard = (qc) => {
@@ -202,6 +203,101 @@ export function CancelSheet({ open, order, onClose }) {
       />
       <SheetPrimaryButton onClick={() => canSubmit && mutate()} disabled={!canSubmit || isPending} background={C.red}>
         {isPending ? '...' : 'Отменить заказ'}
+      </SheetPrimaryButton>
+    </Sheet>
+  )
+}
+
+// ── Force status sheet ───────────────────────────────────────────────────────
+// Mobile twin of the desktop ForceStatusModal: the recovery path for an order
+// stuck in (or wrongly moved to) the wrong status. Every status is offered —
+// all of them are restorable, and the backend re-validates and guards the
+// financial and inventory side effects against double-firing. A reason is
+// mandatory and lands on the order timeline + audit log.
+const FORCE_STATUSES = ['new', 'confirmed', 'assigned', 'in_delivery', 'delivered', 'returned', 'cancelled']
+
+// Statuses whose first entry moves stock and fires the financial events.
+const SETTLING_STATUSES = new Set(['delivered', 'cancelled', 'returned'])
+
+export function ForceStatusSheet({ open, order, onClose }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [status, setStatus] = useState('')
+  const [reason, setReason] = useState('')
+
+  useEffect(() => { if (open) { setStatus(''); setReason('') } }, [open])
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: () => forceOrderStatus(getOrderId(order), { status, reason: reason.trim() }),
+    onSuccess: () => {
+      // Broad key — the history list this is usually opened from lives under
+      // ['dispatcher', 'orderHistory', params] and must refresh too.
+      qc.invalidateQueries({ queryKey: ['dispatcher'] })
+      toast.success('Статус изменён вручную')
+      onClose()
+    },
+    onError: (err) => toast.error(err?.response?.data?.error?.message ?? err?.message ?? 'Ошибка'),
+  })
+
+  if (!open) return null
+
+  const current = order?.status
+  const canSubmit = !!status && status !== current && reason.trim().length >= 3
+  const touchesSettlement = SETTLING_STATUSES.has(status) || SETTLING_STATUSES.has(current)
+
+  return (
+    <Sheet open={open} onClose={onClose} zIndex={41}>
+      <SheetTitle sub={`Заказ #${order ? formatOrderLabel(order) : ''} · сейчас: ${STATUS_LABELS[current] ?? current ?? '—'}`}>
+        Изменить статус вручную
+      </SheetTitle>
+
+      <div style={{ background: C.amberBg, color: C.amber, borderRadius: 13, padding: '11px 13px', fontSize: 12, fontWeight: 600, lineHeight: 1.45, marginBottom: 14 }}>
+        Это принудительное изменение в обход обычных правил перехода.
+        Используйте только для исправления зависших или ошибочных заказов —
+        действие фиксируется в истории заказа с указанной причиной.
+      </div>
+
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.text3, padding: '0 4px 8px' }}>Новый статус</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+        {FORCE_STATUSES.map((s) => {
+          const isCurrent = s === current
+          const pill = statusPill(s)
+          const active = status === s
+          return (
+            <button
+              key={s}
+              onClick={() => !isCurrent && setStatus(s)}
+              disabled={isCurrent}
+              style={{
+                padding: '9px 13px', borderRadius: 11, fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700,
+                cursor: isCurrent ? 'not-allowed' : 'pointer', opacity: isCurrent ? 0.45 : 1,
+                ...chipStyle(active, pill.color),
+              }}
+            >
+              {STATUS_LABELS[s] ?? s}{isCurrent ? ' · текущий' : ''}
+            </button>
+          )
+        })}
+      </div>
+
+      {touchesSettlement && (
+        <div style={{ background: C.redBg, color: C.red, borderRadius: 13, padding: '11px 13px', fontSize: 12, fontWeight: 600, lineHeight: 1.45, marginBottom: 14 }}>
+          Затрагивается статус доставлен / отменён / возврат: изменение
+          влияет на складские остатки и финансовые начисления по заказу.
+        </div>
+      )}
+
+      <textarea
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        maxLength={500}
+        placeholder="Причина изменения статуса (обязательно)"
+        rows={3}
+        style={{ width: '100%', border: `1px solid ${C.border}`, background: '#fff', borderRadius: 13, padding: 12, fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'none', marginBottom: 14 }}
+      />
+
+      <SheetPrimaryButton onClick={() => canSubmit && mutate()} disabled={!canSubmit || isPending} background={C.red}>
+        {isPending ? '...' : 'Применить'}
       </SheetPrimaryButton>
     </Sheet>
   )

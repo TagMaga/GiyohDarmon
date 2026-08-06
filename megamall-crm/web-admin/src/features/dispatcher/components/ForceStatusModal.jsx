@@ -16,6 +16,9 @@ import { STATUS_LABELS } from '../statusConfig'
 // enforces "pick something else" and "explain why".
 const ALL_STATUSES = ['new', 'confirmed', 'assigned', 'in_delivery', 'delivered', 'returned', 'cancelled']
 
+// Statuses whose first entry moves stock and fires the financial events.
+const SETTLING_STATUSES = new Set(['delivered', 'cancelled', 'returned'])
+
 export default function ForceStatusModal({ open, onClose, order }) {
   const qc    = useQueryClient()
   const toast = useToast()
@@ -51,6 +54,10 @@ export default function ForceStatusModal({ open, onClose, order }) {
 
   const errMsg = error?.response?.data?.error?.message ?? error?.message
   const canSubmit = !!status && status !== order?.status && reason.trim().length >= 3
+
+  // Moving into or out of one of these touches inventory and the financial
+  // ledger — surface that before the dispatcher commits.
+  const touchesSettlement = SETTLING_STATUSES.has(status) || SETTLING_STATUSES.has(order?.status)
 
   return (
     <Modal
@@ -98,6 +105,22 @@ export default function ForceStatusModal({ open, onClose, order }) {
             ))}
           </select>
         </div>
+
+        {status && status !== order?.status && (
+          <div className="text-sm text-slate-600">
+            {STATUS_LABELS[order?.status] ?? order?.status ?? '—'}
+            {' → '}
+            <strong className="text-slate-900">{STATUS_LABELS[status] ?? status}</strong>
+          </div>
+        )}
+
+        {touchesSettlement && (
+          <Alert variant="warning">
+            Затрагивается статус доставлен / отменён / возврат: изменение
+            влияет на складские остатки и финансовые начисления по заказу.
+            Убедитесь, что это действительно нужно.
+          </Alert>
+        )}
 
         <div>
           <label className="input-label">Причина *</label>

@@ -638,6 +638,7 @@ function DispatcherBoardDesktop() {
             onFilters={(next) => setHistoryFilters((prev) => ({ ...prev, ...next, page: next.page ?? 1 }))}
             onPage={(page) => setHistoryFilters((prev) => ({ ...prev, page }))}
             onRetry={() => orderHistory.refetch()}
+            onChangeStatus={(row) => handleAction('force_status', row)}
           />
         ) : (
           <section className="dv2-board-wrap">
@@ -1522,7 +1523,7 @@ function CashTransactionCard({ row, busy, onConfirm, onReject, onPreview }) {
   )
 }
 
-function OrderHistoryView({ rows, pageMeta, couriers, range, filters, loading, error, onRange, onFilters, onPage, onRetry }) {
+function OrderHistoryView({ rows, pageMeta, couriers, range, filters, loading, error, onRange, onFilters, onPage, onRetry, onChangeStatus }) {
   const [rangeOpen, setRangeOpen] = useState(false)
 
   useEffect(() => {
@@ -1563,11 +1564,11 @@ function OrderHistoryView({ rows, pageMeta, couriers, range, filters, loading, e
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => <OrderHistoryRowView key={row.id} row={row} />)}
+            {rows.map((row) => <OrderHistoryRowView key={row.id} row={row} onChangeStatus={onChangeStatus} />)}
           </tbody>
         </table>
         <div className="dv2-cash-cards">
-          {rows.map((row) => <OrderHistoryCard key={row.id} row={row} />)}
+          {rows.map((row) => <OrderHistoryCard key={row.id} row={row} onChangeStatus={onChangeStatus} />)}
         </div>
         <Pagination meta={pageMeta} onPage={onPage} />
       </DataPanel>
@@ -1575,12 +1576,12 @@ function OrderHistoryView({ rows, pageMeta, couriers, range, filters, loading, e
   )
 }
 
-function OrderHistoryRowView({ row }) {
+function OrderHistoryRowView({ row, onChangeStatus }) {
   return (
     <tr>
       <td><span className="dv2-cash-num">#{row.order_number || row.id}</span></td>
       <td>{formatFullDate(row.created_at)}</td>
-      <td><OrderStatusBadge status={row.status} /></td>
+      <td><OrderStatusBadge status={row.status} onClick={onChangeStatus && (() => onChangeStatus(row))} /></td>
       <td><ProductLines products={row.products} /></td>
       <td>{row.courier_name || '—'}</td>
       <td>{row.seller_name || '—'}</td>
@@ -1593,12 +1594,12 @@ function OrderHistoryRowView({ row }) {
   )
 }
 
-function OrderHistoryCard({ row }) {
+function OrderHistoryCard({ row, onChangeStatus }) {
   return (
     <div className="dv2-cash-card">
       <div className="dv2-card-headline">
         <span className="dv2-cash-num">#{row.order_number || row.id}</span>
-        <OrderStatusBadge status={row.status} />
+        <OrderStatusBadge status={row.status} onClick={onChangeStatus && (() => onChangeStatus(row))} />
       </div>
       <div className="dv2-cash-card-grid">
         <Info label="Дата" value={formatFullDate(row.created_at)} />
@@ -1678,10 +1679,24 @@ function StatusBadge({ status }) {
   return <span className={`dv2-cash-status ${m.tone}`}>{m.dot} {m.label}</span>
 }
 
-function OrderStatusBadge({ status }) {
+// Clickable when `onClick` is provided — the dispatcher fix-up path for a
+// wrong or stuck status (opens ForceStatusModal, which demands a reason).
+function OrderStatusBadge({ status, onClick }) {
   const label = ORDER_STATUS_OPTIONS.find((opt) => opt.value === status)?.label ?? status ?? '—'
   const tone = status === 'delivered' ? 'settled' : ['cancelled', 'returned'].includes(status) ? 'mismatch' : 'pending'
-  return <span className={`dv2-cash-status ${tone}`}>{label}</span>
+  if (!onClick) return <span className={`dv2-cash-status ${tone}`}>{label}</span>
+  return (
+    <button
+      type="button"
+      className={`dv2-cash-status ${tone} dv2-status-editable`}
+      onClick={onClick}
+      title="Изменить статус вручную"
+      aria-label={`Изменить статус заказа (сейчас: ${label})`}
+    >
+      {label}
+      <Pencil size={11} />
+    </button>
+  )
 }
 
 // row.photo_url only reflects the legacy proof_url column, which is empty

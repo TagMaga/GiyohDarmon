@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Search } from 'lucide-react'
+import { Search, Pencil } from 'lucide-react'
 import { C, statusPill, chipStyle } from './theme'
 import { fmt, fmtDate } from '../statusConfig'
 import { KEYS } from '../../../shared/queryKeys'
@@ -13,7 +13,7 @@ const STATUS_FILTERS = [
   { value: 'cancelled', label: 'Отменён' },
 ]
 
-export default function HistoryTab() {
+export default function HistoryTab({ onChangeStatus }) {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
@@ -69,7 +69,7 @@ export default function HistoryTab() {
             <div style={{ fontSize: 13, fontWeight: 700, color: C.text3 }}>Ничего не найдено</div>
           </div>
         ) : (
-          rows.map((row) => <HistoryCard key={row.id} row={row} />)
+          rows.map((row) => <HistoryCard key={row.id} row={row} onChangeStatus={onChangeStatus} />)
         )}
         {hasMore && (
           <button
@@ -84,7 +84,7 @@ export default function HistoryTab() {
   )
 }
 
-function HistoryCard({ row }) {
+function HistoryCard({ row, onChangeStatus }) {
   const pill = statusPill(row.status)
   const products = Array.isArray(row.products) ? row.products : []
   const productLabel = products.length ? products.map((p) => `${p.name}${p.quantity ? ` ×${p.quantity}` : ''}`).join(', ') : '—'
@@ -93,7 +93,23 @@ function HistoryCard({ row }) {
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 }}>
         <span style={{ fontSize: 13, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>#{row.order_number || row.id}</span>
-        <span style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, background: pill.bg, color: pill.color }}>{pill.label}</span>
+        {onChangeStatus ? (
+          <button
+            type="button"
+            onClick={() => onChangeStatus(row)}
+            aria-label={`Изменить статус заказа (сейчас: ${pill.label})`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 99,
+              fontFamily: 'inherit', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+              background: pill.bg, color: pill.color, border: `1px dashed ${pill.color}`,
+            }}
+          >
+            {pill.label}
+            <Pencil size={10} />
+          </button>
+        ) : (
+          <span style={{ padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, background: pill.bg, color: pill.color }}>{pill.label}</span>
+        )}
       </div>
       <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 2 }}>{productLabel}</div>
       <div style={{ fontSize: 11.5, color: C.text3, marginBottom: 11 }}>{fmtDate(row.created_at)} · {row.courier_name || '—'}</div>
