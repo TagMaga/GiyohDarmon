@@ -1,4 +1,4 @@
--- Migration 00100: Full destructive wipe of the courier-side inventory
+-- Migration 00101: Full destructive wipe of the courier-side inventory
 -- ledger (current stock balances + full movement/cost history).
 --
 -- Requested explicitly, with the consequences below accepted:
