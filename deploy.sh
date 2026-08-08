@@ -336,6 +336,57 @@ NGINX_BLOCK
   fi
 }
 
+# run_migrations applies any pending goose migrations before the new
+# backend binary goes live. Runs BEFORE the artifact switch (step 3) so a
+# migration failure aborts the deploy while the old binary/frontend are
+# still untouched — DEPLOY_STARTED is still 0 at this point, so the ERR
+# trap's rollback() is a no-op and this just fails the deploy cleanly.
+# Migrations must land before the new binary starts, since the new code
+# can depend on schema the migration adds (columns/tables it reads or
+# writes on its very first request).
+#
+# $STAGE/goose and $STAGE/migrations are built/copied into the release
+# tarball by deploy.yml (statically built for the same GOOS/GOARCH as the
+# backend, so the server needs no Go toolchain or network access). Skips
+# with a warning on an older artifact that predates this — never blocks
+# a deploy on their absence, only on goose itself failing.
+run_migrations() {
+  if [[ ! -x "$STAGE/goose" || ! -d "$STAGE/migrations" ]]; then
+    echo "  no goose binary/migrations in this release artifact — skipping" >&2
+    return 0
+  fi
+
+  local env_file="$PROJECT/megamall-crm/.env"
+  if [[ ! -f "$env_file" ]]; then
+    echo "  $env_file not found; cannot read DB_DSN — skipping migrations" >&2
+    return 0
+  fi
+
+  # DB_DSN commonly contains spaces ("host=... password=... sslmode=..."),
+  # which breaks a naive `set -a; . .env`; parse it the same line-by-line
+  # way run_server.sh does instead of sourcing the file.
+  local db_dsn=""
+  local line key val
+  while IFS= read -r line; do
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line// }" ]] && continue
+    key="${line%%=*}"
+    [[ "$key" == "DB_DSN" ]] || continue
+    val="${line#*=}"
+    val="${val%%  #*}"
+    val="${val%% #*}"
+    val="${val%"${val##*[![:space:]]}"}"
+    db_dsn="$val"
+  done < "$env_file"
+
+  if [[ -z "$db_dsn" ]]; then
+    echo "DB_DSN not set in $env_file; cannot apply migrations" >&2
+    return 1
+  fi
+
+  "$STAGE/goose" -dir "$STAGE/migrations" postgres "$db_dsn" up
+}
+
 rollback() {
   local failed_status=$?
   trap - ERR
@@ -371,7 +422,7 @@ rollback() {
 trap cleanup EXIT
 trap rollback ERR
 
-echo "1/7 - Validating release $REVISION"
+echo "1/8 - Validating release $REVISION"
 if tar -tzf "$ARTIFACT" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
   echo "Artifact contains an unsafe path" >&2
   exit 4
@@ -384,7 +435,7 @@ test -f "$STAGE/megamall-crm"
 test -f "$STAGE/frontend/index.html"
 chmod 0755 "$STAGE/megamall-crm"
 
-echo "2/7 - Preparing rollback copy"
+echo "2/8 - Preparing rollback copy"
 mkdir -p "$(dirname "$BACKEND_LIVE")" "$(dirname "$FRONTEND_LIVE")"
 if [[ -f "$BACKEND_LIVE" ]]; then
   cp -a "$BACKEND_LIVE" "$BACKUP/megamall-crm"
@@ -393,7 +444,10 @@ fi
 cp -a "$STAGE/frontend" "$FRONTEND_NEXT"
 install -m 0755 "$STAGE/megamall-crm" "${BACKEND_LIVE}.next"
 
-echo "3/7 - Switching frontend and backend artifacts"
+echo "3/8 - Applying pending database migrations"
+run_migrations
+
+echo "4/8 - Switching frontend and backend artifacts"
 DEPLOY_STARTED=1
 if [[ -e "$FRONTEND_LIVE" ]]; then
   mv "$FRONTEND_LIVE" "$BACKUP/frontend"
@@ -401,17 +455,17 @@ fi
 mv "$FRONTEND_NEXT" "$FRONTEND_LIVE"
 mv -f "${BACKEND_LIVE}.next" "$BACKEND_LIVE"
 
-echo "4/7 - Syncing nginx media/uploads proxy config"
+echo "5/8 - Syncing nginx media/uploads proxy config"
 sync_nginx_media_routes
 sync_nginx_perf_config
 
-echo "5/7 - Restarting backend"
+echo "6/8 - Restarting backend"
 systemctl restart "$SERVICE"
 
-echo "6/7 - Checking application readiness"
+echo "7/8 - Checking application readiness"
 wait_for_health
 
-echo "7/7 - Recording successful release"
+echo "8/8 - Recording successful release"
 printf '%s\n' "$REVISION" > "$RELEASES/CURRENT"
 printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$BACKUP/DEPLOYED_AT"
 rm -f "$ARTIFACT"
