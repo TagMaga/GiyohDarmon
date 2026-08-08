@@ -24,7 +24,7 @@ import useMyTeam                       from '../hooks/useMyTeam'
 import useTeamMembers                  from '../../people/hooks/useTeamMembers'
 import useEmployeesByIds               from '../../people/hooks/useEmployeesByIds'
 import { buildUserMap }                from '../../people/utils/peopleHelpers'
-import { M, InitialsAvatar, StatusPill, Chip } from '../../seller/components/mobileUi'
+import { M, InitialsAvatar, StatusPill, Chip, DarkCard } from '../../seller/components/mobileUi'
 import { toLocalYMD } from '../../../shared/utils/date'
 
 function useDebounce(value, delay) {
@@ -39,6 +39,47 @@ function useDebounce(value, delay) {
 function currentMonthDefault() {
   const now = new Date()
   return { from: toLocalYMD(new Date(now.getFullYear(), now.getMonth(), 1)), to: toLocalYMD(now) }
+}
+
+function pluralOrders(n) {
+  const mod10 = n % 10, mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return 'заказ'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'заказа'
+  return 'заказов'
+}
+
+/** Sum of order amounts for the currently active filters (status/date/seller/search included). */
+function TotalsBar({ amount, count, loading, statusFilter, variant }) {
+  const label = statusFilter === 'all' ? 'Итого по фильтру' : `Итого: ${STATUS_LABELS[statusFilter] ?? statusFilter}`
+  const sub = loading ? 'Считаем…' : `${count} ${pluralOrders(count)}`
+  const value = loading ? '…' : `${fmtAmount(amount)} с`
+
+  if (variant === 'desktop') {
+    return (
+      <div
+        className="rounded-xl px-3.5 py-3 flex items-center justify-between"
+        style={{ background: 'linear-gradient(135deg, #EEF0FF, #FBFAFF)', border: '1px solid #E0E4FA' }}
+      >
+        <div>
+          <p className="text-[10.5px] font-bold uppercase tracking-wide text-indigo-500">{label}</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{sub}</p>
+        </div>
+        <p className="text-lg font-extrabold text-slate-900" style={{ fontVariantNumeric: 'tabular-nums' }}>{value}</p>
+      </div>
+    )
+  }
+
+  return (
+    <DarkCard glow="rgba(99,102,241,.28)" style={{ padding: '16px 18px' }}>
+      <div className="flex items-center justify-between">
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: M.darkSub, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
+          <div style={{ fontSize: 12, color: M.darkMuted, marginTop: 3 }}>{sub}</div>
+        </div>
+        <div style={{ fontSize: 23, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+      </div>
+    </DarkCard>
+  )
 }
 
 export default function TeamLeadOrdersPage() {
@@ -82,7 +123,12 @@ export default function TeamLeadOrdersPage() {
     ...(search                 ? { search }              : {}),
   }), [dateFrom, dateTo, page, statusFilter, sellerId, search])
 
-  const { items, meta, isLoading } = useTeamLeadOrders(hookParams, memberIds)
+  const { items, meta, allItems, allLoading, isLoading } = useTeamLeadOrders(hookParams, memberIds)
+
+  const totalAmount = useMemo(
+    () => allItems.reduce((sum, o) => sum + Number(o.total_order_amount ?? o.total_amount ?? 0), 0),
+    [allItems]
+  )
 
   // Reset page on filter change
   const prevFilters = useRef({ dateFrom, dateTo, statusFilter, sellerId, search })
@@ -300,6 +346,10 @@ export default function TeamLeadOrdersPage() {
           </button>
         </div>
 
+        <div style={{ marginTop: 12 }}>
+          <TotalsBar amount={totalAmount} count={allItems.length} loading={allLoading} statusFilter={statusFilter} variant="mobile" />
+        </div>
+
         {filtersOpen && (
           <div className="fixed inset-0 z-50 lg:hidden">
             <button
@@ -392,6 +442,9 @@ export default function TeamLeadOrdersPage() {
               <p className="text-xs text-slate-400 mt-0.5">Всего: {totalCount}</p>
             </div>
             {filtersSection}
+            <div className="mt-3">
+              <TotalsBar amount={totalAmount} count={allItems.length} loading={allLoading} statusFilter={statusFilter} variant="desktop" />
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
