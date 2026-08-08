@@ -2,6 +2,14 @@
 -- Preserves: users, teams, hierarchy, courier profiles, warehouse tables (products, inventory, etc.), config tables.
 -- Deletes: orders and all children, customers, financial events, cash handovers, sessions, logs.
 --
+-- NOTE ON COURIER/SELLER HISTORY: order rows are the only record of what each
+-- courier delivered and what each seller sold — courier work lives in
+-- order_assignments/order_timeline, seller work in orders.seller_id and its
+-- timeline, both cascade-deleted with the orders they reference. Courier and
+-- seller *profiles* (the users/hierarchy tables) are preserved, but every
+-- completed delivery and every completed sale attributed to them is gone
+-- after this runs, with no way to recover who did what.
+--
 -- PREFER: bash scripts/clear_transactional_data.sh
 -- That wrapper applies the lib/dbsafety.sh production refusal, reports the row
 -- counts about to be destroyed, and requires a typed confirmation. Running this
