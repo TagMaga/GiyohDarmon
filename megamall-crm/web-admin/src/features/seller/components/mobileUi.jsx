@@ -115,7 +115,7 @@ export function Chip({ active, children, onClick, style }) {
   )
 }
 
-const PILL_COLORS = {
+export const PILL_COLORS = {
   indigo:  { color: M.indigoDeep, bg: M.indigoBg, dot: M.indigo },
   sky:     { color: '#0369A1', bg: '#DCEEFB', dot: '#0EA5E9' },
   violet:  { color: '#6D28D9', bg: '#EFE9FE', dot: '#8B5CF6' },

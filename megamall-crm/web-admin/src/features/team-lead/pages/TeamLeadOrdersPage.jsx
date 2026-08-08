@@ -10,22 +10,75 @@
  */
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery }                    from '@tanstack/react-query'
-import { Search, X, ClipboardList, SlidersHorizontal } from 'lucide-react'
+import { Search, X, ClipboardList, ChevronDown } from 'lucide-react'
 import Badge                           from '../../../shared/components/Badge'
 import EmptyState                      from '../../../shared/components/EmptyState'
 import PeriodRangeFilter               from '../../../shared/components/PeriodRangeFilter'
+import DateRangeBottomSheet            from '../../../shared/components/DateRangeBottomSheet'
+import BottomSheet                     from '../../../shared/components/BottomSheet'
 import SellerOrderDetailPanel          from '../../seller/components/SellerOrderDetailPanel'
 import OrderDetailBottomSheet          from '../../seller/components/OrderDetailBottomSheet'
 import { KEYS }                        from '../../../shared/queryKeys'
 import { fetchCities }                 from '../../seller/api'
 import { SELLER_STATUS_FILTERS, STATUS_LABELS, STATUS_BADGE, fmtAmount, fmtDate } from '../../../shared/orderStatusConfig'
 import useTeamLeadOrders               from '../hooks/useTeamLeadOrders'
+import useTeamOrderTotals              from '../hooks/useTeamOrderTotals'
 import useMyTeam                       from '../hooks/useMyTeam'
 import useTeamMembers                  from '../../people/hooks/useTeamMembers'
 import useEmployeesByIds               from '../../people/hooks/useEmployeesByIds'
 import { buildUserMap }                from '../../people/utils/peopleHelpers'
-import { M, InitialsAvatar, StatusPill, Chip } from '../../seller/components/mobileUi'
-import { toLocalYMD } from '../../../shared/utils/date'
+import { M, InitialsAvatar, StatusPill, Chip, PILL_COLORS } from '../../seller/components/mobileUi'
+import { toLocalYMD, appToday } from '../../../shared/utils/date'
+
+// ── Mobile filter-chip row (Период | Статус | Пользователь) ────────────────
+// Same visual language as FinanceFilterBar's chips: h-9 rounded-full pill,
+// filled indigo when active (with an inline ✕ to clear), slate-100 outline
+// otherwise (with a chevron-down to hint "opens a sheet").
+const MOBILE_CHIP_BASE =
+  'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold transition-colors'
+const MOBILE_CHIP_OFF = `${MOBILE_CHIP_BASE} bg-slate-100 text-slate-600 hover:bg-slate-200`
+const MOBILE_CHIP_ON  = `${MOBILE_CHIP_BASE} bg-indigo-600 text-white hover:bg-indigo-700`
+
+function MobileFilterChip({ active, onClick, onClear, children }) {
+  return (
+    <button type="button" onClick={onClick} className={active ? MOBILE_CHIP_ON : MOBILE_CHIP_OFF}>
+      {active && (
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label="Сбросить"
+          onClick={(e) => { e.stopPropagation(); onClear() }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onClear() } }}
+          className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full hover:bg-white/20"
+        >
+          <X size={11} />
+        </span>
+      )}
+      {children}
+      {!active && <ChevronDown size={13} className="opacity-50" />}
+    </button>
+  )
+}
+
+// ── Period label helpers (mirrors FinanceFilterBar's "Август"/"Сегодня"/… chip text) ──
+function startOfMonth(date) { return new Date(date.getFullYear(), date.getMonth(), 1) }
+function addDays(date, days) { const n = new Date(date); n.setDate(n.getDate() + days); return n }
+function formatDMY(value) {
+  if (!value) return ''
+  const [y, m, d] = value.split('-')
+  return `${d}.${m}.${y}`
+}
+function formatMonthName(value) {
+  const [y, m, d] = value.split('-').map(Number)
+  const s = new Date(y, m - 1, d).toLocaleDateString('ru-RU', { month: 'long' })
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+const CHIP_DATE_PRESETS = [
+  { label: 'Сегодня', get: () => { const t = toLocalYMD(appToday()); return { from: t, to: t } } },
+  { label: 'Вчера', get: () => { const y = toLocalYMD(addDays(appToday(), -1)); return { from: y, to: y } } },
+  { label: '7 дней', get: () => ({ from: toLocalYMD(addDays(appToday(), -6)), to: toLocalYMD(appToday()) }) },
+  { label: '30 дней', get: () => ({ from: toLocalYMD(addDays(appToday(), -29)), to: toLocalYMD(appToday()) }) },
+]
 
 function useDebounce(value, delay) {
   const [dv, setDv] = useState(value)
@@ -37,8 +90,8 @@ function useDebounce(value, delay) {
 }
 
 function currentMonthDefault() {
-  const now = new Date()
-  return { from: toLocalYMD(new Date(now.getFullYear(), now.getMonth(), 1)), to: toLocalYMD(now) }
+  const now = appToday()
+  return { from: toLocalYMD(startOfMonth(now)), to: toLocalYMD(now) }
 }
 
 export default function TeamLeadOrdersPage() {
@@ -52,7 +105,7 @@ export default function TeamLeadOrdersPage() {
   const [rawSearch,    setRawSearch]    = useState('')
   const [page,         setPage]         = useState(1)
   const [detailOrder,  setDetailOrder]  = useState(null)
-  const [filtersOpen,  setFiltersOpen]  = useState(false)
+  const [mobileSheet,  setMobileSheet]  = useState(null) // null | 'date' | 'status' | 'user'
 
   const search = useDebounce(rawSearch, 400)
 
@@ -83,6 +136,61 @@ export default function TeamLeadOrdersPage() {
   }), [dateFrom, dateTo, page, statusFilter, sellerId, search])
 
   const { items, meta, isLoading } = useTeamLeadOrders(hookParams, memberIds)
+
+  // Status-agnostic totals for the mobile totals card + breakdown strip —
+  // needs the full date+seller+search scope regardless of statusFilter, so
+  // it's a separate fetch/hook from the paginated `items` above.
+  const totalsParams = useMemo(() => ({
+    from: dateFrom, to: dateTo,
+    ...(sellerId ? { sellerId } : {}),
+    ...(search   ? { search }   : {}),
+  }), [dateFrom, dateTo, sellerId, search])
+  const { scoped: scopedOrders, byStatus, total: totalAll, isLoading: totalsLoading } = useTeamOrderTotals(totalsParams)
+
+  // ── Mobile chip labels / totals card derived state ─────────────────────────
+  const thisMonthRange = useMemo(() => {
+    const now = appToday()
+    return { from: toLocalYMD(startOfMonth(now)), to: toLocalYMD(now) }
+  }, [])
+  const isThisMonth = dateFrom === thisMonthRange.from && dateTo === thisMonthRange.to
+  const periodActive = !isThisMonth
+  const periodLabel = useMemo(() => {
+    if (isThisMonth) return formatMonthName(dateFrom)
+    const matched = CHIP_DATE_PRESETS.find(p => { const r = p.get(); return r.from === dateFrom && r.to === dateTo })
+    if (matched) return matched.label
+    return `${formatDMY(dateFrom)} — ${formatDMY(dateTo)}`
+  }, [dateFrom, dateTo, isThisMonth])
+
+  const statusActive = statusFilter !== 'all'
+  const statusLabel = statusActive
+    ? (SELLER_STATUS_FILTERS.find(f => f.key === statusFilter)?.label ?? statusFilter)
+    : 'Все статусы'
+
+  const sellerActive = !!sellerId
+  const sellerName = userMap[sellerId]?.full_name ?? ''
+  const userChipLabel = sellerActive ? sellerName : 'Пользователь'
+
+  const currentTotals = statusFilter === 'all' ? totalAll : (byStatus[statusFilter] ?? { count: 0, amount: 0 })
+  const totalsCaption = `${statusLabel} · ${periodLabel}${sellerActive && sellerName ? ' · ' + sellerName : ''}`
+
+  const breakdownTiles = useMemo(() => {
+    const tiles = [{
+      key: 'all', label: 'Все',
+      count: totalAll.count, amount: totalAll.amount,
+      dot: M.indigo,
+    }]
+    Object.keys(STATUS_LABELS).forEach(key => {
+      const row = byStatus[key]
+      const count = row?.count ?? 0
+      if (count === 0 && statusFilter !== key) return
+      tiles.push({
+        key, label: STATUS_LABELS[key],
+        count, amount: row?.amount ?? 0,
+        dot: PILL_COLORS[STATUS_BADGE[key]]?.dot ?? PILL_COLORS.slate.dot,
+      })
+    })
+    return tiles
+  }, [byStatus, totalAll, statusFilter])
 
   // Reset page on filter change
   const prevFilters = useRef({ dateFrom, dateTo, statusFilter, sellerId, search })
@@ -116,9 +224,10 @@ export default function TeamLeadOrdersPage() {
     return () => window.removeEventListener('keydown', handleKey)
   }, [items, detailOrder])
 
-  // ── Filters ───────────────────────────────────────────────────────────────
-  // Split so mobile can show search + status chips inline (matching the
-  // mockup) while date range / seller stay behind the "advanced filters" sheet.
+  // ── Desktop filters ──────────────────────────────────────────────────────
+  // Mobile has its own chip row + bottom sheets below (Период | Статус |
+  // Пользователь); these two blocks back only the desktop master-detail
+  // header now.
   const quickFilters = (
     <div className="space-y-2.5">
       {/* Search */}
@@ -276,6 +385,11 @@ export default function TeamLeadOrdersPage() {
   const totalCount = meta?.total ?? items.length
   const totalPages = meta?.total_pages ?? 1
 
+  const mobileList = useMemo(() => {
+    const list = statusFilter === 'all' ? scopedOrders : scopedOrders.filter(o => o.status === statusFilter)
+    return [...list].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  }, [scopedOrders, statusFilter])
+
   return (
     <>
       {/* ═══════════════════════════════════════════════════════════
@@ -284,84 +398,155 @@ export default function TeamLeadOrdersPage() {
       <div className="lg:hidden" style={{ background: M.bg, fontFamily: M.font, minHeight: '100vh', padding: '8px 20px 7.5rem' }}>
         <div className="flex items-baseline gap-[9px]">
           <h1 style={{ fontSize: 24, fontWeight: 800, color: M.ink, letterSpacing: '-.02em', margin: 0 }}>Заказы команды</h1>
-          <span style={{ fontSize: 14, color: M.muted, fontWeight: 600 }}>{totalCount}</span>
+          <span style={{ fontSize: 14, color: M.muted, fontWeight: 600 }}>{mobileList.length}</span>
         </div>
 
-        <div style={{ marginTop: 14 }} className="space-y-3">
-          {quickFilters}
-          <button
-            type="button"
-            onClick={() => setFiltersOpen(true)}
-            className="w-full min-h-[40px] flex items-center justify-between active:scale-[0.99] transition-transform"
-            style={{ background: '#fff', border: `1px solid ${M.borderAlt}`, borderRadius: 12, padding: '9px 14px', fontSize: 13, fontWeight: 700, color: M.ink }}
-          >
-            <span>Период и продавец</span>
-            <SlidersHorizontal size={15} style={{ color: M.muted }} />
-          </button>
-        </div>
-
-        {filtersOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden">
-            <button
-              type="button"
-              aria-label="Close filters"
-              onClick={() => setFiltersOpen(false)}
-              className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]"
+        <div style={{ marginTop: 14 }} className="space-y-2.5">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: M.muted }} />
+            <input
+              type="text"
+              value={rawSearch}
+              onChange={e => setRawSearch(e.target.value)}
+              placeholder="Номер заказа, комментарий…"
+              className="w-full outline-none"
+              style={{ border: `1px solid ${M.borderAlt}`, background: '#fff', borderRadius: 13, padding: '11px 14px 11px 40px', fontFamily: 'inherit', fontSize: 13.5, color: M.ink }}
             />
-            <div className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-white p-4 pb-[calc(env(safe-area-inset-bottom,0px)+18px)] shadow-[0_-24px_60px_rgba(15,23,42,0.18)]">
-              <div className="mx-auto mb-4 h-1 w-11 rounded-full bg-slate-200" />
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-base font-black text-slate-950">Период и продавец</p>
-                  <p className="text-xs text-slate-400">Диапазон дат и конкретный продавец</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFiltersOpen(false)}
-                  className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-              {advancedFilters}
-              <button
-                type="button"
-                onClick={() => setFiltersOpen(false)}
-                className="mt-4 w-full min-h-[46px] rounded-2xl bg-slate-950 text-white text-sm font-black"
-              >
-                Применить
+            {rawSearch && (
+              <button type="button" onClick={() => setRawSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: M.muted }}>
+                <X size={14} />
               </button>
+            )}
+          </div>
+
+          <div className="scrollbar-none -mx-5 flex flex-nowrap items-center gap-2 overflow-x-auto px-5 py-[5px]">
+            <MobileFilterChip active={periodActive} onClick={() => setMobileSheet('date')} onClear={() => { setDateFrom(thisMonthRange.from); setDateTo(thisMonthRange.to) }}>
+              {periodLabel}
+            </MobileFilterChip>
+            <MobileFilterChip active={statusActive} onClick={() => setMobileSheet('status')} onClear={() => setStatusFilter('all')}>
+              {statusActive ? statusLabel : 'Статус'}
+            </MobileFilterChip>
+            <MobileFilterChip active={sellerActive} onClick={() => setMobileSheet('user')} onClear={() => setSellerId('')}>
+              {userChipLabel}
+            </MobileFilterChip>
+          </div>
+        </div>
+
+        {/* Totals card */}
+        <div style={{ marginTop: 14, background: M.dark, borderRadius: 24, padding: '20px 20px 16px', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', right: -34, top: -34, width: 140, height: 140, borderRadius: '50%', background: 'rgba(99,102,241,.16)' }} />
+          <div style={{ position: 'relative' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: M.darkMuted, letterSpacing: '.04em', textTransform: 'uppercase' }}>Сумма по фильтру</div>
+                <div className="flex items-baseline gap-1.5" style={{ marginTop: 7 }}>
+                  <span style={{ fontSize: 34, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', fontVariantNumeric: 'tabular-nums' }}>{fmtAmount(currentTotals.amount)}</span>
+                  <span style={{ fontSize: 17, fontWeight: 700, color: M.darkSub }}>с</span>
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div style={{ fontSize: 19, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{currentTotals.count}</div>
+                <div style={{ fontSize: 11, color: M.darkMuted, fontWeight: 600 }}>заказов</div>
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: M.darkSub, fontWeight: 600, marginTop: 6 }}>{totalsCaption}</div>
+
+            <div className="scrollbar-none flex gap-2 overflow-x-auto" style={{ margin: '15px -20px -2px', padding: '0 20px 4px' }}>
+              {breakdownTiles.map(tile => {
+                const active = statusFilter === tile.key
+                return (
+                  <button
+                    key={tile.key}
+                    type="button"
+                    onClick={() => setStatusFilter(tile.key)}
+                    className="flex-shrink-0 text-left"
+                    style={{
+                      padding: '9px 12px', borderRadius: 13, minWidth: 104,
+                      background: active ? 'rgba(99,102,241,.18)' : 'rgba(255,255,255,.05)',
+                      border: `1px solid ${active ? 'rgba(129,140,248,.55)' : 'rgba(255,255,255,.08)'}`,
+                    }}
+                  >
+                    <span className="flex items-center gap-[5px]">
+                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: tile.dot }} />
+                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? '#C7D2FE' : M.darkSub }}>{tile.label}</span>
+                    </span>
+                    <span style={{ display: 'block', fontSize: 15, fontWeight: 800, color: tile.count ? '#fff' : '#5B5B72', marginTop: 5, fontVariantNumeric: 'tabular-nums' }}>{fmtAmount(tile.amount)}</span>
+                    <span style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: M.darkMuted, marginTop: 1 }}>{tile.count} шт.</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
-        )}
+        </div>
+
+        <DateRangeBottomSheet
+          open={mobileSheet === 'date'}
+          onClose={() => setMobileSheet(null)}
+          from={dateFrom}
+          to={dateTo}
+          onChange={(range) => { setDateFrom(range.from || thisMonthRange.from); setDateTo(range.to || range.from || thisMonthRange.to) }}
+        />
+
+        <BottomSheet open={mobileSheet === 'status'} onClose={() => setMobileSheet(null)} title="Статус" >
+          <div className="flex flex-wrap gap-[7px] py-1">
+            {SELLER_STATUS_FILTERS.map(f => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => { setStatusFilter(f.key); setMobileSheet(null) }}
+                className="rounded-full px-3.5 py-2 text-[12.5px] font-bold"
+                style={{
+                  color: statusFilter === f.key ? '#fff' : '#76766E',
+                  background: statusFilter === f.key ? M.dark : '#fff',
+                  border: `1px solid ${statusFilter === f.key ? 'transparent' : M.borderAlt}`,
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </BottomSheet>
+
+        <BottomSheet open={mobileSheet === 'user'} onClose={() => setMobileSheet(null)} title="Пользователь">
+          <div className="flex flex-col gap-[7px] py-1">
+            <button
+              type="button"
+              onClick={() => { setSellerId(''); setMobileSheet(null) }}
+              className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left"
+              style={{ background: !sellerId ? '#F4F3FF' : '#fff', border: `1px solid ${!sellerId ? '#C7D2FE' : M.border}` }}
+            >
+              <InitialsAvatar name="Все продавцы" size={26} radius={8} />
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>Все продавцы</span>
+            </button>
+            {sellers.map((u, i) => (
+              <button
+                key={u.id}
+                type="button"
+                onClick={() => { setSellerId(u.id); setMobileSheet(null) }}
+                className="flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left"
+                style={{ background: sellerId === u.id ? '#F4F3FF' : '#fff', border: `1px solid ${sellerId === u.id ? '#C7D2FE' : M.border}` }}
+              >
+                <InitialsAvatar name={u.full_name ?? u.id} size={26} radius={8} palette={i} />
+                <span style={{ fontSize: 13.5, fontWeight: 700, color: M.ink }}>{u.full_name ?? u.id}</span>
+              </button>
+            ))}
+          </div>
+        </BottomSheet>
 
         <div style={{ marginTop: 14 }} className="space-y-2.5">
 
-        {isLoading && (
+        {totalsLoading && (
           <div className="space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="h-28 rounded-2xl bg-slate-100 animate-pulse" />
             ))}
           </div>
         )}
-        {!isLoading && items.length === 0 && (
+        {!totalsLoading && mobileList.length === 0 && (
           <div className="card"><EmptyState icon={<ClipboardList size={24} />} title="Нет заказов" description="Заказы вашей команды появятся здесь." /></div>
         )}
-        {!isLoading && items.map(o => <MobileCard key={o.id} order={o} />)}
-
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-3 mt-4">
-            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">
-              ← Назад
-            </button>
-            <span className="text-xs text-slate-500">{page} / {totalPages}</span>
-            <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}
-              className="px-4 py-2 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40">
-              Вперёд →
-            </button>
-          </div>
-        )}
+        {!totalsLoading && mobileList.map(o => <MobileCard key={o.id} order={o} />)}
         </div>
 
         <OrderDetailBottomSheet
