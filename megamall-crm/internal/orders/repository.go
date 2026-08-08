@@ -526,6 +526,23 @@ func (r *Repository) ListPrepayments(ctx context.Context, orderID uuid.UUID) ([]
 	return rows, nil
 }
 
+// MarkPrepaymentsVerified stamps verified_by/verified_at on every order_prepayments
+// row for orderID that isn't already verified. Dispatcher verification is
+// currently a single order-level action (see Service.VerifyPrepayment), so
+// all outstanding records for the order are verified together.
+func (r *Repository) MarkPrepaymentsVerified(ctx context.Context, tx *gorm.DB, orderID, actorID uuid.UUID, verifiedAt time.Time) error {
+	if err := tx.WithContext(ctx).
+		Model(&OrderPrepayment{}).
+		Where("order_id = ? AND verified_at IS NULL", orderID).
+		Updates(map[string]interface{}{
+			"verified_by": actorID,
+			"verified_at": verifiedAt,
+		}).Error; err != nil {
+		return fmt.Errorf("mark prepayments verified: %w", err)
+	}
+	return nil
+}
+
 // SumPrepayments returns the total verified + unverified prepayment amount for an order.
 func (r *Repository) SumPrepayments(ctx context.Context, tx *gorm.DB, orderID uuid.UUID) (float64, error) {
 	var total float64

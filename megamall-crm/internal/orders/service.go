@@ -1835,6 +1835,13 @@ func (s *Service) VerifyPrepayment(ctx context.Context, actorID uuid.UUID, actor
 			return fmt.Errorf("verify prepayment: %w", err)
 		}
 
+		// Stamp the individual order_prepayments records too, so the
+		// per-record "Ожидает"/"Подтверждена" badge in the drawer matches
+		// the order-level verified status instead of staying stuck pending.
+		if err := s.repo.MarkPrepaymentsVerified(ctx, tx, orderID, actorID, now); err != nil {
+			return err
+		}
+
 		// Timeline entry for the confirm transition.
 		fromStatus := o.Status
 		tl := &OrderTimeline{
