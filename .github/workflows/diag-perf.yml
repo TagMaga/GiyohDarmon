@@ -1,0 +1,106 @@
+name: Diagnose production perf (temporary)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/diag-perf.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: HTML document timing + headers
+        run: |
+          echo "=== HTML document (/) ==="
+          curl -sS -D - -o /tmp/index.html \
+            -w "\nDNS:%{time_namelookup} Connect:%{time_connect} TLS:%{time_appconnect} TTFB:%{time_starttransfer} Total:%{time_total} HTTP:%{http_code} SizeDL:%{size_download} SizeHdr:%{size_header}\n" \
+            --max-time 30 "https://giyohdarmon.tj/"
+          echo
+          echo "=== index.html body (first 4000 chars) ==="
+          head -c 4000 /tmp/index.html
+
+      - name: Google Fonts stylesheet timing (as referenced in index.html head)
+        run: |
+          echo "=== fonts.googleapis.com Inter CSS ==="
+          curl -sS -D - -o /tmp/inter.css \
+            -w "\nDNS:%{time_namelookup} Connect:%{time_connect} TLS:%{time_appconnect} TTFB:%{time_starttransfer} Total:%{time_total} HTTP:%{http_code}\n" \
+            --max-time 30 "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" || true
+
+      - name: Extract and time first JS bundle referenced by index.html
+        run: |
+          set -x
+          MAIN_JS=$(grep -oE '/assets/[A-Za-z0-9._-]+\.js' /tmp/index.html | head -1 || true)
+          if [ -n "$MAIN_JS" ]; then
+            curl -sS -D - -o /tmp/main.js \
+              -w "\nDNS:%{time_namelookup} Connect:%{time_connect} TLS:%{time_appconnect} TTFB:%{time_starttransfer} Total:%{time_total} HTTP:%{http_code} SizeDL:%{size_download}\n" \
+              --max-time 30 "https://giyohdarmon.tj${MAIN_JS}"
+          fi
+
+      - name: Full DNS record set for giyohdarmon.tj (via 1.1.1.1)
+        run: |
+          for rtype in NS A AAAA MX TXT CAA SOA; do
+            echo "=== $rtype (via 1.1.1.1) ==="
+            dig @1.1.1.1 "$rtype" giyohdarmon.tj +time=5 +tries=2 +noall +answer +authority
+            echo
+          done
+          echo "=== CNAME www.giyohdarmon.tj (via 1.1.1.1) ==="
+          dig @1.1.1.1 A www.giyohdarmon.tj +time=5 +tries=2 +noall +answer
+
+      - name: Repeated independent verification of ns9 vs ns10 (5 trials each, 3 public resolvers for NS discovery)
+        run: |
+          echo "=== NS delegation, cross-checked against 3 independent public resolvers ==="
+          for resolver in 1.1.1.1 8.8.8.8 9.9.9.9; do
+            echo "--- NS via $resolver ---"
+            dig "@$resolver" NS giyohdarmon.tj +time=5 +tries=2 +short
+          done
+
+          echo
+          echo "=== ns9.ismtj.co: 5 independent trials ==="
+          for i in 1 2 3 4 5; do
+            echo "--- trial $i ---"
+            /usr/bin/time -f "wall_clock=%e s" dig @ns9.ismtj.co A giyohdarmon.tj +time=5 +tries=1 +stats 2>&1 | grep -E "wall_clock|Query time|status|ANSWER SECTION|^giyohdarmon|timed out|no servers"
+          done
+
+          echo
+          echo "=== ns10.ismtj.co: 5 independent trials ==="
+          for i in 1 2 3 4 5; do
+            echo "--- trial $i ---"
+            /usr/bin/time -f "wall_clock=%e s" dig @ns10.ismtj.co A giyohdarmon.tj +time=5 +tries=1 +stats 2>&1 | grep -E "wall_clock|Query time|status|ANSWER SECTION|^giyohdarmon|timed out|no servers"
+          done
+
+          echo
+          echo "=== Does ns10.ismtj.co even resolve to an IP, and is the IP reachable at all? ==="
+          dig @1.1.1.1 A ns10.ismtj.co +short
+          NS10_IP=$(dig @1.1.1.1 A ns10.ismtj.co +short | head -1)
+          echo "ns10.ismtj.co -> $NS10_IP"
+          if [ -n "$NS10_IP" ]; then
+            echo "--- TCP port 53 reachability to $NS10_IP ---"
+            (echo > /dev/tcp/$NS10_IP/53) 2>&1 && echo "TCP:53 OPEN" || echo "TCP:53 UNREACHABLE/REFUSED/TIMEOUT"
+            echo "--- ping (3 packets) ---"
+            ping -c 3 -W 2 "$NS10_IP" || echo "(ping failed/blocked)"
+          else
+            echo "ns10.ismtj.co has NO A record at all via 1.1.1.1"
+          fi
+
+          echo
+          echo "=== ns9.ismtj.co IP + reachability, for comparison ==="
+          dig @1.1.1.1 A ns9.ismtj.co +short
+
+      - name: API readiness + auth-adjacent endpoints timing
+        run: |
+          echo "=== /api/v1/ready ==="
+          curl -sS -D - -o /dev/null \
+            -w "\nTTFB:%{time_starttransfer} Total:%{time_total} HTTP:%{http_code}\n" \
+            --max-time 15 "https://giyohdarmon.tj/api/v1/ready" || true
+
+      - name: Compression check (Accept-Encoding gzip)
+        run: |
+          echo "=== HTML with Accept-Encoding: gzip ==="
+          curl -sS -D - -o /dev/null -H "Accept-Encoding: gzip, br" \
+            -w "\nTotal:%{time_total} HTTP:%{http_code} SizeDL:%{size_download}\n" \
+            --max-time 30 "https://giyohdarmon.tj/"
