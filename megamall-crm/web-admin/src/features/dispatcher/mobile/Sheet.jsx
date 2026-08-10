@@ -1,15 +1,49 @@
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { C } from './theme'
+import { lockScroll, unlockScroll } from '../../../shared/utils/scrollLock'
 
 /**
  * Sheet — bottom-sheet shell shared by every mobile dispatcher overlay
  * (order detail, assign/cancel/schedule, create order, courier detail,
  * fleet, profile). Matches the design's backdrop + drag-handle + slide-in.
+ *
+ * `zIndex` stays a caller-supplied prop (default 40, callers range 40-46) —
+ * that's how nested dispatcher sheets (e.g. an action sheet over an order
+ * detail sheet) deliberately stack; not collapsed to a single shared value.
  */
 export default function Sheet({ open, onClose, maxHeight = '86%', zIndex = 40, children }) {
+  const triggerRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  // Lock body scroll while open — previously missing, so the page behind
+  // the sheet could still scroll. Ref-counted since dispatcher sheets nest
+  // (see the zIndex prop above).
+  useEffect(() => {
+    if (!open) return
+    lockScroll()
+    return unlockScroll
+  }, [open])
+
+  // Return focus to whatever triggered the sheet once it closes
+  useEffect(() => {
+    if (open) {
+      triggerRef.current = document.activeElement
+    } else if (triggerRef.current instanceof HTMLElement) {
+      triggerRef.current.focus()
+      triggerRef.current = null
+    }
+  }, [open])
+
   if (!open) return null
   return createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex }} role="dialog" aria-modal="true">
       <div
         onClick={onClose}
         style={{ position: 'absolute', inset: 0, background: 'rgba(28,28,26,.4)', animation: 'dmFade .2s ease' }}
