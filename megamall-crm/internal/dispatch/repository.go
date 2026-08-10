@@ -154,7 +154,7 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 				-- GetDashboard cash_expected comment for the full story.
 				SELECT SUM(
 					ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
-					- CASE WHEN ch2.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch2.id)
+					- CASE WHEN ch2.source = 'manual'
 					       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
 				)
 				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
@@ -376,7 +376,7 @@ func (r *Repository) GetCashSettlement(ctx context.Context, filter CashSettlemen
 				), 0) + COALESCE((
 					SELECT SUM(
 						ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
-						- CASE WHEN ch2.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch2.id)
+						- CASE WHEN ch2.source = 'manual'
 						       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
 					)
 					FROM cash_handovers ch2 WHERE ch2.courier_id = o.courier_id AND ch2.status = 'confirmed'

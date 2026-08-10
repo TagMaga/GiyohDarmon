@@ -54,9 +54,23 @@ type CashHandover struct {
 	AttachmentsJSON   *string        `gorm:"type:text;column:attachments_json"`
 	ConfirmedAt       *time.Time     `gorm:"column:confirmed_at"`
 	CreatedAt         time.Time      `gorm:"autoCreateTime"`
+	// Source distinguishes a courier-app SubmitHandover (always either has
+	// linked cash_handover_orders rows, or is a zero-total_to_return
+	// carried-over-debt paydown that needs no order links to be correct)
+	// from the owner's manual logistics.CreateHandover entry point (never
+	// linked to specific orders). Debt formulas across the app use this,
+	// not link presence, to decide whether a confirmed handover's amount
+	// needs crediting on top of its own shortfall term — see
+	// internal/logistics/repository.go's GetDashboard cash_expected comment.
+	Source string `gorm:"column:source;not null;default:courier_app"`
 
 	Orders []CashHandoverOrder `gorm:"foreignKey:HandoverID;references:ID"`
 }
+
+const (
+	HandoverSourceCourierApp = "courier_app"
+	HandoverSourceManual     = "manual"
+)
 
 func (CashHandover) TableName() string { return "cash_handovers" }
 

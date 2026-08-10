@@ -117,7 +117,7 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 			), 0) + (
 				SELECT COALESCE(SUM(
 					ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
-					- CASE WHEN ch2.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch2.id)
+					- CASE WHEN ch2.source = 'manual'
 					       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
 				), 0)
 				FROM cash_handovers ch2 WHERE ch2.status = 'confirmed'
@@ -133,7 +133,7 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 			), 0) + (
 				SELECT COALESCE(SUM(
 					ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
-					- CASE WHEN ch2.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch2.id)
+					- CASE WHEN ch2.source = 'manual'
 					       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
 				), 0)
 				FROM cash_handovers ch2 WHERE ch2.status = 'confirmed'
@@ -299,7 +299,7 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 				-- for them above — see the cash_expected comment in GetDashboard.
 				SELECT SUM(
 					ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
-					- CASE WHEN ch2.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch2.id)
+					- CASE WHEN ch2.source = 'manual'
 					       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
 				)
 				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
@@ -382,7 +382,7 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 				-- for them above — see the cash_expected comment in GetDashboard.
 				SELECT SUM(
 					ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
-					- CASE WHEN ch2.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch2.id)
+					- CASE WHEN ch2.source = 'manual'
 					       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
 				)
 				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
@@ -510,7 +510,7 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 				ch.courier_id,
 				SUM(
 					ch.total_to_return - COALESCE(ch.actual_returned, ch.total_to_return)
-					- CASE WHEN ch.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch.id)
+					- CASE WHEN ch.source = 'manual'
 					       THEN COALESCE(ch.actual_returned, ch.total_to_return) ELSE 0 END
 				) AS net_shortfall
 			FROM cash_handovers ch
@@ -675,7 +675,7 @@ func (r *Repository) GetCourier(ctx context.Context, courierID uuid.UUID) (*Cour
 				-- for them above — see the cash_expected comment in GetDashboard.
 				SELECT SUM(
 					ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
-					- CASE WHEN ch2.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch2.id)
+					- CASE WHEN ch2.source = 'manual'
 					       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
 				)
 				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
@@ -996,10 +996,15 @@ func (r *Repository) ListHandovers(ctx context.Context, p pagination.Params, cou
 
 func (r *Repository) CreateHandover(ctx context.Context, req CreateHandoverReq) (*HandoverListRow, error) {
 	id := uuid.New()
+	// source='manual': this endpoint accepts just courier + amount, with no
+	// order selection — never linked to specific orders in cash_handover_orders.
+	// Every debt formula in the app checks this column (not link presence,
+	// which the courier app's own legitimate zero-eligible-orders paydown
+	// handovers can also lack) to know this entry needs crediting once confirmed.
 	err := r.db.WithContext(ctx).Exec(`
 		INSERT INTO cash_handovers
-			(id, courier_id, total_collected, total_delivery_fees, total_to_return, comment, status)
-		VALUES (?, ?, ?, ?, ?, ?, 'pending')
+			(id, courier_id, total_collected, total_delivery_fees, total_to_return, comment, status, source)
+		VALUES (?, ?, ?, ?, ?, ?, 'pending', 'manual')
 	`, id, req.CourierID, req.TotalCollected, req.TotalDeliveryFees, req.TotalToReturn, req.Comment).Error
 	if err != nil {
 		return nil, fmt.Errorf("create handover: %w", err)

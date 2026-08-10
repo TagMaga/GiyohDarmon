@@ -906,7 +906,7 @@ func (r *Repository) GetHandoverPaymentLimit(tx *gorm.DB, ctx context.Context, c
 			-- repository's GetDashboard cash_expected comment for the full story.
 			SELECT COALESCE(SUM(
 				total_to_return - COALESCE(actual_returned, total_to_return)
-				- CASE WHEN cash_handovers.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = cash_handovers.id)
+				- CASE WHEN cash_handovers.source = 'manual'
 				       THEN COALESCE(actual_returned, total_to_return) ELSE 0 END
 			), 0) AS amount
 			FROM cash_handovers
@@ -1116,7 +1116,7 @@ func (r *Repository) GetCashSummary(ctx context.Context, courierID uuid.UUID) (*
 	if err := r.db.WithContext(ctx).Raw(`
 		SELECT COALESCE(SUM(
 			total_to_return - COALESCE(actual_returned, total_to_return)
-			- CASE WHEN cash_handovers.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = cash_handovers.id)
+			- CASE WHEN cash_handovers.source = 'manual'
 			       THEN COALESCE(actual_returned, total_to_return) ELSE 0 END
 		), 0)
 		FROM cash_handovers
@@ -1282,7 +1282,7 @@ func (r *Repository) ListCouriersWithOutstandingCash(ctx context.Context) ([]Cou
 		LEFT JOIN (
 			SELECT courier_id, SUM(
 				total_to_return - COALESCE(actual_returned, total_to_return)
-				- CASE WHEN cash_handovers.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = cash_handovers.id)
+				- CASE WHEN cash_handovers.source = 'manual'
 				       THEN COALESCE(actual_returned, total_to_return) ELSE 0 END
 			) AS amount
 			FROM cash_handovers
