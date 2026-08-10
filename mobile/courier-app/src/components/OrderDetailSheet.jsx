@@ -407,7 +407,7 @@ export function OrderDetailSheet({
         {/* ── Sub-flows ──────────────────────────────────────────── */}
         {step !== 'detail' && (
           <View>
-            {step === 'menu' && PROBLEM_OPTIONS.map(opt => (
+            {step === 'menu' && PROBLEM_OPTIONS.filter(opt => opt.key !== 'cancel' || status === 'in_delivery').map(opt => (
               <TouchableOpacity key={opt.key} style={ps.optRow} onPress={() => setStep(opt.key)}>
                 <View style={ps.optIcon}><Text style={{ fontSize: 22 }}>{opt.icon}</Text></View>
                 <View style={{ flex: 1 }}>
