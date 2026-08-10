@@ -30,6 +30,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react'
 import BottomSheet from '../../../shared/components/BottomSheet'
+import FiltersOverflowPanel from '../../../shared/components/FiltersOverflowPanel'
 import { appToday } from '../../../shared/utils/date'
 import { INCOME_EVENT_TYPES, EXPENSE_EVENT_TYPES, EXPENSE_CATEGORY_LABEL } from '../../hr/utils/hrHelpers'
 
@@ -471,6 +472,17 @@ export default function FinanceFilterBar({
     onUserChange('')
     onOrderChange('')
   }
+  const activeFilterCount = [periodActive, Boolean(direction), Boolean(eventType), amountOn, Boolean(userSearch), Boolean(orderSearch)].filter(Boolean).length
+  const [overflowOpen, setOverflowOpen] = useState(false)
+  const overflowSections = [
+    { key: 'period', label: 'Период', valueLabel: periodActive ? periodLabel : null, active: periodActive, onSelect: () => openSheet('period') },
+    { key: 'income', label: 'Пополнение', valueLabel: direction === 'income' ? 'включено' : null, active: direction === 'income', onSelect: () => onDirectionChange(direction === 'income' ? '' : 'income') },
+    { key: 'expense', label: 'Списание', valueLabel: direction === 'expense' ? 'включено' : null, active: direction === 'expense', onSelect: () => onDirectionChange(direction === 'expense' ? '' : 'expense') },
+    { key: 'type', label: 'Тип операции', valueLabel: eventType ? selectedTypeLabel : null, active: Boolean(eventType), onSelect: () => openSheet('type') },
+    { key: 'amount', label: 'Сумма', valueLabel: amountOn ? (minAmount && maxAmount ? `${minAmount}–${maxAmount}` : minAmount ? `от ${minAmount}` : `до ${maxAmount}`) : null, active: amountOn, onSelect: () => openSheet('amount') },
+    { key: 'user', label: 'Пользователь', valueLabel: userSearch || null, active: Boolean(userSearch), onSelect: () => openSheet('user') },
+    { key: 'order', label: 'Заказ', valueLabel: orderSearch || null, active: Boolean(orderSearch), onSelect: () => openSheet('order') },
+  ]
 
   return (
     <div className="relative">
@@ -523,6 +535,10 @@ export default function FinanceFilterBar({
             </Chip>
           )
         })}
+
+        <Chip active={activeFilterCount > 0} onClick={() => setOverflowOpen(true)}>
+          {activeFilterCount > 0 ? `Фильтры · ${activeFilterCount}` : 'Ещё фильтры'}
+        </Chip>
       </div>
 
       <BottomSheet open={sheet === 'period'} onClose={closeSheet} title="Выбор периода" footer={CTA}>
@@ -796,6 +812,10 @@ export default function FinanceFilterBar({
           )}
         </div>
 
+        <DesktopTrigger active={activeFilterCount > 0} onClick={() => setOverflowOpen(true)} chevron={false}>
+          {activeFilterCount > 0 ? `Фильтры · ${activeFilterCount}` : 'Ещё фильтры'}
+        </DesktopTrigger>
+
         {anyActive && (
           <button
             type="button"
@@ -807,6 +827,13 @@ export default function FinanceFilterBar({
           </button>
         )}
       </div>
+
+      <FiltersOverflowPanel
+        open={overflowOpen}
+        onClose={() => setOverflowOpen(false)}
+        sections={overflowSections}
+        onResetAll={resetAll}
+      />
     </div>
   )
 }
