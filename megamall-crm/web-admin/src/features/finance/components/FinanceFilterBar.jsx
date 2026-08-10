@@ -125,9 +125,9 @@ const WEEKDAYS = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС']
 const ACCENT = '#4F46E5' // indigo-600, matches the app's existing accent
 
 const CHIP_BASE =
-  'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold transition duration-150 font-sans active:scale-[0.94]'
-const CHIP_OFF = `${CHIP_BASE} bg-slate-100 text-slate-600 hover:bg-slate-200`
-const CHIP_ON = `${CHIP_BASE} bg-indigo-600 text-white hover:bg-indigo-700`
+  'inline-flex h-11 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-xs font-semibold transition duration-150 font-sans active:scale-[0.94]'
+const CHIP_OFF = `${CHIP_BASE} border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200`
+const CHIP_ON = `${CHIP_BASE} border-[#C7D2FE] bg-[#EEF2FF] text-[#4338CA] hover:bg-[#E0E7FF]`
 
 function Chip({ flipKey, active, open, onClick, onClear, chevron, children }) {
   return (
@@ -139,7 +139,7 @@ function Chip({ flipKey, active, open, onClick, onClear, chevron, children }) {
           aria-label="Сбросить"
           onClick={(e) => { e.stopPropagation(); onClear() }}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onClear() } }}
-          className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full hover:bg-white/20 animate-[chipPopIn_180ms_cubic-bezier(.34,1.56,.64,1)]"
+          className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full hover:bg-[#C7D2FE]/40 animate-[chipPopIn_180ms_cubic-bezier(.34,1.56,.64,1)]"
         >
           <X size={11} />
         </span>

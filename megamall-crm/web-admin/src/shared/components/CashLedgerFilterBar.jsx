@@ -5,9 +5,13 @@
  * with the actual control; only one popover is open at a time.
  */
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
 import PeriodRangeFilter from './PeriodRangeFilter'
+import SharedFilterChip from './FilterChip'
 
+// Local wrapper: keeps this file's self-managed-popover behavior (open state,
+// outside-click to close, render-prop children for the popover body) while
+// using the canonical shared FilterChip as the trigger button, so the visual
+// style (44px target, unified active tone) stays in one place.
 function FilterChip({ label, active, children, mobile = false }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -21,20 +25,15 @@ function FilterChip({ label, active, children, mobile = false }) {
     return () => document.removeEventListener('mousedown', onDocClick)
   }, [open])
 
-  const base = mobile
-    ? 'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold transition duration-150 active:scale-[0.94]'
-    : 'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold transition-colors'
-
-  const cls = mobile
-    ? `${base} ${active ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`
-    : `${base} ${active ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`
-
   return (
     <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOpen((o) => !o)} className={cls}>
-        <span className="max-w-[160px] truncate">{label}</span>
-        <ChevronDown size={13} className={`opacity-50 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-      </button>
+      <SharedFilterChip
+        label={label}
+        active={active}
+        onClick={() => setOpen((o) => !o)}
+        ariaExpanded={open}
+        maxWidthClass="max-w-[160px]"
+      />
       {open && (
         <div className="absolute z-20 mt-2 w-64 rounded-xl border border-slate-100 bg-white p-3 shadow-lg">
           {children(() => setOpen(false))}
