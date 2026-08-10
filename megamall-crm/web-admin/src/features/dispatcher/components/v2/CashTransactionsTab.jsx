@@ -57,7 +57,7 @@ export default function CashTransactionsTab() {
     )
   }
   if (transactions.length === 0) {
-    return <EmptyState title="Нет транзакций" subtitle="Транзакции появятся здесь" />
+    return <EmptyState title="Нет транзакций" description="Транзакции появятся здесь" />
   }
 
   return (

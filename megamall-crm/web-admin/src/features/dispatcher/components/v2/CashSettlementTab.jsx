@@ -69,7 +69,7 @@ export default function CashSettlementTab() {
     )
   }
   if (couriers.length === 0) {
-    return <EmptyState title="Нет данных" subtitle="Информация о расчётах появится здесь" />
+    return <EmptyState title="Нет данных" description="Информация о расчётах появится здесь" />
   }
 
   return (
