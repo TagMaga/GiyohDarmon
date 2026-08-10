@@ -738,7 +738,7 @@ func (r *Repository) ClaimOrder(ctx context.Context, courierID, orderID uuid.UUI
 		}
 
 		// Enforce payout profile + city service, then freeze the courier payout.
-		payout, err := logistics_settings.ResolveAssignmentPayout(tx, courierID, o.CityID, o.DeliveryMethod)
+		payout, err := logistics_settings.ResolveAssignmentPayout(tx, courierID, o.CityID, o.DeliveryMethod, o.TotalAmount)
 		if err != nil {
 			return err
 		}
@@ -900,7 +900,15 @@ func (r *Repository) GetHandoverPaymentLimit(tx *gorm.DB, ctx context.Context, c
 			  )
 		),
 		confirmed_residue AS (
-			SELECT COALESCE(SUM(total_to_return - COALESCE(actual_returned, total_to_return)), 0) AS amount
+			-- Unlinked handovers (owner's manual entry, no order links) credit
+			-- their full amount here, since order_debt above never excluded
+			-- an order for them (nothing to exclude by) — see logistics
+			-- repository's GetDashboard cash_expected comment for the full story.
+			SELECT COALESCE(SUM(
+				total_to_return - COALESCE(actual_returned, total_to_return)
+				- CASE WHEN cash_handovers.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = cash_handovers.id)
+				       THEN COALESCE(actual_returned, total_to_return) ELSE 0 END
+			), 0) AS amount
 			FROM cash_handovers
 			WHERE courier_id = ?
 			  AND status = 'confirmed'
@@ -935,6 +943,16 @@ func (r *Repository) GetHandoverPaymentLimit(tx *gorm.DB, ctx context.Context, c
 
 func (r *Repository) FindEligibleHandoverOrders(tx *gorm.DB, ctx context.Context, courierID uuid.UUID) ([]orders.Order, error) {
 	var rows []orders.Order
+	// 'disputed' must stay excluded alongside pending/confirmed: ConfirmHandover
+	// moves a handover to disputed (not rejected) when the dispatcher's
+	// actual_returned doesn't match total_to_return by more than 1 cent — a
+	// normal, expected outcome, not a rare edge case. Leaving it out of this
+	// list let a courier resubmit the same disputed orders into a brand new
+	// handover before the dispatcher resolved the dispute, linking the same
+	// order to two open handovers and risking double-counting its cash once
+	// both are eventually settled. Only 'rejected' correctly makes orders
+	// eligible again (see migration 00032's "allows re-handover after a
+	// rejected handover").
 	err := tx.WithContext(ctx).
 		Table("orders").
 		Where(`
@@ -945,7 +963,7 @@ func (r *Repository) FindEligibleHandoverOrders(tx *gorm.DB, ctx context.Context
 				SELECT cho.order_id
 				FROM cash_handover_orders cho
 				JOIN cash_handovers ch ON ch.id = cho.handover_id
-				WHERE ch.status IN ('pending', 'confirmed')
+				WHERE ch.status IN ('pending', 'confirmed', 'disputed')
 			)
 		`, courierID, string(orders.StatusDelivered)).
 		Find(&rows).Error
@@ -1096,7 +1114,11 @@ func (r *Repository) GetCashSummary(ctx context.Context, courierID uuid.UUID) (*
 	// (same COALESCE rule the owner dashboard uses), i.e. zero difference.
 	var shortfall float64
 	if err := r.db.WithContext(ctx).Raw(`
-		SELECT COALESCE(SUM(total_to_return - COALESCE(actual_returned, total_to_return)), 0)
+		SELECT COALESCE(SUM(
+			total_to_return - COALESCE(actual_returned, total_to_return)
+			- CASE WHEN cash_handovers.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = cash_handovers.id)
+			       THEN COALESCE(actual_returned, total_to_return) ELSE 0 END
+		), 0)
 		FROM cash_handovers
 		WHERE courier_id = ?
 		  AND status = 'confirmed'
@@ -1258,7 +1280,11 @@ func (r *Repository) ListCouriersWithOutstandingCash(ctx context.Context) ([]Cou
 			GROUP BY courier_id
 		) pending
 		LEFT JOIN (
-			SELECT courier_id, SUM(total_to_return - COALESCE(actual_returned, total_to_return)) AS amount
+			SELECT courier_id, SUM(
+				total_to_return - COALESCE(actual_returned, total_to_return)
+				- CASE WHEN cash_handovers.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = cash_handovers.id)
+				       THEN COALESCE(actual_returned, total_to_return) ELSE 0 END
+			) AS amount
 			FROM cash_handovers
 			WHERE status = 'confirmed'
 			GROUP BY courier_id

@@ -72,8 +72,17 @@ func CourierProfileStatus(db *gorm.DB, courierID uuid.UUID) (exists bool, active
 //   - profile must be active (else: courier inactive)
 //   - courier must serve the order's city (skipped when cityID is nil, e.g. legacy)
 //
+// orderAmount must be the order's real total_amount (known at
+// creation, well before assignment — orders can only be assigned once
+// confirmed). Passing 0 here previously caused range-based
+// courier_tariff_rules to always match the lowest bracket regardless of the
+// order's real value (CourierTariffRule.Resolve treats amount=0 as falling
+// inside any bracket whose AmountFrom is 0, silently returning that
+// bracket's fixed payout instead of falling through) — every order got
+// paid at the lowest tariff. Callers must pass the order's actual amount.
+//
 // Returns the resolved payout (normal/fast) on success.
-func ResolveAssignmentPayout(db *gorm.DB, courierID uuid.UUID, cityID *uuid.UUID, method string) (float64, error) {
+func ResolveAssignmentPayout(db *gorm.DB, courierID uuid.UUID, cityID *uuid.UUID, method string, orderAmount float64) (float64, error) {
 	// Guard 1: courier user account must be active (dispatcher toggle).
 	var userActive bool
 	if err := db.Raw("SELECT is_active FROM users WHERE id = ? AND deleted_at IS NULL", courierID).Scan(&userActive).Error; err != nil {
@@ -117,9 +126,7 @@ func ResolveAssignmentPayout(db *gorm.DB, courierID uuid.UUID, cityID *uuid.UUID
 			return 0, apperrors.BadRequest("курьер не обслуживает город этого заказа")
 		}
 	}
-	// At assignment time we do not yet know the order amount, so we pass 0.
-	// The tariff resolver falls through to the flat profile rate when amount is 0.
-	return ResolveCourierPayout(db, courierID, method, 0)
+	return ResolveCourierPayout(db, courierID, method, orderAmount)
 }
 
 // courierHasTariffRules reports whether a courier has any range-based tariff

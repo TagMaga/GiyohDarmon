@@ -99,7 +99,15 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 		SELECT
 			-- all unhandled delivered cash (expected = not in confirmed handover),
 			-- plus what confirmed handovers still fell short by (net of
-			-- overpayments) — that money is still out with the couriers
+			-- overpayments) — that money is still out with the couriers.
+			-- The "- unlinked credit" term covers handovers created without
+			-- any order links (the owner's manual cash-handover entry point,
+			-- internal/logistics CreateHandover, never links specific
+			-- orders) — without it, a confirmed manual handover reduced
+			-- nothing here: its orders were never excluded from the SUM
+			-- above (nothing to exclude by), and its own shortfall term is
+			-- zero whenever actual_returned matches total_to_return, so the
+			-- recorded cash silently vanished from every debt figure.
 			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.id NOT IN (
 					SELECT cho.order_id FROM cash_handover_orders cho
@@ -107,11 +115,15 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 					WHERE ch.status = 'confirmed'
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
 			), 0) + (
-				SELECT COALESCE(SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)), 0)
+				SELECT COALESCE(SUM(
+					ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
+					- CASE WHEN ch2.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch2.id)
+					       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
+				), 0)
 				FROM cash_handovers ch2 WHERE ch2.status = 'confirmed'
 			)) AS cash_expected,
 			-- cash actually in circulation (not in pending OR confirmed),
-			-- plus the same confirmed-handover net shortfall
+			-- plus the same confirmed-handover net shortfall (unlinked credit included)
 			GREATEST(0, COALESCE(SUM(
 				CASE WHEN o.id NOT IN (
 					SELECT cho.order_id FROM cash_handover_orders cho
@@ -119,7 +131,11 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 					WHERE ch.status IN ('pending','confirmed')
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
 			), 0) + (
-				SELECT COALESCE(SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)), 0)
+				SELECT COALESCE(SUM(
+					ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
+					- CASE WHEN ch2.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch2.id)
+					       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
+				), 0)
 				FROM cash_handovers ch2 WHERE ch2.status = 'confirmed'
 			)) AS cash_in_circulation
 		FROM orders o
@@ -277,8 +293,15 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 					WHERE ch.status IN ('pending','confirmed')
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
 			), 0) + COALESCE((
-				-- confirmed-handover net shortfall — see ListCouriers' shortfall_cte
-				SELECT SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return))
+				-- confirmed-handover net shortfall — see ListCouriers' shortfall_cte.
+				-- Unlinked handovers (owner's manual entry, no order links)
+				-- credit their full amount here since no order was excluded
+				-- for them above — see the cash_expected comment in GetDashboard.
+				SELECT SUM(
+					ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
+					- CASE WHEN ch2.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch2.id)
+					       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
+				)
 				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
 			), 0)) AS cash_debt
 		FROM users u
@@ -353,8 +376,15 @@ func (r *Repository) GetDashboard(ctx context.Context) (*DashboardResponse, erro
 					WHERE ch.status IN ('pending','confirmed')
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
 			), 0) + COALESCE((
-				-- confirmed-handover net shortfall — see ListCouriers' shortfall_cte
-				SELECT SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return))
+				-- confirmed-handover net shortfall — see ListCouriers' shortfall_cte.
+				-- Unlinked handovers (owner's manual entry, no order links)
+				-- credit their full amount here since no order was excluded
+				-- for them above — see the cash_expected comment in GetDashboard.
+				SELECT SUM(
+					ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
+					- CASE WHEN ch2.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch2.id)
+					       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
+				)
 				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
 			), 0)) AS cash_debt
 		FROM users u
@@ -472,9 +502,17 @@ func (r *Repository) ListCouriers(ctx context.Context) ([]CourierListRow, error)
 		-- cash summary (internal/courier GetCashSummary) so both sides
 		-- report the same debt.
 		shortfall_cte AS (
+			-- Unlinked handovers (owner's manual entry point, no order links)
+			-- credit their full amount here — see the cash_expected comment
+			-- in GetDashboard for why: no order was excluded for them, so
+			-- without this term their recorded cash never reduces debt_cte.
 			SELECT
 				ch.courier_id,
-				SUM(ch.total_to_return - COALESCE(ch.actual_returned, ch.total_to_return)) AS net_shortfall
+				SUM(
+					ch.total_to_return - COALESCE(ch.actual_returned, ch.total_to_return)
+					- CASE WHEN ch.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch.id)
+					       THEN COALESCE(ch.actual_returned, ch.total_to_return) ELSE 0 END
+				) AS net_shortfall
 			FROM cash_handovers ch
 			WHERE ch.status = 'confirmed'
 			GROUP BY ch.courier_id
@@ -631,8 +669,15 @@ func (r *Repository) GetCourier(ctx context.Context, courierID uuid.UUID) (*Cour
 					WHERE ch.status IN ('pending','confirmed')
 				) THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount,0)) ELSE 0 END
 			), 0) + COALESCE((
-				-- confirmed-handover net shortfall — see ListCouriers' shortfall_cte
-				SELECT SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return))
+				-- confirmed-handover net shortfall — see ListCouriers' shortfall_cte.
+				-- Unlinked handovers (owner's manual entry, no order links)
+				-- credit their full amount here since no order was excluded
+				-- for them above — see the cash_expected comment in GetDashboard.
+				SELECT SUM(
+					ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
+					- CASE WHEN ch2.total_to_return > 0 AND NOT EXISTS (SELECT 1 FROM cash_handover_orders cho2 WHERE cho2.handover_id = ch2.id)
+					       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
+				)
 				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
 			), 0)) AS cash_debt,
 			COALESCE((

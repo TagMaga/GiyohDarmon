@@ -1897,6 +1897,23 @@ func (s *Service) RejectPrepayment(ctx context.Context, actorID uuid.UUID, actor
 			return apperrors.BadRequest("order prepayment is not pending verification")
 		}
 
+		// Reject every still-outstanding order_prepayments row and reverse
+		// its amount out of orders.prepayment_amount in the same
+		// transaction — otherwise the courier keeps being told to collect
+		// less than the real order total, permanently undercollecting the
+		// rejected claim's amount with no compensating control anywhere
+		// else in the system.
+		now := time.Now().UTC()
+		rejectedAmount, err := s.repo.MarkPrepaymentsRejected(ctx, tx, orderID, actorID, req.Reason, now)
+		if err != nil {
+			return err
+		}
+		if rejectedAmount > 0 {
+			if err := s.repo.UpdatePrepaymentAmount(ctx, tx, orderID, -rejectedAmount); err != nil {
+				return err
+			}
+		}
+
 		updates := map[string]interface{}{
 			"prepayment_status":           PrepaymentStatusRejected,
 			"prepayment_rejection_reason": req.Reason,
@@ -1910,7 +1927,7 @@ func (s *Service) RejectPrepayment(ctx context.Context, actorID uuid.UUID, actor
 			Action:     "reject_prepayment",
 			EntityType: "order",
 			EntityID:   &orderID,
-			AfterState: map[string]interface{}{"reason": req.Reason},
+			AfterState: map[string]interface{}{"reason": req.Reason, "reversed_amount": rejectedAmount},
 		})
 
 		loaded, err := s.repo.GetByIDForUpdate(tx, ctx, orderID)

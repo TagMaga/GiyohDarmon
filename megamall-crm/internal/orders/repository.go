@@ -527,13 +527,16 @@ func (r *Repository) ListPrepayments(ctx context.Context, orderID uuid.UUID) ([]
 }
 
 // MarkPrepaymentsVerified stamps verified_by/verified_at on every order_prepayments
-// row for orderID that isn't already verified. Dispatcher verification is
-// currently a single order-level action (see Service.VerifyPrepayment), so
-// all outstanding records for the order are verified together.
+// row for orderID that isn't already verified or rejected. Dispatcher
+// verification is currently a single order-level action (see
+// Service.VerifyPrepayment), so all outstanding records for the order are
+// verified together. Rejected rows are excluded so a row that was already
+// rejected (and whose amount was already reversed out of
+// orders.prepayment_amount) can never later be mis-stamped as verified.
 func (r *Repository) MarkPrepaymentsVerified(ctx context.Context, tx *gorm.DB, orderID, actorID uuid.UUID, verifiedAt time.Time) error {
 	if err := tx.WithContext(ctx).
 		Model(&OrderPrepayment{}).
-		Where("order_id = ? AND verified_at IS NULL", orderID).
+		Where("order_id = ? AND verified_at IS NULL AND rejected_at IS NULL", orderID).
 		Updates(map[string]interface{}{
 			"verified_by": actorID,
 			"verified_at": verifiedAt,
@@ -543,12 +546,43 @@ func (r *Repository) MarkPrepaymentsVerified(ctx context.Context, tx *gorm.DB, o
 	return nil
 }
 
-// SumPrepayments returns the total verified + unverified prepayment amount for an order.
+// MarkPrepaymentsRejected stamps rejected_by/rejected_at/rejection_reason on
+// every order_prepayments row for orderID that is still outstanding (not
+// already verified or rejected). Mirrors MarkPrepaymentsVerified's
+// all-outstanding-together semantics. Returns the summed amount of the rows
+// it just rejected, which the caller must subtract from
+// orders.prepayment_amount in the same transaction.
+func (r *Repository) MarkPrepaymentsRejected(ctx context.Context, tx *gorm.DB, orderID, actorID uuid.UUID, reason string, rejectedAt time.Time) (float64, error) {
+	var rejected float64
+	if err := tx.WithContext(ctx).
+		Model(&OrderPrepayment{}).
+		Where("order_id = ? AND verified_at IS NULL AND rejected_at IS NULL", orderID).
+		Select("COALESCE(SUM(amount), 0)").
+		Scan(&rejected).Error; err != nil {
+		return 0, fmt.Errorf("sum pending prepayments: %w", err)
+	}
+	if err := tx.WithContext(ctx).
+		Model(&OrderPrepayment{}).
+		Where("order_id = ? AND verified_at IS NULL AND rejected_at IS NULL", orderID).
+		Updates(map[string]interface{}{
+			"rejected_by":      actorID,
+			"rejected_at":      rejectedAt,
+			"rejection_reason": reason,
+		}).Error; err != nil {
+		return 0, fmt.Errorf("mark prepayments rejected: %w", err)
+	}
+	return rejected, nil
+}
+
+// SumPrepayments returns the total verified + unverified (but not rejected)
+// prepayment amount for an order — i.e. every claim that could still turn
+// into real collected money. Rejected rows are excluded since they no
+// longer count against the order total once RejectPrepayment reverses them.
 func (r *Repository) SumPrepayments(ctx context.Context, tx *gorm.DB, orderID uuid.UUID) (float64, error) {
 	var total float64
 	err := tx.WithContext(ctx).
 		Model(&OrderPrepayment{}).
-		Where("order_id = ?", orderID).
+		Where("order_id = ? AND rejected_at IS NULL", orderID).
 		Select("COALESCE(SUM(amount), 0)").
 		Scan(&total).Error
 	if err != nil {

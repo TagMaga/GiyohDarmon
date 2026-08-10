@@ -269,8 +269,8 @@ func (OrderItem) TableName() string { return "order_items" }
 
 // OrderTimeline is an immutable record of every status transition.
 type OrderTimeline struct {
-	ID         uuid.UUID    `gorm:"type:uuid;primaryKey"`
-	OrderID    uuid.UUID    `gorm:"type:uuid;not null;column:order_id"`
+	ID      uuid.UUID `gorm:"type:uuid;primaryKey"`
+	OrderID uuid.UUID `gorm:"type:uuid;not null;column:order_id"`
 	// TEXT, not the order_status enum: this is an immutable audit trail and must
 	// keep recording historical values (e.g. 'issue', 'prepayment_pending') even
 	// after they are retired from the live status enum (migration 00100).
@@ -290,17 +290,20 @@ func (OrderTimeline) TableName() string { return "order_timeline" }
 // to a freshly-minted signed URL at serialization time (see migration
 // 00079, internal/orders/mediabridge) — never a persisted signed URL.
 type OrderPrepayment struct {
-	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OrderID      uuid.UUID  `gorm:"type:uuid;not null;column:order_id"`
-	Amount       float64    `gorm:"type:numeric(12,2);not null"`
-	ProofURL     *string    `gorm:"column:proof_url"`
-	VerifiedBy   *uuid.UUID `gorm:"type:uuid;column:verified_by"`
-	VerifiedAt   *time.Time `gorm:"column:verified_at"`
-	CreatedBy    uuid.UUID  `gorm:"type:uuid;not null;column:created_by"`
-	MediaAssetID *uuid.UUID `gorm:"column:media_asset_id;type:uuid"`
-	Width        *int       `gorm:"column:width"`
-	Height       *int       `gorm:"column:height"`
-	CreatedAt    time.Time  `gorm:"autoCreateTime"`
+	ID              uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	OrderID         uuid.UUID  `gorm:"type:uuid;not null;column:order_id"`
+	Amount          float64    `gorm:"type:numeric(12,2);not null"`
+	ProofURL        *string    `gorm:"column:proof_url"`
+	VerifiedBy      *uuid.UUID `gorm:"type:uuid;column:verified_by"`
+	VerifiedAt      *time.Time `gorm:"column:verified_at"`
+	RejectedBy      *uuid.UUID `gorm:"type:uuid;column:rejected_by"`
+	RejectedAt      *time.Time `gorm:"column:rejected_at"`
+	RejectionReason *string    `gorm:"column:rejection_reason"`
+	CreatedBy       uuid.UUID  `gorm:"type:uuid;not null;column:created_by"`
+	MediaAssetID    *uuid.UUID `gorm:"column:media_asset_id;type:uuid"`
+	Width           *int       `gorm:"column:width"`
+	Height          *int       `gorm:"column:height"`
+	CreatedAt       time.Time  `gorm:"autoCreateTime"`
 }
 
 func (OrderPrepayment) TableName() string { return "order_prepayments" }
