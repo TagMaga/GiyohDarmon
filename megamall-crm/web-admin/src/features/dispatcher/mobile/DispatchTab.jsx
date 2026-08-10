@@ -117,7 +117,7 @@ function EmptyState({ search }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', textAlign: 'center', color: '#B0B0A6' }}>
       <div style={{ fontSize: 30, opacity: .5, marginBottom: 8 }}>◇</div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: C.text3 }}>{search ? 'Ничего не найдено' : 'Пусто'}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.text3 }}>{search ? 'Ничего не найдено' : 'Заказов пока нет'}</div>
       <div style={{ fontSize: 11.5, marginTop: 2 }}>{search ? 'Измените запрос' : 'Нет заказов в этой колонке'}</div>
     </div>
   )

@@ -455,6 +455,18 @@ export default function ManagerOrdersPage() {
   )
 
   const anyDesktopFilterActive = periodActive || Boolean(sellerId) || amountOn || statusActive || sortActive || Boolean(rawSearch)
+  // Narrower than anyDesktopFilterActive: only the filters that can actually
+  // cause an empty result list (sort order never does).
+  const anyResultFilterActive = periodActive || Boolean(sellerId) || amountOn || statusActive || Boolean(rawSearch)
+  const resetAllFilters = () => {
+    setStatusFilter('all')
+    setDateFrom(def.from)
+    setDateTo(def.to)
+    setSellerId('')
+    setMinAmount('')
+    setMaxAmount('')
+    setRawSearch('')
+  }
 
   const advancedFilters = (
     <div className="scrollbar-none relative flex flex-nowrap items-center gap-2 overflow-x-auto">
@@ -879,7 +891,18 @@ export default function ManagerOrdersPage() {
             </div>
           )}
           {!isLoading && visibleItems.length === 0 && (
-            <div className="card"><EmptyState icon={<ClipboardList size={24} />} title="Нет заказов" description="Заказы вашей команды появятся здесь." /></div>
+            <div className="card">
+              <EmptyState
+                icon={<ClipboardList size={24} />}
+                title={anyResultFilterActive ? 'Под текущие фильтры нет заказов' : 'Нет заказов'}
+                description={anyResultFilterActive ? undefined : 'Заказы вашей команды появятся здесь.'}
+                action={anyResultFilterActive ? (
+                  <button type="button" onClick={resetAllFilters} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+                    Сбросить фильтры
+                  </button>
+                ) : undefined}
+              />
+            </div>
           )}
           {!isLoading && visibleItems.map(o => <MobileCard key={o.id} order={o} />)}
 
@@ -940,7 +963,16 @@ export default function ManagerOrdersPage() {
             )}
             {!isLoading && visibleItems.length === 0 && (
               <div className="p-6">
-                <EmptyState icon={<ClipboardList size={24} />} title="Нет заказов" description="Заказы вашей команды появятся здесь." />
+                <EmptyState
+                  icon={<ClipboardList size={24} />}
+                  title={anyResultFilterActive ? 'Под текущие фильтры нет заказов' : 'Нет заказов'}
+                  description={anyResultFilterActive ? undefined : 'Заказы вашей команды появятся здесь.'}
+                  action={anyResultFilterActive ? (
+                    <button type="button" onClick={resetAllFilters} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+                      Сбросить фильтры
+                    </button>
+                  ) : undefined}
+                />
               </div>
             )}
             {!isLoading && visibleItems.map(o => <ListRow key={o.id} order={o} />)}

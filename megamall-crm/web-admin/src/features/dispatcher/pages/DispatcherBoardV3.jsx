@@ -1525,6 +1525,8 @@ function CashTransactionCard({ row, busy, onConfirm, onReject, onPreview }) {
 
 function OrderHistoryView({ rows, pageMeta, couriers, range, filters, loading, error, onRange, onFilters, onPage, onRetry, onChangeStatus }) {
   const [rangeOpen, setRangeOpen] = useState(false)
+  const filtersActive = Boolean(filters.search || filters.status || filters.courier || filters.seller || filters.product)
+  const resetFilters = () => onFilters({ search: '', status: '', courier: '', seller: '', product: '' })
 
   useEffect(() => {
     if (!error) return
@@ -1556,7 +1558,7 @@ function OrderHistoryView({ rows, pageMeta, couriers, range, filters, loading, e
         </div>
       </div>
 
-      <DataPanel title="Заказы" count={pageMeta.total ?? rows.length} deliveredCount={pageMeta.delivered_count} totalIncome={pageMeta.total_income} rowCount={rows.length} loading={loading} error={error} emptyTitle="Нет данных за выбранный период" onRetry={onRetry}>
+      <DataPanel title="Заказы" count={pageMeta.total ?? rows.length} deliveredCount={pageMeta.delivered_count} totalIncome={pageMeta.total_income} rowCount={rows.length} loading={loading} error={error} emptyTitle="Нет данных за выбранный период" onRetry={onRetry} filtersActive={filtersActive} onResetFilters={resetFilters}>
         <table className="dv2-cash-table dv2-data-table dv2-history-table">
           <thead>
             <tr>
@@ -1616,7 +1618,7 @@ function OrderHistoryCard({ row, onChangeStatus }) {
   )
 }
 
-function DataPanel({ title, count, deliveredCount, totalIncome, rowCount, loading, error, emptyTitle, onRetry, children }) {
+function DataPanel({ title, count, deliveredCount, totalIncome, rowCount, loading, error, emptyTitle, onRetry, filtersActive, onResetFilters, children }) {
   return (
     <div className="dv2-cash-table-wrap">
       <div className="dv2-cash-head">
@@ -1640,7 +1642,14 @@ function DataPanel({ title, count, deliveredCount, totalIncome, rowCount, loadin
         </div>
       ) : rowCount === 0 ? (
         <div className="dv2-cash-state">
-          <EmptyState title={emptyTitle} sub="Измените фильтры или период" />
+          {filtersActive && onResetFilters ? (
+            <>
+              <EmptyState title="Ничего не найдено" sub="Под текущие фильтры ничего не найдено" />
+              <button className="dv2-btn dv2-btn-ghost" onClick={onResetFilters}>Сбросить фильтры</button>
+            </>
+          ) : (
+            <EmptyState title={emptyTitle} sub="Данные появятся здесь" />
+          )}
         </div>
       ) : children}
     </div>
@@ -1906,7 +1915,7 @@ function BottomNav({ tab, counts, onTab }) {
   )
 }
 
-function EmptyState({ title = 'Пусто', sub = 'Нет заказов в этой колонке' }) {
+function EmptyState({ title = 'Заказов пока нет', sub = 'Нет заказов в этой колонке' }) {
   return <div className="dv2-empty"><div className="dv2-empty-icon">□</div><div className="dv2-empty-title">{title}</div><div className="dv2-empty-sub">{sub}</div></div>
 }
 
