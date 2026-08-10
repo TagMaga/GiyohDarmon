@@ -14,6 +14,7 @@ import { Search, X, ClipboardList, ChevronDown, CalendarDays, ArrowUpDown } from
 import Badge                           from '../../../shared/components/Badge'
 import EmptyState                      from '../../../shared/components/EmptyState'
 import BottomSheet                     from '../../../shared/components/BottomSheet'
+import FilterChip                      from '../../../shared/components/FilterChip'
 import SellerOrderDetailPanel          from '../../seller/components/SellerOrderDetailPanel'
 import OrderDetailBottomSheet          from '../../seller/components/OrderDetailBottomSheet'
 import { M, InitialsAvatar, StatusPill }       from '../../seller/components/mobileUi'
@@ -100,37 +101,6 @@ const SORTS = [
   { key: 'amount_desc', label: 'Сумма: больше' },
   { key: 'amount_asc',  label: 'Сумма: меньше' },
 ]
-
-const CHIP_BASE = 'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold transition duration-150 font-sans active:scale-[0.94]'
-
-function FilterChip({ flipKey, active, onClick, onClear, children }) {
-  return (
-    <button
-      type="button"
-      data-flip-key={flipKey}
-      onClick={onClick}
-      className={CHIP_BASE}
-      style={active
-        ? { color: '#fff', background: M.dark, border: '1px solid transparent' }
-        : { color: '#76766E', background: '#fff', border: `1px solid ${M.borderAlt}` }}
-    >
-      {active && (
-        <span
-          role="button"
-          tabIndex={0}
-          aria-label="Сбросить"
-          onClick={(e) => { e.stopPropagation(); onClear() }}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onClear() } }}
-          className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full hover:bg-white/20"
-        >
-          <X size={11} />
-        </span>
-      )}
-      {children}
-      {!active && <ChevronDown size={13} style={{ opacity: 0.5, color: M.muted }} className="transition-transform duration-200" />}
-    </button>
-  )
-}
 
 function PresetPill({ active, onClick, children }) {
   return (
@@ -485,6 +455,18 @@ export default function ManagerOrdersPage() {
   )
 
   const anyDesktopFilterActive = periodActive || Boolean(sellerId) || amountOn || statusActive || sortActive || Boolean(rawSearch)
+  // Narrower than anyDesktopFilterActive: only the filters that can actually
+  // cause an empty result list (sort order never does).
+  const anyResultFilterActive = periodActive || Boolean(sellerId) || amountOn || statusActive || Boolean(rawSearch)
+  const resetAllFilters = () => {
+    setStatusFilter('all')
+    setDateFrom(def.from)
+    setDateTo(def.to)
+    setSellerId('')
+    setMinAmount('')
+    setMaxAmount('')
+    setRawSearch('')
+  }
 
   const advancedFilters = (
     <div className="scrollbar-none relative flex flex-nowrap items-center gap-2 overflow-x-auto">
@@ -764,16 +746,16 @@ export default function ManagerOrdersPage() {
           </div>
 
           <div className="scrollbar-none -mx-5 flex flex-nowrap items-center gap-2 overflow-x-auto px-5 py-[5px]">
-            <FilterChip flipKey="status" active={statusActive} onClick={() => openSheet('status')} onClear={() => setStatusFilter('all')}>
+            <FilterChip active={statusActive} onClick={() => openSheet('status')} onClear={() => setStatusFilter('all')}>
               {statusLabel}
             </FilterChip>
-            <FilterChip flipKey="period" active={periodActive} onClick={() => openSheet('period')} onClear={() => { setDateFrom(def.from); setDateTo(def.to) }}>
+            <FilterChip active={periodActive} onClick={() => openSheet('period')} onClear={() => { setDateFrom(def.from); setDateTo(def.to) }}>
               {periodLabel}
             </FilterChip>
-            <FilterChip flipKey="user" active={Boolean(sellerId)} onClick={() => openSheet('user')} onClear={() => setSellerId('')}>
+            <FilterChip active={Boolean(sellerId)} onClick={() => openSheet('user')} onClear={() => setSellerId('')}>
               {selectedSeller?.full_name ?? 'Пользователь'}
             </FilterChip>
-            <FilterChip flipKey="amount" active={amountOn} onClick={() => openSheet('amount')} onClear={() => { setMinAmount(''); setMaxAmount('') }}>
+            <FilterChip active={amountOn} onClick={() => openSheet('amount')} onClear={() => { setMinAmount(''); setMaxAmount('') }}>
               {amountLabel}
             </FilterChip>
           </div>
@@ -909,7 +891,18 @@ export default function ManagerOrdersPage() {
             </div>
           )}
           {!isLoading && visibleItems.length === 0 && (
-            <div className="card"><EmptyState icon={<ClipboardList size={24} />} title="Нет заказов" description="Заказы вашей команды появятся здесь." /></div>
+            <div className="card">
+              <EmptyState
+                icon={<ClipboardList size={24} />}
+                title={anyResultFilterActive ? 'Под текущие фильтры нет заказов' : 'Нет заказов'}
+                description={anyResultFilterActive ? undefined : 'Заказы вашей команды появятся здесь.'}
+                action={anyResultFilterActive ? (
+                  <button type="button" onClick={resetAllFilters} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+                    Сбросить фильтры
+                  </button>
+                ) : undefined}
+              />
+            </div>
           )}
           {!isLoading && visibleItems.map(o => <MobileCard key={o.id} order={o} />)}
 
@@ -970,7 +963,16 @@ export default function ManagerOrdersPage() {
             )}
             {!isLoading && visibleItems.length === 0 && (
               <div className="p-6">
-                <EmptyState icon={<ClipboardList size={24} />} title="Нет заказов" description="Заказы вашей команды появятся здесь." />
+                <EmptyState
+                  icon={<ClipboardList size={24} />}
+                  title={anyResultFilterActive ? 'Под текущие фильтры нет заказов' : 'Нет заказов'}
+                  description={anyResultFilterActive ? undefined : 'Заказы вашей команды появятся здесь.'}
+                  action={anyResultFilterActive ? (
+                    <button type="button" onClick={resetAllFilters} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+                      Сбросить фильтры
+                    </button>
+                  ) : undefined}
+                />
               </div>
             )}
             {!isLoading && visibleItems.map(o => <ListRow key={o.id} order={o} />)}

@@ -31,13 +31,13 @@ import { M, InitialsAvatar, StatusPill, Chip, PILL_COLORS } from '../../seller/c
 import { toLocalYMD, appToday } from '../../../shared/utils/date'
 
 // ── Mobile filter-chip row (Период | Статус | Пользователь) ────────────────
-// Same visual language as FinanceFilterBar's chips: h-9 rounded-full pill,
-// filled indigo when active (with an inline ✕ to clear), slate-100 outline
-// otherwise (with a chevron-down to hint "opens a sheet").
+// Same visual language as the shared FilterChip: h-11 (44px touch target)
+// rounded-full pill, active = outline #C7D2FE / fill #EEF2FF / text #4338CA
+// (no more solid fills — tone carries state, the ✕ carries the action).
 const MOBILE_CHIP_BASE =
-  'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold transition-colors'
-const MOBILE_CHIP_OFF = `${MOBILE_CHIP_BASE} bg-slate-100 text-slate-600 hover:bg-slate-200`
-const MOBILE_CHIP_ON  = `${MOBILE_CHIP_BASE} bg-indigo-600 text-white hover:bg-indigo-700`
+  'inline-flex h-11 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-xs font-semibold transition-colors'
+const MOBILE_CHIP_OFF = `${MOBILE_CHIP_BASE} border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200`
+const MOBILE_CHIP_ON  = `${MOBILE_CHIP_BASE} border-[#C7D2FE] bg-[#EEF2FF] text-[#4338CA] hover:bg-[#E0E7FF]`
 
 function MobileFilterChip({ active, onClick, onClear, children }) {
   return (
@@ -49,7 +49,7 @@ function MobileFilterChip({ active, onClick, onClear, children }) {
           aria-label="Сбросить"
           onClick={(e) => { e.stopPropagation(); onClear() }}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onClear() } }}
-          className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full hover:bg-white/20"
+          className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full hover:bg-[#C7D2FE]/40"
         >
           <X size={11} />
         </span>

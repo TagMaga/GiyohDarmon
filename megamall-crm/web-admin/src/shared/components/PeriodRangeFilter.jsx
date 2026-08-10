@@ -104,7 +104,7 @@ export default function PeriodRangeFilter({ from = '', to = '', onChange, align 
         onClick={() => setOpen(true)}
         aria-expanded={open}
         className={[
-          'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 md:hidden',
+          'inline-flex h-11 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 md:hidden',
           className,
         ].filter(Boolean).join(' ')}
       >

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { createPortal }     from 'react-dom'
 import { X }                from 'lucide-react'
+import { lockScroll, unlockScroll } from '../utils/scrollLock'
 
 /**
  * Modal — portal-based dialog.
@@ -26,15 +27,13 @@ const sizeClass = {
 
 export default function Modal({ open, onClose, title, description, children, footer, size = 'md' }) {
   const panelRef = useRef(null)
+  const triggerRef = useRef(null)
 
   // Lock body scroll while open
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
-    return () => { document.body.style.overflow = '' }
+    if (!open) return
+    lockScroll()
+    return unlockScroll
   }, [open])
 
   // Close on Escape
@@ -44,6 +43,16 @@ export default function Modal({ open, onClose, title, description, children, foo
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
+
+  // Return focus to whatever triggered the modal once it closes
+  useEffect(() => {
+    if (open) {
+      triggerRef.current = document.activeElement
+    } else if (triggerRef.current instanceof HTMLElement) {
+      triggerRef.current.focus()
+      triggerRef.current = null
+    }
+  }, [open])
 
   if (!open) return null
 
@@ -56,7 +65,7 @@ export default function Modal({ open, onClose, title, description, children, foo
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-[2px] animate-fade-in"
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] animate-fade-in"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -84,7 +93,7 @@ export default function Modal({ open, onClose, title, description, children, foo
           </div>
           <button
             onClick={onClose}
-            className="ml-4 flex-shrink-0 p-1.5 min-h-[36px] min-w-[36px] rounded-xl
+            className="ml-4 flex-shrink-0 p-1.5 min-h-[44px] min-w-[44px] rounded-xl
                        text-slate-400 hover:bg-slate-100 hover:text-slate-700
                        transition-colors flex items-center justify-center"
             aria-label="Закрыть"

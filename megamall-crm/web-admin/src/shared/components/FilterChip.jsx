@@ -35,9 +35,11 @@ export default function FilterChip({
       onClick={onClick}
       aria-expanded={ariaExpanded}
       className={[
-        'inline-flex h-9 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-xs font-semibold transition-colors',
+        'inline-flex h-11 flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-xs font-semibold transition-colors',
         maxWidthClass,
-        active ? 'bg-slate-900 text-white hover:bg-slate-800' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+        active
+          ? 'border-[#C7D2FE] bg-[#EEF2FF] text-[#4338CA] hover:bg-[#E0E7FF]'
+          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
         className,
       ].filter(Boolean).join(' ')}
     >
@@ -47,7 +49,7 @@ export default function FilterChip({
           tabIndex={0}
           onClick={(e) => { e.stopPropagation(); onClear() }}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onClear() } }}
-          className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full hover:bg-white/20"
+          className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full hover:bg-[#C7D2FE]/40"
           aria-label="Сбросить"
         >
           <X size={11} />

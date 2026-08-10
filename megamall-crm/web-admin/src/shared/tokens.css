@@ -1,0 +1,26 @@
+/**
+ * Design tokens for the web-admin owner/manager/team-lead/dispatcher-desktop
+ * surface — the indigo/slate accent scale used consistently by the shared
+ * FilterChip, Modal, BottomSheet, and FiltersOverflowPanel components (see
+ * shared/components/).
+ *
+ * NOT wired into tailwind.config.js, styles/index.css, or imported anywhere
+ * yet — see the "token consolidation" section of the implementation report
+ * for why. In short: this file documents the *target* scale (matching what
+ * FilterChip/Modal/BottomSheet/FiltersOverflowPanel already use in practice)
+ * as a safe, reviewable starting point, without touching
+ * DispatcherBoardV2.css (1374 lines, no existing token layer to migrate
+ * from) or the two React Native theme systems (dispatcher/mobile/theme.js,
+ * courier-app/src/components/glass.jsx) — both of which are CSS-variable-
+ * incompatible (RN has no equivalent) and, per theme.js's own header
+ * comment, intentionally use a different visual language from this one.
+ */
+:root {
+  --accent:      #4F46E5; /* indigo-600 — primary action, active filter */
+  --accent-soft: #EEF2FF; /* indigo-50  — active chip/row fill */
+  --accent-edge: #C7D2FE; /* indigo-200 — active state outline */
+  --accent-ink:  #4338CA; /* indigo-700 — active state text */
+  --ink:         #0F172A; /* slate-900  — headings, values */
+  --muted:       #64748B; /* slate-500  — captions, secondary text */
+  --border:      #E2E8F0; /* slate-200  — default borders */
+}
