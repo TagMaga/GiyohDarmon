@@ -19,7 +19,7 @@ func TestResolveAssignmentPayout_NoProfileNoRules_Rejected(t *testing.T) {
 	db := testutil.NewTestDB(t)
 	courier := testutil.CreateUser(t, db, users.RoleCourier)
 
-	_, err := ResolveAssignmentPayout(db, courier.ID, nil, "normal")
+	_, err := ResolveAssignmentPayout(db, courier.ID, nil, "normal", 0)
 	if err == nil {
 		t.Fatal("expected an error when courier has neither a payout profile nor tariff rules")
 	}
@@ -47,7 +47,7 @@ func TestResolveAssignmentPayout_TariffRulesOnly_Accepted(t *testing.T) {
 		t.Fatalf("create tariff rule fixture: %v", err)
 	}
 
-	if _, err := ResolveAssignmentPayout(db, courier.ID, nil, "normal"); err != nil {
+	if _, err := ResolveAssignmentPayout(db, courier.ID, nil, "normal", 0); err != nil {
 		t.Fatalf("expected success for a courier with only tariff rules configured, got: %v", err)
 	}
 }
@@ -69,7 +69,7 @@ func TestResolveAssignmentPayout_InactiveProfile_Rejected(t *testing.T) {
 		t.Fatalf("deactivate courier profile fixture: %v", err)
 	}
 
-	_, err := ResolveAssignmentPayout(db, courier.ID, nil, "normal")
+	_, err := ResolveAssignmentPayout(db, courier.ID, nil, "normal", 0)
 	if err == nil {
 		t.Fatal("expected an error for a courier with an inactive payout profile")
 	}
@@ -91,7 +91,7 @@ func TestResolveAssignmentPayout_ActiveProfile_Accepted(t *testing.T) {
 		t.Fatalf("create courier profile fixture: %v", err)
 	}
 
-	if _, err := ResolveAssignmentPayout(db, courier.ID, nil, "normal"); err != nil {
+	if _, err := ResolveAssignmentPayout(db, courier.ID, nil, "normal", 0); err != nil {
 		t.Fatalf("expected success for a courier with an active payout profile, got: %v", err)
 	}
 }

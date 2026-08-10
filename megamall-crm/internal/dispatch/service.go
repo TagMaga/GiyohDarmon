@@ -243,7 +243,7 @@ func (s *Service) AssignCourier(ctx context.Context, actorID uuid.UUID, orderID 
 		}
 
 		// Enforce payout profile + city service, then freeze the courier payout.
-		payout, err := logistics_settings.ResolveAssignmentPayout(tx, req.CourierID, o.CityID, o.DeliveryMethod)
+		payout, err := logistics_settings.ResolveAssignmentPayout(tx, req.CourierID, o.CityID, o.DeliveryMethod, o.TotalAmount)
 		if err != nil {
 			return err
 		}
@@ -360,7 +360,7 @@ func (s *Service) ReassignCourier(ctx context.Context, actorID uuid.UUID, orderI
 		}
 
 		// Enforce payout profile + city service for the NEW courier, then re-freeze.
-		payout, err := logistics_settings.ResolveAssignmentPayout(tx, req.CourierID, o.CityID, o.DeliveryMethod)
+		payout, err := logistics_settings.ResolveAssignmentPayout(tx, req.CourierID, o.CityID, o.DeliveryMethod, o.TotalAmount)
 		if err != nil {
 			return err
 		}

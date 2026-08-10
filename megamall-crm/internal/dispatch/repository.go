@@ -147,8 +147,16 @@ func (r *Repository) GetCouriersOverview(ctx context.Context) ([]CourierOverview
 				-- confirmed-handover net shortfall (expected − actual on
 				-- confirmed handovers) — keeps this board's debt in sync
 				-- with the courier app's cash summary and the owner's
-				-- logistics dashboard (see internal/courier GetCashSummary)
-				SELECT SUM(ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return))
+				-- logistics dashboard (see internal/courier GetCashSummary).
+				-- Unlinked handovers (owner's manual entry, no order links)
+				-- credit their full amount here, mirroring every other
+				-- debt formula in the app — see logistics repository's
+				-- GetDashboard cash_expected comment for the full story.
+				SELECT SUM(
+					ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
+					- CASE WHEN ch2.source = 'manual'
+					       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
+				)
 				FROM cash_handovers ch2 WHERE ch2.courier_id = u.id AND ch2.status = 'confirmed'
 			), 0))                                                           AS cash_owed
 		FROM users u
@@ -246,6 +254,7 @@ func (r *Repository) GetCashSettlement(ctx context.Context, filter CashSettlemen
 		CollectedCash      float64   `gorm:"column:collected_cash"`
 		HandedOverCash     float64   `gorm:"column:handed_over_cash"`
 		Earnings           float64   `gorm:"column:earnings"`
+		CashDebt           float64   `gorm:"column:cash_debt"`
 	}
 
 	var rows []settlementRow
@@ -338,6 +347,43 @@ func (r *Repository) GetCashSettlement(ctx context.Context, filter CashSettlemen
 			  AND (?::timestamptz IS NULL OR COALESCE(ch.confirmed_at, ch.created_at) >= ?)
 			  AND (?::timestamptz IS NULL OR COALESCE(ch.confirmed_at, ch.created_at) <= ?)
 			GROUP BY ch.courier_id
+		),
+		-- Current total outstanding debt (NOT scoped to filter.From/To — a
+		-- courier's real debt is a running balance, not a period total).
+		-- This must use the same order-exclusion-by-linked-handover formula
+		-- as every other debt figure in the app (GetCouriersOverview,
+		-- logistics.GetDashboard/ListCouriers, courier.GetCashSummary) —
+		-- previously this endpoint computed debt as
+		-- collected_cash(period) − earnings(period) − handed_over(period),
+		-- a period-bounded net sum that disagreed with every other panel
+		-- whenever an order's delivery and its handover's confirmation fell
+		-- in different filter windows (e.g. delivered last week, handover
+		-- confirmed this week — "this week" would show the handed-over cash
+		-- but none of the collected cash it settled).
+		debt_cte AS (
+			SELECT
+				o.courier_id,
+				GREATEST(0, COALESCE(SUM(
+					CASE WHEN o.status = 'delivered'
+					     AND o.id NOT IN (
+					         SELECT cho.order_id
+					         FROM   cash_handover_orders cho
+					         JOIN   cash_handovers ch ON ch.id = cho.handover_id
+					         WHERE  ch.status = 'confirmed'
+					     )
+					     THEN GREATEST(0, o.total_amount + o.delivery_fee - COALESCE(o.prepayment_amount, 0) - COALESCE(o.courier_payout, 0))
+					     ELSE 0 END
+				), 0) + COALESCE((
+					SELECT SUM(
+						ch2.total_to_return - COALESCE(ch2.actual_returned, ch2.total_to_return)
+						- CASE WHEN ch2.source = 'manual'
+						       THEN COALESCE(ch2.actual_returned, ch2.total_to_return) ELSE 0 END
+					)
+					FROM cash_handovers ch2 WHERE ch2.courier_id = o.courier_id AND ch2.status = 'confirmed'
+				), 0)) AS cash_debt
+			FROM orders o
+			WHERE o.deleted_at IS NULL AND o.courier_id IS NOT NULL
+			GROUP BY o.courier_id
 		)
 		SELECT
 			u.id AS courier_id,
@@ -350,12 +396,14 @@ func (r *Repository) GetCashSettlement(ctx context.Context, filter CashSettlemen
 			m.avg_delivery_seconds AS avg_delivery_seconds,
 			COALESCE(m.collected_cash, 0) AS collected_cash,
 			COALESCE(h.handed_over_cash, 0) AS handed_over_cash,
-			COALESCE(m.earnings, 0) AS earnings
+			COALESCE(m.earnings, 0) AS earnings,
+			COALESCE(d.cash_debt, 0) AS cash_debt
 		FROM users u
 		LEFT JOIN latest_status ls ON ls.courier_id = u.id
 		LEFT JOIN active_cte a ON a.courier_id = u.id
 		LEFT JOIN metrics_cte m ON m.courier_id = u.id
 		LEFT JOIN handover_cte h ON h.courier_id = u.id
+		LEFT JOIN debt_cte d ON d.courier_id = u.id
 		WHERE u.role = 'courier'
 		  AND u.deleted_at IS NULL
 		  AND u.is_active = TRUE
@@ -392,7 +440,7 @@ func (r *Repository) GetCashSettlement(ctx context.Context, filter CashSettlemen
 			Failed:             row.Failed,
 			SuccessRate:        cashSettlementSuccessRate(row.Delivered, row.Failed),
 			AvgDeliverySeconds: avgSeconds,
-			CashDebt:           cashSettlementDebt(row.CollectedCash, row.Earnings, row.HandedOverCash),
+			CashDebt:           row.CashDebt,
 			Earnings:           row.Earnings,
 		})
 	}
@@ -406,16 +454,6 @@ func cashSettlementSuccessRate(delivered, failed int) *float64 {
 	}
 	rate := float64(delivered) * 100 / float64(total)
 	return &rate
-}
-
-// cashSettlementDebt is the cash the courier still owes: collected from clients
-// minus their own payout (which they keep) minus what they have already handed over.
-func cashSettlementDebt(collectedCash, earnings, handedOverCash float64) float64 {
-	debt := collectedCash - earnings - handedOverCash
-	if debt < 0 {
-		return 0
-	}
-	return debt
 }
 
 func (r *Repository) ListCashTransactions(ctx context.Context, filter CashTransactionFilter, p pagination.Params) ([]CashTransactionRow, int, error) {

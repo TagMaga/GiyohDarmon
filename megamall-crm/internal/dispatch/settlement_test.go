@@ -17,28 +17,13 @@ func TestCashSettlementSuccessRate_IgnoresIssueOrders(t *testing.T) {
 	}
 }
 
-// Cash debt = collected − courier_earnings − already_handed_over.
-// Courier owes the net amount after subtracting their payout and prior handovers.
-func TestCashSettlementDebt_RemainingCashHeld(t *testing.T) {
-	// collected=1000, earnings=200, handed=500 → debt=300
-	got := cashSettlementDebt(1000, 200, 500)
-	if got != 300 {
-		t.Fatalf("debt: got %.2f, want 300.00", got)
-	}
-}
-
-func TestCashSettlementDebt_ZeroWhenFullySettled(t *testing.T) {
-	// collected=1000, earnings=200, handed=800 → debt=0
-	got := cashSettlementDebt(1000, 200, 800)
-	if got != 0 {
-		t.Fatalf("debt: got %.2f, want 0.00", got)
-	}
-}
-
-func TestCashSettlementDebt_EarningsReduceDebt(t *testing.T) {
-	// Higher earnings → lower debt: collected=500, earnings=150, handed=200 → debt=150
-	got := cashSettlementDebt(500, 150, 200)
-	if got != 150 {
-		t.Fatalf("debt: got %.2f, want 150.00", got)
-	}
-}
+// CashDebt used to be computed by a pure period-bounded function
+// (cashSettlementDebt: collected − earnings − handed_over, all scoped to
+// the filter's date range). That formula was removed in favor of a
+// debt_cte in GetCashSettlement's SQL using the same current,
+// not-period-scoped, order-exclusion formula every other panel uses (see
+// the debt_cte comment in repository.go) — the period-bounded version
+// could disagree with the rest of the app whenever a delivery and its
+// handover's confirmation fell in different filter windows. DB-backed
+// coverage for the new formula lives alongside the other GetCashSettlement
+// tests exercising the repository directly.
