@@ -1,7 +1,7 @@
 // ── Role labels / badges ──────────────────────────────────────────────────────
 
 export const ROLE_LABEL = {
-  owner:             'Владелец',
+  owner:             'SuperAdmin',
   it_specialist:     'IT-специалист',
   sales_team_lead:   'Руководитель группы',
   manager:           'Менеджер',
